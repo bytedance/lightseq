@@ -4,7 +4,7 @@
 
 1. 构建编译镜像
 
-https://github.com/NVIDIA/tensorrt-inference-server.git
+git clone https://github.com/NVIDIA/tensorrt-inference-server.git
 
 cp -r $this_repo_dir tensorrt-inference-server/src/custom/transformer 
 
