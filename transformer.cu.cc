@@ -294,10 +294,19 @@ int Context::Init() {
   }
 
   int buf_bytesize =
-      max(encoder_->compute_buffer_bytesize(), 126418944 * datatype_bytesize_);
+      max(encoder_->compute_buffer_bytesize(), decoder_->compute_buffer_bytesize());
   AllocateCudaBuffers(&d_buf_, buf_bytesize);
+  // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
-
+  decoder_->init_buffer(d_buf_);
+  
+  // Wait for all init finish.
+  cuerr = cudaDeviceSynchronize();
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "failed to init GPU for transformer: "
+              << cudaGetErrorString(cuerr) << std::endl;
+    return kCudaExecute;
+  }
   return kSuccess;
 }
 

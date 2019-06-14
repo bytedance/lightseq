@@ -22,6 +22,8 @@ class Decoder {
   Decoder(int max_batch_size, const int* p_d_padding_mask,
           const float* p_d_encoder_output, int* p_d_result,
           const TransformerWeight& tw, cublasHandle_t hd);
+  int compute_buffer_bytesize();
+  void init_buffer(void* pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
   int _cur_step;

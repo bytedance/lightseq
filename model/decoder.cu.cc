@@ -108,6 +108,13 @@ Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
   return;
 }
 
+int Decoder::compute_buffer_bytesize() {
+  return 0;
+}
+void Decoder::init_buffer(void* pbuf) {
+  return;
+}
+
 std::string Decoder::check() {
   if (_max_thread_per_block < _tw._hidden_size) {
     return "violate hidden_size <= max_thread_per_block";
@@ -140,7 +147,7 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
   cudaMemcpy(_p_d_finished_scores, _h_finished_scores.data(),
              sizeof(float) * _batch_size, cudaMemcpyHostToDevice);
   for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
-    // for(_cur_step = 0; _cur_step < 20; _cur_step++) {
+  // for(_cur_step = 0; _cur_step < 20; _cur_step++) {
     // std::cout<<"run step " << _cur_step << std::endl;
     if (run_step()) {
       break;

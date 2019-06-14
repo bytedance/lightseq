@@ -41,7 +41,7 @@ __global__ void ker_update_new_seq_probs(float* logits, const float* logit_bias,
   /* step1: compute -log(sum(exp(logits))) + seq_probs */
   const int block_start = blockIdx.x * vocab_size;
   const int left_idx = block_start + threadIdx.x;
-  const int right_idx = (blockIdx.x + 1) * vocab_size - 1;  // prevent END
+  int right_idx = (blockIdx.x + 1) * vocab_size - 1;  // prevent END
   float local_max = logit_thresh_min;
   float local_sum = 0;
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
@@ -83,6 +83,7 @@ __global__ void ker_update_new_seq_probs(float* logits, const float* logit_bias,
   int idx = left_idx;
   int batch_id = blockIdx.x / beam_size;
   int batch_start_pos = batch_id * beam_size * vocab_size;
+  right_idx -= 2; // prevent <unk> <start> <end>
   __shared__ int l_n;  // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
