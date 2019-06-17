@@ -7,7 +7,7 @@ namespace nmt {
 
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
-const float min_log_probability = -100000.f;
+const float min_log_probability = -10000.f;
 const float epsilon = 0.000001;
 
 template <int beam_size>
@@ -83,7 +83,7 @@ __global__ void ker_update_new_seq_probs(float* logits, const float* logit_bias,
   int idx = left_idx;
   int batch_id = blockIdx.x / beam_size;
   int batch_start_pos = batch_id * beam_size * vocab_size;
-  right_idx -= 2; // prevent <unk> <start> <end>
+  right_idx -= 2;      // prevent <unk> <start> <end>
   __shared__ int l_n;  // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {

@@ -105,9 +105,6 @@ cc_library(
 cc_library(
     name = "transformer_base",
     srcs = ["transformer.cu.cc"],
-    hdrs = glob([
-        "kernels/*.h",
-    ]),
     copts = cuda_default_copts(),
     deps = [
         ":transformer_weight",
@@ -135,4 +132,22 @@ cc_binary(
     ],
     linkopts = ["-pthread"],
     linkshared = 1,
+)
+
+cc_binary(
+    name = "example",
+    srcs = ["example.cu.cc"],
+    deps = [
+        ":transformer_weight",
+        ":transformer_util",
+        "transformer_encoder",
+        "transformer_decoder",        
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
 )
