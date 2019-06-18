@@ -58,6 +58,7 @@ class Decoder {
   float* _p_d_alive_seq_probs;
   float* _p_d_can_probs;
   int* _p_d_can_idx;
+  int* _p_d_finished_beam_tag;
   float* _p_d_finished_scores;
   int* _p_d_can_num;
   int* _p_d_alive_seq;

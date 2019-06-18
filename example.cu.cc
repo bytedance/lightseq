@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     std::cout << res << std::endl;
     return 0;
   }
-  tw_._length_penalty = 0.6;
+  // tw_._length_penalty = 0.6;
 
   // init encoder and decoder
   // use thrust vector to avoid manage gpu memory by hand

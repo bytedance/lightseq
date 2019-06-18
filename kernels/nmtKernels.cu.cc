@@ -190,8 +190,10 @@ __global__ void ker_arrange_decself_qkv(const float* ori_qkv,
 }
 
 __global__ void ker_refresh_cache(const int* num_can_per_beam,
-                                  const int* can_idx, float* self_k_bgeem,
-                                  float* self_v_bgeem, float* new_self_k_bgeem,
+                                  const int* can_idx, const float* self_k_bgeem,
+                                  const float* self_v_bgeem, 
+                                  const int* finished_beam_tag,
+				  float* new_self_k_bgeem,
                                   float* new_self_v_bgeem,
                                   int self_k_bgeem_offset, int beam_size,
                                   int dim_per_head, int head_num,
@@ -208,13 +210,13 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
   @param
   num_can_per_beam: [batch_size, beam_size]
   can_idx: [none], no certain length, determined by rough candidate number
-  self_step_qkv: [batch_size, beam_size, 3, hidden_size] * decoder_layer_num
-  self_k_bgeem: [batch_size, beam_size, head_num, dim_per_head, max_step] *
-  decoder_layer_num self_v_bgeem: [batch_size, beam_size, head_num, max_step,
-  dim_per_head] * decoder_layer_num
-
-
-  self_step_qkv_offset = max_batch_size * beam_size * tw._hidden_size * 3
+  self_k_bgeem: [batch_size, beam_size, head_num, dim_per_head, max_step] * decoder_layer_num 
+  self_v_bgeem: [batch_size, beam_size, head_num, max_step, dim_per_head] * decoder_layer_num
+  finished_beam_tag: [1 + batch_size * beam_size]. 
+    the first ele save the number of finished beam
+    the remaining batch_size*beam_size ele save tag represent if this beam finished
+  new_self_k_bgeem: [batch_size, beam_size, head_num, dim_per_head, max_step] * decoder_layer_num 
+  new_self_v_bgeem: [batch_size, beam_size, head_num, max_step, dim_per_head] * decoder_layer_num
   self_k_bgeem_offset = max_batch_size * max_step * hidden_size * beam_size
   */
   int layer_id = blockIdx.x / (cur_step + 1);
@@ -225,6 +227,10 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
   int beam_id = beam_id_global % beam_size;
   int head_id = threadIdx.x / dim_per_head;
   int dim_id = threadIdx.x % dim_per_head;
+  if (finished_beam_tag[beam_id_global + 1] == 1) {
+    // this beam has been finished
+    return;
+  }
 
   int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
   int can_beam_id =
@@ -412,11 +418,11 @@ __global__ void ker_refresh_result(
     const int* can_idx, const float* can_probs, const int* num_can_per_beam,
     const int* old_alive_seq, int* new_alive_seq, float* alive_seq_probs,
     const float* finished_scores, const float* cur_finished_scores,
-    int* finished_seq, int* num_finish_beam, int vocab_size, int cur_step,
+    int* finished_seq, int* finished_beam_tag, int vocab_size, int cur_step,
     float max_length_norm) {
   /**
   @brief
-  refresh finished_seq, alive_seq_probs, num_finish_beam, alive_seq based on
+  refresh finished_seq, alive_seq_probs, finished_beam_tag, alive_seq based on
   sorted candidate
 
   @thread
@@ -436,17 +442,22 @@ __global__ void ker_refresh_result(
   finished_scores: [batch_size]
   cur_finished_scores: [batch_size, beam_size]
   finished_seq: [batch_size, max_step]
-  num_finish_beam: [1]
+  finished_beam_tag: [1 + batch_size * beam_size]. 
+    the first ele save the number of finished beam
+    the remaining batch_size*beam_size ele save tag represent if this beam finished
   */
+  int global_beam_id = blockIdx.x * gridDim.y + blockIdx.y;
+  if (finished_beam_tag[global_beam_id + 1] == 1) {
+    // this beam has been finished
+    return;
+  }
 
   int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
   int thread_vocab_id;
 
   // step1 update finished_seq
   float best_finish_score = finished_scores[blockIdx.x];
-  float score_diff =
-      fabsf(cur_finished_scores[blockIdx.x * gridDim.y + blockIdx.y] -
-            best_finish_score);
+  float score_diff = fabsf(cur_finished_scores[global_beam_id] - best_finish_score);
   if (score_diff < epsilon) {
     // finished_seq = this beam's current seq
     thread_vocab_id = threadIdx.x < cur_step
@@ -457,13 +468,16 @@ __global__ void ker_refresh_result(
     finished_seq[blockIdx.x * blockDim.x + threadIdx.x] = thread_vocab_id;
   }
 
-  // step2 update alive_seq_probs and num_finish_beam,
+  // step2 update alive_seq_probs and finished_beam_tag,
   if (threadIdx.x == 0) {
     float can_seq_prob =
         can_probs[can_pos] - blockIdx.x * min_log_probability;  // recover it
-    atomicAdd(num_finish_beam,
-              int(can_seq_prob * max_length_norm < best_finish_score));
-    alive_seq_probs[blockIdx.x * gridDim.y + blockIdx.y] = can_seq_prob;
+    if (can_seq_prob * max_length_norm < best_finish_score) {
+      // this beam will be mark as finished beam
+      finished_beam_tag[global_beam_id + 1] = 1;
+      atomicAdd(finished_beam_tag, 1);
+    }
+    alive_seq_probs[global_beam_id] = can_seq_prob;
   }
 
   // step3 update alive_seq

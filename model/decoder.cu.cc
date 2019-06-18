@@ -4,7 +4,7 @@
 #include "src/custom/transformer/model/decoder.h"
 #include "src/custom/transformer/util.h"
 
-//#define DEBUG_RESULT
+#define DEBUG_RESULT
 //#define DEBUG_TIME
 
 namespace lab {
@@ -72,7 +72,7 @@ int Decoder::compute_buffer_bytesize() {
   int si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
            _max_batch_size * _tw._max_step +
            _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
-           _max_batch_size * _tw._beam_size + 1;
+           (_max_batch_size * _tw._beam_size + 1) * 2;
   int beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
 
   return cache_bytesize + max(decode_buffer_bytesize, beam_buffer_bytesize);
@@ -147,6 +147,8 @@ void Decoder::init_buffer(void* pbuf) {
   pint += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
+  _p_d_finished_beam_tag = pint;
+  pint += _max_batch_size * _tw._beam_size + 1;
   return;
 }
 
@@ -181,6 +183,9 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
              cudaMemcpyHostToDevice);
   cudaMemcpy(_p_d_finished_scores, _h_finished_scores.data(),
              sizeof(float) * _batch_size, cudaMemcpyHostToDevice);
+  // _p_d_finished_beam_tag: the first ele save the number of finished beam
+  // the remaining batch_size*beam_size ele save tag represent if this beam finished
+  cudaMemset(_p_d_finished_beam_tag, 0, sizeof(int) * (_batch_size * _tw._beam_size + 1)); 
   for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
     // for(_cur_step = 0; _cur_step < 10; _cur_step++) {
     // std::cout<<"run step " << _cur_step << std::endl;
@@ -427,16 +432,15 @@ bool Decoder::beam_search() {
     step 3. refresh finished_seq, alive_seq_probs,
     num_finish_beam, alive_seq based on sorted candidate
   */
-  cudaMemset(_p_d_can_num, 0, sizeof(int));
   ker_refresh_result<<<dim3(_batch_size, _tw._beam_size), _tw._max_step>>>(
       _p_d_can_idx, _p_d_can_probs, _p_d_can_num + 1, _p_d_alive_seq,
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_finished_scores,
-      _p_d_finished_scores + _batch_size, _p_d_finished_seq, _p_d_can_num,
+      _p_d_finished_scores + _batch_size, _p_d_finished_seq, _p_d_finished_beam_tag,
       _tw._trg_vocab_size, _cur_step, _h_length_norm[_batch_max_decode_length]);
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
-  cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
+  cudaMemcpy(&_h_can_num_batch, _p_d_finished_beam_tag, sizeof(int),
              cudaMemcpyDeviceToHost);
   if (_h_can_num_batch == _step_token_num) {
     // all alive seq will not get a higher score than current best finish seq
@@ -447,11 +451,11 @@ bool Decoder::beam_search() {
   print_vec(_p_d_alive_seq_probs, "alive seq probs",
             _batch_size * _tw._beam_size);
   print_vec(_p_d_alive_seq, "alive seq batch0, beam0", _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 1, "alive seq batch0, beam1",
+  print_vec(_p_d_alive_seq + _tw._max_step * 4, "alive seq batch1, beam0",
             _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 2, "alive seq batch0, beam2",
+  print_vec(_p_d_alive_seq + _tw._max_step * 8, "alive seq batch2, beam0",
             _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 3, "alive seq batch0, beam3",
+  print_vec(_p_d_alive_seq + _tw._max_step * 12, "alive seq batch3, beam0",
             _cur_step + 2);
   print_vec(_p_d_finished_scores, "finish seq scores",
             _batch_size * (_tw._beam_size + 1));
@@ -460,6 +464,8 @@ bool Decoder::beam_search() {
             _cur_step + 2);
   print_vec(_p_d_finished_seq + _tw._max_step * 2, "finish_seq, batch2",
             _cur_step + 2);
+  print_vec(_p_d_finished_beam_tag, "finished_beam_tag",
+            _batch_size * _tw._beam_size + 1);
 #endif
 
   /* step 4. refresh cache: k, v of self attention */
@@ -468,7 +474,7 @@ bool Decoder::beam_search() {
                              _step_token_num * 2),
                         _tw._hidden_size>>>(
         _p_d_can_num + 1, _p_d_can_idx, _p_d_self_k_bgeem1[0],
-        _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0], _p_d_self_v_bgeem2[0],
+        _p_d_self_v_bgeem1[0], _p_d_finished_beam_tag, _p_d_self_k_bgeem2[0], _p_d_self_v_bgeem2[0],
         _layer_size_self_k, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
         _tw._trg_vocab_size, _cur_step, _tw._max_step);
     float** ftmp = _p_d_self_k_bgeem2;
@@ -493,25 +499,28 @@ void Decoder::update_new_seq_probs() {
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
         _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+        _p_d_finished_beam_tag, _h_length_norm[_cur_step]);
   if (_tw._beam_size == 2)
     ker_update_new_seq_probs<2><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
         _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+        _p_d_finished_beam_tag, _h_length_norm[_cur_step]);
   if (_tw._beam_size == 4)
     ker_update_new_seq_probs<4><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
         _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+        _p_d_finished_beam_tag, _h_length_norm[_cur_step]);
   if (_tw._beam_size == 8)
     ker_update_new_seq_probs<8><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
         _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+        _p_d_finished_beam_tag, _h_length_norm[_cur_step]);
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_can_num, "beam rough topk can num", _batch_size * _tw._beam_size + 1);
+#endif
   thrust::exclusive_scan(thrust::device, _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
 #ifdef DEBUG_TIME
