@@ -11,12 +11,11 @@ const float min_log_probability = -10000.f;
 const float epsilon = 0.000001;
 
 template <int beam_size>
-__global__ void ker_update_new_seq_probs(const float* logits, const float* logit_bias,
+__global__ void ker_update_new_seq_probs(float* logits, const float* logit_bias,
                                          const float* seq_probs, int vocab_size,
                                          int* can_idx, float* can_probs,
-                                         int* ncan, float* batch_finished_scores,
-                                         float* beam_finished_scores,
-					 const int* finished_beam_tag,
+                                         int* ncan, float* finished_scores,
+                                         float* cur_finished_scores,
                                          float length_norm) {
   /**
   @brief
@@ -30,28 +29,14 @@ __global__ void ker_update_new_seq_probs(const float* logits, const float* logit
 
   @param
   logits: [batch_size, beam_size, vocab_size], cur step logit
-  logits_bias: [vocab_size], logit bias
   seq_probs: [batch_size, beam_size], prefix sequence log probability
   vocab_size: vocabulary size
   can_idx: [batch_size, beam_size, vocab_size], topk candidate's index
-  can_probs: [batch_size, beam_size, vocab_size], topk candidate's log probs
-  ncan: [1 + batch_size * beam_size]
-    the first ele save the number of all topk candidate
-    the remaining batch_size*beam_size ele save the number of this beam's topk candidate
-  batch_finished_scores: [batch_size], best finished score util now for every batch
-  beam_finished_scores: [batch_size, beam_size], cur step's beam finished score
-  finished_beam_tag: [1 + batch_size * beam_size]. 
-    the first ele save the number of finished beam
-    the remaining batch_size*beam_size ele save tag represent if this beam finished
+  can_probs: [batch_size, beam_size, vocab_size], topk candidate's log
+  probability ncan: [1+batch_size*beam_size], number of topk candidate
+  finished_scores: [batch_size], best finished score util now
+  cur_finished_scores: [batch_size, beam_size], cur step's finished score
   */
-
-  if (finished_beam_tag[blockIdx.x + 1] == 1) {
-    // this beam has been finished
-    if (threadIdx.x == 0) {
-      ncan[blockIdx.x + 1] = 0;
-    }
-    return;
-  }
 
   /* step1: compute -log(sum(exp(logits))) + seq_probs */
   const int block_start = blockIdx.x * vocab_size;
@@ -146,8 +131,8 @@ __global__ void ker_update_new_seq_probs(const float* logits, const float* logit
         logits[(blockIdx.x + 1) * vocab_size - 1];  // the EOS token logit
     float score = max(min(lgt, logit_thresh_max) + s_sum, min_log_probability) *
                   length_norm;
-    beam_finished_scores[blockIdx.x] = score;
-    atomicMaxFloat(batch_finished_scores + batch_id, score);
+    cur_finished_scores[blockIdx.x] = score;
+    atomicMaxFloat(finished_scores + batch_id, score);
   }
 }
 __global__ void kerBiasRelu(float* first_output, const float* first_bias,
@@ -185,10 +170,8 @@ __global__ void ker_arrange_decself_qkv(const float* ori_qkv,
                                         int max_step, int step_id);
 
 __global__ void ker_refresh_cache(const int* num_can_per_beam,
-                                  const int* can_idx, const float* self_k_bgeem,
-                                  const float* self_v_bgeem, 
-				  const int* finished_beam_tag,
-				  float* new_self_k_bgeem,
+                                  const int* can_idx, float* self_k_bgeem,
+                                  float* self_v_bgeem, float* new_self_k_bgeem,
                                   float* new_self_v_bgeem,
                                   int self_k_bgeem_offset, int beam_size,
                                   int dim_per_head, int head_num,
