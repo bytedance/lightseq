@@ -409,14 +409,13 @@ __global__ void ker_arrange_atten_output(const float* ori_q, float* new_q,
 }
 
 __global__ void ker_refresh_result(
-    const int* can_idx, const float* can_probs, const int* num_can_per_beam,
-    const int* old_alive_seq, int* new_alive_seq, float* alive_seq_probs,
-    const float* finished_scores, const float* cur_finished_scores,
-    int* finished_seq, int* num_finish_beam, int vocab_size, int cur_step,
-    float max_length_norm) {
+    const int* can_idx, const float* can_score, const int* num_can_per_beam,
+    const int* old_alive_seq, int* new_alive_seq, float* seq_probs,
+    float* seq_score, int* num_finish_beam, int vocab_size, int cur_step,
+    float length_norm) {
   /**
   @brief
-  refresh finished_seq, alive_seq_probs, num_finish_beam, alive_seq based on
+  refresh alive_seq, seq_probs, seq_score, num_finish_beam based on
   sorted candidate
 
   @thread
@@ -426,66 +425,94 @@ __global__ void ker_refresh_result(
 
   @param
   can_idx: [none], no certain length, determined by rough candidate number
-  can_probs: [none], no certain length, determined by rough candidate number
+  can_score: [none], no certain length, determined by rough candidate number
   num_can_per_beam: [batch_size * beam_size]
+      save exclusive_scan_sum of the beam candidate number array
+      e.g. [0,2,5,1] -> [0, 0, 2, 7]
 
   old_alive_seq: [batch_size, beam_size, max_step]
   new_alive_seq: [batch_size, beam_size, max_step]
-  alive_seq_probs: [batch_size, beam_size]
+  seq_probs: [batch_size, beam_size]
 
   finished_scores: [batch_size]
   cur_finished_scores: [batch_size, beam_size]
   finished_seq: [batch_size, max_step]
-  num_finish_beam: [1]
   */
 
-  int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
-  int thread_vocab_id;
-
-  // step1 update finished_seq
-  float best_finish_score = finished_scores[blockIdx.x];
-  float score_diff =
-      fabsf(cur_finished_scores[blockIdx.x * gridDim.y + blockIdx.y] -
-            best_finish_score);
-  if (score_diff < epsilon) {
-    // finished_seq = this beam's current seq
-    thread_vocab_id = threadIdx.x < cur_step
-                          ? old_alive_seq[targetid_3dim(blockIdx.x, blockIdx.y,
-                                                        threadIdx.x + 1,
-                                                        gridDim.y, blockDim.x)]
-                          : vocab_size - 1;
-    finished_seq[blockIdx.x * blockDim.x + threadIdx.x] = thread_vocab_id;
-  }
-
-  // step2 update alive_seq_probs and num_finish_beam,
-  if (threadIdx.x == 0) {
-    float can_seq_prob =
-        can_probs[can_pos] - blockIdx.x * min_log_probability;  // recover it
-    atomicAdd(num_finish_beam,
-              int(can_seq_prob * max_length_norm < best_finish_score));
-    alive_seq_probs[blockIdx.x * gridDim.y + blockIdx.y] = can_seq_prob;
-  }
-
-  // step3 update alive_seq
+  // step1 update alive_seq
+  int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;  
   int ori_can_idx = can_idx[can_pos];  // can_beam_id * vocab_size + vocab_id
   int can_beam_id = ori_can_idx / vocab_size;
-  thread_vocab_id =
-      threadIdx.x <= cur_step
-          ? old_alive_seq[targetid_3dim(blockIdx.x, can_beam_id, threadIdx.x,
-                                        gridDim.y, blockDim.x)]
-          : vocab_size - 1;
-  if (threadIdx.x == cur_step + 1) {
-    thread_vocab_id =
-        ori_can_idx % vocab_size;  // add current step generate vocabulary id
+  int can_vocab_id = ori_can_idx % vocab_size;
+  int thread_vocab_id;
+  if (threadIdx.x > cur_step + 1) {
+    thread_vocab_id = vocab_size - 1;
+  } else if (threadIdx.x == cur_step + 1) {
+    // add current step generate vocabulary id
+    thread_vocab_id = can_vocab_id;
+  } else {
+    // threadIdx.x <= cur_step
+    thread_vocab_id = old_alive_seq[targetid_3dim(blockIdx.x, can_beam_id, threadIdx.x, gridDim.y,
+		    blockDim.x)];
   }
   new_alive_seq[targetid_3dim(blockIdx.x, blockIdx.y, threadIdx.x, gridDim.y,
                               blockDim.x)] = thread_vocab_id;
+
+  // step2 update seq_probs if alive seq
+  int eos_id = vocab_size - 1;
+  if (can_vocab_id != eos_id) {
+    // alive seq
+    if (threadIdx.x == 0) {
+      seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
+          (can_score[can_pos] - blockIdx.x * min_log_probability) / length_norm;  // recover it
+    }
+    return;
+  }
+  
+  // step3 update seq_score, num_finish_beam if finish seq
+  if (threadIdx.x == 0) {
+    atomicAdd(num_finish_beam, 1);
+  }
+  int seq_last_id = old_alive_seq[targetid_3dim(blockIdx.x, can_beam_id, cur_step, gridDim.y, blockDim.x)];
+  if (seq_last_id != eos_id) {
+    // new finished seq
+    if (threadIdx.x == 0) {
+      // note, with batch offset value, to sort between batch element
+      seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos]; 
+    }
+  }
 }
 
-__global__ void ker_write_trg_tokenid(const int* input, int* output,
-                                      int max_step) {
-  output[blockIdx.x * blockDim.x + threadIdx.x] =
-      input[blockIdx.x * max_step + threadIdx.x];
+__global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
+		int* output, int max_step, int beam_size) {
+  int target_id = targetid_3dim(blockIdx.x, 0, threadIdx.x + 1, beam_size, max_step);
+  output[blockIdx.x * blockDim.x + threadIdx.x] = alive_seq[target_id];
+}
+
+__global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq, const float* seq_score,
+		int* output, int max_step, int beam_size, int vocab_size) {
+  __shared__ float seq_final_score;
+  __shared__ int res_beam_id;
+  if (threadIdx.x == 0) {
+    seq_final_score = min_log_probability * 10;
+    res_beam_id = 0;
+  }
+  for(int beam_id=0; beam_id < beam_size; beam_id++) {
+    int target_id = targetid_3dim(blockIdx.x, beam_id, threadIdx.x + 1, beam_size, max_step);
+    int seq_len = blockReduceSum(int(alive_seq[target_id] != vocab_size - 1)); // compute seq len
+    if (threadIdx.x == 0) {
+      float cur_beam_score = seq_score[blockIdx.x * beam_size + beam_id] - blockIdx.x * min_log_probability;  // recover prob
+      cur_beam_score /= (float(seq_len) + epsilon);
+      if (cur_beam_score > seq_final_score) {
+        seq_final_score = cur_beam_score;
+	res_beam_id = beam_id;
+      }
+    }
+    __syncthreads();
+  }
+  int target_id = targetid_3dim(blockIdx.x, res_beam_id, threadIdx.x + 1, beam_size, max_step);
+  output[blockIdx.x * blockDim.x + threadIdx.x] = alive_seq[target_id];
+  //output[blockIdx.x * blockDim.x + threadIdx.x] = int(seq_final_score[threadIdx.x]);
 }
 
 }  // namespace nmt

@@ -34,13 +34,14 @@ Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _output_scaler(sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
-      _h_finished_scores(max_batch_size, min_log_probability),
-      _h_length_norm(tw._max_step, 0.f) {
+      _h_length_norm(tw._max_step, 1.f) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
   }
-  for (int i = 0; i < _h_length_norm.size(); i++) {
-    _h_length_norm[i] = length_norm(i + 1, tw._length_penalty);
+  if (tw._length_penalty >= 0) {
+    for (int i = 0; i < _h_length_norm.size(); i++) {
+      _h_length_norm[i] = length_norm(i + 1, tw._length_penalty);
+    }
   }
 #ifdef DEBUG_RESULT
   std::cout << "length penalty is: " << tw._length_penalty << std::endl;
@@ -68,9 +69,8 @@ int Decoder::compute_buffer_bytesize() {
   decode_buffer_bytesize *= sizeof(float);
 
   int sf = _max_batch_size * _tw._beam_size * _tw._trg_vocab_size * 2 +
-           _max_batch_size * (_tw._beam_size * 2 + 1);
+           _max_batch_size * _tw._beam_size * 2;
   int si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
-           _max_batch_size * _tw._max_step +
            _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
            _max_batch_size * _tw._beam_size + 1;
   int beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
@@ -128,12 +128,12 @@ void Decoder::init_buffer(void* pbuf) {
   curp = reuse_p;
   _p_d_logit_buf = curp;
   curp += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
+  _p_d_can_score = curp;
+  curp += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   _p_d_alive_seq_probs = curp;
   curp += _max_batch_size * _tw._beam_size;
-  _p_d_can_probs = curp;
-  curp += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
-  _p_d_finished_scores = curp;
-  curp += _max_batch_size * (_tw._beam_size + 1);
+  _p_d_alive_seq_score = curp;
+  curp += _max_batch_size * _tw._beam_size;
 
   int* pint = reinterpret_cast<int*>(curp);
   _p_d_alive_seq = pint;
@@ -141,8 +141,6 @@ void Decoder::init_buffer(void* pbuf) {
   thrust::fill(thrust::device, _p_d_alive_seq, pint, _tw._start_id);
   _p_d_alive_seq_buf = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._max_step;
-  _p_d_finished_seq = pint;
-  pint += _max_batch_size * _tw._max_step;
   _p_d_can_idx = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   _p_d_can_num = pint;
@@ -179,8 +177,6 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
   cudaMemcpy(_p_d_alive_seq_probs, _h_alive_seq_probs.data(),
              sizeof(float) * _batch_size * _tw._beam_size,
              cudaMemcpyHostToDevice);
-  cudaMemcpy(_p_d_finished_scores, _h_finished_scores.data(),
-             sizeof(float) * _batch_size, cudaMemcpyHostToDevice);
   for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
     // for(_cur_step = 0; _cur_step < 10; _cur_step++) {
     // std::cout<<"run step " << _cur_step << std::endl;
@@ -188,8 +184,19 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
       break;
     }
   }
-  ker_write_trg_tokenid<<<_batch_size, _cur_step + 1>>>(
-      _p_d_finished_seq, _p_d_result, _tw._max_step);
+  if (_tw._length_penalty >= 0.f) {
+    ker_write_trg_tokenid_pos_penalty<<<_batch_size, _cur_step + 1>>>(
+        _p_d_alive_seq, _p_d_result, _tw._max_step, _tw._beam_size);
+  } else {
+    ker_write_trg_tokenid_neg_penalty<<<_batch_size, _cur_step + 1, _tw._beam_size * sizeof(float)>>>(
+        _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, _tw._max_step, _tw._beam_size,
+	_tw._trg_vocab_size);
+  }
+#ifdef DEBUG_RESULT
+  for(int i=0; i<_batch_size; i++) {
+    print_vec(_p_d_result + i * (_cur_step + 1), "finial res", _cur_step + 1);
+  }
+#endif
   return;
 }
 
@@ -399,21 +406,21 @@ bool Decoder::beam_search() {
              cudaMemcpyDeviceToHost);
   if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(
-        _p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_probs, _p_d_can_probs,
+        _p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score, _p_d_can_score,
         _p_d_can_idx, _p_d_can_idx, _h_can_num_batch));
   } else {
-    thrust::sort_by_key(thrust::device, _p_d_can_probs,
-                        _p_d_can_probs + _h_can_num_batch, _p_d_can_idx,
+    thrust::sort_by_key(thrust::device, _p_d_can_score,
+                        _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
                         thrust::greater<float>());
   }
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "decoder output batch0, beam0", 10);
-  print_vec(_p_d_cur_step_query + _tw._hidden_size * 4,
-            "decoder output batch1, beam0", 10);
-  print_vec(_p_d_cur_step_query + _tw._hidden_size * 8,
-            "decoder output batch2, beam0", 10);
-  print_vec(_p_d_cur_step_query + _tw._hidden_size * 12,
-            "decoder output batch3, beam0", 10);
+  //print_vec(_p_d_cur_step_query, "decoder output batch0, beam0", 10);
+  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 4,
+  //          "decoder output batch1, beam0", 10);
+  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 8,
+  //          "decoder output batch2, beam0", 10);
+  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 12,
+  //          "decoder output batch3, beam0", 10);
   print_vec(_p_d_logit_buf, "logit batch0, beam0", 10);
   print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 4, "logit batch1, beam0",
             10);
@@ -424,43 +431,39 @@ bool Decoder::beam_search() {
 #endif
 
   /*
-    step 3. refresh finished_seq, alive_seq_probs,
-    num_finish_beam, alive_seq based on sorted candidate
+    step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam
+    based on sorted candidate
   */
   cudaMemset(_p_d_can_num, 0, sizeof(int));
   ker_refresh_result<<<dim3(_batch_size, _tw._beam_size), _tw._max_step>>>(
-      _p_d_can_idx, _p_d_can_probs, _p_d_can_num + 1, _p_d_alive_seq,
-      _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_finished_scores,
-      _p_d_finished_scores + _batch_size, _p_d_finished_seq, _p_d_can_num,
-      _tw._trg_vocab_size, _cur_step, _h_length_norm[_batch_max_decode_length]);
+      _p_d_can_idx, _p_d_can_score, _p_d_can_num + 1, _p_d_alive_seq,
+      _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
+      _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step]);
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
   cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
              cudaMemcpyDeviceToHost);
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_alive_seq_probs, "seq probs",
+            _batch_size * _tw._beam_size);
+  print_vec(_p_d_alive_seq_score, "seq score",
+            _batch_size * _tw._beam_size);
+  print_vec(_p_d_can_num, "beam can num",
+            _batch_size * _tw._beam_size + 1);
+  print_vec(_p_d_alive_seq, "alive seq batch0, beam0", _cur_step + 2);
+  print_vec(_p_d_alive_seq + _tw._max_step * 4, "alive seq batch1, beam0",
+            _cur_step + 2);
+  print_vec(_p_d_alive_seq + _tw._max_step * 8, "alive seq batch2, beam0",
+            _cur_step + 2);
+  print_vec(_p_d_alive_seq + _tw._max_step * 12, "alive seq batch3, beam0",
+            _cur_step + 2);
+#endif
   if (_h_can_num_batch == _step_token_num) {
-    // all alive seq will not get a higher score than current best finish seq
     // std::cout<<"early stop beam search!" <<std::endl;
     return true;
   }
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_alive_seq_probs, "alive seq probs",
-            _batch_size * _tw._beam_size);
-  print_vec(_p_d_alive_seq, "alive seq batch0, beam0", _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 1, "alive seq batch0, beam1",
-            _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 2, "alive seq batch0, beam2",
-            _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 3, "alive seq batch0, beam3",
-            _cur_step + 2);
-  print_vec(_p_d_finished_scores, "finish seq scores",
-            _batch_size * (_tw._beam_size + 1));
-  print_vec(_p_d_finished_seq, "finish_seq, batch0", _cur_step + 2);
-  print_vec(_p_d_finished_seq + _tw._max_step * 1, "finish_seq, batch1",
-            _cur_step + 2);
-  print_vec(_p_d_finished_seq + _tw._max_step * 2, "finish_seq, batch2",
-            _cur_step + 2);
-#endif
+
 
   /* step 4. refresh cache: k, v of self attention */
   if (_cur_step > 0) {
@@ -489,29 +492,25 @@ void Decoder::update_new_seq_probs() {
   auto start = std::chrono::high_resolution_clock::now();
 #endif
   if (_tw._beam_size == 1)
-    ker_update_new_seq_probs<1><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<1><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
-        _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 2)
-    ker_update_new_seq_probs<2><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<2><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
-        _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 4)
-    ker_update_new_seq_probs<4><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<4><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
-        _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 8)
-    ker_update_new_seq_probs<8><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<8><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _tw._trg_vocab_size, _p_d_can_idx, _p_d_can_probs, _p_d_can_num,
-        _p_d_finished_scores, _p_d_finished_scores + _batch_size,
-        _h_length_norm[_cur_step]);
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   thrust::exclusive_scan(thrust::device, _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
 #ifdef DEBUG_TIME
