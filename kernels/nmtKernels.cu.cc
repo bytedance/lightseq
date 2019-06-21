@@ -189,66 +189,6 @@ __global__ void ker_arrange_decself_qkv(const float* ori_qkv,
   }
 }
 
-__global__ void ker_refresh_cache(const int* num_can_per_beam,
-                                  const int* can_idx, float* self_k_bgeem,
-                                  float* self_v_bgeem, float* new_self_k_bgeem,
-                                  float* new_self_v_bgeem,
-                                  int self_k_bgeem_offset, int beam_size,
-                                  int dim_per_head, int head_num,
-                                  int vocab_size, int cur_step, int max_step) {
-  /**
-  @brief
-  refresh K, V of self attention, add current step's projected k,v
-
-  @thread
-  gridDim.x = decoder_layer_num * (step_id + 1)
-  gridDim.y = batch_size * beam_size * 2
-  blockDim.x = hidden_size
-
-  @param
-  num_can_per_beam: [batch_size, beam_size]
-  can_idx: [none], no certain length, determined by rough candidate number
-  self_step_qkv: [batch_size, beam_size, 3, hidden_size] * decoder_layer_num
-  self_k_bgeem: [batch_size, beam_size, head_num, dim_per_head, max_step] *
-  decoder_layer_num self_v_bgeem: [batch_size, beam_size, head_num, max_step,
-  dim_per_head] * decoder_layer_num
-
-
-  self_step_qkv_offset = max_batch_size * beam_size * tw._hidden_size * 3
-  self_k_bgeem_offset = max_batch_size * max_step * hidden_size * beam_size
-  */
-  int layer_id = blockIdx.x / (cur_step + 1);
-  int step_id = blockIdx.x % (cur_step + 1);
-  int kv_id = blockIdx.y & 1;
-  int beam_id_global = blockIdx.y >> 1;
-  int batch_id = beam_id_global / beam_size;
-  int beam_id = beam_id_global % beam_size;
-  int head_id = threadIdx.x / dim_per_head;
-  int dim_id = threadIdx.x % dim_per_head;
-
-  int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
-  int can_beam_id =
-      can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
-
-  if (kv_id == 0) {
-    // for key
-    int base_pos = targetid_5dim(batch_id, 0, head_id, dim_id, step_id,
-                                 beam_size, head_num, dim_per_head, max_step) +
-                   layer_id * self_k_bgeem_offset;
-    int beam_offset = blockDim.x * max_step;
-    new_self_k_bgeem[base_pos + beam_offset * beam_id] =
-        self_k_bgeem[base_pos + beam_offset * can_beam_id];
-  } else {
-    // for value
-    int base_pos = targetid_5dim(batch_id, 0, head_id, step_id, dim_id,
-                                 beam_size, head_num, max_step, dim_per_head) +
-                   layer_id * self_k_bgeem_offset;
-    int beam_offset = blockDim.x * max_step;
-    new_self_v_bgeem[base_pos + beam_offset * beam_id] =
-        self_v_bgeem[base_pos + beam_offset * can_beam_id];
-  }
-}
-
 __global__ void ker_arrange_encdec_kv(const float* ori_kv, const float* kv_bias,
                                       float* new_k, float* new_v,
                                       int offset_per_layer, int batch_seq_len,
@@ -309,74 +249,101 @@ __global__ void ker_arrange_encdec_q(const float* ori_q, const float* q_bias,
 }
 
 __global__ void ker_correlation_softmax_encself(float* correlation,
-                                                const int* src_padding_mask) {
-  // correlation is a pointer to matrix of size token_num*token_num
-  // stored in row-first, the (i, j) element represent the correlation
-  // of query-i and key-j
+                                                const int* src_padding_mask) {  
+  /**
+  @brief
+  query-key correlation softmax for encoder self attention
 
-  // one block compute the weight vector of one query
-  // perform weighted-average on Value sequence using this weight vector
-  // will get the result of "Scaled Dot-Product Attention"
+  @thread
+  gridDim.x = batch_size
+  gridDim.y = head_num * batch_seq_len
+  blockDim.x = batch_seq_len
 
-  // correlation: [batch_size, head_num, batch_seq_len, batch_seq_len]
-  // src_padding_mask: [batch_size * batch_seq_len]
-  // blockIdx.x = batch_id, blockIdx.y = head_id * batch_seq_len + token_id,
-  // threadIdx.x = target token id
-  // gridDim.x = batch_size, gridDim.y = head_num * batch_seq_len, blockDim.x =
-  // batch_seq_len
+  @param
+  correlation: [batch_size, head_num, batch_seq_len, batch_seq_len]
+  src_padding_mask: [batch_size, batch_seq_len]
+  */
   if (src_padding_mask[blockIdx.x * blockDim.x + blockIdx.y % blockDim.x])
     return;
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
-  float val = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x]
-                  ? 0.f
-                  : exp(correlation[idx]);
+  int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];
+  float val = correlation[idx];
+
+  float max_val = blockReduceMax(mask ? CUDA_FLOAT_INF_NEG : val);
+  __shared__ float smax;
+  if (threadIdx.x == 0) smax = max_val;
+  __syncthreads();
+
+  val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
-  // FIXME
+
   correlation[idx] = val / (ssum + epsilon);
 }
 
 __global__ void ker_correlation_softmax_decself(float* correlation) {
-  // correlation is a pointer to matrix of size token_num*token_num
-  // stored in row-first, the (i, j) element represent the correlation
-  // of query-i and key-j
+  /**
+  @brief
+  query-key correlation softmax for decoder self attention
 
-  // one block compute the weight vector of one query
-  // perform weighted-average on Value sequence using this weight vector
-  // will get the result of "Scaled Dot-Product Attention"
+  @thread
+  gridDim.x = batch_size * beam_size * head_num
+  blockDim.x = cur_step + 1
+
+  @param
+  correlation: [batch_size, beam_size, head_num, cur_step + 1]
+  */
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  float val = exp(correlation[idx]);
+  float val = correlation[idx];
+  
+  float max_val = blockReduceMax(val);
+  __shared__ float smax;
+  if (threadIdx.x == 0) smax = max_val;
+  __syncthreads();
+
+  val = expf(fmaxf(logit_thresh_min, val - smax));
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
+
   correlation[idx] = val / ssum;
+  //correlation[idx] = ssum;
 }
+
 __global__ void ker_correlation_softmax_encdec(float* correlation,
                                                const int* src_padding_mask) {
-  // correlation is a pointer to matrix of size token_num*token_num
-  // stored in row-first, the (i, j) element represent the correlation
-  // of query-i and key-j
+  /**
+  @brief
+  query-key correlation softmax for encoder-decoder attention
 
-  // one block compute the weight vector of one query
-  // perform weighted-average on Value sequence using this weight vector
-  // will get the result of "Scaled Dot-Product Attention"
+  @thread
+  gridDim.x = batch_size
+  gridDim.y = head_num * beam_size
+  blockDim.x = batch_seq_len
 
-  // correlation: [batch_size, head_num, beam_size, batch_seq_len]
-  // src_padding_mask: [batch_size * batch_seq_len]
-  // gridDim.x = batch_size, gridDim.y = head_num * beam_size, blockDim.x =
-  // batch_seq_len
+  @param
+  correlation: [batch_size, head_num, beam_size, batch_seq_len]
+  src_padding_mask: [batch_size, batch_seq_len]
+  */
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
-  float val = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x]
-                  ? 0.f
-                  : exp(correlation[idx]);
+  int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];
+  float val = correlation[idx]; 
+  
+  float max_val = blockReduceMax(mask ? CUDA_FLOAT_INF_NEG : val);
+  __shared__ float smax;
+  if (threadIdx.x == 0) smax = max_val;
+  __syncthreads();
+
+  val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
-  correlation[idx] = val / ssum;
+
+  correlation[idx] = val / (ssum + epsilon);
 }
 
 __global__ void ker_arrange_atten_output(const float* ori_q, float* new_q,
@@ -483,18 +450,110 @@ __global__ void ker_refresh_result(
   }
 }
 
+__global__ void ker_refresh_cache(const int* num_can_per_beam,
+                                  const int* can_idx, float* self_k_bgeem,
+                                  float* self_v_bgeem, float* new_self_k_bgeem,
+                                  float* new_self_v_bgeem,
+                                  int self_k_bgeem_offset, int beam_size,
+                                  int dim_per_head, int head_num,
+                                  int vocab_size, int cur_step, int max_step) {
+  /**
+  @brief
+  refresh K, V of self attention, add current step's projected k,v
+
+  @thread
+  gridDim.x = decoder_layer_num * (step_id + 1)
+  gridDim.y = batch_size * beam_size * 2
+  blockDim.x = hidden_size
+
+  @param
+  num_can_per_beam: [batch_size, beam_size]
+  can_idx: [none], no certain length, determined by rough candidate number
+  self_step_qkv: [batch_size, beam_size, 3, hidden_size] * decoder_layer_num
+  self_k_bgeem: [batch_size, beam_size, head_num, dim_per_head, max_step] *
+  decoder_layer_num self_v_bgeem: [batch_size, beam_size, head_num, max_step,
+  dim_per_head] * decoder_layer_num
+
+
+  self_step_qkv_offset = max_batch_size * beam_size * tw._hidden_size * 3
+  self_k_bgeem_offset = max_batch_size * max_step * hidden_size * beam_size
+  */
+  int layer_id = blockIdx.x / (cur_step + 1);
+  int step_id = blockIdx.x % (cur_step + 1);
+  int kv_id = blockIdx.y & 1;
+  int beam_id_global = blockIdx.y >> 1;
+  int batch_id = beam_id_global / beam_size;
+  int beam_id = beam_id_global % beam_size;
+  int head_id = threadIdx.x / dim_per_head;
+  int dim_id = threadIdx.x % dim_per_head;
+
+  int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
+  int can_beam_id =
+      can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
+  if (can_idx[can_pos] % vocab_size == vocab_size - 1) {
+    return;
+  }
+
+  if (kv_id == 0) {
+    // for key
+    int base_pos = targetid_5dim(batch_id, 0, head_id, dim_id, step_id,
+                                 beam_size, head_num, dim_per_head, max_step) +
+                   layer_id * self_k_bgeem_offset;
+    int beam_offset = blockDim.x * max_step;
+    new_self_k_bgeem[base_pos + beam_offset * beam_id] =
+        self_k_bgeem[base_pos + beam_offset * can_beam_id];
+  } else {
+    // for value
+    int base_pos = targetid_5dim(batch_id, 0, head_id, step_id, dim_id,
+                                 beam_size, head_num, max_step, dim_per_head) +
+                   layer_id * self_k_bgeem_offset;
+    int beam_offset = blockDim.x * max_step;
+    new_self_v_bgeem[base_pos + beam_offset * beam_id] =
+        self_v_bgeem[base_pos + beam_offset * can_beam_id];
+  }
+}
+
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
-		int* output, int max_step, int beam_size) {
+		int* output, int max_step, int beam_size) {  
+  /**
+  @brief
+  write result from alive seq to output, for length_penlty >= 0
+  or length_penlty < 0 and decode to max_decode_step
+  simply output the beam0 as final result
+
+  @thread
+  gridDim.x = batch_size
+  blockDim.x = cur_step + 1
+
+  @param
+  alive_seq: [batch_size, beam_size, max_step], <start> is the first token in each beam
+  output: [batch_size, cur_step + 1], no <start> and at least one <eos> in the last of seq
+  */
   int target_id = targetid_3dim(blockIdx.x, 0, threadIdx.x + 1, beam_size, max_step);
   output[blockIdx.x * blockDim.x + threadIdx.x] = alive_seq[target_id];
 }
 
 __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq, const float* seq_score,
-		int* output, int max_step, int beam_size, int vocab_size) {
+		int* output, int max_step, int beam_size, int vocab_size) {  
+  /**
+  @brief
+  write result from alive seq to output, 
+  for length_penlty < 0 and all beam has reach it's eos
+  compute each beam's score and select the top beam
+
+  @thread
+  gridDim.x = batch_size
+  blockDim.x = cur_step + 1
+
+  @param
+  alive_seq: [batch_size, beam_size, max_step], <start> is the first token in each beam
+  seq_score: [batch_size, beam_size], the length_penlty < 0, seq_score is also the sum_log_probs
+  output: [batch_size, cur_step + 1], no <start> and at least one <eos> in the last of seq
+  */
   __shared__ float seq_final_score;
   __shared__ int res_beam_id;
   if (threadIdx.x == 0) {
-    seq_final_score = min_log_probability * 10;
+    seq_final_score = CUDA_FLOAT_INF_NEG;
     res_beam_id = 0;
   }
   for(int beam_id=0; beam_id < beam_size; beam_id++) {

@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     std::cout << res << std::endl;
     return 0;
   }
-  tw_._length_penalty = 0.6;
+  // tw_._length_penalty = 0.6;
 
   // init encoder and decoder
   // use thrust vector to avoid manage gpu memory by hand
@@ -68,19 +68,23 @@ int main(int argc, char* argv[]) {
       reinterpret_cast<void*>(thrust::raw_pointer_cast(d_buf_.data())));
   cudaDeviceSynchronize();
 
-  int batch_size = 8;
-  int batch_seq_len = 8;
+  int batch_size = 1;
+  int batch_seq_len = 32;
   for (int i = 0; i < 5; i++) {
     auto start = std::chrono::high_resolution_clock::now();
-    std::vector<int> host_input = {
-        2491,  5591,  64,    35062, 35063, 35063, 35063, 35063, 15703, 208,
-        11,    2485,  1,     8918,  64,    35062, 2491,  5591,  64,    35062,
-        35063, 35063, 35063, 35063, 15703, 208,   11,    2485,  1,     8918,
-        64,    35062, 2491,  5591,  64,    35062, 35063, 35063, 35063, 35063,
-        15703, 208,   11,    2485,  1,     8918,  64,    35062, 2491,  5591,
-        64,    35062, 35063, 35063, 35063, 35063, 15703, 208,   11,    2485,
-        1,     8918,  64,    35062,
-    };
+    // for ru2en
+    //std::vector<int> host_input = {
+    //    2491,  5591,  64,    35062, 35063, 35063, 35063, 35063, 15703, 208,
+    //    11,    2485,  1,     8918,  64,    35062, 2491,  5591,  64,    35062,
+    //    35063, 35063, 35063, 35063, 15703, 208,   11,    2485,  1,     8918,
+    //    64,    35062, 2491,  5591,  64,    35062, 35063, 35063, 35063, 35063,
+    //    15703, 208,   11,    2485,  1,     8918,  64,    35062, 2491,  5591,
+    //    64,    35062, 35063, 35063, 35063, 35063, 15703, 208,   11,    2485,
+    //    1,     8918,  64,    35062,
+    //};
+
+    // for zh2en.1.3.77.29
+    std::vector<int> host_input = {5553, 1, 2518, 1612, 3774, 104, 14559, 3698, 1572, 3030, 101, 1033, 2833, 5531, 1, 2414, 4032, 6, 111, 1503, 2169, 3774, 1529, 4063, 730, 3882, 2485, 0, 7354, 348, 2, 35611};
     cudaMemcpy(
         reinterpret_cast<int*>(thrust::raw_pointer_cast(d_input_.data())),
         host_input.data(), sizeof(int) * batch_size * batch_seq_len,

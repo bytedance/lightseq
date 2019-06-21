@@ -7,6 +7,7 @@ namespace nmt {
 
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
 const unsigned int WARP_SIZE = 32;
+const float CUDA_FLOAT_INF_NEG = -100000000.f; // FIXME later
 
 template <typename T>
 __forceinline__ __device__ T warpReduceSum(T val) {
@@ -51,7 +52,8 @@ __forceinline__ __device__ T blockReduceMax(T val) {
   if (lane == 0) shared[wid] = val;
   __syncthreads();
 
-  val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : 0;
+  //val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : CUDA_FLOAT_INF_NEG;
+  val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane] : CUDA_FLOAT_INF_NEG;
   val = warpReduceMax(val);
 
   return val;
