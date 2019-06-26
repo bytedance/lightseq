@@ -69,8 +69,8 @@ int main(int argc, char* argv[]) {
   cudaDeviceSynchronize();
 
   int batch_size = 1;
-  int batch_seq_len = 32;
-  for (int i = 0; i < 5; i++) {
+  int batch_seq_len = 28;
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // for ru2en
     //std::vector<int> host_input = {
@@ -84,7 +84,8 @@ int main(int argc, char* argv[]) {
     //};
 
     // for zh2en.1.3.77.29
-    std::vector<int> host_input = {5553, 1, 2518, 1612, 3774, 104, 14559, 3698, 1572, 3030, 101, 1033, 2833, 5531, 1, 2414, 4032, 6, 111, 1503, 2169, 3774, 1529, 4063, 730, 3882, 2485, 0, 7354, 348, 2, 35611};
+    // std::vector<int> host_input = {5553, 1, 2518, 1612, 3774, 104, 14559, 3698, 1572, 3030, 101, 1033, 2833, 5531, 1, 2414, 4032, 6, 111, 1503, 2169, 3774, 1529, 4063, 730, 3882, 2485, 0, 7354, 348, 2, 35611};
+    std::vector<int> host_input = {7480, 18, 1, 14673, 279, 2631, 1, 13004, 505, 893, 10065, 1, 2155, 1357, 3520, 141, 1, 3680, 557, 8, 9610, 194, 549, 0, 893, 2705, 2, 35611};
     cudaMemcpy(
         reinterpret_cast<int*>(thrust::raw_pointer_cast(d_input_.data())),
         host_input.data(), sizeof(int) * batch_size * batch_seq_len,

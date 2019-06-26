@@ -47,7 +47,7 @@ __global__ void select_beam_rough_topk(float* logits, const float* logit_bias,
       num_beam_can[blockIdx.x + 1] = 1; // generate one candidate
       int pos = atomicAdd(num_beam_can, 1); // get a candidate pos
       can_score[pos] = seq_score[blockIdx.x]; // this beam's score will not be change
-      can_idx[pos] = vocab_size - 1; // EOS
+      can_idx[pos] = vocab_size - 1 + (blockIdx.x % beam_size) * vocab_size; // EOS
     }
     return;
   }

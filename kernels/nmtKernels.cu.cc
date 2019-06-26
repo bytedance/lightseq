@@ -441,12 +441,10 @@ __global__ void ker_refresh_result(
     atomicAdd(num_finish_beam, 1);
   }
   int seq_last_id = old_alive_seq[targetid_3dim(blockIdx.x, can_beam_id, cur_step, gridDim.y, blockDim.x)];
-  if (seq_last_id != eos_id) {
-    // new finished seq
-    if (threadIdx.x == 0) {
-      // note, with batch offset value, to sort between batch element
-      seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos]; 
-    }
+  // update finished seq score
+  if (threadIdx.x == 0) {
+    // note, with batch offset value, to sort between batch element
+    seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos]; 
   }
 }
 

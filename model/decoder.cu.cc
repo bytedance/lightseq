@@ -180,7 +180,9 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
   // max _batch_max_decode_length 254
   for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
     // for(_cur_step = 0; _cur_step < 10; _cur_step++) {
-    // std::cout<<"run step " << _cur_step << std::endl;
+#ifdef DEBUG_RESULT
+  std::cout<<"run step " << _cur_step << std::endl;
+#endif
     if (run_step()) {
       break;
     }
@@ -279,9 +281,9 @@ void Decoder::self_attention() {
   ker_norm_layer3<<<_step_token_num, _tw._hidden_size>>>(
       _p_d_cur_step_query, _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5]);
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "self_attention:ln output batch0, beam0", 10);
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_cur_step_query, "self_attention:ln output batch0, beam0", 10);
+//#endif
 
   // step 1. qkv = q * qkv_wei
   CUBLAS_CALL(cublasSgemm(
@@ -301,16 +303,16 @@ void Decoder::self_attention() {
       _tw._dim_per_head, &_fzero, _p_d_c, _cur_step + 1, _cur_step + 1,
       _step_token_num * _tw._head_num));
 
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_c + 4*(_cur_step + 1), "self_attention:correlation:before batch0, beam0",
-		  (_cur_step + 1));
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_c + 4*(_cur_step + 1), "self_attention:correlation:before batch0, beam0",
+//		  (_cur_step + 1));
+//#endif
   ker_correlation_softmax_decself<<<_step_token_num * _tw._head_num,
                                     _cur_step + 1>>>(_p_d_c);
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_c + 4*(_cur_step + 1), "self_attention:correlation:after batch0, beam0",
-		  (_cur_step + 1));
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_c + 4*(_cur_step + 1), "self_attention:correlation:after batch0, beam0",
+//		  (_cur_step + 1));
+//#endif
   // step 3. q = correlation * v
   CUBLAS_CALL(cublasSgemmStridedBatched(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._dim_per_head, 1, _cur_step + 1,
@@ -324,17 +326,17 @@ void Decoder::self_attention() {
                           _p_d_dec_wei[_weight_offset + 4], _tw._hidden_size,
                           _p_d_query_buf1, _tw._hidden_size, &_fone,
                           _p_d_cur_step_query, _tw._hidden_size));
-#ifdef DEBUG_RESULT
-  CUBLAS_CALL(cublasSgemm(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
-                          _step_token_num, _tw._hidden_size, &_fone,
-                          _p_d_dec_wei[_weight_offset + 4], _tw._hidden_size,
-                          _p_d_query_buf1, _tw._hidden_size, &_fzero,
-                          _p_d_logit_buf, _tw._hidden_size));
-  print_vec(_p_d_dec_wei[_weight_offset + 4], "self_attention:output_project_wei output batch0, beam0", 10);
-  print_vec(_p_d_query_buf1 + 256, "self_attention:c*v output batch0, beam0", 66);
-  print_vec(_p_d_logit_buf, "self_attention:output_project output batch0, beam0", 10);
-  print_vec(_p_d_cur_step_query, "self_attention output batch0, beam0", 10);
-#endif
+//#ifdef DEBUG_RESULT
+//  CUBLAS_CALL(cublasSgemm(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
+//                          _step_token_num, _tw._hidden_size, &_fone,
+//                          _p_d_dec_wei[_weight_offset + 4], _tw._hidden_size,
+//                          _p_d_query_buf1, _tw._hidden_size, &_fzero,
+//                          _p_d_logit_buf, _tw._hidden_size));
+//  print_vec(_p_d_dec_wei[_weight_offset + 4], "self_attention:output_project_wei output batch0, beam0", 10);
+//  print_vec(_p_d_query_buf1 + 256, "self_attention:c*v output batch0, beam0", 66);
+//  print_vec(_p_d_logit_buf, "self_attention:output_project output batch0, beam0", 10);
+//  print_vec(_p_d_cur_step_query, "self_attention output batch0, beam0", 10);
+//#endif
 }
 
 void Decoder::encdec_attention() {
@@ -381,9 +383,9 @@ void Decoder::encdec_attention() {
                           _p_d_dec_wei[_weight_offset + 10], _tw._hidden_size,
                           _p_d_query_buf2, _tw._hidden_size, &_fone,
                           _p_d_cur_step_query, _tw._hidden_size));
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "encdec output batch0, beam0", 10);
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_cur_step_query, "encdec output batch0, beam0", 10);
+//#endif
   return;
 }
 
@@ -405,9 +407,9 @@ void Decoder::ffn_add_norm() {
                           _p_d_dec_wei[_weight_offset + 16], _tw._hidden_size,
                           _p_d_query_buf2, _tw._inner_size, &_fone,
                           _p_d_cur_step_query, _tw._hidden_size));
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "ffn_add output batch0, beam0", 10);
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_cur_step_query, "ffn_add output batch0, beam0", 10);
+//#endif
   return;
 }
 
@@ -421,29 +423,31 @@ bool Decoder::beam_search() {
                           _p_d_trg_emb_wei[0], _tw._trg_vocab_size,
                           _p_d_cur_step_query, _tw._hidden_size, &_fzero,
                           _p_d_logit_buf, _tw._trg_vocab_size));
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "decoder output batch0, beam0", 10);
-  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 4,
-  //          "decoder output batch1, beam0", 10);
-  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 8,
-  //          "decoder output batch2, beam0", 10);
-  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 12,
-  //          "decoder output batch3, beam0", 10);
-  print_vec(_p_d_logit_buf, "logit batch0, beam0", 10);
-  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 1, "logit batch0, beam1",
-            10);
-  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 2, "logit batch0, beam2",
-            10);
-  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 3, "logit batch0, beam3",
-            10);
-#endif
+//#ifdef DEBUG_RESULT
+//  print_vec(_p_d_cur_step_query, "decoder output batch0, beam0", 10);
+//  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 4,
+//  //          "decoder output batch1, beam0", 10);
+//  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 8,
+//  //          "decoder output batch2, beam0", 10);
+//  //print_vec(_p_d_cur_step_query + _tw._hidden_size * 12,
+//  //          "decoder output batch3, beam0", 10);
+//  print_vec(_p_d_logit_buf, "logit batch0, beam0", 10);
+//  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 1, "logit batch0, beam1",
+//            10);
+//  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 2, "logit batch0, beam2",
+//            10);
+//  print_vec(_p_d_logit_buf + _tw._trg_vocab_size * 3, "logit batch0, beam3",
+//            10);
+//#endif
   /* step 1. softmax and select rough topk candidate for every batch item */
-  cudaMemset(_p_d_can_num, 0, sizeof(int));
   update_new_seq_probs();
 
   /* step 2. sort the candidate with their probability */
   cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
              cudaMemcpyDeviceToHost);
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_can_idx, "candidate index before sort", _h_can_num_batch);
+#endif
   if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(
         _p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score, _p_d_can_score,
@@ -467,23 +471,23 @@ bool Decoder::beam_search() {
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
-  cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
-             cudaMemcpyDeviceToHost);
 #ifdef DEBUG_RESULT
+  print_vec(_p_d_can_idx, "candidate index", _h_can_num_batch);
+  print_vec(_p_d_can_score, "candidate score", _h_can_num_batch);
   print_vec(_p_d_alive_seq_probs, "seq probs",
             _batch_size * _tw._beam_size);
   print_vec(_p_d_alive_seq_score, "seq score",
             _batch_size * _tw._beam_size);
-  print_vec(_p_d_alive_seq, "alive seq batch0, beam0", _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 1, "alive seq batch0, beam1",
-            _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 2, "alive seq batch0, beam2",
-            _cur_step + 2);
-  print_vec(_p_d_alive_seq + _tw._max_step * 3, "alive seq batch0, beam3",
-            _cur_step + 2);
+  for(int i=0; i < _tw._beam_size; i++) {
+    print_vec(_p_d_alive_seq + _tw._max_step * i, "alive seq batch0", _cur_step + 2);
+  }
 #endif
+  cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
+             cudaMemcpyDeviceToHost);
   if (_h_can_num_batch == _step_token_num) {
-    // std::cout<<"early stop beam search!" <<std::endl;
+#ifdef DEBUG_RESULT
+  std::cout<<"early stop beam search!" <<std::endl;
+#endif
     return true;
   }
 
@@ -514,6 +518,7 @@ void Decoder::update_new_seq_probs() {
 #ifdef DEBUG_TIME
   auto start = std::chrono::high_resolution_clock::now();
 #endif
+  cudaMemset(_p_d_can_num, 0, sizeof(int));
   if (_tw._beam_size == 1)
     select_beam_rough_topk<1><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
