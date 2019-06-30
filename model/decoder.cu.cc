@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <cub/cub.cuh>
 
 #include "src/custom/transformer/kernels/nmtKernels.h"
@@ -136,15 +137,22 @@ void Decoder::init_buffer(void* pbuf) {
   curp += _max_batch_size * _tw._beam_size;
 
   int* pint = reinterpret_cast<int*>(curp);
+  // FIXME
+  std::vector<int> start_id_vec(_max_batch_size * _tw._beam_size * _tw._max_step * 2, _tw._start_id);
+  usleep(2000); 
+  cudaMemcpy(pint, start_id_vec.data(),
+             sizeof(int) * start_id_vec.size(),
+             cudaMemcpyHostToDevice);
+  //thrust::fill(thrust::device, _p_d_alive_seq, pint, _tw._start_id);
   _p_d_alive_seq = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._max_step;
-  thrust::fill(thrust::device, _p_d_alive_seq, pint, _tw._start_id);
   _p_d_alive_seq_buf = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._max_step;
   _p_d_can_idx = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
+  std::cout << "decoder init buffer finished." << std::endl;
   return;
 }
 

@@ -56,13 +56,20 @@ __global__ void select_beam_rough_topk(float* logits, const float* logit_bias,
   const int block_start = blockIdx.x * vocab_size;
   const int left_idx = block_start + threadIdx.x;
   const int right_idx = (blockIdx.x + 1) * vocab_size;
-  float rough_top_kth_logit = logit_thresh_min;
+  float rough_top_kth_logit = CUDA_FLOAT_INF_NEG;
   float sum_exp_logit = 0;
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    float lgt =
-        max(min(logits[i] + logit_bias[i - block_start], logit_thresh_max),
-            logit_thresh_min);
-    rough_top_kth_logit = max(rough_top_kth_logit, lgt);
+    float lgt = logits[i] + logit_bias[i - block_start];
+    rough_top_kth_logit = fmaxf(rough_top_kth_logit, lgt);
+  }  
+  float max_logit = blockReduceMax(rough_top_kth_logit);  
+  __shared__ float s_max_logit;
+  if (threadIdx.x == 0) {
+    s_max_logit = max_logit;
+  }
+  __syncthreads();
+  for (int i = left_idx; i < right_idx; i += blockDim.x) {
+    float lgt = fmaxf(logits[i] + logit_bias[i - block_start] - s_max_logit, logit_thresh_min);
     sum_exp_logit += expf(lgt);
   }
 
@@ -76,7 +83,7 @@ __global__ void select_beam_rough_topk(float* logits, const float* logit_bias,
   sum_exp_logit = blockReduceSum(sum_exp_logit);
   rough_top_kth_logit = blockRoughTopK<float, beam_size>(rough_top_kth_logit);
   if (threadIdx.x == 0) {
-    s_log_prob_base = seq_probs[blockIdx.x] - logf(sum_exp_logit);
+    s_log_prob_base = seq_probs[blockIdx.x] - logf(sum_exp_logit) - s_max_logit;
     s_topk = rough_top_kth_logit;
     num_cur_beam_can = 0;
   }
@@ -120,7 +127,7 @@ __global__ void select_beam_rough_topk(float* logits, const float* logit_bias,
     if ((lgt >= s_topk)) {
       pos += l_n;  // increment local pos by global counter
       can_score[pos] =
-          max(min(lgt, logit_thresh_max) + s_log_prob_base, min_log_probability + 1.f) * length_norm +
+          fmaxf((lgt + s_log_prob_base) * length_norm, min_log_probability + 1.f) +
           batch_id * min_log_probability;
       can_idx[pos] = idx - batch_start_pos;
     }

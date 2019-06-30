@@ -205,6 +205,12 @@ int Context::AllocateCudaBuffers(void** pdata, size_t byte_size) {
     LOG_ERROR << "unable to allocate memory in function AllocateCudaBuffers"
               << cudaGetErrorString(cuerr);
     return kCudaMalloc;
+  }  
+  cuerr = cudaDeviceSynchronize();
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "DeviceSynchronize failed after cudaMalloc"
+              << cudaGetErrorString(cuerr) << std::endl;
+    return kCudaMalloc;
   }
   return kSuccess;
 }
