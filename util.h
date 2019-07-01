@@ -19,7 +19,7 @@ namespace nmt {
   {                                                                 \
     cudaError_t err = (f);                                          \
     if (err != cudaSuccess) {                                       \
-      std::cout << "    CUDA Error occurred: " << err << std::endl; \
+      std::cerr << "    CUDA Error occurred: " << err << std::endl; \
       std::exit(1);                                                 \
     }                                                               \
   }
@@ -28,9 +28,20 @@ namespace nmt {
   {                                                                   \
     cublasStatus_t err = (f);                                         \
     if (err != CUBLAS_STATUS_SUCCESS) {                               \
-      std::cout << "    CuBLAS Error occurred: " << err << std::endl; \
+      std::cerr << "    CuBLAS Error occurred: " << err << std::endl; \
       std::exit(1);                                                   \
     }                                                                 \
+  }
+
+#define CUDA_CHECK()                                                \
+  {                                                                 \
+    cudaError_t err = cudaGetLastError();                           \
+    if (err != cudaSuccess) {                                       \
+      std::cerr << "    CUDA Error occurred: " << err << std::endl; \
+      std::cerr << "CUDA Error string: "                            \
+          << cudaGetErrorString(err) << std::endl;                  \
+      std::exit(1);                                                 \
+    }                                                               \
   }
 
 template <typename T>

@@ -80,6 +80,7 @@ int Decoder::compute_buffer_bytesize() {
 }
 
 void Decoder::init_buffer(void* pbuf) {
+  std::cout << "start init decoder buffer..." << std::endl;
   float* curp = reinterpret_cast<float*>(pbuf);
 
   for (int i = 0; i < _tw._n_dec_layer; i++) {
@@ -139,7 +140,7 @@ void Decoder::init_buffer(void* pbuf) {
   int* pint = reinterpret_cast<int*>(curp);
   // FIXME
   std::vector<int> start_id_vec(_max_batch_size * _tw._beam_size * _tw._max_step * 2, _tw._start_id);
-  usleep(2000); 
+  usleep(3000); 
   cudaMemcpy(pint, start_id_vec.data(),
              sizeof(int) * start_id_vec.size(),
              cudaMemcpyHostToDevice);
@@ -152,6 +153,7 @@ void Decoder::init_buffer(void* pbuf) {
   pint += _max_batch_size * _tw._beam_size * _tw._trg_vocab_size;
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
+  CUDA_CHECK();
   std::cout << "decoder init buffer finished." << std::endl;
   return;
 }
