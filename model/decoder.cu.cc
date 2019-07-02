@@ -13,7 +13,7 @@ namespace nmt {
 
 Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
                  const float* p_d_encoder_output, int* p_d_result,
-                 const TransformerWeight& tw, cublasHandle_t hd)
+                 const TransformerWeight& tw, cublasHandle_t hd, bool output_topk)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -24,13 +24,11 @@ Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _p_d_result(p_d_result),
       _p_d_trg_emb_wei(tw.get_trg_emb_wei()),
       _p_d_dec_wei(tw.get_dec_wei()),
-      _tw(tw),
-      _hd(hd),
+      _tw(tw), _hd(hd), _output_topk(output_topk),
       _layer_size_encdec_k(max_batch_size * tw._max_step * tw._hidden_size),
       _layer_size_self_k(max_batch_size * tw._max_step * tw._hidden_size *
                          tw._beam_size),
-      _fone(1.f),
-      _fzero(0.f),
+      _fone(1.f), _fzero(0.f),
       _atten_scaler(sqrt(1.f / tw._dim_per_head)),
       _output_scaler(sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
@@ -173,6 +171,19 @@ std::string Decoder::check() {
   if (_p_d_dec_wei.size() != _tw._weight_per_dec_layer * _tw._n_dec_layer) {
     return "violate p_d_dec_wei.size() = weight_per_dec_layer * n_dec_layer";
   }
+  if (_output_topk && _tw._length_penalty < 0) {
+    return "not support length_penlty < 0 for generate topk currently !";
+  }
+  bool btmp = false;
+  for(int i = 1; i < 64; i *= 2) {
+    if (i == _tw._beam_size) {
+      btmp = true;
+      break;
+    }
+  }
+  if (! btmp) {
+    return "wrong beam_size, should be 1, 2, 4, 8, 16 or 32";
+  }
   return "";
 }
 
@@ -198,6 +209,15 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
     }
   }
   // max _cur_step 254
+  if (_output_topk) {
+    if (_cur_step == _batch_max_decode_length) {
+      _cur_step -= 1;
+    }
+    ker_write_topk_result<<<_batch_size * _tw._beam_size, _cur_step + 1>>>(
+            _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, 
+            _tw._trg_vocab_size, _tw._max_step, _tw._beam_size);
+    return;
+  }
   if (_tw._length_penalty >= 0.f || _cur_step == _batch_max_decode_length) {
     ker_write_trg_tokenid_pos_penalty<<<_batch_size, _cur_step + 1>>>(
         _p_d_alive_seq, _p_d_result, _tw._max_step, _tw._beam_size);
@@ -546,6 +566,16 @@ void Decoder::update_new_seq_probs() {
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 8)
     select_beam_rough_topk<8><<<_step_token_num, _max_thread_per_block>>>(
+        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
+  if (_tw._beam_size == 16)
+    select_beam_rough_topk<16><<<_step_token_num, _max_thread_per_block>>>(
+        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
+        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
+  if (_tw._beam_size == 32)
+    select_beam_rough_topk<32><<<_step_token_num, _max_thread_per_block>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);

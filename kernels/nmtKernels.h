@@ -213,5 +213,9 @@ __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
 __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq, const float* seq_score,
 		int* output, int max_step, int beam_size, int vocab_size);
 
+__global__ void ker_write_topk_result(const int* alive_seq, 
+        float* seq_score, int* res_seq, 
+	int vocab_size, int max_step, int beam_size);
+
 }  // namespace nmt
 }  // namespace lab
