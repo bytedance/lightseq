@@ -133,7 +133,13 @@ Context::Context(const std::string& instance_name,
     : instance_name_(instance_name),
       model_config_(model_config),
       gpu_device_(gpu_device),
-      datatype_(DataType::TYPE_INVALID) {}
+      datatype_(DataType::TYPE_INVALID),
+      d_input_(nullptr),
+      d_padding_mask_(nullptr),
+      d_encoder_output_(nullptr),
+      d_buf_(nullptr),
+      d_output_(nullptr),
+      stream_(nullptr) {}
 
 Context::~Context() {
   FreeCudaBuffers();
@@ -278,15 +284,28 @@ int Context::Init() {
   }
 
   int max_batch_size = model_config_.max_batch_size();
-  AllocateCudaBuffers(&d_input_,
+  int err;
+  err = AllocateCudaBuffers(&d_input_,
                       max_batch_size * tw_._max_step * datatype_bytesize_);
-  AllocateCudaBuffers(&d_padding_mask_,
+  if (err != kSuccess) {
+    return err;
+  }
+  err = AllocateCudaBuffers(&d_padding_mask_,
                       max_batch_size * tw_._max_step * datatype_bytesize_);
-  AllocateCudaBuffers(
+  if (err != kSuccess) {
+    return err;
+  }
+  err = AllocateCudaBuffers(
       &d_encoder_output_,
       max_batch_size * tw_._max_step * tw_._hidden_size * datatype_bytesize_);
-  AllocateCudaBuffers(&d_output_,
+  if (err != kSuccess) {
+    return err;
+  }
+  err = AllocateCudaBuffers(&d_output_,
                       max_batch_size * tw_._beam_size * tw_._max_step * datatype_bytesize_);
+  if (err != kSuccess) {
+    return err;
+  }
 
   encoder_ = std::make_shared<lab::nmt::Encoder>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
@@ -309,7 +328,10 @@ int Context::Init() {
 
   int buf_bytesize =
       max(encoder_->compute_buffer_bytesize(), decoder_->compute_buffer_bytesize());
-  AllocateCudaBuffers(&d_buf_, buf_bytesize);
+  err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
+  if (err != kSuccess) {
+    return err;
+  }
   // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
@@ -321,6 +343,7 @@ int Context::Init() {
               << cudaGetErrorString(cuerr) << std::endl;
     return kCudaExecute;
   }
+  LOG_INFO << "Generate topk, release-version[2019.7.3] start succeed !" << std::endl;
   return kSuccess;
 }
 
