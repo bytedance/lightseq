@@ -572,5 +572,32 @@ __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq, const fl
   //output[blockIdx.x * blockDim.x + threadIdx.x] = int(seq_final_score[threadIdx.x]);
 }
 
+__global__ void ker_write_topk_result(const int* alive_seq, 
+        float* seq_score, int* res_seq, 
+	int vocab_size, int max_step, int beam_size) {
+  /**
+  @brief
+  write result from alive seq to output, recover seq_score 
+  for length_penlty > 0
+
+  @thread
+  gridDim.x = batch_size * beam_size
+  blockDim.x = cur_step + 1
+
+  @param
+  alive_seq: [batch_size, beam_size, max_step], <start> is the first token in each beam
+  seq_score: [batch_size, beam_size]
+  seq_probs: [batch_size, beam_size]
+  output: [batch_size, cur_step + 1], no <start> and at least one <eos> in the last of seq
+  */
+  res_seq[blockIdx.x * blockDim.x + threadIdx.x] = 
+	  alive_seq[blockIdx.x * max_step + threadIdx.x + 1]; 
+  if (threadIdx.x == 0) {
+      seq_score[blockIdx.x] -= (blockIdx.x / beam_size) * min_log_probability;
+      res_seq[blockIdx.x * blockDim.x + blockDim.x - 1] = vocab_size - 1;
+  }
+}
+
+
 }  // namespace nmt
 }  // namespace lab

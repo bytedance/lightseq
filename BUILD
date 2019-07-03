@@ -134,6 +134,38 @@ cc_binary(
     linkshared = 1,
 )
 
+cc_library(
+    name = "generate_base",
+    srcs = ["generate.cu.cc"],
+    copts = cuda_default_copts(),
+    deps = [
+        ":transformer_weight",
+        ":transformer_util",
+        "transformer_encoder",
+        "transformer_decoder",
+        "//src/core:model_config",
+        "//src/core:model_config_cuda",
+        "//src/core:model_config_proto",
+        "//src/servables/custom:custom",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_binary(
+    name = "libgenerate.so",
+    deps = [
+        ":generate_base",
+        "transformer_proto",
+        ":transformer_kernel",
+        ":transformer_weight",
+       ":transformer_util",
+        "transformer_encoder",
+        ":transformer_decoder",
+    ],
+    linkopts = ["-pthread"],
+    linkshared = 1,
+)
+
 cc_binary(
     name = "example",
     srcs = ["example.cu.cc"],
