@@ -343,7 +343,8 @@ int Context::Init() {
               << cudaGetErrorString(cuerr) << std::endl;
     return kCudaExecute;
   }
-  LOG_INFO << "Generate topk, release-version[2019.7.3] start succeed !" << std::endl;
+  LOG_INFO << "Generate topk, release-version[" << __DATE__
+           << " " << __TIME__ << "], start succeed!" << std::endl;
   return kSuccess;
 }
 

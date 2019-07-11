@@ -104,7 +104,7 @@ __global__ void select_beam_rough_topk(float* logits, const float* logit_bias,
     if (threadIdx.x == 0) l_n = 0;
     __syncthreads();
 
-    float lgt = logit_thresh_min - 1.f; // min s_topk is logit_thresh_min
+    float lgt = CUDA_FLOAT_INF_NEG - 1.f; // min s_topk is CUDA_FLOAT_INF_NEG
     int pos;
     int vocab_id = idx - block_start;
 
