@@ -78,7 +78,7 @@ int Decoder::compute_buffer_bytesize() {
 }
 
 void Decoder::init_buffer(void* pbuf) {
-  std::cout << "start init decoder buffer..." << std::endl;
+  std::cout << "decoder buffer init start" << std::endl;
   float* curp = reinterpret_cast<float*>(pbuf);
 
   for (int i = 0; i < _tw._n_dec_layer; i++) {
@@ -152,7 +152,7 @@ void Decoder::init_buffer(void* pbuf) {
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
   CUDA_CHECK();
-  std::cout << "decoder init buffer finished." << std::endl;
+  std::cout << "decoder buffer init succeed" << std::endl;
   return;
 }
 

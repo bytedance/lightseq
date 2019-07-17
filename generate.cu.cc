@@ -226,6 +226,7 @@ int Context::Init() {
   // CUDA API calls. The device is maintained per-CPU-thread, and
   // the same CPU thread will always be used with this instance of
   // the backend, so only need to set the device once.
+  LOG_INFO << "Trtis instance init start" << std::endl;
   cudaError_t cuerr = cudaSetDevice(gpu_device_);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "failed to set CUDA device to " << gpu_device_ << ": "
@@ -344,7 +345,7 @@ int Context::Init() {
     return kCudaExecute;
   }
   LOG_INFO << "Generate topk, release-version[" << __DATE__
-           << " " << __TIME__ << "], start succeed!" << std::endl;
+           << " " << __TIME__ << "], Trtis instance init succeed!" << std::endl;
   return kSuccess;
 }
 
