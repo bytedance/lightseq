@@ -5,8 +5,8 @@ namespace nmt {
 
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,
-    std::string duration_name) {
-  cudaDeviceSynchronize();
+    std::string duration_name, cudaStream_t stream) {
+  cudaStreamSynchronize(stream);
   auto finish = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> elapsed = finish - start;
   std::cout << duration_name

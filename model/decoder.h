@@ -21,7 +21,8 @@ class Decoder {
  public:
   Decoder(int max_batch_size, const int* p_d_padding_mask,
           const float* p_d_encoder_output, int* p_d_result,
-          const TransformerWeight& tw, cublasHandle_t hd, bool output_topk = false);
+          const TransformerWeight& tw, cudaStream_t stream, cublasHandle_t hd, 
+	  bool output_topk = false);
   int compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();
@@ -47,6 +48,7 @@ class Decoder {
   int _h_can_num_batch;
   size_t _cub_sort_buffer_bytes;
   const TransformerWeight& _tw;
+  cudaStream_t _stream;
   cublasHandle_t _hd;
   const bool _output_topk;
 

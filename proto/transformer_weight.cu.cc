@@ -353,12 +353,18 @@ std::string TransformerWeight::initializing(std::string proto_path) {
   // Verify that the version of the library that we linked against is
   // compatible with the version of the headers we compiled against.
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-  std::fstream input(proto_path, std::ios::in | std::ios::binary);
-  if (!input) {
+  int fd = open(proto_path.c_str(), O_RDONLY);
+  if (!fd) {
     return "Proto file [" + proto_path + "] not found.";
-  } else if (!transformer.ParseFromIstream(&input)) {
-    return "Failed to parse transformer weight.";
   }
+  google::protobuf::io::ZeroCopyInputStream* raw_input = new google::protobuf::io::FileInputStream(fd);
+  if (!transformer.ParseFromZeroCopyStream(raw_input)) {
+    delete raw_input;
+    close(fd);
+    return "Parse weights from [" + proto_path + "] failed.";
+  }
+  delete raw_input;
+  close(fd);
 
   get_model_config(transformer);
 

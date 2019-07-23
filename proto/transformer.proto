@@ -1,4 +1,5 @@
 syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
 // all the matrix are stored in row-major order, 
 // plz see https://en.wikipedia.org/wiki/Row-_and_column-major_order for details
 

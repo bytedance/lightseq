@@ -13,7 +13,8 @@ namespace nmt {
 
 Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
                  const float* p_d_encoder_output, int* p_d_result,
-                 const TransformerWeight& tw, cublasHandle_t hd, bool output_topk)
+                 const TransformerWeight& tw, cudaStream_t stream, cublasHandle_t hd, 
+		 bool output_topk)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -24,7 +25,7 @@ Decoder::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _p_d_result(p_d_result),
       _p_d_trg_emb_wei(tw.get_trg_emb_wei()),
       _p_d_dec_wei(tw.get_dec_wei()),
-      _tw(tw), _hd(hd), _output_topk(output_topk),
+      _tw(tw), _stream(stream), _hd(hd), _output_topk(output_topk),
       _layer_size_encdec_k(max_batch_size * tw._max_step * tw._hidden_size),
       _layer_size_self_k(max_batch_size * tw._max_step * tw._hidden_size *
                          tw._beam_size),
@@ -139,9 +140,10 @@ void Decoder::init_buffer(void* pbuf) {
   // FIXME
   std::vector<int> start_id_vec(_max_batch_size * _tw._beam_size * _tw._max_step * 2, _tw._start_id);
   usleep(3000); 
-  cudaMemcpy(pint, start_id_vec.data(),
+  CUDA_CALL(cudaMemcpyAsync(pint, start_id_vec.data(),
              sizeof(int) * start_id_vec.size(),
-             cudaMemcpyHostToDevice);
+             cudaMemcpyHostToDevice, _stream));
+  CUDA_CALL(cudaStreamSynchronize(_stream));
   //thrust::fill(thrust::device, _p_d_alive_seq, pint, _tw._start_id);
   _p_d_alive_seq = pint;
   pint += _max_batch_size * _tw._beam_size * _tw._max_step;
@@ -195,9 +197,9 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
   _batch_max_decode_length =
       min(_tw._max_step, batch_seq_len + _tw._extra_decode_length) - 1;
   project_encoder_output();
-  cudaMemcpy(_p_d_alive_seq_probs, _h_alive_seq_probs.data(),
+  CUDA_CALL(cudaMemcpyAsync(_p_d_alive_seq_probs, _h_alive_seq_probs.data(),
              sizeof(float) * _batch_size * _tw._beam_size,
-             cudaMemcpyHostToDevice);
+             cudaMemcpyHostToDevice, _stream));
   // max _batch_max_decode_length 254
   for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
     // for(_cur_step = 0; _cur_step < 10; _cur_step++) {
@@ -213,16 +215,16 @@ void Decoder::run_one_infer(int batch_size, int batch_seq_len) {
     if (_cur_step == _batch_max_decode_length) {
       _cur_step -= 1;
     }
-    ker_write_topk_result<<<_batch_size * _tw._beam_size, _cur_step + 1>>>(
+    ker_write_topk_result<<<_batch_size * _tw._beam_size, _cur_step + 1, 0, _stream>>>(
             _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, 
             _tw._trg_vocab_size, _tw._max_step, _tw._beam_size);
     return;
   }
   if (_tw._length_penalty >= 0.f || _cur_step == _batch_max_decode_length) {
-    ker_write_trg_tokenid_pos_penalty<<<_batch_size, _cur_step + 1>>>(
+    ker_write_trg_tokenid_pos_penalty<<<_batch_size, _cur_step + 1, 0, _stream>>>(
         _p_d_alive_seq, _p_d_result, _tw._max_step, _tw._beam_size);
   } else {
-    ker_write_trg_tokenid_neg_penalty<<<_batch_size, _cur_step + 1>>>(
+    ker_write_trg_tokenid_neg_penalty<<<_batch_size, _cur_step + 1, 0, _stream>>>(
         _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, _tw._max_step, _tw._beam_size,
 	_tw._trg_vocab_size);
   }
@@ -246,12 +248,12 @@ void Decoder::project_encoder_output() {
   // _p_d_encoder_out_buf: [batch_size, batch_seq_len, layer_num, 2,
   // hidden_size]
   ker_arrange_encdec_kv<<<dim3(_batch_token_num, _tw._n_dec_layer * 2),
-                          _tw._hidden_size>>>(
+                          _tw._hidden_size, 0, _stream>>>(
       _p_d_encoder_out_buf, _p_d_trg_emb_wei[5], _p_d_encdec_k_bgeem[0],
       _p_d_encdec_v_bgeem[0], _layer_size_encdec_k, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num);
 #ifdef DEBUG_TIME
-  print_time_duration(start, "encode output project");
+  print_time_duration(start, "encode output project", _stream);
 #endif
   return;
 }
@@ -268,11 +270,11 @@ void Decoder::embedding() {
 #ifdef DEBUG_TIME
   auto start = std::chrono::high_resolution_clock::now();
 #endif
-  ker_dec_embedding<<<_step_token_num, _tw._hidden_size>>>(
+  ker_dec_embedding<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_trg_emb_wei[0], _p_d_trg_emb_wei[1], _p_d_alive_seq,
       _p_d_cur_step_query, _cur_step, _tw._max_step, _tw._trg_vocab_size);
 #ifdef DEBUG_TIME
-  print_time_duration(start, "trg embedding");
+  print_time_duration(start, "trg embedding", _stream);
 #endif
   return;
 }
@@ -298,17 +300,17 @@ void Decoder::decoder_stack() {
 
     ffn_add_norm();
   }
-  ker_norm_layer<<<_step_token_num, _tw._hidden_size>>>(
+  ker_norm_layer<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_cur_step_query, _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3]);
 #ifdef DEBUG_TIME
-  print_time_duration(start, "decoder all");
+  print_time_duration(start, "decoder all", _stream);
 #endif
   return;
 }
 
 void Decoder::self_attention() {
   // step 0. layer_norm
-  ker_norm_layer3<<<_step_token_num, _tw._hidden_size>>>(
+  ker_norm_layer3<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_cur_step_query, _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5]);
 //#ifdef DEBUG_RESULT
@@ -321,7 +323,7 @@ void Decoder::self_attention() {
       _tw._hidden_size, &_fone, _p_d_dec_wei[_weight_offset + 2],
       _tw._hidden_size * 3, _p_d_query_buf1, _tw._hidden_size, &_fzero,
       _p_d_self_step_qkv, _tw._hidden_size * 3));
-  ker_arrange_decself_qkv<<<dim3(_step_token_num, 3), _tw._hidden_size>>>(
+  ker_arrange_decself_qkv<<<dim3(_step_token_num, 3), _tw._hidden_size, 0, _stream>>>(
       _p_d_self_step_qkv, _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
       _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step);
@@ -338,7 +340,7 @@ void Decoder::self_attention() {
 //		  (_cur_step + 1));
 //#endif
   ker_correlation_softmax_decself<<<_step_token_num * _tw._head_num,
-                                    _cur_step + 1>>>(_p_d_c);
+                                    _cur_step + 1, 0, _stream>>>(_p_d_c);
 //#ifdef DEBUG_RESULT
 //  print_vec(_p_d_c + 4*(_cur_step + 1), "self_attention:correlation:after batch0, beam0",
 //		  (_cur_step + 1));
@@ -371,7 +373,7 @@ void Decoder::self_attention() {
 
 void Decoder::encdec_attention() {
   // step 0. layer_norm
-  ker_norm_layer3<<<_step_token_num, _tw._hidden_size>>>(
+  ker_norm_layer3<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_cur_step_query, _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11]);
   // step 1. q = q * q_wei
@@ -380,7 +382,7 @@ void Decoder::encdec_attention() {
                           _p_d_dec_wei[_weight_offset + 8], _tw._hidden_size,
                           _p_d_query_buf1, _tw._hidden_size, &_fzero,
                           _p_d_query_buf2, _tw._hidden_size));
-  ker_arrange_encdec_q<<<_step_token_num, _tw._hidden_size>>>(
+  ker_arrange_encdec_q<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_query_buf2, _p_d_dec_wei[_weight_offset + 9], _p_d_query_buf1,
       _tw._beam_size, _tw._dim_per_head, _tw._head_num);
   // step 2. correlation = q * k
@@ -393,7 +395,7 @@ void Decoder::encdec_attention() {
       _batch_size * _tw._head_num));
 
   ker_correlation_softmax_encdec<<<
-      dim3(_batch_size, _tw._head_num * _tw._beam_size), _batch_seq_len>>>(
+      dim3(_batch_size, _tw._head_num * _tw._beam_size), _batch_seq_len, 0, _stream>>>(
       _p_d_c, _p_d_padding_mask);
 
   // step 3. q = correlation * v
@@ -404,7 +406,7 @@ void Decoder::encdec_attention() {
       _tw._beam_size * _batch_seq_len, &_fzero, _p_d_query_buf1,
       _tw._dim_per_head, _tw._beam_size * _tw._dim_per_head,
       _batch_size * _tw._head_num));
-  ker_arrange_atten_output<<<_step_token_num, _tw._hidden_size>>>(
+  ker_arrange_atten_output<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_query_buf1, _p_d_query_buf2, _tw._beam_size, _tw._dim_per_head,
       _tw._head_num);
   // step 4. q = ori_q + q * output_wei
@@ -421,7 +423,7 @@ void Decoder::encdec_attention() {
 
 void Decoder::ffn_add_norm() {
   // step 0. layer_norm
-  ker_norm_layer3<<<_step_token_num, _tw._hidden_size>>>(
+  ker_norm_layer3<<<_step_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_cur_step_query, _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17]);
   CUBLAS_CALL(cublasSgemm(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
@@ -430,7 +432,7 @@ void Decoder::ffn_add_norm() {
                           _p_d_query_buf1, _tw._hidden_size, &_fzero,
                           _p_d_query_buf2, _tw._inner_size));
   kerBiasRelu<<<dim3(_step_token_num, _tw._inner_size / _max_thread_per_block),
-                _max_thread_per_block>>>(
+                _max_thread_per_block, 0, _stream>>>(
       _p_d_query_buf2, _p_d_dec_wei[_weight_offset + 15], _tw._inner_size);
   CUBLAS_CALL(cublasSgemm(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
                           _step_token_num, _tw._inner_size, &_fone,
@@ -473,17 +475,18 @@ bool Decoder::beam_search() {
   update_new_seq_probs();
 
   /* step 2. sort the candidate with their probability */
-  cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
-             cudaMemcpyDeviceToHost);
+  CUDA_CALL(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
+             cudaMemcpyDeviceToHost, _stream));
+  CUDA_CALL(cudaStreamSynchronize(_stream));
 #ifdef DEBUG_RESULT
   print_vec(_p_d_can_idx, "candidate index before sort", _h_can_num_batch);
 #endif
   if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
     CUDA_CALL(cub::DeviceRadixSort::SortPairsDescending(
         _p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score, _p_d_can_score,
-        _p_d_can_idx, _p_d_can_idx, _h_can_num_batch));
+        _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0, sizeof(float) * 8, _stream));
   } else {
-    thrust::sort_by_key(thrust::device, _p_d_can_score,
+    thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
                         _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
                         thrust::greater<float>());
   }
@@ -493,8 +496,8 @@ bool Decoder::beam_search() {
     step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam
     based on sorted candidate
   */
-  cudaMemset(_p_d_can_num, 0, sizeof(int));
-  ker_refresh_result<<<dim3(_batch_size, _tw._beam_size), _tw._max_step>>>(
+  CUDA_CALL(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
+  ker_refresh_result<<<dim3(_batch_size, _tw._beam_size), _tw._max_step, 0, _stream>>>(
       _p_d_can_idx, _p_d_can_score, _p_d_can_num + 1, _p_d_alive_seq,
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
       _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step]);
@@ -512,8 +515,9 @@ bool Decoder::beam_search() {
     print_vec(_p_d_alive_seq + _tw._max_step * i, "alive seq batch0", _cur_step + 2);
   }
 #endif
-  cudaMemcpy(&_h_can_num_batch, _p_d_can_num, sizeof(int),
-             cudaMemcpyDeviceToHost);
+  CUDA_CALL(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
+             cudaMemcpyDeviceToHost, _stream));
+  CUDA_CALL(cudaStreamSynchronize(_stream));
   if (_h_can_num_batch == _step_token_num) {
 #ifdef DEBUG_RESULT
   std::cout<<"early stop beam search!" <<std::endl;
@@ -521,12 +525,11 @@ bool Decoder::beam_search() {
     return true;
   }
 
-
   /* step 4. refresh cache: k, v of self attention */
   if (_cur_step > 0) {
     ker_refresh_cache<<<dim3(_tw._n_dec_layer * (_cur_step + 1),
                              _step_token_num * 2),
-                        _tw._hidden_size>>>(
+                        _tw._hidden_size, 0, _stream>>>(
         _p_d_can_num + 1, _p_d_can_idx, _p_d_self_k_bgeem1[0],
         _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0], _p_d_self_v_bgeem2[0],
         _layer_size_self_k, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
@@ -539,7 +542,7 @@ bool Decoder::beam_search() {
     _p_d_self_v_bgeem1 = ftmp;
   }
 #ifdef DEBUG_TIME
-  print_time_duration(start, "beam search");
+  print_time_duration(start, "beam search", _stream);
 #endif
   return false;
 }
@@ -548,34 +551,34 @@ void Decoder::update_new_seq_probs() {
 #ifdef DEBUG_TIME
   auto start = std::chrono::high_resolution_clock::now();
 #endif
-  cudaMemset(_p_d_can_num, 0, sizeof(int));
+  CUDA_CALL(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
   if (_tw._beam_size == 1)
-    select_beam_rough_topk<1><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<1><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 2)
-    select_beam_rough_topk<2><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<2><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 4)
-    select_beam_rough_topk<4><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<4><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 8)
-    select_beam_rough_topk<8><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<8><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 16)
-    select_beam_rough_topk<16><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<16><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
   if (_tw._beam_size == 32)
-    select_beam_rough_topk<32><<<_step_token_num, _max_thread_per_block>>>(
+    select_beam_rough_topk<32><<<_step_token_num, _max_thread_per_block, 0, _stream>>>(
         _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
 	_p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
         _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step], _cur_step);
@@ -583,10 +586,10 @@ void Decoder::update_new_seq_probs() {
   print_vec(_p_d_can_num, "beam can num",
             _batch_size * _tw._beam_size + 1);
 #endif
-  thrust::exclusive_scan(thrust::device, _p_d_can_num + 1,
+  thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
 #ifdef DEBUG_TIME
-  print_time_duration(start, "update seq probs");
+  print_time_duration(start, "update seq probs", _stream);
 #endif
   return;
 }
