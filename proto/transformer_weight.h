@@ -1,9 +1,15 @@
 #pragma once
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #include <thrust/device_vector.h>
 

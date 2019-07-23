@@ -64,6 +64,7 @@ enum ErrorCodes {
   kCudaMemcpy,
   kCudaExecute,
   kCudaStream,
+  kCublas,
   kCpuExecute,
   kWeightLoad,
   kModelSize
@@ -121,9 +122,9 @@ class Context {
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
   cudaStream_t stream_;
+  cublasHandle_t hd_;
 
   lab::nmt::TransformerWeight tw_;
-  cublasHandle_t hd_;
   std::shared_ptr<lab::nmt::Decoder> decoder_;
   std::shared_ptr<lab::nmt::Encoder> encoder_;
 };
@@ -139,10 +140,19 @@ Context::Context(const std::string& instance_name,
       d_encoder_output_(nullptr),
       d_buf_(nullptr),
       d_output_(nullptr),
-      stream_(nullptr) {}
+      stream_(nullptr),
+      hd_(nullptr){}
 
 Context::~Context() {
-  FreeCudaBuffers();
+  FreeCudaBuffers();  
+  
+  if (hd_ != nullptr) {
+    cublasStatus_t cuerr = cublasDestroy(hd_);
+    if (cuerr != CUBLAS_STATUS_SUCCESS) {
+      LOG_ERROR << "Failed to destroy cublas handle.";
+    }
+    hd_ = nullptr;
+  }
 
   if (stream_ != nullptr) {
     cudaError_t cuerr = cudaStreamDestroy(stream_);
@@ -212,9 +222,9 @@ int Context::AllocateCudaBuffers(void** pdata, size_t byte_size) {
               << cudaGetErrorString(cuerr);
     return kCudaMalloc;
   }  
-  cuerr = cudaDeviceSynchronize();
+  cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "DeviceSynchronize failed after cudaMalloc"
+    LOG_ERROR << "Stream synchronize failed after cudaMalloc"
               << cudaGetErrorString(cuerr) << std::endl;
     return kCudaMalloc;
   }
@@ -229,9 +239,30 @@ int Context::Init() {
   LOG_INFO << "Trtis instance init start" << std::endl;
   cudaError_t cuerr = cudaSetDevice(gpu_device_);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "failed to set CUDA device to " << gpu_device_ << ": "
+    LOG_ERROR << "Failed to set CUDA device to " << gpu_device_ << ": "
               << cudaGetErrorString(cuerr);
     return kCudaDevice;
+  }
+  
+  const int cuda_stream_priority =
+      GetCudaStreamPriority(model_config_.optimization().priority());
+  cuerr = cudaStreamCreateWithPriority(
+      &stream_, cudaStreamDefault, cuda_stream_priority);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "Unable to create stream"
+              << cudaGetErrorString(cuerr);
+    return kCudaStream;
+  }
+
+  cublasStatus_t cublaserr = cublasCreate(&hd_);
+  if (cublaserr != CUBLAS_STATUS_SUCCESS) {
+    LOG_ERROR << "Failed to creat cublas handle";
+    return kCublas;
+  }
+  cublaserr = cublasSetStream(hd_, stream_);
+  if (cublaserr != CUBLAS_STATUS_SUCCESS) {
+    LOG_ERROR << "Failed to set stream for cublas handle";
+    return kCublas;
   }
 
   if (model_config_.input_size() != 1) {
@@ -260,7 +291,6 @@ int Context::Init() {
     return kOutputName;
   }
 
-  CUBLAS_CALL(cublasCreate(&hd_));
   char* mz = getenv("MODEL_ZOO");
   if (mz == NULL) {
     LOG_ERROR << "plz set environment variable MODEL_ZOO !" << std::endl;
@@ -268,9 +298,9 @@ int Context::Init() {
   }
   std::string model_path = mz;
   model_path += "/" + model_config_.name();
-  LOG_INFO << "load model weight from " << model_path + "/transformer.pb"
-           << std::endl;
-  std::string res = tw_.initializing(model_path + "/transformer.pb");
+  std::string res = "load model weight from " + model_path + "/transformer.pb\n";
+  LOG_INFO << res;
+  res = tw_.initializing(model_path + "/transformer.pb");
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
@@ -303,7 +333,7 @@ int Context::Init() {
   encoder_ = std::make_shared<lab::nmt::Encoder>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<float*>(d_encoder_output_), tw_, hd_);
+      reinterpret_cast<float*>(d_encoder_output_), tw_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -312,7 +342,7 @@ int Context::Init() {
   decoder_ = std::make_shared<lab::nmt::Decoder>(
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<float*>(d_encoder_output_),
-      reinterpret_cast<int*>(d_output_), tw_, hd_);
+      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_);
   res = decoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -330,7 +360,7 @@ int Context::Init() {
   decoder_->init_buffer(d_buf_);
   
   // Wait for all init finish.
-  cuerr = cudaDeviceSynchronize();
+  cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "failed to init GPU for transformer: "
               << cudaGetErrorString(cuerr) << std::endl;
@@ -369,7 +399,7 @@ int Context::GetInputTensorGPU(CustomGetNextInputFn_t input_fn,
 
     cudaError_t cuerr = cudaMemcpyAsync(
         reinterpret_cast<char*>(input) + total_content_byte_size, content,
-        content_byte_size, cudaMemcpyHostToDevice);
+        content_byte_size, cudaMemcpyHostToDevice, stream_);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "failed to copy input values to GPU for transformer: "
                 << cudaGetErrorString(cuerr) << std::endl;
@@ -461,7 +491,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
     }
 
     cuerr = cudaMemcpyAsync(obuffer, d_output_, output_bytesize,
-                            cudaMemcpyDeviceToHost);
+                            cudaMemcpyDeviceToHost, stream_);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "failed to copy output values from GPU for transformer: "
                 << cudaGetErrorString(cuerr) << std::endl;
@@ -471,7 +501,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
   }
 
   // Wait for all compute and memcpy to complete.
-  cudaError_t cuerr = cudaDeviceSynchronize();
+  cudaError_t cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "failed to synchronize GPU for transformer: "
               << cudaGetErrorString(cuerr) << std::endl;
@@ -558,6 +588,8 @@ const char* CustomErrorString(void* custom_context, int errcode) {
       return "cuda execution failed";
     case kCudaStream:
       return "failed to create CUDA stream";
+    case kCublas:
+      return "failed to create Cublas handle";
     case kCpuExecute:
       return "cpu execution failed";
     case kWeightLoad:

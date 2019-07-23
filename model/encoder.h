@@ -20,7 +20,8 @@ namespace nmt {
 class Encoder {
  public:
   Encoder(int max_batch_size, const int* p_d_token_id, int* p_d_padding_mask,
-          float* p_d_output, const TransformerWeight& tw, cublasHandle_t hd);
+          float* p_d_output, const TransformerWeight& tw,
+	  cudaStream_t stream, cublasHandle_t hd);
   int compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();
@@ -37,6 +38,7 @@ class Encoder {
   float*
       _p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
   const TransformerWeight& _tw;
+  cudaStream_t _stream;
   cublasHandle_t _hd;
   const float _fone;
   const float _fzero;

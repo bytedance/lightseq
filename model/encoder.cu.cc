@@ -7,13 +7,13 @@ namespace nmt {
 
 Encoder::Encoder(int max_batch_size, const int* p_d_token_id,
                  int* p_d_padding_mask, float* p_d_output,
-                 const TransformerWeight& tw, cublasHandle_t hd)
+                 const TransformerWeight& tw, cudaStream_t stream, cublasHandle_t hd)
     : _max_batch_size(max_batch_size),
       _p_d_token_id(p_d_token_id),
       _p_d_padding_mask(p_d_padding_mask),
       _p_d_output(p_d_output),
       _tw(tw),
-      _hd(hd),
+      _stream(stream), _hd(hd),
       _p_d_src_emb_wei(tw.get_src_emb_wei()),
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone(1.f),
@@ -64,7 +64,7 @@ void Encoder::run_one_infer(int batch_size, int batch_seq_len) {
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
   // token embedding, add position embedding and layer_norm
-  ker_enc_embedding<<<dim3(batch_size, batch_seq_len), _tw._hidden_size>>>(
+  ker_enc_embedding<<<dim3(batch_size, batch_seq_len), _tw._hidden_size, 0, _stream>>>(
       _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_token_id, _p_d_output,
       _p_d_padding_mask, _tw._padding_id);
 
@@ -74,14 +74,14 @@ void Encoder::run_one_infer(int batch_size, int batch_seq_len) {
     ffn_add_norm();
   }
 
-  ker_norm_layer<<<_batch_token_num, _tw._hidden_size>>>(
+  ker_norm_layer<<<_batch_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_output, _p_d_src_emb_wei[2], _p_d_src_emb_wei[3]);
   return;
 }
 
 void Encoder::self_attention() {
   // step 0. layer_norm
-  lab::nmt::ker_norm_layer3<<<_batch_token_num, _tw._hidden_size>>>(
+  lab::nmt::ker_norm_layer3<<<_batch_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_output, _p_d_q, _p_d_enc_wei[_weight_offset],
       _p_d_enc_wei[_weight_offset + 1], _p_d_enc_wei[_weight_offset + 5]);
 
@@ -91,7 +91,7 @@ void Encoder::self_attention() {
                           _p_d_enc_wei[_weight_offset + 2],
                           _tw._hidden_size * 3, _p_d_q, _tw._hidden_size,
                           &_fzero, _p_d_qkv_projected, _tw._hidden_size * 3));
-  ker_arrange_encself_qkv<<<dim3(_batch_token_num, 3), _tw._hidden_size>>>(
+  ker_arrange_encself_qkv<<<dim3(_batch_token_num, 3), _tw._hidden_size, 0, _stream>>>(
       _p_d_qkv_projected, _p_d_enc_wei[_weight_offset + 3], _p_d_q,
       _max_batch_dim, _batch_seq_len, _tw._dim_per_head, _tw._head_num);
   // step 2. correlation = q * k
@@ -102,7 +102,7 @@ void Encoder::self_attention() {
       _batch_seq_len * _tw._dim_per_head, &_fzero, _p_d_c, _batch_seq_len,
       _batch_seq_len * _batch_seq_len, _batch_size * _tw._head_num));
   ker_correlation_softmax_encself<<<
-      dim3(_batch_size, _tw._head_num * _batch_seq_len), _batch_seq_len>>>(
+      dim3(_batch_size, _tw._head_num * _batch_seq_len), _batch_seq_len, 0, _stream>>>(
       _p_d_c, _p_d_padding_mask);
 
   // step 3. q = correlation * v
@@ -115,7 +115,7 @@ void Encoder::self_attention() {
 
   // use v to save reshaped q, since they are in same size and v
   // will not be use again before the next multi-head-attention
-  ker_arrange_atten_output<<<_batch_token_num, _tw._hidden_size>>>(
+  ker_arrange_atten_output<<<_batch_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_q, _p_d_v, _batch_seq_len, _tw._dim_per_head, _tw._head_num);
 
   // step 4. q = ori_q + q * output_wei
@@ -130,7 +130,7 @@ void Encoder::self_attention() {
 
 void Encoder::ffn_add_norm() {
   // step 0. layer_norm
-  lab::nmt::ker_norm_layer3<<<_batch_token_num, _tw._hidden_size>>>(
+  lab::nmt::ker_norm_layer3<<<_batch_token_num, _tw._hidden_size, 0, _stream>>>(
       _p_d_output, _p_d_ffn_buf1, _p_d_enc_wei[_weight_offset + 6],
       _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11]);
 
@@ -141,7 +141,7 @@ void Encoder::ffn_add_norm() {
                           _p_d_ffn_buf1, _tw._hidden_size, &_fzero,
                           _p_d_ffn_buf2, _tw._inner_size));
   kerBiasRelu<<<dim3(_batch_token_num, _tw._inner_size / _max_thread_per_block),
-                _max_thread_per_block>>>(
+                _max_thread_per_block, 0, _stream>>>(
       _p_d_ffn_buf2, _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
   // step 2. second layer
   CUBLAS_CALL(cublasSgemm(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,

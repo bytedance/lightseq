@@ -6,7 +6,14 @@
 #include "src/custom/transformer/util.h"
 
 int main(int argc, char* argv[]) {
-  // load model weights from proto
+  // load model weights from proto  
+  cudaStream_t stream_;
+  cublasHandle_t hd_;
+  cudaSetDevice(0);
+  cudaStreamCreate(&stream_);
+  cublasCreate(&hd_);
+  cublasSetStream(hd_, stream_);
+
   lab::nmt::TransformerWeight tw_;
   std::string res = tw_.initializing(argv[1]);  // proto path
   if (!res.empty()) {
@@ -28,8 +35,6 @@ int main(int argc, char* argv[]) {
       0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._max_step * datatype_bytesize_, 0);
-  cublasHandle_t hd_;
-  CUBLAS_CALL(cublasCreate(&hd_));
   std::shared_ptr<lab::nmt::Encoder> encoder_ =
       std::make_shared<lab::nmt::Encoder>(
           max_batch_size,
@@ -38,7 +43,7 @@ int main(int argc, char* argv[]) {
               thrust::raw_pointer_cast(d_padding_mask_.data())),
           reinterpret_cast<float*>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
-          tw_, hd_);
+          tw_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     std::cout << res << std::endl;
@@ -51,7 +56,7 @@ int main(int argc, char* argv[]) {
           reinterpret_cast<float*>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
           reinterpret_cast<int*>(thrust::raw_pointer_cast(d_output_.data())),
-          tw_, hd_);
+          tw_, stream_, hd_);
   res = decoder_->check();
   if (!res.empty()) {
     std::cout << res << std::endl;
@@ -66,11 +71,11 @@ int main(int argc, char* argv[]) {
       reinterpret_cast<void*>(thrust::raw_pointer_cast(d_buf_.data())));
   decoder_->init_buffer(
       reinterpret_cast<void*>(thrust::raw_pointer_cast(d_buf_.data())));
-  cudaDeviceSynchronize();
+  cudaStreamSynchronize(stream_);
 
   int batch_size = 1;
   int batch_seq_len = 32;
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // for ru2en
     //std::vector<int> host_input = {
@@ -86,13 +91,13 @@ int main(int argc, char* argv[]) {
     // for zh2en.1.3.77.29
     std::vector<int> host_input = {5553, 1, 2518, 1612, 3774, 104, 14559, 3698, 1572, 3030, 101, 1033, 2833, 5531, 1, 2414, 4032, 6, 111, 1503, 2169, 3774, 1529, 4063, 730, 3882, 2485, 0, 7354, 348, 2, 35611};
     // std::vector<int> host_input = {7480, 18, 1, 14673, 279, 2631, 1, 13004, 505, 893, 10065, 1, 2155, 1357, 3520, 141, 1, 3680, 557, 8, 9610, 194, 549, 0, 893, 2705, 2, 35611};
-    cudaMemcpy(
+    cudaMemcpyAsync(
         reinterpret_cast<int*>(thrust::raw_pointer_cast(d_input_.data())),
         host_input.data(), sizeof(int) * batch_size * batch_seq_len,
-        cudaMemcpyHostToDevice);
+        cudaMemcpyHostToDevice, stream_);
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
-    lab::nmt::print_time_duration(start, "one infer time");
+    lab::nmt::print_time_duration(start, "one infer time", stream_);
   }
   return 0;
 }
