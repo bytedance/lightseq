@@ -16,7 +16,7 @@ docker build -t tensorrtserver_build --target trtserver_build .
 
 nvidia-docker run -it --rm -v/${path}/${to}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build （19.03版本docker以前）
 
-或者 docker run -it --rm -v/${path}/${to}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build（19.03版本docker）
+或者 docker run -it --rm -v/${path}/${to}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build（19.03版本docker及以后）
 
 2. 在镜像内
 
