@@ -12,7 +12,7 @@ cp -r trtis_cuda tensorrt-inference-server/src/custom/transformer
 
 cd tensorrt-inference-server && git checkout r19.05
 
-docker build -t tensorrtserver_build --target trtserver_build . (包涵众多境外依赖库，可在dockerfile设置http_proxy)
+docker build -t tensorrtserver_build --target trtserver_build . (使用众多境外依赖库，可在dockerfile设置http_proxy)
 
 nvidia-docker run -it --rm -v/${path}/${to}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build （19.03版本docker以前）
 
