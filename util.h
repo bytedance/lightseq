@@ -15,68 +15,90 @@
 namespace lab {
 namespace nmt {
 
-#define CUDA_CALL(f)                                                \
-  {                                                                 \
-    cudaError_t err = (f);                                          \
-    if (err != cudaSuccess) {                                       \
-      std::cerr << "    CUDA Error occurred: " << err << std::endl; \
-      std::exit(1);                                                 \
-    }                                                               \
-  }
+static const char *_cudaGetErrorString(cudaError_t error) {
+  return cudaGetErrorString(error);
+}
 
-#define CUBLAS_CALL(f)                                                \
-  {                                                                   \
-    cublasStatus_t err = (f);                                         \
-    if (err != CUBLAS_STATUS_SUCCESS) {                               \
-      std::cerr << "    CuBLAS Error occurred: " << err << std::endl; \
-      std::exit(1);                                                   \
-    }                                                                 \
-  }
+static const char *_cudaGetErrorString(cublasStatus_t error) {
+  switch (error) {
+    case CUBLAS_STATUS_SUCCESS:
+      return "CUBLAS_STATUS_SUCCESS";
 
-#define CUDA_CHECK()                                                \
-  {                                                                 \
-    cudaError_t err = cudaGetLastError();                           \
-    if (err != cudaSuccess) {                                       \
-      std::cerr << "    CUDA Error occurred: " << err << std::endl; \
-      std::cerr << "CUDA Error string: "                            \
-          << cudaGetErrorString(err) << std::endl;                  \
-      std::exit(1);                                                 \
-    }                                                               \
-  }
+    case CUBLAS_STATUS_NOT_INITIALIZED:
+      return "CUBLAS_STATUS_NOT_INITIALIZED";
 
-template <typename T>
-inline void print_vec(const thrust::device_vector<T>& outv, std::string outn,
-                      int num_output_ele = -1) {
-  std::cout << outn << ": ";
-  if (num_output_ele > 0) {
-    num_output_ele = min(size_t(num_output_ele), outv.size());
-    thrust::copy(outv.begin(), outv.begin() + num_output_ele,
-                 std::ostream_iterator<T>(std::cout, " "));
-    std::cout << " ...";
-  } else {
-    thrust::copy(outv.begin(), outv.end(),
-                 std::ostream_iterator<T>(std::cout, " "));
+    case CUBLAS_STATUS_ALLOC_FAILED:
+      return "CUBLAS_STATUS_ALLOC_FAILED";
+
+    case CUBLAS_STATUS_INVALID_VALUE:
+      return "CUBLAS_STATUS_INVALID_VALUE";
+
+    case CUBLAS_STATUS_ARCH_MISMATCH:
+      return "CUBLAS_STATUS_ARCH_MISMATCH";
+
+    case CUBLAS_STATUS_MAPPING_ERROR:
+      return "CUBLAS_STATUS_MAPPING_ERROR";
+
+    case CUBLAS_STATUS_EXECUTION_FAILED:
+      return "CUBLAS_STATUS_EXECUTION_FAILED";
+
+    case CUBLAS_STATUS_INTERNAL_ERROR:
+      return "CUBLAS_STATUS_INTERNAL_ERROR";
+
+    case CUBLAS_STATUS_NOT_SUPPORTED:
+      return "CUBLAS_STATUS_NOT_SUPPORTED";
+
+    case CUBLAS_STATUS_LICENSE_ERROR:
+      return "CUBLAS_STATUS_LICENSE_ERROR";
   }
-  std::cout << std::endl;
+  return "CUBLAS_UNKNOW";
 }
 
 template <typename T>
-inline void print_vec(thrust::device_ptr<T> outv, std::string outn,
-                      int num_output_ele) {
-  std::cout << outn << ": ";
-  thrust::copy(outv, outv + num_output_ele,
-               std::ostream_iterator<T>(std::cout, " "));
-  std::cout << std::endl;
+void check_gpu_error(T result, char const *const func, const char *const file, int const line) {
+  if (result) {
+    throw std::runtime_error(std::string("[CUDA][ERROR] ") + \
+        + file + "(" + std::to_string(line) + "): " + \
+        (_cudaGetErrorString(result)) + "\n");
+  }
 }
 
+#define CHECK_GPU_ERROR(val) lab::nmt::check_gpu_error((val), #val, __FILE__, __LINE__)
+
+enum class OperationType{FP32, FP16};
+
+template <OperationType OpType_> class OperationTypeTraits;
+
+template <> class OperationTypeTraits<OperationType::FP32> {
+public:
+  typedef float DataType;
+  static cudaDataType_t const computeType = CUDA_R_32F;
+  static cudaDataType_t const AType = CUDA_R_32F;
+  static cudaDataType_t const BType = CUDA_R_32F;
+  static cudaDataType_t const CType = CUDA_R_32F;
+  // add FP32 Traits here
+};
+
+template <> class OperationTypeTraits<OperationType::FP16> {
+public:
+  typedef __half DataType;
+  static cudaDataType_t const computeType = CUDA_R_16F;
+  static cudaDataType_t const AType = CUDA_R_16F;
+  static cudaDataType_t const BType = CUDA_R_16F;
+  static cudaDataType_t const CType = CUDA_R_16F;
+  // add FP16 Traits here
+};
+
 template <typename T>
-inline void print_vec(const T* outv, std::string outn, int num_output_ele) {
-  std::cout << outn << ": ";
-  thrust::copy(thrust::device_pointer_cast(outv),
-               thrust::device_pointer_cast(outv + num_output_ele),
-               std::ostream_iterator<T>(std::cout, " "));
-  std::cout << std::endl;
-}
+void print_vec(const thrust::device_vector<T>& outv, std::string outn,
+                      int num_output_ele = -1);
+
+template <typename T>
+void print_vec(thrust::device_ptr<T> outv, std::string outn,
+                      int num_output_ele);
+
+template <typename T>
+void print_vec(const T* outv, std::string outn, int num_output_ele);
 
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,

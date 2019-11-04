@@ -67,6 +67,7 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":transformer_proto",
+        ":transformer_util",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
@@ -174,6 +175,44 @@ cc_binary(
         ":transformer_util",
         "transformer_encoder",
         "transformer_decoder",        
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
+)
+
+cc_binary(
+    name = "fp32test",
+    srcs = ["FasterTransformer/tools/gemm_test/gemm_fp32.cc"],
+    includes = [
+        "FasterTransformer/tools/gemm_test"
+    ],
+    copts = cuda_default_copts(),
+    deps = [
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
+)
+
+cc_binary(
+    name = "fp16test",
+    srcs = ["FasterTransformer/tools/gemm_test/gemm_fp16.cc"],
+    includes = [
+        "FasterTransformer/tools/gemm_test"
+    ],
+    copts = cuda_default_copts(),
+    deps = [
+        "@local_config_cuda//cuda:cuda_headers",
     ],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",

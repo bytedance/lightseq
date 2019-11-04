@@ -39,6 +39,7 @@
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
+const lab::nmt::OperationType OPTYPE = lab::nmt::OperationType::FP16;
 
 namespace nvidia {
 namespace inferenceserver {
@@ -86,6 +87,7 @@ class Context {
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
+  typedef lab::nmt::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
   int AllocateCudaBuffers(void** pdata, size_t byte_size);
 
@@ -124,9 +126,9 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  lab::nmt::TransformerWeight tw_;
-  std::shared_ptr<lab::nmt::Decoder> decoder_;
-  std::shared_ptr<lab::nmt::Encoder> encoder_;
+  lab::nmt::TransformerWeight<OPTYPE> tw_;
+  std::shared_ptr<lab::nmt::Decoder<OPTYPE>> decoder_;
+  std::shared_ptr<lab::nmt::Encoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -318,6 +320,7 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
+  // FIXME
   err = AllocateCudaBuffers(
       &d_encoder_output_,
       max_batch_size * tw_._max_step * tw_._hidden_size * datatype_bytesize_);
@@ -330,19 +333,19 @@ int Context::Init() {
     return err;
   }
 
-  encoder_ = std::make_shared<lab::nmt::Encoder>(
-      max_batch_size, reinterpret_cast<int*>(d_input_),
-      reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<float*>(d_encoder_output_), tw_, stream_, hd_);
+  encoder_ = std::make_shared<lab::nmt::Encoder<OPTYPE>>(
+      max_batch_size, reinterpret_cast<int *>(d_input_),
+      reinterpret_cast<int *>(d_padding_mask_),
+      reinterpret_cast<_optraits::DataType *>(d_encoder_output_), tw_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kModelSize;
   }
-  decoder_ = std::make_shared<lab::nmt::Decoder>(
-      max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<float*>(d_encoder_output_),
-      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_);
+  decoder_ = std::make_shared<lab::nmt::Decoder<OPTYPE>>(
+      max_batch_size, reinterpret_cast<int *>(d_padding_mask_),
+      reinterpret_cast<_optraits::DataType *>(d_encoder_output_),
+      reinterpret_cast<int *>(d_output_), tw_, stream_, hd_);
   res = decoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
