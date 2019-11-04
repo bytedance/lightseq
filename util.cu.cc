@@ -3,6 +3,77 @@
 namespace lab {
 namespace nmt {
 
+template <typename T>
+void print_vec(const thrust::device_vector<T>& outv, std::string outn,
+                      int num_output_ele) {
+  std::cout << outn << ": ";
+  if (num_output_ele > 0) {
+    num_output_ele = min(size_t(num_output_ele), outv.size());
+    thrust::copy(outv.begin(), outv.begin() + num_output_ele,
+                 std::ostream_iterator<T>(std::cout, " "));
+    std::cout << " ...";
+  } else {
+    thrust::copy(outv.begin(), outv.end(),
+                 std::ostream_iterator<T>(std::cout, " "));
+  }
+  std::cout << std::endl;
+}
+
+template void 
+print_vec<float>(const thrust::device_vector<float>& outv, std::string outn,
+                      int num_output_ele);
+
+template void 
+print_vec<int>(const thrust::device_vector<int>& outv, std::string outn,
+                      int num_output_ele);
+
+template <typename T>
+void print_vec(thrust::device_ptr<T> outv, std::string outn,
+                      int num_output_ele) {
+  std::cout << outn << ": ";
+  thrust::copy(outv, outv + num_output_ele,
+               std::ostream_iterator<T>(std::cout, " "));
+  std::cout << std::endl;
+}
+
+template void 
+print_vec<float>(thrust::device_ptr<float> outv, std::string outn,
+                      int num_output_ele);
+
+template void 
+print_vec<int>(thrust::device_ptr<int> outv, std::string outn,
+                      int num_output_ele);
+
+template <typename T>
+void print_vec(const T* outv, std::string outn, int num_output_ele) {
+  std::cout << outn << ": ";
+  thrust::copy(thrust::device_pointer_cast(outv),
+               thrust::device_pointer_cast(outv + num_output_ele),
+               std::ostream_iterator<T>(std::cout, " "));
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<__half>(const __half* outv, std::string outn, int num_output_ele) {
+  std::cout << outn << ": ";
+  std::vector<__half> hout(num_output_ele, (__half)0.f);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half), 
+    cudaMemcpyDeviceToHost);
+  for(int i = 0; i < num_output_ele; i++) {
+    std::cout << __half2float(hout[i]) << " ";
+  }
+  std::cout << std::endl;
+}
+
+template void 
+print_vec<float>(const float* outv, std::string outn, int num_output_ele);
+
+template void 
+print_vec<int>(const int* outv, std::string outn, int num_output_ele);
+
+template void 
+print_vec<__half>(const __half* outv, std::string outn, int num_output_ele);
+
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,
     std::string duration_name, cudaStream_t stream) {

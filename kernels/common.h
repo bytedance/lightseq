@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cuda.h>
+#include <cuda_fp16.h>
 
 namespace lab {
 namespace nmt {
@@ -10,14 +11,16 @@ const unsigned int WARP_SIZE = 32;
 const float CUDA_FLOAT_INF_NEG = -100000000.f; // FIXME later
 
 template <typename T>
-__forceinline__ __device__ T warpReduceSum(T val) {
+__forceinline__ __device__ 
+T warpReduceSum(T val) {
   for (int mask = (WARP_SIZE >> 1); mask > 0; mask >>= 1)
     val += __shfl_xor_sync(WARP_REDUCE_MASK, val, mask, WARP_SIZE);
   return val;
 }
 
 template <typename T>
-__forceinline__ __device__ T warpReduceMax(T val) {
+__forceinline__ __device__ 
+T warpReduceMax(T val) {
   for (int mask = (WARP_SIZE >> 1); mask > 0; mask >>= 1)
     val = max(val, __shfl_xor_sync(WARP_REDUCE_MASK, val, mask, WARP_SIZE));
   return val;
@@ -25,37 +28,42 @@ __forceinline__ __device__ T warpReduceMax(T val) {
 
 /* Calculate the sum of all elements in a block */
 template <typename T>
-__forceinline__ __device__ T blockReduceSum(T val) {
+__forceinline__ __device__ 
+T blockReduceSum(T val) {
   static __shared__ T shared[32];
   int lane = threadIdx.x & 0x1f;
   int wid = threadIdx.x >> 5;
 
-  val = warpReduceSum(val);
-  if (lane == 0) shared[wid] = val;
+  val = warpReduceSum<T>(val);
+
+  if (lane == 0) 
+    shared[wid] = val;
   __syncthreads();
 
-  // val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : 0;
-  val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane] : 0;
-  val = warpReduceSum(val);
-
+  // val = (threadIdx.x < (blockDim.x >> 5 )) ? shared[lane] : (T)0.0f;
+  val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane] : (T)0.0f;
+  val = warpReduceSum<T>(val);
   return val;
 }
 
 /* Calculate the maximum of all elements in a block */
 template <typename T>
-__forceinline__ __device__ T blockReduceMax(T val) {
+__forceinline__ __device__ 
+T blockReduceMax(T val) {
   static __shared__ T shared[32];
   int lane = threadIdx.x & 0x1f;
   int wid = threadIdx.x >> 5;
 
-  val = warpReduceMax(val);
-  if (lane == 0) shared[wid] = val;
+  val = warpReduceMax<T>(val);
+
+  if (lane == 0) 
+    shared[wid] = val;
   __syncthreads();
 
-  //val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : CUDA_FLOAT_INF_NEG;
+  // FIXME later. provide inf value for int32, fp16
+  // val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : CUDA_FLOAT_INF_NEG;
   val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane] : CUDA_FLOAT_INF_NEG;
-  val = warpReduceMax(val);
-
+  val = warpReduceMax<T>(val);
   return val;
 }
 
@@ -163,29 +171,13 @@ __forceinline__ __host__ __device__ int targetid_6dim(int id1, int id2, int id3,
   return res;
 }
 
-__forceinline__ __device__ float atomicMinFloat(float *addr, float value) {
-  // atomicMin for float, since there not float version for atomicMin
-  float old;
-  old = (value >= 0)
-            ? __int_as_float(atomicMin((int *)addr, __float_as_int(value)))
-            : __uint_as_float(
-                  atomicMax((unsigned int *)addr, __float_as_uint(value)));
-  return old;
-}
-
-__forceinline__ __device__ float atomicMaxFloat(float *addr, float value) {
-  // atomicMax for float, since there not float version for atomicMax
-  float old;
-  old = (value >= 0)
-            ? __int_as_float(atomicMax((int *)addr, __float_as_int(value)))
-            : __uint_as_float(
-                  atomicMin((unsigned int *)addr, __float_as_uint(value)));
-  return old;
-}
-
-__forceinline__ __host__ __device__ float length_norm(int length, float alpha) {
-  if (alpha < 0.f) return 1.f / length;
-  return pow((5.f + length) / 6.f, -alpha);
+__forceinline__ __host__ __device__ 
+float2 safe_half2_to_float2(half2 vhalf2) {
+  float2 vfloat2 = __half22float2(vhalf2);
+  // mask inf and -inf
+  vfloat2.x = fmax(fmin(100000.f, vfloat2.x), -100000.f);
+  vfloat2.y = fmax(fmin(100000.f, vfloat2.y), -100000.f);
+  return vfloat2;
 }
 
 }  // namespace nmt
