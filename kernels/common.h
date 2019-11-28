@@ -11,6 +11,26 @@ const unsigned int WARP_SIZE = 32;
 const float CUDA_FLOAT_INF_NEG = -100000000.f; // FIXME later
 
 template <typename T>
+__forceinline__ __device__
+T gelu(T x) {
+  float cdf = 0.5f * (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
+  return x * cdf;
+}
+
+template <>
+__forceinline__ __device__
+half2 gelu<half2>(half2 val)
+{
+  half2 val_pow3 = __hmul2(val, __hmul2(val, val));
+  float2 tmp_pow = __half22float2(val_pow3);
+  float2 tmp =  __half22float2(val);
+
+  tmp.x = 0.5f * (1.0f + tanhf((0.7978845608028654f * (tmp.x + 0.044715f * tmp_pow.x))));
+  tmp.y = 0.5f * (1.0f + tanhf((0.7978845608028654f * (tmp.y + 0.044715f * tmp_pow.y))));
+  return __hmul2(val, __float22half2_rn(tmp));
+}
+
+template <typename T>
 __forceinline__ __device__ 
 T warpReduceSum(T val) {
   for (int mask = (WARP_SIZE >> 1); mask > 0; mask >>= 1)

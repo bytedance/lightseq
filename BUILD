@@ -36,11 +36,31 @@ cc_proto_library(
     srcs = ["proto/transformer.proto"],
 )
 
+cc_proto_library(
+    name = "gpt_proto",
+    srcs = ["proto/gpt.proto"],
+)
+
 cc_library(
     name = "transformer_kernel",
     srcs = ["kernels/nmtKernels.cu.cc"],
     hdrs = glob([
-        "kernels/*.h",
+        "kernels/common.h",
+        "kernels/nmtKernels.h",
+    ]),
+    copts = cuda_default_copts(),
+    deps = [
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_library(
+    name = "gpt_kernel",
+    srcs = ["kernels/gptKernels.cu.cc"],
+    hdrs = glob([
+        "kernels/common.h",
+        "kernels/gptKernels.h",
+        "kernels/nmtKernels.h",
     ]),
     copts = cuda_default_copts(),
     deps = [
@@ -73,6 +93,20 @@ cc_library(
 )
 
 cc_library(
+    name = "gpt_weight",
+    srcs = ["proto/gpt_weight.cu.cc"],
+    hdrs = glob([
+        "proto/gpt_weight.h",
+    ]),
+    copts = cuda_default_copts(),
+    deps = [
+        ":gpt_proto",
+        ":transformer_util",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_library(
     name = "transformer_encoder",
     srcs = ["model/encoder.cu.cc"],
     hdrs = glob([
@@ -83,6 +117,22 @@ cc_library(
         ":transformer_weight",
        ":transformer_util",
        ":transformer_kernel",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_library(
+    name = "gpt_encoder",
+    srcs = ["model/gpt_encoder.cu.cc"],
+    hdrs = glob([
+        "model/gpt_encoder.h"
+    ]),
+    copts = cuda_default_copts(),
+    deps = [
+        ":gpt_weight",
+       ":transformer_util",
+       ":transformer_kernel",
+       ":gpt_kernel",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
@@ -167,6 +217,36 @@ cc_binary(
     linkshared = 1,
 )
 
+cc_library(
+    name = "gptlm_base",
+    srcs = ["gptlm.cu.cc"],
+    copts = cuda_default_copts(),
+    deps = [
+        ":gpt_weight",
+        ":transformer_util",
+        "gpt_encoder",
+        "//src/core:model_config",
+        "//src/core:model_config_cuda",
+        "//src/core:model_config_proto",
+        "//src/servables/custom:custom",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_binary(
+    name = "libgptlm.so",
+    deps = [
+        ":gptlm_base",
+        "gpt_proto",
+        ":gpt_kernel",
+        ":gpt_weight",
+       ":transformer_util",
+        "gpt_encoder",
+    ],
+    linkopts = ["-pthread"],
+    linkshared = 1,
+)
+
 cc_binary(
     name = "example",
     srcs = ["example.cu.cc"],
@@ -175,6 +255,23 @@ cc_binary(
         ":transformer_util",
         "transformer_encoder",
         "transformer_decoder",        
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
+)
+
+cc_binary(
+    name = "gpt_example",
+    srcs = ["gpt_example.cu.cc"],
+    deps = [
+        ":gpt_weight",
+        ":transformer_util",
+        "gpt_encoder",
     ],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
