@@ -8,7 +8,7 @@ git clone git@code.byted.org:wangxiaohui.neo/trtis_cuda.git
 
 git clone https://github.com/NVIDIA/tensorrt-inference-server.git
 
-cp -r trtis_cuda tensorrt-inference-server/src/custom/transformer 
+cp -r trtis_cuda tensorrt-inference-server/src/custom/byseqlib 
 
 cd tensorrt-inference-server && git checkout r19.05
 

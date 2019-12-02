@@ -12,14 +12,21 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "src/custom/transformer/proto/transformer_weight.h"
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/proto/transformer_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
-namespace lab {
-namespace nmt {
+/**
+@file
+Transformer decoder, composed by gemm lib and
+  custom cuda kernel function
+*/
 
-template <OperationType OpType_> class Encoder {
-private:
+namespace byseqlib {
+namespace cuda {
+
+template <OperationType OpType_>
+class Encoder {
+ private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -32,9 +39,10 @@ private:
   void ffn_add_norm();
 
   const int _max_batch_size;
-  const int* _p_d_token_id;  // input token id [batch_size, batch_seq_len]
-  int* _p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
-  _DataType *_p_d_output; // encoder output, [batch_size, batch_seq_len, hidden_size]
+  const int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+  int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
+  _DataType
+      *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
   const TransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -67,7 +75,7 @@ private:
   int _layer_id;
   int _weight_offset;
 
-public:
+ public:
   Encoder(int max_batch_size, const int *p_d_token_id, int *p_d_padding_mask,
           _DataType *p_d_output, const TransformerWeight<OpType_> &tw,
           cudaStream_t stream, cublasHandle_t hd);
@@ -77,5 +85,5 @@ public:
   void run_one_infer(int batch_size, int batch_seq_len);
 };
 
-}  // namespace nmt
-}  // namespace lab
+}  // namespace cuda
+}  // namespace byseqlib

@@ -12,14 +12,20 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "src/custom/transformer/proto/transformer_weight.h"
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/proto/transformer_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
-namespace lab {
-namespace nmt {
+/**
+@file
+Transformer decoder, composed by gemm lib and
+  custom cuda kernel function
+*/
+namespace byseqlib {
+namespace cuda {
 
-template <OperationType OpType_> class Decoder {
-private:
+template <OperationType OpType_>
+class Decoder {
+ private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -42,7 +48,7 @@ private:
   const int _max_thread_per_block;
   int _h_can_num_batch;
   size_t _cub_sort_buffer_bytes;
-  const TransformerWeight<OpType_> &_tw;
+  const TransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
   const bool _output_topk;
@@ -99,27 +105,29 @@ private:
   int _batch_max_decode_length;
 
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
-  const std::vector<const _DataType*>& _p_d_dec_wei;  // size: 18 * dec_layer_num
+  const std::vector<const _DataType*>&
+      _p_d_dec_wei;  // size: 18 * dec_layer_num
   const _DataType _fone;
   const _DataType _fzero;
-  const _DataType _atten_scaler;   // scaling factor of Scaled Dot-Product Attention
+  const _DataType
+      _atten_scaler;  // scaling factor of Scaled Dot-Product Attention
   const _DataType _output_scaler;  // output scaling factor of the liner project
-                               // after decoder
+                                   // after decoder
   const int _layer_size_encdec_k;
   const int _layer_size_self_k;
 
-public:
-  Decoder(int max_batch_size, const int *p_d_padding_mask,
-          const _DataType *p_d_encoder_output, int *p_d_result,
-          const TransformerWeight<OpType_> &tw, cudaStream_t stream,
+ public:
+  Decoder(int max_batch_size, const int* p_d_padding_mask,
+          const _DataType* p_d_encoder_output, int* p_d_result,
+          const TransformerWeight<OpType_>& tw, cudaStream_t stream,
           cublasHandle_t hd, bool output_topk = false);
   int compute_buffer_bytesize();
-  void init_buffer(void *pbuf);
+  void init_buffer(void* pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
   int _cur_step;
   float* _p_d_alive_seq_score;
 };
 
-}  // namespace nmt
-}  // namespace lab
+}  // namespace cuda
+}  // namespace byseqlib

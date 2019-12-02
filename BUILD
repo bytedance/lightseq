@@ -1,28 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
 package(
     default_visibility = ["//visibility:public"],
@@ -43,10 +19,10 @@ cc_proto_library(
 
 cc_library(
     name = "transformer_kernel",
-    srcs = ["kernels/nmtKernels.cu.cc"],
+    srcs = ["kernels/transformerKernels.cu.cc"],
     hdrs = glob([
         "kernels/common.h",
-        "kernels/nmtKernels.h",
+        "kernels/transformerKernels.h",
     ]),
     copts = cuda_default_copts(),
     deps = [
@@ -60,7 +36,7 @@ cc_library(
     hdrs = glob([
         "kernels/common.h",
         "kernels/gptKernels.h",
-        "kernels/nmtKernels.h",
+        "kernels/transformerKernels.h",
     ]),
     copts = cuda_default_copts(),
     deps = [
@@ -69,9 +45,9 @@ cc_library(
 )
 
 cc_library(
-    name = "transformer_util",
-    srcs = ["util.cu.cc"],
-    hdrs = ["util.h"],
+    name = "util",
+    srcs = ["tools/util.cu.cc"],
+    hdrs = ["tools/util.h"],
     copts = cuda_default_copts(),
     deps = [
         "@local_config_cuda//cuda:cuda_headers",
@@ -87,7 +63,7 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":transformer_proto",
-        ":transformer_util",
+        ":util",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
@@ -101,7 +77,7 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":gpt_proto",
-        ":transformer_util",
+        ":util",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
@@ -115,7 +91,7 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":transformer_weight",
-       ":transformer_util",
+       ":util",
        ":transformer_kernel",
         "@local_config_cuda//cuda:cuda_headers",
     ],
@@ -130,7 +106,7 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":gpt_weight",
-       ":transformer_util",
+       ":util",
        ":transformer_kernel",
        ":gpt_kernel",
         "@local_config_cuda//cuda:cuda_headers",
@@ -144,22 +120,22 @@ cc_library(
         "model/decoder.h"
     ]),
     copts = cuda_default_copts(),
-    includes = ["cub-1.8.0"],
+    includes = ["3rdparty/cub-1.8.0"],
     deps = [
         ":transformer_weight",
-       ":transformer_util",
+       ":util",
        ":transformer_kernel",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
 
 cc_library(
-    name = "transformer_base",
-    srcs = ["transformer.cu.cc"],
+    name = "transformer_server",
+    srcs = ["server/transformer_server.cu.cc"],
     copts = cuda_default_copts(),
     deps = [
         ":transformer_weight",
-        ":transformer_util",
+        ":util",
         "transformer_encoder",
         "transformer_decoder",
         "//src/core:model_config",
@@ -173,11 +149,11 @@ cc_library(
 cc_binary(
     name = "libtransformer.so",
     deps = [
-        ":transformer_base",
+        ":transformer_server",
         "transformer_proto",
         ":transformer_kernel",
         ":transformer_weight",
-       ":transformer_util",
+       ":util",
         "transformer_encoder",
         ":transformer_decoder",
     ],
@@ -186,12 +162,12 @@ cc_binary(
 )
 
 cc_library(
-    name = "generate_base",
-    srcs = ["generate.cu.cc"],
+    name = "generate_server",
+    srcs = ["server/generate_server.cu.cc"],
     copts = cuda_default_copts(),
     deps = [
         ":transformer_weight",
-        ":transformer_util",
+        ":util",
         "transformer_encoder",
         "transformer_decoder",
         "//src/core:model_config",
@@ -205,11 +181,11 @@ cc_library(
 cc_binary(
     name = "libgenerate.so",
     deps = [
-        ":generate_base",
+        ":generate_server",
         "transformer_proto",
         ":transformer_kernel",
         ":transformer_weight",
-       ":transformer_util",
+       ":util",
         "transformer_encoder",
         ":transformer_decoder",
     ],
@@ -218,12 +194,12 @@ cc_binary(
 )
 
 cc_library(
-    name = "gptlm_base",
-    srcs = ["gptlm.cu.cc"],
+    name = "gptlm_server",
+    srcs = ["server/gptlm_server.cu.cc"],
     copts = cuda_default_copts(),
     deps = [
         ":gpt_weight",
-        ":transformer_util",
+        ":util",
         "gpt_encoder",
         "//src/core:model_config",
         "//src/core:model_config_cuda",
@@ -236,11 +212,11 @@ cc_library(
 cc_binary(
     name = "libgptlm.so",
     deps = [
-        ":gptlm_base",
+        ":gptlm_server",
         "gpt_proto",
         ":gpt_kernel",
         ":gpt_weight",
-       ":transformer_util",
+       ":util",
         "gpt_encoder",
     ],
     linkopts = ["-pthread"],
@@ -248,13 +224,13 @@ cc_binary(
 )
 
 cc_binary(
-    name = "example",
-    srcs = ["example.cu.cc"],
+    name = "transformer_example",
+    srcs = ["example/transformer_example.cu.cc"],
     deps = [
         ":transformer_weight",
-        ":transformer_util",
+        ":util",
         "transformer_encoder",
-        "transformer_decoder",        
+        "transformer_decoder",
     ],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
@@ -266,50 +242,12 @@ cc_binary(
 )
 
 cc_binary(
-    name = "gpt_example",
-    srcs = ["gpt_example.cu.cc"],
+    name = "gptlm_example",
+    srcs = ["example/gptlm_example.cu.cc"],
     deps = [
         ":gpt_weight",
-        ":transformer_util",
+        ":util",
         "gpt_encoder",
-    ],
-    linkopts = [
-        "-L/usr/local/cuda/lib64/stubs",
-        "-L/usr/local/cuda/lib64",
-        "-pthread",
-        "-lcudart",
-        "-lcublas"
-    ],
-)
-
-cc_binary(
-    name = "fp32test",
-    srcs = ["FasterTransformer/tools/gemm_test/gemm_fp32.cc"],
-    includes = [
-        "FasterTransformer/tools/gemm_test"
-    ],
-    copts = cuda_default_copts(),
-    deps = [
-        "@local_config_cuda//cuda:cuda_headers",
-    ],
-    linkopts = [
-        "-L/usr/local/cuda/lib64/stubs",
-        "-L/usr/local/cuda/lib64",
-        "-pthread",
-        "-lcudart",
-        "-lcublas"
-    ],
-)
-
-cc_binary(
-    name = "fp16test",
-    srcs = ["FasterTransformer/tools/gemm_test/gemm_fp16.cc"],
-    includes = [
-        "FasterTransformer/tools/gemm_test"
-    ],
-    copts = cuda_default_copts(),
-    deps = [
-        "@local_config_cuda//cuda:cuda_headers",
     ],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
