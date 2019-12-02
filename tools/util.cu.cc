@@ -1,11 +1,11 @@
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/tools/util.h"
 
-namespace lab {
-namespace nmt {
+namespace byseqlib {
+namespace cuda {
 
 template <typename T>
 void print_vec(const thrust::device_vector<T>& outv, std::string outn,
-                      int num_output_ele) {
+               int num_output_ele) {
   std::cout << outn << ": ";
   if (num_output_ele > 0) {
     num_output_ele = min(size_t(num_output_ele), outv.size());
@@ -19,30 +19,26 @@ void print_vec(const thrust::device_vector<T>& outv, std::string outn,
   std::cout << std::endl;
 }
 
-template void 
-print_vec<float>(const thrust::device_vector<float>& outv, std::string outn,
-                      int num_output_ele);
+template void print_vec<float>(const thrust::device_vector<float>& outv,
+                               std::string outn, int num_output_ele);
 
-template void 
-print_vec<int>(const thrust::device_vector<int>& outv, std::string outn,
-                      int num_output_ele);
+template void print_vec<int>(const thrust::device_vector<int>& outv,
+                             std::string outn, int num_output_ele);
 
 template <typename T>
 void print_vec(thrust::device_ptr<T> outv, std::string outn,
-                      int num_output_ele) {
+               int num_output_ele) {
   std::cout << outn << ": ";
   thrust::copy(outv, outv + num_output_ele,
                std::ostream_iterator<T>(std::cout, " "));
   std::cout << std::endl;
 }
 
-template void 
-print_vec<float>(thrust::device_ptr<float> outv, std::string outn,
-                      int num_output_ele);
+template void print_vec<float>(thrust::device_ptr<float> outv, std::string outn,
+                               int num_output_ele);
 
-template void 
-print_vec<int>(thrust::device_ptr<int> outv, std::string outn,
-                      int num_output_ele);
+template void print_vec<int>(thrust::device_ptr<int> outv, std::string outn,
+                             int num_output_ele);
 
 template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele) {
@@ -54,25 +50,26 @@ void print_vec(const T* outv, std::string outn, int num_output_ele) {
 }
 
 template <>
-void print_vec<__half>(const __half* outv, std::string outn, int num_output_ele) {
+void print_vec<__half>(const __half* outv, std::string outn,
+                       int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<__half> hout(num_output_ele, (__half)0.f);
-  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half), 
-    cudaMemcpyDeviceToHost);
-  for(int i = 0; i < num_output_ele; i++) {
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_output_ele; i++) {
     std::cout << __half2float(hout[i]) << " ";
   }
   std::cout << std::endl;
 }
 
-template void 
-print_vec<float>(const float* outv, std::string outn, int num_output_ele);
+template void print_vec<float>(const float* outv, std::string outn,
+                               int num_output_ele);
 
-template void 
-print_vec<int>(const int* outv, std::string outn, int num_output_ele);
+template void print_vec<int>(const int* outv, std::string outn,
+                             int num_output_ele);
 
-template void 
-print_vec<__half>(const __half* outv, std::string outn, int num_output_ele);
+template void print_vec<__half>(const __half* outv, std::string outn,
+                                int num_output_ele);
 
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,
@@ -126,5 +123,19 @@ void generate_distribution(thrust::device_vector<float>& input_output,
                       input_output.begin(), prg_norm(a, b));
 }
 
-}  // namespace nmt
-}  // namespace lab
+void read_batch_tokenids_from_file(std::string file_name, int& batch_size,
+                                   int& batch_seq_len,
+                                   std::vector<int>& input_ids) {
+  std::ifstream fin(file_name);
+  fin >> batch_size >> batch_seq_len;
+  input_ids = std::vector<int>(batch_size * batch_seq_len, 0);
+  for (int i = 0; i < batch_size; i++) {
+    for (int j = 0; j < batch_seq_len; j++) {
+      int idx = i * batch_seq_len + j;
+      fin >> input_ids[idx];
+    }
+  }
+}
+
+}  // namespace cuda
+}  // namespace byseqlib

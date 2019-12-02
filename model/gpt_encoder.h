@@ -12,14 +12,15 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "src/custom/transformer/proto/gpt_weight.h"
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/proto/gpt_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
-namespace lab {
-namespace nmt {
+namespace byseqlib {
+namespace cuda {
 
-template <OperationType OpType_> class GptEncoder {
-private:
+template <OperationType OpType_>
+class GptEncoder {
+ private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   const cudaDataType_t _computeType = _optraits::computeType;
@@ -32,8 +33,8 @@ private:
   void ffn_add_norm();
 
   const int _max_batch_size;
-  const int* _p_d_token_id;  // input token id, [batch_size, batch_seq_len]
-  float* _p_d_ppl; // ppl for every seq, [batch_size]
+  const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
+  float *_p_d_ppl;           // ppl for every seq, [batch_size]
   const GptWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -72,10 +73,10 @@ private:
   int _layer_id;
   int _weight_offset;
 
-public:
-  GptEncoder(int max_batch_size, const int *p_d_token_id,
-          float *p_d_ppl, const GptWeight<OpType_> &tw,
-          cudaStream_t stream, cublasHandle_t hd);
+ public:
+  GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
+             const GptWeight<OpType_> &tw, cudaStream_t stream,
+             cublasHandle_t hd);
   int compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
@@ -83,5 +84,5 @@ public:
   void compute_ppl();
 };
 
-}  // namespace nmt
-}  // namespace lab
+}  // namespace cuda
+}  // namespace byseqlib

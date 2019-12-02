@@ -1,29 +1,30 @@
 #pragma once
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <google/protobuf/io/zero_copy_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #include <thrust/device_vector.h>
 
-#include "src/custom/transformer/proto/transformer.pb.h"
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/proto/transformer.pb.h"
+#include "src/custom/byseqlib/tools/util.h"
 
-namespace lab {
-namespace nmt {
+namespace byseqlib {
+namespace cuda {
 
 /*
-    extract the Transformer network weights from proto to gpu device memory
+Load the model weights which stored in custom proto file into GPU memory.
 */
-template <OperationType OpType_> class TransformerWeight {
-private:
+template <OperationType OpType_>
+class TransformerWeight {
+ private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
@@ -32,10 +33,11 @@ private:
   std::string parse_enc_wei(const Transformer &transformer);
   std::string parse_dec_wei(const Transformer &transformer);
 
-  std::vector<const _DataType *> _p_d_src_emb_wei; // size: 4
-  std::vector<const _DataType *> _p_d_trg_emb_wei; // size: 4
-  std::vector<const _DataType *> _p_d_enc_wei;     // size: 12 * enc_layer_num
-  std::vector<const _DataType *> _p_d_dec_wei;     // size: 18 * dec_layer_num
+  // store the weights pointer
+  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
+  std::vector<const _DataType *> _p_d_trg_emb_wei;  // size: 4
+  std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
+  std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
 
   // store the weights on gpu memo
   thrust::device_vector<_DataType> _d_src_emb_wei;
@@ -43,7 +45,7 @@ private:
   thrust::device_vector<_DataType> _d_enc_wei;
   thrust::device_vector<_DataType> _d_dec_wei;
 
-public:
+ public:
   std::string initializing(std::string proto_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
@@ -95,5 +97,5 @@ public:
   int _start_id;    // for trg
 };
 
-}  // namespace nmt
-}  // namespace lab
+}  // namespace cuda
+}  // namespace byseqlib

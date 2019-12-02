@@ -1,28 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and/or other materials provided with the distribution.
-//  * Neither the name of NVIDIA CORPORATION nor the names of its
-//    contributors may be used to endorse or promote products derived
-//    from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
 #include <unistd.h>
 #include <string>
@@ -32,18 +8,24 @@
 #include "src/core/model_config_cuda.h"
 #include "src/servables/custom/custom.h"
 
-#include "src/custom/transformer/model/gpt_encoder.h"
-#include "src/custom/transformer/proto/gpt_weight.h"
-#include "src/custom/transformer/util.h"
+#include "src/custom/byseqlib/model/gpt_encoder.h"
+#include "src/custom/byseqlib/proto/gpt_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
+
+/**
+@file
+GPT Language Model server based on tensorrt inference server.
+*/
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
-const lab::nmt::OperationType OPTYPE = lab::nmt::OperationType::FP32;
+const byseqlib::cuda::OperationType OPTYPE =
+    byseqlib::cuda::OperationType::FP32;
 
 namespace nvidia {
 namespace inferenceserver {
 namespace custom {
-namespace gpt {
+namespace gptlm {
 
 // Integer error codes. TRTIS requires that success must be 0. All
 // other codes are interpreted by TRTIS as failures.
@@ -86,7 +68,7 @@ class Context {
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  typedef lab::nmt::OperationTypeTraits<OPTYPE> _optraits;
+  typedef byseqlib::cuda::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
   int AllocateCudaBuffers(void** pdata, size_t byte_size);
 
@@ -123,8 +105,8 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  lab::nmt::GptWeight<OPTYPE> tw_;
-  std::shared_ptr<lab::nmt::GptEncoder<OPTYPE>> encoder_;
+  byseqlib::cuda::GptWeight<OPTYPE> tw_;
+  std::shared_ptr<byseqlib::cuda::GptEncoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -137,11 +119,11 @@ Context::Context(const std::string& instance_name,
       d_buf_(nullptr),
       d_output_(nullptr),
       stream_(nullptr),
-      hd_(nullptr){}
+      hd_(nullptr) {}
 
 Context::~Context() {
-  FreeCudaBuffers();  
-  
+  FreeCudaBuffers();
+
   if (hd_ != nullptr) {
     cublasStatus_t cuerr = cublasDestroy(hd_);
     if (cuerr != CUBLAS_STATUS_SUCCESS) {
@@ -201,7 +183,7 @@ int Context::AllocateCudaBuffers(void** pdata, size_t byte_size) {
     LOG_ERROR << "unable to allocate memory in function AllocateCudaBuffers"
               << cudaGetErrorString(cuerr);
     return kCudaMalloc;
-  }  
+  }
   cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "Stream synchronize failed after cudaMalloc"
@@ -223,14 +205,13 @@ int Context::Init() {
               << cudaGetErrorString(cuerr);
     return kCudaDevice;
   }
-  
+
   const int cuda_stream_priority =
       GetCudaStreamPriority(model_config_.optimization().priority());
-  cuerr = cudaStreamCreateWithPriority(
-      &stream_, cudaStreamDefault, cuda_stream_priority);
+  cuerr = cudaStreamCreateWithPriority(&stream_, cudaStreamDefault,
+                                       cuda_stream_priority);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "Unable to create stream"
-              << cudaGetErrorString(cuerr);
+    LOG_ERROR << "Unable to create stream" << cudaGetErrorString(cuerr);
     return kCudaStream;
   }
 
@@ -288,20 +269,20 @@ int Context::Init() {
 
   int max_batch_size = model_config_.max_batch_size();
   int err;
-  err = AllocateCudaBuffers(&d_input_,
-                      max_batch_size * tw_._max_step * datatype_bytesize_);
+  err = AllocateCudaBuffers(
+      &d_input_, max_batch_size * tw_._max_step * datatype_bytesize_);
   if (err != kSuccess) {
     return err;
   }
   err = AllocateCudaBuffers(&d_output_,
-                      max_batch_size * sizeof(DataType::TYPE_FP32));
+                            max_batch_size * sizeof(DataType::TYPE_FP32));
   if (err != kSuccess) {
     return err;
   }
 
-  encoder_ = std::make_shared<lab::nmt::GptEncoder<OPTYPE>>(
-      max_batch_size, reinterpret_cast<int *>(d_input_),
-      reinterpret_cast<float *>(d_output_), tw_, stream_, hd_);
+  encoder_ = std::make_shared<byseqlib::cuda::GptEncoder<OPTYPE>>(
+      max_batch_size, reinterpret_cast<int*>(d_input_),
+      reinterpret_cast<float*>(d_output_), tw_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -314,16 +295,16 @@ int Context::Init() {
     return err;
   }
   encoder_->init_buffer(d_buf_);
-  
+
   // Wait for all init finish.
   cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "failed to init GPU for gpt: "
-              << cudaGetErrorString(cuerr) << std::endl;
+    LOG_ERROR << "failed to init GPU for gpt: " << cudaGetErrorString(cuerr)
+              << std::endl;
     return kCudaExecute;
   }
-  LOG_INFO << "GPT, release-version[" << __DATE__
-           << " " << __TIME__ << "], Trtis instance init succeed!" << std::endl;
+  LOG_INFO << "GPT, release-version[" << __DATE__ << " " << __TIME__
+           << "], Trtis instance init succeed!" << std::endl;
   return kSuccess;
 }
 

@@ -2,8 +2,10 @@
 
 #include <math_constants.h>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <cublas_v2.h>
 #include <cuda.h>
@@ -12,14 +14,20 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
 
-namespace lab {
-namespace nmt {
+/**
+@file
+Util functions
+*/
 
-static const char *_cudaGetErrorString(cudaError_t error) {
+namespace byseqlib {
+namespace cuda {
+
+/* GPU function guard */
+static const char* _cudaGetErrorString(cudaError_t error) {
   return cudaGetErrorString(error);
 }
 
-static const char *_cudaGetErrorString(cublasStatus_t error) {
+static const char* _cudaGetErrorString(cublasStatus_t error) {
   switch (error) {
     case CUBLAS_STATUS_SUCCESS:
       return "CUBLAS_STATUS_SUCCESS";
@@ -55,58 +63,82 @@ static const char *_cudaGetErrorString(cublasStatus_t error) {
 }
 
 template <typename T>
-void check_gpu_error(T result, char const *const func, const char *const file, int const line) {
+void check_gpu_error(T result, char const* const func, const char* const file,
+                     int const line) {
   if (result) {
-    throw std::runtime_error(std::string("[CUDA][ERROR] ") + \
-        + file + "(" + std::to_string(line) + "): " + \
-        (_cudaGetErrorString(result)) + "\n");
+    throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
+                             std::to_string(line) + "): " +
+                             (_cudaGetErrorString(result)) + "\n");
   }
 }
 
-#define CHECK_GPU_ERROR(val) lab::nmt::check_gpu_error((val), #val, __FILE__, __LINE__)
+#define CHECK_GPU_ERROR(val) check_gpu_error((val), #val, __FILE__, __LINE__)
 
-enum class OperationType{FP32, FP16};
+enum class OperationType { FP32, FP16 };
 
-template <OperationType OpType_> class OperationTypeTraits;
+/* Precision descriptor */
+template <OperationType OpType_>
+class OperationTypeTraits;
 
-template <> class OperationTypeTraits<OperationType::FP32> {
-public:
+/* Type when fp32 */
+template <>
+class OperationTypeTraits<OperationType::FP32> {
+ public:
   typedef float DataType;
+  // cuda gemm computeType type
   static cudaDataType_t const computeType = CUDA_R_32F;
   static cudaDataType_t const AType = CUDA_R_32F;
   static cudaDataType_t const BType = CUDA_R_32F;
   static cudaDataType_t const CType = CUDA_R_32F;
-  // add FP32 Traits here
 };
 
-template <> class OperationTypeTraits<OperationType::FP16> {
-public:
+/* Type when fp16 */
+template <>
+class OperationTypeTraits<OperationType::FP16> {
+ public:
   typedef __half DataType;
+  // cuda gemm computeType type
   static cudaDataType_t const computeType = CUDA_R_16F;
   static cudaDataType_t const AType = CUDA_R_16F;
   static cudaDataType_t const BType = CUDA_R_16F;
   static cudaDataType_t const CType = CUDA_R_16F;
-  // add FP16 Traits here
 };
 
+/* Print vector stored in GPU memory, for debug */
 template <typename T>
 void print_vec(const thrust::device_vector<T>& outv, std::string outn,
-                      int num_output_ele = -1);
+               int num_output_ele = -1);
 
 template <typename T>
 void print_vec(thrust::device_ptr<T> outv, std::string outn,
-                      int num_output_ele);
+               int num_output_ele);
 
 template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele);
 
+/* Print run time, for debug */
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,
-    std::string duration_name, cudaStream_t stream=0);
+    std::string duration_name, cudaStream_t stream = 0);
 
+/* Generate distribution */
 void generate_distribution(thrust::device_vector<float>& input_output,
                            std::string mode = "uniform", float a = 0.f,
                            float b = 1.f);
 
-}  // namespace nmt
-}  // namespace lab
+/*
+Read input token ids from file.
+the first line of input file should
+be two integers: batch_size and batch_seq_len.
+followed by batch_size lines of
+batch_seq_len integers, e.g.
+2 3
+666 666 666
+666 666 666
+*/
+void read_batch_tokenids_from_file(std::string, int& batch_size,
+                                   int& batch_seq_len,
+                                   std::vector<int>& input_ids);
+
+}  // namespace cuda
+}  // namespace byseqlib
