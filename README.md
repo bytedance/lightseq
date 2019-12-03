@@ -24,4 +24,8 @@ cd /workspace
 
 bazel build -c opt src/servers/trtserver
 
-bazel build -c opt src/custom/...
+如果要编译fp16版本，需要在镜像内修改下/workspace/.bazelrc的TF_CUDA_COMPUTE_CAPABILITIES变量
+改成: 
+build --action_env TF_CUDA_COMPUTE_CAPABILITIES="6.0,6.1,7.0,7.5"
+
+bazel build -c opt src/custom/byseqlib/...
