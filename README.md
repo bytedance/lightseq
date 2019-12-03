@@ -78,4 +78,3 @@ bazel build -c opt src/custom/byseqlib/...
     ├── util.cu.cc
     └── util.h
 ```
-
