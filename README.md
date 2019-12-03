@@ -29,3 +29,49 @@ bazel build -c opt src/servers/trtserver
 build --action_env TF_CUDA_COMPUTE_CAPABILITIES="6.0,6.1,7.0,7.5"
 
 bazel build -c opt src/custom/byseqlib/...
+
+
+
+## Directory Structure
+```
+├── 3rdparty
+│   └── cub-1.8.0
+├── BUILD
+├── CONTRIBUTING.md
+├── example
+│   ├── gptlm_example.cu.cc
+│   └── transformer_example.cu.cc
+├── kernels
+│   ├── common.h
+│   ├── gptKernels.cu.cc
+│   ├── gptKernels.h
+│   ├── transformerKernels.cu.cc
+│   └── transformerKernels.h
+├── LICENSE
+├── model
+│   ├── decoder.cu.cc
+│   ├── decoder.h
+│   ├── encoder.cu.cc
+│   ├── encoder.h
+│   ├── gpt_encoder.cu.cc
+│   └── gpt_encoder.h
+├── NOTICE
+├── proto
+│   ├── gpt.proto
+│   ├── gpt_weight.cu.cc
+│   ├── gpt_weight.h
+│   ├── transformer.proto
+│   ├── transformer_weight.cu.cc
+│   └── transformer_weight.h
+├── README.md
+├── server
+│   ├── generate_server.cu.cc
+│   ├── gptlm_server.cu.cc
+│   └── transformer_server.cu.cc
+├── test_case
+│   ├── case_en2es-5
+│   └── case_gpt
+└── tools
+    ├── util.cu.cc
+    └── util.h
+```
