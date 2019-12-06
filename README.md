@@ -149,7 +149,10 @@ save space, we only show the results of batch_size = 8. More results is availabl
 │   └── transformer_server.cu.cc # transfomer server, one target for one source
 └── tools # development tools. e.g. runtime guard, debug
 ```
-
+## Requirements
+- Install Docker and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
+- GPU driver version >= 410.48
+- [Login to the NGC registry](https://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html).
 
 ## Quick Start
 To avoid problems caused by inconsistent environments, you can use the pre-built trtis container from
@@ -223,3 +226,6 @@ work:
 - Support more model architectures and decoding search algorithms.
 - Int8 inference.
 - Device deployment.
+
+## Contact
+Any questions or suggestions, please feel free to contact us with wangxiaohui.neo@bytedance.com
