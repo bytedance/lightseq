@@ -160,7 +160,6 @@ To avoid problems caused by inconsistent environments, you can use the pre-built
 [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) and make your GPU driver version >= 410.48
 ```shell
 docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
-# 
 docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
 /${current}/${path}:/quick_start nvcr.io/nvidia/tensorrtserver:19.05-py3 /bin/bash
 # inside container
