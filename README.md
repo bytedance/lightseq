@@ -1,8 +1,11 @@
-# Byseqlib
-Byseqlib is a high performance inference library for SOTA NLU/NLG models. It's built on
-CUDA official library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
-[Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and custom kernel functions which are specially fused and
-optimized for these widely used models. In addition to model components, we also provide codes
+# Byseqlib: A High Performance Inference Library for Sequence Processing and Generation
+
+Byseqlib is a high performance inference library for sequence processing and generation implemented in CUDA. 
+It enables highly efficient computation of modern NLP models such as **BERT**, **GPT2**, **Transformer**, etc. 
+It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*， *Language Modelling*, and other related tasks using these models. 
+
+The library is built on top of CUDA official library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
+[Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and custom kernel functions which are specially fused and optimized for these widely used models. In addition to model components, we also provide codes
 manage model weights trained from deepleanring framework and servers as a custom backend for
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
@@ -11,8 +14,8 @@ your own model architectures just with a little code modification.
 
 
 ## Features
-- Currently supports Transformer(with beam search) and GPT-2 language model.
-- Out-of-the-box end-to-end model server based on trtis.
+- Currently supports BERT, Transformer(with beam search) and GPT-2 language model.
+- Out-of-the-box end-to-end model server based on TRTIS.
 - In addition to FP32, FP16 inference is also supported with no loss of accuracy even when the model weight is in FP32.
 - High inference performance compared with TensorFlow(8x+ speedup on Transformer with beam search,
   4x+ speedup on GPT-2 LM).
