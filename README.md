@@ -2,7 +2,7 @@
 
 Byseqlib is a high performance inference library for sequence processing and generation implemented in CUDA. 
 It enables highly efficient computation of modern NLP models such as **BERT**, **GPT2**, **Transformer**, etc. 
-It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*， *Language Modelling*, and other related tasks using these models. 
+It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*, *Language Modelling*, and other related tasks using these models. 
 
 The library is built on top of CUDA official library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and custom kernel functions which are specially fused and optimized for these widely used models. In addition to model components, we also provide codes
