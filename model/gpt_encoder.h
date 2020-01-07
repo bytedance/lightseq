@@ -9,6 +9,7 @@
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
@@ -35,6 +36,7 @@ class GptEncoder {
   const int _max_batch_size;
   const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
   float *_p_d_ppl;           // ppl for every seq, [batch_size]
+  int *_p_d_sample_id;
   const GptWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -45,6 +47,9 @@ class GptEncoder {
   const int _max_thread_per_block;
   std::vector<int> _h_real_seq_len;
   std::vector<float> _h_ppl;
+  std::vector<int> _h_sample_id;
+  int* _p_d_unfinished;
+  int _h_unfinished;
 
   // gpu memeory buffer
   _DataType *_p_d_query;
@@ -56,7 +61,9 @@ class GptEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
   _DataType *_p_d_logit;
-  int *_p_d_real_seq_len;  // [batch_size]
+  int *_p_d_real_seq_len;         // [batch_size]
+  int *_p_d_sample_id_buf;        // [batch_size, max_step]
+  curandState *_p_d_curandstate;  //[batch_size]
 
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
@@ -75,12 +82,14 @@ class GptEncoder {
 
  public:
   GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
-             const GptWeight<OpType_> &tw, cudaStream_t stream,
-             cublasHandle_t hd);
+             int *p_d_sample_id, const GptWeight<OpType_> &tw,
+             cudaStream_t stream, cublasHandle_t hd);
   int compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
+  void run_one_sample(int batch_size, int batch_seq_len);
+  int sample_one_token();
   void compute_ppl();
 };
 

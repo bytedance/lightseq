@@ -1,6 +1,7 @@
 #pragma once
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <curand_kernel.h>
 
 namespace byseqlib {
 namespace cuda {
@@ -29,5 +30,14 @@ void ker_ppl_launcher(int batch_size, int batch_seq_len,
                       const T* logits, const int* input_ids,
                       const int* real_seq_len, float* ppl, int vocab_size);
 
+template <typename T>
+void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
+                              int max_thread_per_block, cudaStream_t stream,
+                              const T* logits, const int* old_input_ids,
+                              int* new_input_ids, const int* real_seq_len,
+                              const int vocab_size, const int k, int* all_finished,
+                              curandState* curandstate);
+
+__global__ void ker_curand_setup(curandState* state);
 }  // namespace cuda
 }  // namespace byseqlib

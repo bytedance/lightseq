@@ -1,6 +1,6 @@
-#include "src/custom/byseqlib/model/gpt_encoder.h"
 #include "src/custom/byseqlib/kernels/gptKernels.h"
 #include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "src/custom/byseqlib/model/gpt_encoder.h"
 
 /**
 @file
@@ -8,18 +8,20 @@ GPT encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-//#define DEBUG_RESULT
+#define DEBUG_RESULT
 
 namespace byseqlib {
 namespace cuda {
 
 template <OperationType OpType_>
 GptEncoder<OpType_>::GptEncoder(int max_batch_size, const int *p_d_token_id,
-                                float *p_d_ppl, const GptWeight<OpType_> &tw,
+                                float *p_d_ppl, int *p_d_sample_id,
+                                const GptWeight<OpType_> &tw,
                                 cudaStream_t stream, cublasHandle_t hd)
     : _max_batch_size(max_batch_size),
       _p_d_token_id(p_d_token_id),
       _p_d_ppl(p_d_ppl),
+      _p_d_sample_id(p_d_sample_id),
       _tw(tw),
       _stream(stream),
       _hd(hd),
@@ -31,7 +33,9 @@ GptEncoder<OpType_>::GptEncoder(int max_batch_size, const int *p_d_token_id,
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024),
       _h_real_seq_len(max_batch_size, 0),
-      _h_ppl(max_batch_size, 0.f) {}
+      _h_ppl(max_batch_size, 0.f),
+      _h_sample_id(max_batch_size * tw._max_step, 0),
+      _h_unfinished(1) {}
 
 /**
 Compute GPU memory size needed by gpt encoder,
@@ -40,12 +44,15 @@ Compute GPU memory size needed by gpt encoder,
 template <OperationType OpType_>
 int GptEncoder<OpType_>::compute_buffer_bytesize() {
   int si = _max_batch_size;
+  int si2 = _max_batch_size * _tw._max_step;
+  int si3 = 1;
   int sz0 = _max_batch_dim;
   int sz1 = _max_batch_dim * 6 +
             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
   int sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
   int sz3 = _max_batch_size * _tw._max_step * _tw._src_vocab_size;
-  return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
+  return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) +
+         (si + si2 + si3) * sizeof(int);
 }
 
 /**
@@ -60,6 +67,11 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
   int *p_d_int = reinterpret_cast<int *>(pbuf);
   _p_d_real_seq_len = p_d_int;
   p_d_int += _max_batch_size;
+  _p_d_sample_id_buf = p_d_int;
+  p_d_int += _max_batch_size * _tw._max_step;
+
+  _p_d_unfinished = p_d_int;
+  p_d_int += 1;
 
   // datatype buffer
   _DataType *p_d_datatype = reinterpret_cast<_DataType *>(p_d_int);
@@ -80,6 +92,9 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
   // reuse 3 ---------------------
   // _max_batch_size * _tw._max_step * _tw._src_vocab_size
   _p_d_logit = p_d_datatype;
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
+                             _max_batch_dim * sizeof(curandState)));
+  ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
   return;
 }
 
@@ -134,6 +149,9 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
     self_attention();
     ffn_add_norm();
+#ifdef DEBUG_RESULT
+    // if (_layer_id == 0) print_vec(_p_d_q, "_p_d_query", 1 * 2 * 768);
+#endif
   }
 
   // last layer norm
@@ -144,6 +162,87 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   compute_ppl();
 
   return;
+}
+
+template <OperationType OpType_>
+void GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
+  _batch_size = batch_size;
+  _batch_seq_len = batch_seq_len;
+  _batch_token_num = batch_size * batch_seq_len;
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_real_seq_len, _h_real_seq_len.data(),
+                                  sizeof(int) * _batch_size,
+                                  cudaMemcpyHostToDevice, _stream));
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_ppl, _h_ppl.data(),
+                                  sizeof(float) * _batch_size,
+                                  cudaMemcpyHostToDevice, _stream));
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id, _p_d_token_id,
+                                  sizeof(int) * _batch_size * _tw._max_step,
+                                  cudaMemcpyDeviceToDevice, _stream));
+#ifdef DEBUG_RESULT
+  std::cout << "batch_size-" << batch_size << " batch_seq_len-" << batch_seq_len
+            << std::endl;
+  print_vec(_p_d_sample_id, "batch_token_ids", batch_size * batch_seq_len);
+#endif
+
+  while (1) {
+#ifdef DEBUG_RESULT
+    std::cout << "before sample:batch_size-" << _batch_size << " batch_seq_len-"
+              << _batch_seq_len << std::endl;
+    print_vec(_p_d_sample_id, "batch_token_ids", _batch_token_num);
+#endif
+    // token embedding, add position embedding and layer_norm
+    ker_gpt_embedding_launcher<_DataType>(
+        _batch_size, _batch_seq_len, _tw._hidden_size, _stream,
+        _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_sample_id, _p_d_query,
+        _p_d_real_seq_len, _tw._padding_id);
+#ifdef DEBUG_RESULT
+    print_vec(_p_d_query, "embedding", _batch_token_num * _tw._hidden_size - 10,
+              _batch_token_num * _tw._hidden_size);
+#endif
+    for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
+      _weight_offset = _layer_id * _tw._weight_per_enc_layer;
+      self_attention();
+      ffn_add_norm();
+    }
+
+    // last layer norm
+    ker_norm_layer_launcher<_DataType>(_batch_token_num, _tw._hidden_size,
+                                       _stream, _p_d_query, _p_d_src_emb_wei[2],
+                                       _p_d_src_emb_wei[3]);
+
+    if (sample_one_token() == 0 || _batch_seq_len == _tw._max_step) break;
+  }
+  return;
+}
+
+template <OperationType OpType_>
+int GptEncoder<OpType_>::sample_one_token() {
+  /* ---step 1. project hidden states to vocab logits--- */
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_T, CUBLAS_OP_N, _tw._src_vocab_size, _batch_token_num,
+      _tw._hidden_size, &_fone, _p_d_src_emb_wei[0], _AType, _tw._hidden_size,
+      _p_d_query, _BType, _tw._hidden_size, &_fzero, _p_d_logit, _CType,
+      _tw._src_vocab_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_logit, "logits", _batch_token_num * _tw._src_vocab_size - 10,
+            _batch_token_num * _tw._src_vocab_size);
+#endif
+  CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
+  /* ---step 2. sample new tokens from logits */
+  ker_topk_sample_launcher(
+      _batch_size, _batch_seq_len, _max_thread_per_block, _stream, _p_d_logit,
+      _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
+      _tw._src_vocab_size, 4, _p_d_unfinished, _p_d_curandstate);
+  int *temp = _p_d_sample_id;
+  _p_d_sample_id = _p_d_sample_id_buf;
+  _p_d_sample_id_buf = temp;
+  CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_unfinished, sizeof(int),
+                                  cudaMemcpyDeviceToHost, _stream));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  _batch_seq_len++;
+  _batch_token_num = _batch_size * _batch_seq_len;
+  return _h_unfinished;
 }
 
 template <OperationType OpType_>

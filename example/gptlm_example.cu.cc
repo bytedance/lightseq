@@ -39,12 +39,15 @@ int main(int argc, char *argv[]) {
   int max_batch_size = 128;
   thrust::device_vector<int> d_input_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
+  thrust::device_vector<int> d_sample_ =
+      std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<float> d_ppl_ = std::vector<float>(max_batch_size, 0.f);
   std::shared_ptr<byseqlib::cuda::GptEncoder<optype>> encoder_ =
       std::make_shared<byseqlib::cuda::GptEncoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
           reinterpret_cast<float *>(thrust::raw_pointer_cast(d_ppl_.data())),
+          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_sample_.data())),
           tw_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
@@ -75,7 +78,7 @@ int main(int argc, char *argv[]) {
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(
@@ -83,8 +86,11 @@ int main(int argc, char *argv[]) {
         host_input.data(), sizeof(int) * batch_size * batch_seq_len,
         cudaMemcpyHostToDevice, stream_);
     encoder_->run_one_infer(batch_size, batch_seq_len);
+    encoder_->run_one_sample(batch_size, batch_seq_len);
     byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
     byseqlib::cuda::print_vec(d_ppl_.data(), "ppl", batch_size);
+    byseqlib::cuda::print_vec(d_sample_.data(), "sample_output",
+                              batch_size * tw_._max_step);
   }
   return 0;
 }
