@@ -103,6 +103,7 @@ class Context {
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
   cudaStream_t stream_;
+  cudaStream_t cache_stream_;
   cublasHandle_t hd_;
 
   byseqlib::cuda::GptWeight<OPTYPE> tw_;
@@ -119,6 +120,7 @@ Context::Context(const std::string& instance_name,
       d_buf_(nullptr),
       d_output_(nullptr),
       stream_(nullptr),
+      cache_stream_(nullptr),
       hd_(nullptr) {}
 
 Context::~Context() {
@@ -139,6 +141,14 @@ Context::~Context() {
                 << cudaGetErrorString(cuerr);
     }
     stream_ = nullptr;
+  }
+  if (cache_stream_ != nullptr) {
+    cudaError_t cuerr = cudaStreamDestroy(cache_stream_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: "
+                << cudaGetErrorString(cuerr);
+    }
+    cache_stream_ = nullptr;
   }
 }
 
@@ -248,7 +258,7 @@ int Context::Init() {
     return kInputOutputDataType;
   }
 
-  if (model_config_.output(0).name() != "loss") {
+  if (model_config_.output(0).name() != "outputs_ids") {
     return kOutputName;
   }
 
@@ -274,8 +284,8 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
-  err = AllocateCudaBuffers(&d_output_,
-                            max_batch_size * sizeof(DataType::TYPE_FP32));
+  err = AllocateCudaBuffers(
+      &d_output_, max_batch_size * tw_._max_step * datatype_bytesize_);
   if (err != kSuccess) {
     return err;
   }
@@ -283,7 +293,7 @@ int Context::Init() {
   encoder_ = std::make_shared<byseqlib::cuda::GptEncoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<float*>(d_output_), reinterpret_cast<int*>(d_output_),
-      tw_, stream_, stream_, hd_);
+      tw_, stream_, cache_stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -395,15 +405,16 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
       continue;
     }
 
-    encoder_->run_one_infer(payload.batch_size, batch_seq_len);
+    encoder_->run_one_sample(payload.batch_size, batch_seq_len);
     // The output shape is [payload-batch-size, shape] if the model
     // configuration supports batching, or just [shape] if the
     // model configuration does not support batching.
-    std::vector<int64_t> output_shape = {payload.batch_size, 1};
+    std::vector<int64_t> output_shape = {payload.batch_size,
+                                         encoder_->_batch_seq_len};
     int64_t output_bytesize =
         output_shape[0] * output_shape[1] * datatype_bytesize_;
 
-    const char* output_name = "loss";
+    const char* output_name = "outputs_ids";
 
     void* obuffer;
     if (!output_fn(payload.output_context, output_name, output_shape.size(),

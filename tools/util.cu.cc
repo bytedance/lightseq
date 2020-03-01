@@ -80,6 +80,20 @@ void print_vec(const T* outv, std::string outn, int start, int end) {
   std::cout << std::endl;
 }
 
+template <>
+void print_vec<__half>(const __half* outv, std::string outn, int start,
+                       int end) {
+  std::cout << outn << ": ";
+  int num_elements = end - start;
+  std::vector<__half> hout(num_elements, (__half)0.f);
+  cudaMemcpy(hout.data(), outv + start, num_elements * sizeof(__half),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_elements; i++) {
+    std::cout << __half2float(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
 template void print_vec<float>(const float* outv, std::string outn, int start,
                                int end);
 

@@ -27,8 +27,7 @@ int main(int argc, char *argv[]) {
   /* ---step2. load model weights into GPU memory--- */
   byseqlib::cuda::GptWeight<optype> tw_;
   // saved in custom proto file
-  // std::string model_weights_path = argv[1];
-  std::string model_weights_path = "/workspace/keyword_to_title.pb";
+  std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
   if (!res.empty()) {
     std::cout << res << std::endl;
@@ -81,16 +80,18 @@ int main(int argc, char *argv[]) {
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 1; i++) {
-    auto start = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
+
+  for (int i = 0; i < 100; i++) {
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(
         reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
         host_input.data(), sizeof(int) * batch_size * batch_seq_len,
         cudaMemcpyHostToDevice, stream_);
-    encoder_->run_one_infer(batch_size, batch_seq_len);
-    byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
-    byseqlib::cuda::print_vec(d_ppl_.data(), "ppl", batch_size);
+    encoder_->run_one_sample(batch_size, batch_seq_len);
   }
+  byseqlib::cuda::print_vec(d_sample_.data(), "sample_output",
+                            batch_size * tw_._max_step);
+  byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
   return 0;
 }
