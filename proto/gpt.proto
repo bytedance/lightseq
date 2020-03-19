@@ -53,6 +53,10 @@ message EmbeddingLayer {
 message ModelConf {
   int32 head_num = 1;
   int32 src_padding_id = 2;
+  string sampling_method = 3;
+  float topp = 4;
+  int32 topk = 5;
+  int32 eos_id = 6;
 }
 
 message Gpt {

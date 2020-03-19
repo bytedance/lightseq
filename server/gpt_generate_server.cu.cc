@@ -25,7 +25,7 @@ const byseqlib::cuda::OperationType OPTYPE =
 namespace nvidia {
 namespace inferenceserver {
 namespace custom {
-namespace gptlm {
+namespace gptgeneration {
 
 // Integer error codes. TRTIS requires that success must be 0. All
 // other codes are interpreted by TRTIS as failures.
@@ -254,7 +254,7 @@ int Context::Init() {
     return kInputOutputShape;
   }
 
-  if (model_config_.output(0).data_type() != DataType::TYPE_FP32) {
+  if (model_config_.output(0).data_type() != DataType::TYPE_INT32) {
     return kInputOutputDataType;
   }
 
@@ -405,12 +405,12 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
       continue;
     }
 
+    int sample_step =
     encoder_->run_one_sample(payload.batch_size, batch_seq_len);
     // The output shape is [payload-batch-size, shape] if the model
     // configuration supports batching, or just [shape] if the
     // model configuration does not support batching.
-    std::vector<int64_t> output_shape = {payload.batch_size,
-                                         encoder_->_batch_seq_len};
+    std::vector<int64_t> output_shape = {payload.batch_size, sample_step};
     int64_t output_bytesize =
         output_shape[0] * output_shape[1] * datatype_bytesize_;
 
@@ -511,13 +511,13 @@ const char* CustomErrorString(void* custom_context, int errcode) {
     case kGpuNotSupported:
       return "execution on GPU not supported";
     case kInputOutputShape:
-      return "model must have two inputs and two outputs with the same shape";
+      return "model must have one input and one output with the same shape";
     case kInputName:
-      return "model inputs must be named 'src_ids:0' and 'INPUT1'";
+      return "model inputs must be named 'inputs_ids' and 'INPUT1'";
     case kOutputName:
-      return "model outputs must be named 'trg_ids:0' and 'OUTPUT1'";
+      return "model outputs must be named 'outputs_ids' and 'OUTPUT1'";
     case kInputOutputDataType:
-      return "model inputs and outputs must have TYPE_INT32 or TYPE_FP32 "
+      return "model inputs and outputs must be TYPE_INT32 "
              "data-type";
     case kInputContents:
       return "unable to get input tensor values";

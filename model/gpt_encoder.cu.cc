@@ -46,16 +46,13 @@ Compute GPU memory size needed by gpt encoder,
 template <OperationType OpType_>
 int GptEncoder<OpType_>::compute_buffer_bytesize() {
   int si = _max_batch_size;
-  int si2 = _max_batch_size * _tw._max_step;
-  int si3 = 1;
   int sz0 = _max_batch_dim;
   sz0 += 2 * _max_batch_dim * _tw._n_enc_layer;
   int sz1 = _max_batch_dim * 6 +
             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
   int sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
   int sz3 = _max_batch_size * _tw._max_step * _tw._src_vocab_size;
-  return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) +
-         (si + si2 + si3) * sizeof(int);
+  return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
 }
 
 /**
@@ -70,11 +67,6 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
   int *p_d_int = reinterpret_cast<int *>(pbuf);
   _p_d_real_seq_len = p_d_int;
   p_d_int += _max_batch_size;
-  _p_d_sample_id_buf = p_d_int;
-  p_d_int += _max_batch_size * _tw._max_step;
-
-  _p_d_unfinished = p_d_int;
-  p_d_int += 1;
 
   // datatype buffer
   _DataType *p_d_datatype = reinterpret_cast<_DataType *>(p_d_int);
@@ -99,6 +91,9 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_logit = p_d_datatype;
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
                              _max_batch_dim * sizeof(curandState)));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_sample_id_buf,
+                             _max_batch_size * _tw._max_step * sizeof(int)));
+  CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_unfinished, sizeof(int)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
   return;
 }
@@ -170,10 +165,14 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 }
 
 template <OperationType OpType_>
-void GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
+int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
+
+  if (_batch_seq_len >= _tw._max_step) {
+    return _batch_seq_len;
+  }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_real_seq_len, _h_real_seq_len.data(),
                                   sizeof(int) * _batch_size,
@@ -187,6 +186,9 @@ void GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
 #ifdef DEBUG_RESULT
   std::cout << "batch_size-" << batch_size << " batch_seq_len-" << batch_seq_len
             << std::endl;
+  std::cout << "Sample with " << _tw._sampling_method << std::endl;
+  std::cout << "padding_id: " << _tw._padding_id << std::endl;
+  std::cout << "vocab_size: " << _tw._src_vocab_size << std::endl;
   print_vec(_p_d_sample_id, "batch_token_ids", batch_size * batch_seq_len);
 #endif
 
@@ -211,7 +213,13 @@ void GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   ker_norm_layer_launcher<_DataType>(_batch_token_num, _tw._hidden_size,
                                      _stream, _p_d_query, _p_d_src_emb_wei[2],
                                      _p_d_src_emb_wei[3]);
-  if (sample_one_token() == 0 || _batch_seq_len == _tw._max_step) return;
+  if (sample_one_token() == 0 || _batch_seq_len >= _tw._max_step) {
+    CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
+                                    _batch_token_num * sizeof(int),
+                                    cudaMemcpyDeviceToDevice, _stream));
+    CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+    return _batch_seq_len;
+  }
 
   while (1) {
 #ifdef DEBUG_RESULT
@@ -244,13 +252,19 @@ void GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
     print_vec(_p_d_query, "_p_d_query before logits",
               _batch_size * _tw._hidden_size - 10,
               _batch_size * _tw._hidden_size);
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len == 10) break;
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= 20) break;
 #else
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len == _tw._max_step)
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
       break;
 #endif
   }
-  return;
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
+                                  _batch_token_num * sizeof(int),
+                                  cudaMemcpyDeviceToDevice, _stream));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+
+  return _batch_seq_len;
 }
 
 template <OperationType OpType_>
@@ -267,16 +281,19 @@ int GptEncoder<OpType_>::sample_one_token() {
 #endif
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   /* ---step 2. sample new tokens from logits */
-  // ker_topk_sample_launcher<_DataType>(
-  //     _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
-  //     _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
-  //     _p_d_real_seq_len, _tw._src_vocab_size, 4, _p_d_unfinished,
-  //     _p_d_curandstate);
-  ker_topp_sample_launcher<_DataType>(
-      _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
-      _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
-      _p_d_real_seq_len, _tw._src_vocab_size, 0.75, _p_d_unfinished,
-      _p_d_curandstate);
+  if (_tw._sampling_method == "topk") {
+    ker_topk_sample_launcher<_DataType>(
+        _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
+        _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
+        _p_d_real_seq_len, _tw._src_vocab_size, _tw._topk, _p_d_unfinished,
+        _p_d_curandstate, _tw._eos_id);
+  } else {
+    ker_topp_sample_launcher<_DataType>(
+        _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
+        _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
+        _p_d_real_seq_len, _tw._src_vocab_size, _tw._topp, _p_d_unfinished,
+        _p_d_curandstate, _tw._eos_id);
+  }
   int *temp = _p_d_sample_id;
   _p_d_sample_id = _p_d_sample_id_buf;
   _p_d_sample_id_buf = temp;
@@ -304,15 +321,20 @@ int GptEncoder<OpType_>::sample_one_token_with_cache() {
 #endif
 
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
-  /* ---step 2. sample new tokens from logits */
-  // ker_topk_sample_launcher(
-  //     _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
-  //     _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
-  //     _tw._src_vocab_size, 4, _p_d_unfinished, _p_d_curandstate);
-  ker_topp_sample_launcher<_DataType>(
-      _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
-      _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
-      _tw._src_vocab_size, 0.75, _p_d_unfinished, _p_d_curandstate);
+  // /* ---step 2. sample new tokens from logits */
+  if (_tw._sampling_method == "topk") {
+    ker_topk_sample_launcher<_DataType>(
+        _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
+        _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
+        _tw._src_vocab_size, _tw._topk, _p_d_unfinished, _p_d_curandstate,
+        _tw._eos_id);
+  } else {
+    ker_topp_sample_launcher<_DataType>(
+        _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
+        _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
+        _tw._src_vocab_size, _tw._topp, _p_d_unfinished, _p_d_curandstate,
+        _tw._eos_id);
+  }
   int *temp = _p_d_sample_id;
   _p_d_sample_id = _p_d_sample_id_buf;
   _p_d_sample_id_buf = temp;
@@ -333,6 +355,17 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
       _p_d_enc_wei[_weight_offset + 5]);
 
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_query, "input with bias",
+              _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+    print_vec(_p_d_q, "first ln output",
+              _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+  }
+#endif
+
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -341,6 +374,15 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_qkv_projected, "_p_d_qkv_projected",
+              _batch_token_num * _tw._hidden_size * 3 - 5,
+              _batch_token_num * _tw._hidden_size * 3);
+  }
+#endif
+
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
@@ -365,6 +407,17 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
                         cudaMemcpyDeviceToDevice, stream));
   }
 
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_q, "_p_d_q", _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+    print_vec(_p_d_k, "_p_d_k", _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+    print_vec(_p_d_v, "_p_d_v", _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+  }
+#endif
+
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
       _hd, CUBLAS_OP_T, CUBLAS_OP_N, _batch_seq_len, _batch_seq_len,
@@ -374,9 +427,26 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
       _batch_seq_len, _batch_seq_len * _batch_seq_len,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_c, "q*k",
+              _batch_token_num * _batch_seq_len * _tw._head_num - 5,
+              _batch_token_num * _batch_seq_len * _tw._head_num);
+  }
+#endif
+
   ker_correlation_softmax_gpt_launcher<_DataType>(_batch_size, _batch_seq_len,
                                                   _tw._head_num, _stream,
                                                   _p_d_c, _p_d_real_seq_len);
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_c, "mask weights",
+              _batch_token_num * _batch_seq_len * _tw._head_num - 5,
+              _batch_token_num * _batch_seq_len * _tw._head_num);
+  }
+#endif
 
   /* ---step 3. new_q = correlation * v--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -387,11 +457,27 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
       _tw._dim_per_head, _batch_seq_len * _tw._dim_per_head,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_q, "value after attention",
+              _batch_token_num * _tw._hidden_size - 5,
+              _batch_token_num * _tw._hidden_size);
+  }
+#endif
+
   // use v to save reshaped q, since they are in same size and v
   // will not be use again before the next multi-head-attention
   ker_arrange_atten_output_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _p_d_v,
       _batch_seq_len, _tw._dim_per_head, _tw._head_num);
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_v, "reshaped value after attention", 0, 5);
+    print_vec(_p_d_query, "attention input with output bias", 0, 5);
+  }
+#endif
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -399,6 +485,13 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 4], _AType,
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_query,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  if (_layer_id == 0) {
+    print_vec(_p_d_enc_wei[_weight_offset + 4], "attn out kernel", 0, 5);
+    print_vec(_p_d_query, "attention output", 0, 5);
+  }
+#endif
   return;
 }
 
@@ -534,12 +627,6 @@ void GptEncoder<OpType_>::self_attention_with_cache() {
 
 #ifdef DEBUG_RESULT
   if (_layer_id == 0) {
-    // print_vec(_p_d_v, "reshaped value after attention",
-    //           _batch_size * _tw._hidden_size - 5,
-    //           _batch_size * _tw._hidden_size);
-    // print_vec(_p_d_query, "attention input with output bias",
-    //           _batch_size * _tw._hidden_size - 5,
-    //           _batch_size * _tw._hidden_size);
     print_vec(_p_d_v, "reshaped value after attention", 0, 5);
     print_vec(_p_d_query, "attention input with output bias", 0, 5);
   }
@@ -555,12 +642,6 @@ void GptEncoder<OpType_>::self_attention_with_cache() {
 #ifdef DEBUG_RESULT
   if (_layer_id == 0) {
     print_vec(_p_d_enc_wei[_weight_offset + 4], "attn out kernel", 0, 5);
-    // print_vec(_p_d_enc_wei[_weight_offset + 4], "attn out kernel",
-    //           _tw._hidden_size * _tw._hidden_size - 5,
-    //           _tw._hidden_size * _tw._hidden_size);
-    // print_vec(_p_d_query, "attention output",
-    //           _batch_size * _tw._hidden_size - 5,
-    //           _batch_size * _tw._hidden_size);
     print_vec(_p_d_query, "attention output", 0, 5);
   }
 #endif

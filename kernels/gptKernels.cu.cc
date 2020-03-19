@@ -353,22 +353,6 @@ __global__ void ker_arrange_qkv_with_cache<__half>(
     const __half* ori_qkv, const __half* qkv_bias, __half* new_q, __half* new_k,
     __half* k_cache, __half* new_v, __half* v_cache, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num) {
-  // int batch_id = blockIdx.x / batch_seq_len;
-  // int token_id = blockIdx.x % batch_seq_len;
-  // int head_id = threadIdx.x / dim_per_head;
-  // int dim_id = threadIdx.x % dim_per_head;
-  // int qkv_offset = max_batch_dim * blockIdx.y;
-  // int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id,
-  // head_num,
-  //                               batch_seq_len, dim_per_head);
-
-  // const half2* p_ori_qkv = (const half2*)ori_qkv;
-  // const half2* p_bias = (const half2*)qkv_bias;
-  // half2* p_new_q = (half2*)new_q;
-  // p_new_q[qkv_offset + target_id] =
-  //     __hadd2(p_ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x +
-  //                       threadIdx.x],
-  //             __ldg(&p_bias[blockIdx.y * blockDim.x + threadIdx.x]));
   int batch_id = blockIdx.x / batch_seq_len;
   int token_id = blockIdx.x % batch_seq_len;
   int head_id = threadIdx.x / dim_per_head;
@@ -550,11 +534,11 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
                                 int* new_input_ids, const int* real_seq_len,
                                 const int vocab_size, const int batch_seq_len,
                                 int logits_seq_len, int* unfinished,
-                                curandState* curandstate) {
-  int token_idx_in_batch = blockIdx.x * batch_seq_len + batch_seq_len - 1;
+                                curandState* curandstate, int eos_id) {
+  int last_token_idx_in_batch = blockIdx.x * batch_seq_len + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (old_input_ids[token_idx_in_batch] == 3) {
+  if (old_input_ids[last_token_idx_in_batch] == eos_id) {
     int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
     int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
     for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
@@ -562,8 +546,9 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
       new_input_ids[new_idx] = old_input_ids[idx];
     }
     if (threadIdx.x == 0) {
-      new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = 3;
-      old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = 3;
+      // blockIdx.x*(batch_seq_len+1)+(batch_seq_len)
+      new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = eos_id;
+      old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = eos_id;
     }
     return;
   }
@@ -634,10 +619,13 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
 
   int threadID = threadIdx.x;
   __shared__ int s_threadID;
+  __shared__ float s_max_prob;
   if (random_x > prefix_sum_prob) threadID = blockDim.x;
   threadID = blockReduceMin(threadID);
+  float max_prob = blockReduceMax(topk_prob);
   if (threadIdx.x == 0) {
     s_threadID = threadID;
+    s_max_prob = max_prob;
   }
   __syncthreads();
   if (threadIdx.x == s_threadID) {
@@ -645,9 +633,14 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
   }
   __syncthreads();
 
+  if (s_tid == vocab_size && topk_prob == s_max_prob) {
+    s_tid = topk_tid;
+  }
+  __syncthreads();
+
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != 3) unfinished[0] = 1;
+    if (s_tid != eos_id) unfinished[0] = 1;
   }
 
   /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
@@ -671,31 +664,31 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
                               int* old_input_ids, int* new_input_ids,
                               const int* real_seq_len, const int vocab_size,
                               const int k, int* unfinished,
-                              curandState* curandstate) {
+                              curandState* curandstate, int eos_id) {
   if (k == 1)
     ker_topk_sample<T, 1><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   if (k == 2)
     ker_topk_sample<T, 2><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   if (k == 4)
     ker_topk_sample<T, 4><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   if (k == 8)
     ker_topk_sample<T, 8><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   if (k == 16)
     ker_topk_sample<T, 16><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   if (k == 32)
     ker_topk_sample<T, 32><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-        batch_seq_len, logits_seq_len, unfinished, curandstate);
+        batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
 }
 
 template void ker_topk_sample_launcher<float>(
@@ -703,14 +696,14 @@ template void ker_topk_sample_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, const float* logits,
     int* old_input_ids, int* new_input_idx, const int* real_seq_len,
     const int vocab_size, const int k, int* unfinished,
-    curandState* curandstate);
+    curandState* curandstate, int eos_id);
 
 template void ker_topk_sample_launcher<__half>(
     int batch_size, int batch_seq_len, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
     int* old_input_ids, int* new_input_idx, const int* real_seq_len,
     const int vocab_size, const int k, int* unfinished,
-    curandState* curandstate);
+    curandState* curandstate, int eos_id);
 
 /**
 @brief: ker_topp_sample
@@ -732,11 +725,11 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
                                 int* new_input_ids, const int* real_seq_len,
                                 const int vocab_size, const int batch_seq_len,
                                 int logits_seq_len, int* unfinished, float p,
-                                curandState* curandstate) {
+                                curandState* curandstate, int eos_id) {
   int token_idx_in_batch = blockIdx.x * batch_seq_len + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (old_input_ids[token_idx_in_batch] == 3) {
+  if (old_input_ids[token_idx_in_batch] == eos_id) {
     int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
     int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
     for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
@@ -744,8 +737,8 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
       new_input_ids[new_idx] = old_input_ids[idx];
     }
     if (threadIdx.x == 0) {
-      new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = 3;
-      old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = 3;
+      new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = eos_id;
+      old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = eos_id;
     }
     return;
   }
@@ -841,10 +834,13 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
 
   int threadID = threadIdx.x;
   __shared__ int s_threadID;
+  __shared__ float s_max_prob;
   if (random_x > prefix_sum_prob) threadID = blockDim.x;
   threadID = blockReduceMin(threadID);
+  float max_prob = blockReduceMax(topk_prob);
   if (threadIdx.x == 0) {
     s_threadID = threadID;
+    s_max_prob = max_prob;
   }
   __syncthreads();
   if (threadIdx.x == s_threadID) {
@@ -852,9 +848,14 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   }
   __syncthreads();
 
+  if (s_tid == vocab_size && topk_prob == s_max_prob) {
+    s_tid = topk_tid;
+  }
+  __syncthreads();
+
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {
-    if (s_tid != 3) unfinished[0] = 1;
+    if (s_tid != eos_id) unfinished[0] = 1;
   }
 
   /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
@@ -878,10 +879,10 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               int* old_input_ids, int* new_input_ids,
                               const int* real_seq_len, const int vocab_size,
                               const float p, int* unfinished,
-                              curandState* curandstate) {
+                              curandState* curandstate, int eos_id) {
   ker_topp_sample<T><<<batch_size, max_thread_per_block, 0, stream>>>(
       logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
-      batch_seq_len, logits_seq_len, unfinished, p, curandstate);
+      batch_seq_len, logits_seq_len, unfinished, p, curandstate, eos_id);
 }
 
 template void ker_topp_sample_launcher<float>(
@@ -889,14 +890,14 @@ template void ker_topp_sample_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, const float* logits,
     int* old_input_ids, int* new_input_idx, const int* real_seq_len,
     const int vocab_size, const float p, int* unfinished,
-    curandState* curandstate);
+    curandState* curandstate, int eos_id);
 
 template void ker_topp_sample_launcher<__half>(
     int batch_size, int batch_seq_len, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
     int* old_input_ids, int* new_input_idx, const int* real_seq_len,
     const int vocab_size, const float p, int* unfinished,
-    curandState* curandstate);
+    curandState* curandstate, int eos_id);
 
 __global__ void ker_curand_setup(curandState* state) {
   /* Each thread gets same seed, a different sequence

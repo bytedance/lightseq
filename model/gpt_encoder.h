@@ -97,7 +97,7 @@ class GptEncoder {
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
-  void run_one_sample(int batch_size, int batch_seq_len);
+  int run_one_sample(int batch_size, int batch_seq_len);
   void compute_ppl();
 };
 
