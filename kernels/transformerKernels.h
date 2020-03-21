@@ -34,7 +34,14 @@ void select_beam_rough_topk_launcher(
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size);
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda);
+
+void ker_diverse_beam_search_launcher(float* can_score, int* can_ids,
+                                      int* num_beam_can, int step_token_num,
+                                      int max_thread_per_block,
+                                      cudaStream_t stream, int beam_size,
+                                      float diverse_lambda, int vocab_size);
 
 template <typename T>
 void ker_bias_relu_launcher(int batch_token_num, int block_dim,

@@ -43,7 +43,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _trg_vocab_size =
       transformer.trg_embedding().token_embedding_size() / _hidden_size;
   _n_enc_layer = transformer.encoder_stack_size();
-  _n_dec_layer = transformer.decoder_stack_size();
+  _n_dec_layer = transformer.decoder_stack_size(); 
   _head_num = transformer.model_conf().head_num();
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
@@ -53,6 +53,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _length_penalty = transformer.model_conf().length_penalty();
   _padding_id = transformer.model_conf().src_padding_id();
   _start_id = transformer.model_conf().trg_start_id();
+  _diverse_lambda = transformer.model_conf().diverse_lambda();
 }
 
 /**

@@ -36,22 +36,27 @@ vocab_size: the vocab size of decoder
 max_step: max decode step
 length_norm: length penlty value for current step
 cur_step: current step
+diverse_lambda: lambda of diverse beam search
 */
 template <typename T, int beam_size>
-__global__ void select_beam_rough_topk(const T* logits, const T* logit_bias,
-                                       const float* seq_probs,
-                                       const float* seq_score,
-                                       const int* alive_seq, int* can_idx,
-                                       float* can_score, int* num_beam_can,
-                                       int vocab_size, int max_step,
-                                       float length_norm, int cur_step) {
+__global__ void select_beam_rough_topk(
+    const T* logits, const T* logit_bias, const float* seq_probs,
+    const float* seq_score, const int* alive_seq, int* can_idx,
+    float* can_score, int* num_beam_can, int vocab_size, int max_step,
+    float length_norm, int cur_step, float diverse_lambda) {
   if (alive_seq[blockIdx.x * max_step + cur_step] == vocab_size - 1) {
     // this is a finished beam
     if (threadIdx.x == 0) {
       num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
       int pos = atomicAdd(num_beam_can, 1);  // get a candidate pos
-      can_score[pos] =
-          seq_score[blockIdx.x];  // this beam's score will not be change
+      if (diverse_lambda == 0) {
+        can_score[pos] =
+            seq_score[blockIdx.x];  // this beam's score will not be change
+      } else {
+        int batch_id = blockIdx.x / beam_size;
+        can_score[pos] = seq_score[blockIdx.x] +
+                         (blockIdx.x - batch_id) * min_log_probability;
+      }
       can_idx[pos] =
           vocab_size - 1 + (blockIdx.x % beam_size) * vocab_size;  // EOS
     }
@@ -138,9 +143,15 @@ __global__ void select_beam_rough_topk(const T* logits, const T* logit_bias,
     // threads with true predicates write their elements
     if ((lgt >= s_topk)) {
       pos += l_n;  // increment local pos by global counter
-      can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
-                             min_log_probability + 1.f) +
-                       batch_id * min_log_probability;
+      if (diverse_lambda == 0) {
+        can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
+                               min_log_probability + 1.f) +
+                         batch_id * min_log_probability;
+      } else {
+        can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
+                               min_log_probability + 1.f) +
+                         blockIdx.x * min_log_probability;
+      }
       can_idx[pos] = idx - batch_start_pos;
     }
     __syncthreads();
@@ -157,37 +168,44 @@ void select_beam_rough_topk_launcher(
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size) {
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda) {
   if (beam_size == 1)
     select_beam_rough_topk<
         T, 1><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
   if (beam_size == 2)
     select_beam_rough_topk<
         T, 2><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
   if (beam_size == 4)
     select_beam_rough_topk<
         T, 4><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
   if (beam_size == 8)
     select_beam_rough_topk<
         T, 8><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
   if (beam_size == 16)
     select_beam_rough_topk<
         T, 16><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
   if (beam_size == 32)
     select_beam_rough_topk<
         T, 32><<<step_token_num, max_thread_per_block, 0, stream>>>(
         logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step);
+        num_beam_can, vocab_size, max_step, length_norm, cur_step,
+        diverse_lambda);
 }
 
 template void select_beam_rough_topk_launcher<float>(
@@ -195,14 +213,59 @@ template void select_beam_rough_topk_launcher<float>(
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size);
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda);
 
 template void select_beam_rough_topk_launcher<__half>(
     const __half* logits, const __half* logit_bias, const float* seq_probs,
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size);
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda);
+
+/**
+@brief: ker_diverse_beam_search
+Add different diverse score to can_score in each beam
+
+@thread
+gridDim.x = batch_size * beam_size
+blockDim.x = max_thread_per_block
+
+@param
+can_score: [batch_size * beam_size * candidates_size] candidates_size is
+dynamic
+can_ids: [batch_size * beam_size * candidates_size]
+num_beam_can: [1 + batch_size * beam_size]
+*/
+__global__ void ker_diverse_beam_search(float* can_score, int* can_ids,
+                                        int* num_beam_can, int beam_size,
+                                        float diverse_lambda, int vocab_size) {
+  int total_candidates = num_beam_can[0];
+  num_beam_can += 1;
+  int can_pos = num_beam_can[blockIdx.x];
+  int batch_id = blockIdx.x / beam_size;
+  int beam_score_left_idx = can_pos + threadIdx.x;
+  int beam_score_right_idx =
+      blockIdx.x == (gridDim.x - 1)
+          ? total_candidates
+          : num_beam_can[blockIdx.x * gridDim.y + blockIdx.y + 1];
+  for (int idx = beam_score_left_idx; idx < beam_score_right_idx;
+       idx += blockDim.x) {
+    atomicAdd(can_score + idx, batch_id * min_log_probability -
+                                   min_log_probability * blockIdx.x -
+                                   diverse_lambda * (idx - can_pos + 1));
+  }
+}
+
+void ker_diverse_beam_search_launcher(float* can_score, int* can_ids,
+                                      int* num_beam_can, int step_token_num,
+                                      int max_thread_per_block,
+                                      cudaStream_t stream, int beam_size,
+                                      float diverse_lambda, int vocab_size) {
+  ker_diverse_beam_search<<<step_token_num, max_thread_per_block, 0, stream>>>(
+      can_score, can_ids, num_beam_can, beam_size, diverse_lambda, vocab_size);
+}
 
 /**
 @brief: ker_bias_relu

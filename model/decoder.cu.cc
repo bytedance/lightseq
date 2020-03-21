@@ -532,6 +532,22 @@ bool Decoder<OpType_>::beam_search() {
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
                                   cudaMemcpyDeviceToHost, _stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  if (_tw._diverse_lambda != 0) {
+    if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
+      CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
+          (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
+          _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
+          sizeof(float) * 8, _stream));
+    } else {
+      thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
+                          _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
+                          thrust::greater<float>());
+    }
+    ker_diverse_beam_search_launcher(_p_d_can_score, _p_d_can_idx, _p_d_can_num,
+                                     _step_token_num, _max_thread_per_block,
+                                     _stream, _tw._beam_size,
+                                     _tw._diverse_lambda, _tw._trg_vocab_size);
+  }
   // tow sort ways, decided by the number of candidates
   if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
     CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
@@ -600,7 +616,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
       _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
       _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
       _h_length_norm[_cur_step], _cur_step, _step_token_num,
-      _max_thread_per_block, _stream, _tw._beam_size);
+      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda);
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
   return;

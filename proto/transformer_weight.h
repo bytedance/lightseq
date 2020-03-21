@@ -95,6 +95,7 @@ class TransformerWeight {
   float _length_penalty;
   int _padding_id;  // for src
   int _start_id;    // for trg
+  float _diverse_lambda;
 };
 
 }  // namespace cuda

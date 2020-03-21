@@ -242,6 +242,24 @@ cc_binary(
 )
 
 cc_binary(
+    name = "transformer_generate_example",
+    srcs = ["example/transformer_generate_example.cu.cc"],
+    deps = [
+        ":transformer_weight",
+        ":util",
+        "transformer_encoder",
+        "transformer_decoder",
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
+)
+
+cc_binary(
     name = "gptlm_example",
     srcs = ["example/gptlm_example.cu.cc"],
     deps = [

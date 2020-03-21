@@ -96,6 +96,7 @@ message ModelConf {
   float length_penalty = 4;  // length penalty of beam search
   int32 src_padding_id = 5;  // source padding id
   int32 trg_start_id = 6;    // target start id
+  float diverse_lambda = 7; // diverse beam search lambda
 }
 
 message Transformer {
