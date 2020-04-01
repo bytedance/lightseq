@@ -1,4 +1,5 @@
 #include <unistd.h>
+
 #include <cub/cub.cuh>
 
 #include "src/custom/byseqlib/kernels/transformerKernels.h"
@@ -570,7 +571,8 @@ bool Decoder<OpType_>::beam_search() {
                        _stream>>>(
       _p_d_can_idx, _p_d_can_score, _p_d_can_num + 1, _p_d_alive_seq,
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
-      _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step]);
+      _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step],
+      _tw._diverse_lambda);
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;

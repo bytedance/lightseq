@@ -65,8 +65,9 @@ int main(int argc, char *argv[]) {
   // instantiate decoder
   std::shared_ptr<byseqlib::cuda::Decoder<optype>> decoder_ =
       std::make_shared<byseqlib::cuda::Decoder<optype>>(
-          max_batch_size, reinterpret_cast<int *>(
-                              thrust::raw_pointer_cast(d_padding_mask_.data())),
+          max_batch_size,
+          reinterpret_cast<int *>(
+              thrust::raw_pointer_cast(d_padding_mask_.data())),
           reinterpret_cast<optraits::DataType *>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_output_.data())),
@@ -120,6 +121,9 @@ int main(int argc, char *argv[]) {
             d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
                 j * (decoder_->_cur_step + 1),
             "Beam result: ", decoder_->_cur_step + 1);
+        byseqlib::cuda::print_vec(
+            decoder_->_p_d_alive_seq_score + ii * tw_._beam_size + j,
+            "Beam score: ", 1);
       }
     }
   }

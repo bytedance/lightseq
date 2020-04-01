@@ -1,5 +1,5 @@
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
 #include "src/custom/byseqlib/kernels/common.h"
+#include "src/custom/byseqlib/kernels/transformerKernels.h"
 /**
 @file
 Implemented the cuda kernel function and its launcher
@@ -171,41 +171,41 @@ void select_beam_rough_topk_launcher(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda) {
   if (beam_size == 1)
-    select_beam_rough_topk<
-        T, 1><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 1>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
   if (beam_size == 2)
-    select_beam_rough_topk<
-        T, 2><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 2>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
   if (beam_size == 4)
-    select_beam_rough_topk<
-        T, 4><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 4>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
   if (beam_size == 8)
-    select_beam_rough_topk<
-        T, 8><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 8>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
   if (beam_size == 16)
-    select_beam_rough_topk<
-        T, 16><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 16>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
   if (beam_size == 32)
-    select_beam_rough_topk<
-        T, 32><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda);
+    select_beam_rough_topk<T, 32>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda);
 }
 
 template void select_beam_rough_topk_launcher<float>(
@@ -255,6 +255,11 @@ __global__ void ker_diverse_beam_search(float* can_score, int* can_ids,
     atomicAdd(can_score + idx, batch_id * min_log_probability -
                                    min_log_probability * blockIdx.x -
                                    diverse_lambda * (idx - can_pos + 1));
+    int ori_can_idx = can_ids[idx];  // can_beam_id * vocab_size + vocab_id
+    int can_beam_id = ori_can_idx / vocab_size;
+    int can_vocab_id = ori_can_idx % vocab_size;
+    can_ids[idx] =
+        (can_beam_id + (idx - can_pos) * beam_size) * vocab_size + can_vocab_id;
   }
 }
 
@@ -309,16 +314,16 @@ template <typename T>
 void ker_bias_relu_launcher(int batch_token_num, int block_dim,
                             cudaStream_t stream, T* input, const T* bias,
                             int feature_dim) {
-  ker_bias_relu<T><<<batch_token_num, block_dim, 0, stream>>>(input, bias,
-                                                              feature_dim);
+  ker_bias_relu<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
 }
 
 template <>
 void ker_bias_relu_launcher<__half>(int batch_token_num, int block_dim,
                                     cudaStream_t stream, __half* input,
                                     const __half* bias, int feature_dim) {
-  ker_bias_relu<__half><<<batch_token_num, block_dim, 0, stream>>>(
-      input, bias, feature_dim / 2);
+  ker_bias_relu<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
 }
 
 template void ker_bias_relu_launcher<float>(int batch_token_num, int block_dim,
@@ -410,8 +415,8 @@ template <>
 void ker_norm_layer_launcher<__half>(int token_num, int hidden_size,
                                      cudaStream_t stream, __half* matrix,
                                      const __half* scale, const __half* bias) {
-  ker_norm_layer<__half><<<token_num, hidden_size / 2, 0, stream>>>(
-      matrix, scale, bias);
+  ker_norm_layer<__half>
+      <<<token_num, hidden_size / 2, 0, stream>>>(matrix, scale, bias);
 }
 
 template void ker_norm_layer_launcher<float>(int token_num, int hidden_size,
@@ -602,9 +607,9 @@ void ker_enc_embedding_launcher(int batch_size, int batch_seq_len,
                                 const T* token_emb, const T* pos_emb,
                                 const int* token_id, T* output,
                                 int* padding_mask, int padding_id) {
-  ker_enc_embedding<
-      T><<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, padding_mask, padding_id);
+  ker_enc_embedding<T>
+      <<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, padding_mask, padding_id);
 }
 
 template <>
@@ -614,9 +619,9 @@ void ker_enc_embedding_launcher<__half>(int batch_size, int batch_seq_len,
                                         const __half* pos_emb,
                                         const int* token_id, __half* output,
                                         int* padding_mask, int padding_id) {
-  ker_enc_embedding<
-      __half><<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, padding_mask, padding_id);
+  ker_enc_embedding<__half>
+      <<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, padding_mask, padding_id);
 }
 
 template void ker_enc_embedding_launcher<float>(
@@ -742,10 +747,10 @@ void ker_arrange_encself_qkv_launcher(int batch_token_num, int hidden_size,
                                       const T* qkv_bias, T* new_qkv,
                                       int max_batch_dim, int batch_seq_len,
                                       int dim_per_head, int head_num) {
-  ker_arrange_encself_qkv<
-      T><<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
-      ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len, dim_per_head,
-      head_num);
+  ker_arrange_encself_qkv<T>
+      <<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len,
+          dim_per_head, head_num);
 }
 
 template <>
@@ -753,10 +758,10 @@ void ker_arrange_encself_qkv_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const __half* ori_qkv, const __half* qkv_bias, __half* new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num) {
-  ker_arrange_encself_qkv<
-      __half><<<dim3(batch_token_num, 3), hidden_size / 2, 0, stream>>>(
-      ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
-      dim_per_head / 2, head_num);
+  ker_arrange_encself_qkv<__half>
+      <<<dim3(batch_token_num, 3), hidden_size / 2, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
+          dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_encself_qkv_launcher<float>(
@@ -853,10 +858,10 @@ void ker_arrange_decself_qkv_launcher(int step_token_num, int hidden_size,
                                       const T* qkv_bias, T* new_q, T* new_k,
                                       T* new_v, int head_num, int dim_per_head,
                                       int max_step, int step_id) {
-  ker_arrange_decself_qkv<
-      T><<<dim3(step_token_num, 3), hidden_size, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head, max_step,
-      step_id);
+  ker_arrange_decself_qkv<T>
+      <<<dim3(step_token_num, 3), hidden_size, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
+          max_step, step_id);
 }
 
 template <>
@@ -864,10 +869,10 @@ void ker_arrange_decself_qkv_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const __half* ori_qkv, const __half* qkv_bias, __half* new_q, __half* new_k,
     __half* new_v, int head_num, int dim_per_head, int max_step, int step_id) {
-  ker_arrange_decself_qkv<
-      __half><<<dim3(step_token_num, 3), hidden_size / 2, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-      max_step, step_id);
+  ker_arrange_decself_qkv<__half>
+      <<<dim3(step_token_num, 3), hidden_size / 2, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
+          max_step, step_id);
 }
 
 template void ker_arrange_decself_qkv_launcher<float>(
@@ -965,10 +970,10 @@ void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,
                                     T* new_v, int offset_per_layer,
                                     int batch_seq_len, int dim_per_head,
                                     int head_num) {
-  ker_arrange_encdec_kv<
-      T><<<dim3(batch_token_num, dec_layer_num * 2), hidden_size, 0, stream>>>(
-      ori_kv, kv_bias, new_k, new_v, offset_per_layer, batch_seq_len,
-      dim_per_head, head_num);
+  ker_arrange_encdec_kv<T>
+      <<<dim3(batch_token_num, dec_layer_num * 2), hidden_size, 0, stream>>>(
+          ori_kv, kv_bias, new_k, new_v, offset_per_layer, batch_seq_len,
+          dim_per_head, head_num);
 }
 
 template <>
@@ -977,10 +982,10 @@ void ker_arrange_encdec_kv_launcher<__half>(
     cudaStream_t stream, const __half* ori_kv, const __half* kv_bias,
     __half* new_k, __half* new_v, int offset_per_layer, int batch_seq_len,
     int dim_per_head, int head_num) {
-  ker_arrange_encdec_kv<__half><<<dim3(batch_token_num, dec_layer_num * 2),
-                                  hidden_size / 2, 0, stream>>>(
-      ori_kv, kv_bias, new_k, new_v, offset_per_layer / 2, batch_seq_len,
-      dim_per_head / 2, head_num);
+  ker_arrange_encdec_kv<__half>
+      <<<dim3(batch_token_num, dec_layer_num * 2), hidden_size / 2, 0,
+         stream>>>(ori_kv, kv_bias, new_k, new_v, offset_per_layer / 2,
+                   batch_seq_len, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_encdec_kv_launcher<float>(
@@ -1116,9 +1121,9 @@ void ker_correlation_softmax_encself_launcher(int batch_size, int batch_seq_len,
                                               int head_num, cudaStream_t stream,
                                               T* correlation,
                                               const int* src_padding_mask) {
-  ker_correlation_softmax_encself<T><<<
-      dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0, stream>>>(
-      correlation, src_padding_mask);
+  ker_correlation_softmax_encself<T>
+      <<<dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0,
+         stream>>>(correlation, src_padding_mask);
 }
 
 template void ker_correlation_softmax_encself_launcher<float>(
@@ -1212,9 +1217,9 @@ template <typename T>
 void ker_correlation_softmax_encdec_launcher(
     int batch_size, int head_num_per_seq, int batch_seq_len,
     cudaStream_t stream, T* correlation, const int* src_padding_mask) {
-  ker_correlation_softmax_encdec<
-      T><<<dim3(batch_size, head_num_per_seq), batch_seq_len, 0, stream>>>(
-      correlation, src_padding_mask);
+  ker_correlation_softmax_encdec<T>
+      <<<dim3(batch_size, head_num_per_seq), batch_seq_len, 0, stream>>>(
+          correlation, src_padding_mask);
 }
 
 template void ker_correlation_softmax_encdec_launcher<float>(
@@ -1289,9 +1294,9 @@ void ker_arrange_atten_output_launcher<__half>(int batch_token_num,
                                                const __half* ori_q,
                                                __half* new_q, int beam_size,
                                                int dim_per_head, int head_num) {
-  ker_arrange_atten_output<
-      __half><<<batch_token_num, hidden_size / 2, 0, stream>>>(
-      ori_q, new_q, beam_size, dim_per_head / 2, head_num);
+  ker_arrange_atten_output<__half>
+      <<<batch_token_num, hidden_size / 2, 0, stream>>>(
+          ori_q, new_q, beam_size, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_atten_output_launcher<float>(
@@ -1336,12 +1341,18 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    const int* old_alive_seq, int* new_alive_seq,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
-                                   int cur_step, float length_norm) {
+                                   int cur_step, float length_norm,
+                                   float diverse_lambda) {
   // step1 update alive_seq
   int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
   int ori_can_idx = can_idx[can_pos];  // can_beam_id * vocab_size + vocab_id
   int can_beam_id = ori_can_idx / vocab_size;
   int can_vocab_id = ori_can_idx % vocab_size;
+  int rank_id;
+  if (diverse_lambda != 0) {
+    rank_id = can_beam_id / gridDim.y;
+    can_beam_id %= gridDim.y;
+  }
   int thread_vocab_id;
   if (threadIdx.x > cur_step + 1) {
     thread_vocab_id = vocab_size - 1;
@@ -1356,14 +1367,21 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
   new_alive_seq[targetid_3dim(blockIdx.x, blockIdx.y, threadIdx.x, gridDim.y,
                               blockDim.x)] = thread_vocab_id;
 
-  // step2 update seq_probs if alive seq
+  // step2 update seq_probs if alive seq when not eos
   int eos_id = vocab_size - 1;
   if (can_vocab_id != eos_id) {
     // alive seq
     if (threadIdx.x == 0) {
-      seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
-          (can_score[can_pos] - blockIdx.x * min_log_probability) /
-          length_norm;  // recover it
+      if (diverse_lambda == 0) {
+        seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
+            (can_score[can_pos] - blockIdx.x * min_log_probability) /
+            length_norm;  // recover it
+      } else {
+        seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
+            (can_score[can_pos] - blockIdx.x * min_log_probability +
+             diverse_lambda * (rank_id + 1)) /
+            length_norm;
+      }
     }
     return;
   }
@@ -1377,9 +1395,14 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
   // update finished seq score
   if (threadIdx.x == 0) {
     // note, with batch offset value, to sort between batch element
-    seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos];
+    if (diverse_lambda == 0) {
+      seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos];
+    } else {
+      seq_score[blockIdx.x * gridDim.y + blockIdx.y] =
+          can_score[can_pos] + diverse_lambda * (rank_id + 1);
+    }
   }
-}
+}  // namespace cuda
 
 /**
 @brief: ker_refresh_cache
@@ -1508,11 +1531,12 @@ void ker_refresh_cache_launcher<__half>(
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step,
     int max_step) {
-  ker_refresh_cache<
-      __half><<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
-      num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem, new_self_k_bgeem,
-      new_self_v_bgeem, self_k_bgeem_offset / 2, beam_size, dim_per_head / 2,
-      head_num, vocab_size, cur_step, max_step);
+  ker_refresh_cache<__half>
+      <<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
+          num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem,
+          new_self_k_bgeem, new_self_v_bgeem, self_k_bgeem_offset / 2,
+          beam_size, dim_per_head / 2, head_num, vocab_size, cur_step,
+          max_step);
 }
 
 template void ker_refresh_cache_launcher<float>(

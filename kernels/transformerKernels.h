@@ -120,7 +120,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    const int* old_alive_seq, int* new_alive_seq,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
-                                   int cur_step, float length_norm);
+                                   int cur_step, float length_norm, float diverse_lambda);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
                                                   int* output, int max_step,
