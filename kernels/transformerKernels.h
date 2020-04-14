@@ -77,7 +77,7 @@ void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
                                 T* new_self_k_bgeem, T* new_self_v_bgeem,
                                 int self_k_bgeem_offset, int beam_size,
                                 int dim_per_head, int head_num, int vocab_size,
-                                int cur_step, int max_step);
+                                int cur_step, int max_step, bool diverse);
 
 template <typename T>
 void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,

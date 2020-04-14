@@ -246,10 +246,9 @@ __global__ void ker_diverse_beam_search(float* can_score, int* can_ids,
   int can_pos = num_beam_can[blockIdx.x];
   int batch_id = blockIdx.x / beam_size;
   int beam_score_left_idx = can_pos + threadIdx.x;
-  int beam_score_right_idx =
-      blockIdx.x == (gridDim.x - 1)
-          ? total_candidates
-          : num_beam_can[blockIdx.x * gridDim.y + blockIdx.y + 1];
+  int beam_score_right_idx = blockIdx.x == (gridDim.x - 1)
+                                 ? total_candidates
+                                 : num_beam_can[blockIdx.x + 1];
   for (int idx = beam_score_left_idx; idx < beam_score_right_idx;
        idx += blockDim.x) {
     atomicAdd(can_score + idx, batch_id * min_log_probability -
@@ -1438,7 +1437,8 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
                                   const T* self_v_bgeem, T* new_self_k_bgeem,
                                   T* new_self_v_bgeem, int self_k_bgeem_offset,
                                   int beam_size, int dim_per_head, int head_num,
-                                  int vocab_size, int cur_step, int max_step) {
+                                  int vocab_size, int cur_step, int max_step,
+                                  bool diverse) {
   int layer_id = blockIdx.x / (cur_step + 1);
   int step_id = blockIdx.x % (cur_step + 1);
   int kv_id = blockIdx.y & 1;
@@ -1451,6 +1451,7 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
   int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
   int can_beam_id =
       can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
+  if (diverse) can_beam_id %= beam_size;
   if (can_idx[can_pos] % vocab_size == vocab_size - 1) {
     return;
   }
@@ -1475,8 +1476,8 @@ __global__ void ker_refresh_cache<__half>(
     const int* num_can_per_beam, const int* can_idx, const __half* self_k_bgeem,
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step,
-    int max_step) {
+    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
+    bool diverse) {
   int layer_id = blockIdx.x / (cur_step + 1);
   int step_id = blockIdx.x % (cur_step + 1);
   int kv_id = blockIdx.y & 1;
@@ -1489,6 +1490,7 @@ __global__ void ker_refresh_cache<__half>(
   int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
   int can_beam_id =
       can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
+  if (diverse) can_beam_id %= beam_size;
   if (can_idx[can_pos] % vocab_size == vocab_size - 1) {
     return;
   }
@@ -1516,11 +1518,11 @@ void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
                                 T* new_self_k_bgeem, T* new_self_v_bgeem,
                                 int self_k_bgeem_offset, int beam_size,
                                 int dim_per_head, int head_num, int vocab_size,
-                                int cur_step, int max_step) {
+                                int cur_step, int max_step, bool diverse) {
   ker_refresh_cache<T><<<dim3(grid_dim_x, grid_dim_y), block_dim, 0, stream>>>(
       num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem, new_self_k_bgeem,
       new_self_v_bgeem, self_k_bgeem_offset, beam_size, dim_per_head, head_num,
-      vocab_size, cur_step, max_step);
+      vocab_size, cur_step, max_step, diverse);
 }
 
 template <>
@@ -1529,14 +1531,14 @@ void ker_refresh_cache_launcher<__half>(
     const int* num_can_per_beam, const int* can_idx, const __half* self_k_bgeem,
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step,
-    int max_step) {
+    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
+    bool diverse) {
   ker_refresh_cache<__half>
       <<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
           num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem,
           new_self_k_bgeem, new_self_v_bgeem, self_k_bgeem_offset / 2,
-          beam_size, dim_per_head / 2, head_num, vocab_size, cur_step,
-          max_step);
+          beam_size, dim_per_head / 2, head_num, vocab_size, cur_step, max_step,
+          diverse);
 }
 
 template void ker_refresh_cache_launcher<float>(
@@ -1544,14 +1546,15 @@ template void ker_refresh_cache_launcher<float>(
     const int* num_can_per_beam, const int* can_idx, const float* self_k_bgeem,
     const float* self_v_bgeem, float* new_self_k_bgeem, float* new_self_v_bgeem,
     int self_k_bgeem_offset, int beam_size, int dim_per_head, int head_num,
-    int vocab_size, int cur_step, int max_step);
+    int vocab_size, int cur_step, int max_step, bool diverse);
 
 template void ker_refresh_cache_launcher<__half>(
     int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
     const int* num_can_per_beam, const int* can_idx, const __half* self_k_bgeem,
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step);
+    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
+    bool diverse);
 
 /**
 @brief: ker_write_trg_tokenid_pos_penalty

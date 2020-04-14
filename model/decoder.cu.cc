@@ -594,7 +594,7 @@ bool Decoder<OpType_>::beam_search() {
         _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
         _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
         _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step);
+        _tw._max_step, _tw._diverse_lambda!=0);
     _DataType** ftmp = _p_d_self_k_bgeem2;
     _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
     _p_d_self_k_bgeem1 = ftmp;
