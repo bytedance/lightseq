@@ -669,26 +669,30 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
     ker_topk_sample<T, 1><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  if (k == 2)
+  else if (k == 2)
     ker_topk_sample<T, 2><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  if (k == 4)
+  else if (k == 4)
     ker_topk_sample<T, 4><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  if (k == 8)
+  else if (k == 8)
     ker_topk_sample<T, 8><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  if (k == 16)
+  else if (k == 16)
     ker_topk_sample<T, 16><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  if (k == 32)
+  else if (k == 32)
     ker_topk_sample<T, 32><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
+  else
+  {
+    throw std::invalid_argument("topk argument should be in [1,2,4,8,16,32]");
+  }
 }
 
 template void ker_topk_sample_launcher<float>(
