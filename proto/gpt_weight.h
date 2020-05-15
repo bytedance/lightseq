@@ -67,6 +67,10 @@ class GptWeight {
 
   int _head_num;
   int _padding_id;  // for src
+  std::string _sampling_method = "topk";
+  int _topk = 4;
+  float _topp = 0.75;
+  int _eos_id;
 };
 
 }  // namespace cuda

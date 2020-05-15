@@ -30,7 +30,7 @@ void print_vec(thrust::device_ptr<T> outv, std::string outn,
                int num_output_ele) {
   std::cout << outn << ": ";
   thrust::copy(outv, outv + num_output_ele,
-               std::ostream_iterator<T>(std::cout, " "));
+               std::ostream_iterator<T>(std::cout, ", "));
   std::cout << std::endl;
 }
 
@@ -45,7 +45,7 @@ void print_vec(const T* outv, std::string outn, int num_output_ele) {
   std::cout << outn << ": ";
   thrust::copy(thrust::device_pointer_cast(outv),
                thrust::device_pointer_cast(outv + num_output_ele),
-               std::ostream_iterator<T>(std::cout, " "));
+               std::ostream_iterator<T>(std::cout, ", "));
   std::cout << std::endl;
 }
 
@@ -57,7 +57,7 @@ void print_vec<__half>(const __half* outv, std::string outn,
   cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
              cudaMemcpyDeviceToHost);
   for (int i = 0; i < num_output_ele; i++) {
-    std::cout << __half2float(hout[i]) << " ";
+    std::cout << __half2float(hout[i]) << ", ";
   }
   std::cout << std::endl;
 }
@@ -71,6 +71,34 @@ template void print_vec<int>(const int* outv, std::string outn,
 template void print_vec<__half>(const __half* outv, std::string outn,
                                 int num_output_ele);
 
+template <typename T>
+void print_vec(const T* outv, std::string outn, int start, int end) {
+  std::cout << outn << ": ";
+  thrust::copy(thrust::device_pointer_cast(outv + start),
+               thrust::device_pointer_cast(outv + end),
+               std::ostream_iterator<T>(std::cout, ", "));
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<__half>(const __half* outv, std::string outn, int start,
+                       int end) {
+  std::cout << outn << ": ";
+  int num_elements = end - start;
+  std::vector<__half> hout(num_elements, (__half)0.f);
+  cudaMemcpy(hout.data(), outv + start, num_elements * sizeof(__half),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_elements; i++) {
+    std::cout << __half2float(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
+template void print_vec<float>(const float* outv, std::string outn, int start,
+                               int end);
+
+template void print_vec<int>(const int* outv, std::string outn, int start,
+                             int end);
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point& start,
     std::string duration_name, cudaStream_t stream) {

@@ -67,8 +67,8 @@ void check_gpu_error(T result, char const* const func, const char* const file,
                      int const line) {
   if (result) {
     throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
-                             std::to_string(line) + "): " +
-                             (_cudaGetErrorString(result)) + "\n");
+                             std::to_string(line) +
+                             "): " + (_cudaGetErrorString(result)) + "\n");
   }
 }
 
@@ -115,6 +115,10 @@ void print_vec(thrust::device_ptr<T> outv, std::string outn,
 
 template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele);
+
+template <typename T>
+void print_vec(const T* outv, std::string outn, int start,
+               int end);
 
 /* Print run time, for debug */
 void print_time_duration(
