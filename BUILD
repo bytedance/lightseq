@@ -25,6 +25,7 @@ cc_library(
         "kernels/transformerKernels.h",
     ]),
     copts = cuda_default_copts(),
+    includes = ["3rdparty/cub-1.8.0"],
     deps = [
         "@local_config_cuda//cuda:cuda_headers",
     ],

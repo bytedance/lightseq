@@ -2,6 +2,8 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
+#include <cub/cub.cuh>
+
 
 namespace byseqlib {
 namespace cuda {
@@ -63,6 +65,6 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               const float p, int* unfinished,
                               curandState* curandstate, int eos_id);
 
-__global__ void ker_curand_setup(curandState* state);
+
 }  // namespace cuda
 }  // namespace byseqlib

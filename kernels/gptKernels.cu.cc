@@ -1,7 +1,8 @@
-#include "src/custom/byseqlib/kernels/gptKernels.h"
 #include <cub/cub.cuh>
 #include <random>
+
 #include "src/custom/byseqlib/kernels/common.h"
+#include "src/custom/byseqlib/kernels/gptKernels.h"
 #include "src/custom/byseqlib/kernels/transformerKernels.h"
 /**
 @file
@@ -86,10 +87,10 @@ void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
                                 const int* token_id, T* output,
                                 int* real_seq_len, int padding_id,
                                 int pos_offset) {
-  ker_gpt_embedding<
-      T><<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
-      pos_offset);
+  ker_gpt_embedding<T>
+      <<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
+          pos_offset);
 }
 
 template <>
@@ -97,10 +98,10 @@ void ker_gpt_embedding_launcher<__half>(
     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
     const __half* token_emb, const __half* pos_emb, const int* token_id,
     __half* output, int* real_seq_len, int padding_id, int pos_offset) {
-  ker_gpt_embedding<
-      __half><<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
-      pos_offset);
+  ker_gpt_embedding<__half>
+      <<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
+          pos_offset);
 }
 
 template void ker_gpt_embedding_launcher<float>(
@@ -153,16 +154,16 @@ template <typename T>
 void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
                             cudaStream_t stream, T* input, const T* bias,
                             int feature_dim) {
-  ker_bias_gelu<T><<<batch_token_num, block_dim, 0, stream>>>(input, bias,
-                                                              feature_dim);
+  ker_bias_gelu<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
 }
 
 template <>
 void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
                                     cudaStream_t stream, __half* input,
                                     const __half* bias, int feature_dim) {
-  ker_bias_gelu<__half><<<batch_token_num, block_dim, 0, stream>>>(
-      input, bias, feature_dim / 2);
+  ker_bias_gelu<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
 }
 
 template void ker_bias_gelu_launcher<float>(int batch_token_num, int block_dim,
@@ -219,9 +220,9 @@ void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,
                                           int head_num, cudaStream_t stream,
                                           T* correlation,
                                           const int* real_seq_len) {
-  ker_correlation_softmax_gpt<T><<<dim3(batch_size, head_num * batch_seq_len),
-                                   batch_seq_len, 0, stream>>>(correlation,
-                                                               real_seq_len);
+  ker_correlation_softmax_gpt<T>
+      <<<dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0,
+         stream>>>(correlation, real_seq_len);
 }
 
 template void ker_correlation_softmax_gpt_launcher<float>(
@@ -279,9 +280,9 @@ void ker_attention_mask_weights_launcher(int batch_size, int dst_seq_len,
                                          int src_seq_len, int head_num,
                                          cudaStream_t stream, T* correlation,
                                          const int* real_seq_len) {
-  ker_attention_mask_weights<
-      T><<<dim3(batch_size, head_num * dst_seq_len), src_seq_len, 0, stream>>>(
-      correlation, real_seq_len, dst_seq_len, src_seq_len);
+  ker_attention_mask_weights<T>
+      <<<dim3(batch_size, head_num * dst_seq_len), src_seq_len, 0, stream>>>(
+          correlation, real_seq_len, dst_seq_len, src_seq_len);
 }
 
 template void ker_attention_mask_weights_launcher<float>(
@@ -398,10 +399,10 @@ void ker_arrange_qkv_with_cache_launcher(int batch_token_num, int hidden_size,
                                          T* k_cache, T* new_v, T* v_cache,
                                          int max_batch_dim, int batch_seq_len,
                                          int dim_per_head, int head_num) {
-  ker_arrange_qkv_with_cache<
-      T><<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache, max_batch_dim,
-      batch_seq_len, dim_per_head, head_num);
+  ker_arrange_qkv_with_cache<T>
+      <<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
+          max_batch_dim, batch_seq_len, dim_per_head, head_num);
 }
 
 template <>
@@ -410,10 +411,10 @@ void ker_arrange_qkv_with_cache_launcher<__half>(
     const __half* ori_qkv, const __half* qkv_bias, __half* new_q, __half* new_k,
     __half* k_cache, __half* new_v, __half* v_cache, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num) {
-  ker_arrange_qkv_with_cache<
-      __half><<<dim3(batch_token_num, 3), hidden_size / 2, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
-      max_batch_dim / 2, batch_seq_len, dim_per_head / 2, head_num);
+  ker_arrange_qkv_with_cache<__half>
+      <<<dim3(batch_token_num, 3), hidden_size / 2, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
+          max_batch_dim / 2, batch_seq_len, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_qkv_with_cache_launcher<float>(
@@ -497,9 +498,9 @@ void ker_ppl_launcher(int batch_size, int batch_seq_len,
                       int max_thread_per_block, cudaStream_t stream,
                       const T* logits, const int* input_ids,
                       const int* real_seq_len, float* ppl, int vocab_size) {
-  ker_ppl<
-      T><<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
-      logits, input_ids, real_seq_len, ppl, vocab_size);
+  ker_ppl<T>
+      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
+          logits, input_ids, real_seq_len, ppl, vocab_size);
 }
 
 template void ker_ppl_launcher<float>(int batch_size, int batch_seq_len,
@@ -689,8 +690,7 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
     ker_topk_sample<T, 32><<<batch_size, max_thread_per_block, 0, stream>>>(
         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
-  else
-  {
+  else {
     throw std::invalid_argument("topk argument should be in [1,2,4,8,16,32]");
   }
 }
@@ -903,10 +903,5 @@ template void ker_topp_sample_launcher<__half>(
     const int vocab_size, const float p, int* unfinished,
     curandState* curandstate, int eos_id);
 
-__global__ void ker_curand_setup(curandState* state) {
-  /* Each thread gets same seed, a different sequence
-     number, no offset */
-  curand_init(clock(), blockIdx.x, 0, &state[blockIdx.x]);
-}
 }  // namespace cuda
 }  // namespace byseqlib

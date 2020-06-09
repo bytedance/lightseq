@@ -9,6 +9,7 @@
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
@@ -40,6 +41,7 @@ class Decoder {
   void self_attention();
   void encdec_attention();
   void ffn_add_norm();
+  bool sample();
   bool beam_search();
   void update_new_seq_probs();
 
@@ -47,8 +49,9 @@ class Decoder {
   const int _max_batch_size;
   const int _max_thread_per_block;
   int _h_can_num_batch;
+  int _h_unfinished;
   size_t _cub_sort_buffer_bytes;
-  const TransformerWeight<OpType_>& _tw;
+  TransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
   const bool _output_topk;
@@ -56,6 +59,9 @@ class Decoder {
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
   int* _p_d_result;
+  int* _p_d_sample_unfinished;
+  curandState *_p_d_curandstate;  //[batch_size]
+
 
   std::vector<float> _h_alive_seq_probs;
   std::vector<float> _h_length_norm;
@@ -103,6 +109,7 @@ class Decoder {
   int _weight_offset;
   int _step_token_num;
   int _batch_max_decode_length;
+  bool _is_sampling;
 
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
   const std::vector<const _DataType*>&
@@ -119,7 +126,7 @@ class Decoder {
  public:
   Decoder(int max_batch_size, const int* p_d_padding_mask,
           const _DataType* p_d_encoder_output, int* p_d_result,
-          const TransformerWeight<OpType_>& tw, cudaStream_t stream,
+          TransformerWeight<OpType_>& tw, cudaStream_t stream,
           cublasHandle_t hd, bool output_topk = false);
   int compute_buffer_bytesize();
   void init_buffer(void* pbuf);

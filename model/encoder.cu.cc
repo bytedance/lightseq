@@ -1,5 +1,5 @@
-#include "src/custom/byseqlib/model/encoder.h"
 #include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "src/custom/byseqlib/model/encoder.h"
 
 /**
 @file
@@ -7,7 +7,7 @@ Transformer encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-//#define DEBUG_RESULT
+// #define DEBUG_RESULT
 
 namespace byseqlib {
 namespace cuda {

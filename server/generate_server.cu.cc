@@ -1,17 +1,18 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
 #include <unistd.h>
+
 #include <string>
+
 #include "cuda/include/cuda.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
-#include "src/servables/custom/custom.h"
-
 #include "src/custom/byseqlib/model/decoder.h"
 #include "src/custom/byseqlib/model/encoder.h"
 #include "src/custom/byseqlib/proto/transformer_weight.h"
 #include "src/custom/byseqlib/tools/util.h"
+#include "src/servables/custom/custom.h"
 
 /**
 @file
@@ -22,7 +23,7 @@ Generate(Transformer multi target outputs) server
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 const byseqlib::cuda::OperationType OPTYPE =
-    byseqlib::cuda::OperationType::FP16;
+    byseqlib::cuda::OperationType::FP32;
 
 namespace nvidia {
 namespace inferenceserver {
@@ -298,7 +299,7 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
-
+  if (tw_._sampling_method != "") tw_._beam_size = 1;
   int max_batch_size = model_config_.max_batch_size();
   int err;
   err = AllocateCudaBuffers(
@@ -360,8 +361,8 @@ int Context::Init() {
               << cudaGetErrorString(cuerr) << std::endl;
     return kCudaExecute;
   }
-  LOG_INFO << "Generate topk, release-version[" << __DATE__ << " " << __TIME__
-           << "], Trtis instance init succeed!" << std::endl;
+  LOG_INFO << "Transformer Generate, release-version[" << __DATE__ << " "
+           << __TIME__ << "], Trtis instance init succeed!" << std::endl;
   return kSuccess;
 }
 
@@ -619,7 +620,7 @@ int CustomExecute(void* custom_context, const uint32_t payload_cnt,
 
 }  // extern "C"
 
-}  // namespace transformer
+}  // namespace generate
 }  // namespace custom
 }  // namespace inferenceserver
 }  // namespace nvidia

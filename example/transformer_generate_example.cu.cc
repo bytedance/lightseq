@@ -33,13 +33,16 @@ int main(int argc, char *argv[]) {
     std::cout << res << std::endl;
     return 0;
   }
+  if (tw_._sampling_method != "") {
+    tw_._beam_size = 1;
+  }
 
   /*
     step3. instantiate encoder and decoder, init the gpu memory buffer.
       using thrust vector to avoid manage gpu memory by hand
   */
   // instantiate encoder
-  int max_batch_size = 8;
+  int max_batch_size = 128;
   thrust::device_vector<int> d_input_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_padding_mask_ =
@@ -105,8 +108,9 @@ int main(int argc, char *argv[]) {
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
+  auto start = std::chrono::high_resolution_clock::now();
+  int sum_sample_step = 0;
   for (int i = 0; i < 10; i++) {
-    auto start = std::chrono::high_resolution_clock::now();
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(
         reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
@@ -114,18 +118,29 @@ int main(int argc, char *argv[]) {
         cudaMemcpyHostToDevice, stream_);
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
-    byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
+    sum_sample_step += decoder_->_cur_step;
     for (int ii = 0; ii < batch_size; ii++) {
       for (int j = 0; j < tw_._beam_size; j++) {
         byseqlib::cuda::print_vec(
-            d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
+            d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step) +
                 j * (decoder_->_cur_step + 1),
-            "Beam result: ", decoder_->_cur_step + 1);
-        byseqlib::cuda::print_vec(
-            decoder_->_p_d_alive_seq_score + ii * tw_._beam_size + j,
-            "Beam score: ", 1);
+            "Beam result: ", decoder_->_cur_step);
       }
     }
   }
+  //   for (int ii = 0; ii < batch_size; ii++) {
+  //     for (int j = 0; j < tw_._beam_size; j++) {
+  //       byseqlib::cuda::print_vec(
+  //           d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step +
+  //           1) +
+  //               j * (decoder_->_cur_step + 1),
+  //           "Beam result: ", decoder_->_cur_step + 1);
+  //       byseqlib::cuda::print_vec(
+  //           decoder_->_p_d_alive_seq_score + ii * tw_._beam_size + j,
+  //           "Beam score: ", 1);
+  //     }
+  //   }
+  byseqlib::cuda::print_time_duration(start, "infer time", stream_);
+  std::cout << "Total sampled steps: " << sum_sample_step << std::endl;
   return 0;
 }

@@ -1,6 +1,9 @@
 #pragma once
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <curand_kernel.h>
+
+#include <cub/cub.cuh>
 
 namespace byseqlib {
 namespace cuda {
@@ -120,7 +123,8 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    const int* old_alive_seq, int* new_alive_seq,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
-                                   int cur_step, float length_norm, float diverse_lambda);
+                                   int cur_step, float length_norm,
+                                   float diverse_lambda);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
                                                   int* output, int max_step,
@@ -140,6 +144,26 @@ __forceinline__ __host__ __device__ float length_norm(int length, float alpha) {
   if (alpha < 0.f) return 1.f / length;
   return pow((5.f + length) / 6.f, -alpha);
 }
+
+template <typename T>
+void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
+                              const int max_step, int logits_seq_len,
+                              int max_thread_per_block, cudaStream_t stream,
+                              const T* logits, int* old_input_ids,
+                              int* new_input_ids, const int vocab_size,
+                              const int k, int* all_finished,
+                              curandState* curandstate, int eos_id);
+
+template <typename T>
+void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
+                              const int max_step, int logits_seq_len,
+                              int max_thread_per_block, cudaStream_t stream,
+                              const T* logits, int* old_input_ids,
+                              int* new_input_ids, const int vocab_size,
+                              const float p, int* unfinished,
+                              curandState* curandstate, int eos_id);
+
+__global__ void ker_curand_setup(curandState* state);
 
 }  // namespace cuda
 }  // namespace byseqlib

@@ -90,7 +90,7 @@ void GptEncoder<OpType_>::init_buffer(void *pbuf) {
   // _max_batch_size * _tw._max_step * _tw._src_vocab_size
   _p_d_logit = p_d_datatype;
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
-                             _max_batch_dim * sizeof(curandState)));
+                             _max_batch_size * sizeof(curandState)));
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_sample_id_buf,
                              _max_batch_size * _tw._max_step * sizeof(int)));
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_unfinished, sizeof(int)));
