@@ -13,8 +13,8 @@
 
 #include <thrust/device_vector.h>
 
-#include "src/custom/byseqlib/proto/gpt.pb.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "gpt.pb.h"
+#include "tools/util.h"
 
 namespace byseqlib {
 namespace cuda {

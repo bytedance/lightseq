@@ -13,8 +13,8 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "src/custom/byseqlib/proto/gpt_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "proto/gpt_weight.h"
+#include "tools/util.h"
 
 namespace byseqlib {
 namespace cuda {

@@ -5,16 +5,16 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <thrust/device_vector.h>
 #include <unistd.h>
+
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include <thrust/device_vector.h>
-
-#include "src/custom/byseqlib/proto/transformer.pb.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "tools/util.h"
+#include "transformer.pb.h"
 
 namespace byseqlib {
 namespace cuda {
@@ -29,7 +29,8 @@ class TransformerWeight {
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
   void get_model_config(const Transformer &transformer);
-  std::string parse_emb_wei(const EmbeddingLayer &layer, std::string source);
+  std::string parse_emb_wei(const EmbeddingLayer &layer,
+                            std::string source = "src");
   std::string parse_enc_wei(const Transformer &transformer);
   std::string parse_dec_wei(const Transformer &transformer);
 

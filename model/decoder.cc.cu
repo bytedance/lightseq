@@ -1,9 +1,9 @@
 #include <unistd.h>
 
-#include <cub/cub.cuh>
+#include "3rdparty/cub-1.8.0/cub/cub.cuh"
 
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/decoder.h"
+#include "kernels/transformerKernels.h"
+#include "decoder.h"
 
 /**
 @file

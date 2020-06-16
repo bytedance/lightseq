@@ -1,4 +1,4 @@
-#include "src/custom/byseqlib/proto/gpt_weight.h"
+#include "gpt_weight.h"
 
 /**
 @file

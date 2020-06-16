@@ -1,4 +1,4 @@
-#include "src/custom/byseqlib/proto/transformer_weight.h"
+#include "transformer_weight.h"
 
 /**
 @file
@@ -68,7 +68,7 @@ Compared with the encoder, the decoder has more
 */
 template <OperationType OpType_>
 std::string TransformerWeight<OpType_>::parse_emb_wei(
-    const EmbeddingLayer &layer, std::string source = "src") {
+    const EmbeddingLayer &layer, std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::vector<int> offset;

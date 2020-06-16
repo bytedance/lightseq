@@ -1,5 +1,7 @@
-#include "src/custom/byseqlib/kernels/common.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "common.h"
+#include "3rdparty/cub-1.8.0/cub/cub.cuh"
+#include "transformerKernels.h"
+
 /**
 @file
 Implemented the cuda kernel function and its launcher

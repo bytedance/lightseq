@@ -1,5 +1,5 @@
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/encoder.h"
+#include "kernels/transformerKernels.h"
+#include "encoder.h"
 
 /**
 @file

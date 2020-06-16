@@ -1,9 +1,9 @@
-#include <cub/cub.cuh>
+// #include "<cub/cub.cuh>"
 #include <random>
-
-#include "src/custom/byseqlib/kernels/common.h"
-#include "src/custom/byseqlib/kernels/gptKernels.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "3rdparty/cub-1.8.0/cub/cub.cuh"
+#include "common.h"
+#include "gptKernels.h"
+#include "transformerKernels.h"
 /**
 @file
 Implemented the cuda kernel function and its launcher

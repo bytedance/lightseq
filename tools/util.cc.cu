@@ -1,4 +1,4 @@
-#include "src/custom/byseqlib/tools/util.h"
+#include "util.h"
 
 namespace byseqlib {
 namespace cuda {
@@ -8,7 +8,7 @@ void print_vec(const thrust::device_vector<T>& outv, std::string outn,
                int num_output_ele) {
   std::cout << outn << ": ";
   if (num_output_ele > 0) {
-    num_output_ele = min(size_t(num_output_ele), outv.size());
+    num_output_ele = std::min(size_t(num_output_ele), outv.size());
     thrust::copy(outv.begin(), outv.begin() + num_output_ele,
                  std::ostream_iterator<T>(std::cout, " "));
     std::cout << " ...";
@@ -43,9 +43,12 @@ template void print_vec<int>(thrust::device_ptr<int> outv, std::string outn,
 template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele) {
   std::cout << outn << ": ";
-  thrust::copy(thrust::device_pointer_cast(outv),
-               thrust::device_pointer_cast(outv + num_output_ele),
-               std::ostream_iterator<T>(std::cout, ", "));
+  std::vector<T> hout(num_output_ele, (T)0);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_output_ele; i++) {
+    std::cout << hout[i] << ", ";
+  }
   std::cout << std::endl;
 }
 

@@ -33,7 +33,7 @@ cc_library(
 
 cc_library(
     name = "gpt_kernel",
-    srcs = ["kernels/gptKernels.cu.cc"],
+    srcs = ["kernels/gptKernels.cc.cu"],
     hdrs = glob([
         "kernels/common.h",
         "kernels/gptKernels.h",
@@ -48,7 +48,7 @@ cc_library(
 
 cc_library(
     name = "util",
-    srcs = ["tools/util.cu.cc"],
+    srcs = ["tools/util.cc.cu"],
     hdrs = ["tools/util.h"],
     copts = cuda_default_copts(),
     deps = [
@@ -58,7 +58,7 @@ cc_library(
 
 cc_library(
     name = "transformer_weight",
-    srcs = ["proto/transformer_weight.cu.cc"],
+    srcs = ["proto/transformer_weight.cc"],
     hdrs = glob([
         "proto/transformer_weight.h",
     ]),
@@ -72,7 +72,7 @@ cc_library(
 
 cc_library(
     name = "gpt_weight",
-    srcs = ["proto/gpt_weight.cu.cc"],
+    srcs = ["proto/gpt_weight.cc"],
     hdrs = glob([
         "proto/gpt_weight.h",
     ]),
@@ -86,7 +86,7 @@ cc_library(
 
 cc_library(
     name = "transformer_encoder",
-    srcs = ["model/encoder.cu.cc"],
+    srcs = ["model/encoder.cc.cu"],
     hdrs = glob([
         "model/encoder.h",
     ]),
@@ -101,7 +101,7 @@ cc_library(
 
 cc_library(
     name = "gpt_encoder",
-    srcs = ["model/gpt_encoder.cu.cc"],
+    srcs = ["model/gpt_encoder.cc.cu"],
     hdrs = glob([
         "model/gpt_encoder.h",
     ]),
@@ -117,7 +117,7 @@ cc_library(
 
 cc_library(
     name = "transformer_decoder",
-    srcs = ["model/decoder.cu.cc"],
+    srcs = ["model/decoder.cc.cu"],
     hdrs = glob([
         "model/decoder.h",
     ]),
@@ -257,7 +257,7 @@ cc_binary(
 
 cc_binary(
     name = "transformer_example",
-    srcs = ["example/transformer_example.cu.cc"],
+    srcs = ["example/transformer_example.cc.cu"],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
         "-L/usr/local/cuda/lib64",
@@ -275,7 +275,7 @@ cc_binary(
 
 cc_binary(
     name = "transformer_generate_example",
-    srcs = ["example/transformer_generate_example.cu.cc"],
+    srcs = ["example/transformer_generate_example.cc.cu"],
     deps = [
         ":transformer_weight",
         ":util",
@@ -293,7 +293,7 @@ cc_binary(
 
 cc_binary(
     name = "gptlm_example",
-    srcs = ["example/gptlm_example.cu.cc"],
+    srcs = ["example/gptlm_example.cc.cu"],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
         "-L/usr/local/cuda/lib64",
@@ -310,7 +310,7 @@ cc_binary(
 
 cc_binary(
     name = "gpt_generate_example",
-    srcs = ["example/gpt_generation.cu.cc"],
+    srcs = ["example/gpt_generation.cc.cu"],
     linkopts = [
         "-L/usr/local/cuda/lib64/stubs",
         "-L/usr/local/cuda/lib64",
