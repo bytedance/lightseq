@@ -1,6 +1,6 @@
 ## Build from source code
 
-Byseqlib is built using Docker and trtis containers from
+<!-- Byseqlib is built using Docker and trtis containers from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). Before building you must install Docker and
 nvidia-docker and login to the NGC registry.
 
@@ -30,5 +30,12 @@ cd /workspace
 # For compatibility with fp16
 sed -i '/COMPUTE_CAPABILITIES/s/5.2,6.0,6.1,7.0,7.5/6.0,6.1,7.0,7.5/g' ./.bazelrc
 bazel build -c opt src/custom/byseqlib/...
-```
+``` -->
 
+- cuda == 10.1
+- protobuf == 3.11.2
+
+```
+$make build && cd build
+$cmake -DSM=xx -DCMAKE_BUILD_TYPE=Release -DProtobuf_INCLUDE_DIR=~/anaconda3/include/ -DProtobuf_LIBRARY=~/anaconda3/lib64/libprotobuf.so ..
+```
