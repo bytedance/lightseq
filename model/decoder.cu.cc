@@ -712,16 +712,16 @@ bool Decoder<OpType_>::beam_search() {
                                      _tw._diverse_lambda, _tw._trg_vocab_size);
   }
   // tow sort ways, decided by the number of candidates
-  if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
-    CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
-        (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
-        _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
-        sizeof(float) * 8, _stream));
-  } else {
-    thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
-                        _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
-                        thrust::greater<float>());
-  }
+  // if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
+  //   CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
+  //       (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
+  //       _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
+  //       sizeof(float) * 8, _stream));
+  // } else {
+  thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
+                      _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
+                      thrust::greater<float>());
+  // }
 
   /*
     step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam

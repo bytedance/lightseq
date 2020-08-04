@@ -10,7 +10,7 @@ namespace cuda {
 
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
-const float min_log_probability = -10000.f;
+const float min_log_probability = -2000.f;
 const float epsilon = 0.000001;
 
 template <typename T>

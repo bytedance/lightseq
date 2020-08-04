@@ -114,7 +114,7 @@ __global__ void select_beam_rough_topk(
   int idx = left_idx;
   int batch_id = blockIdx.x / beam_size;
   int batch_start_pos = batch_id * beam_size * vocab_size;
-  int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
+  // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
   __shared__ int l_n;                 // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
@@ -126,7 +126,8 @@ __global__ void select_beam_rough_topk(
     int pos;
     int vocab_id = idx - block_start;
 
-    if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
+    // if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
+    if (vocab_id < vocab_size) {
       lgt = (float)(logits[idx]) + (float)__ldg(&logit_bias[vocab_id]);
       if (lgt >= s_topk)
         // pos: relative pos inside this iteration
