@@ -29,6 +29,7 @@ token_id: input token id, [batch_size, token_seq_len]
 output: result, [batch_size, token_seq_len, hidden_size]
 real_seq_len: record seq len exclude padding, [batch_size]
 padding_id, the padding_id, default 0
+pos_offset: get real pos when decoding which gridDim.y=1
 */
 template <typename T>
 __global__ void ker_gpt_embedding(const T* token_emb, const T* pos_emb,
@@ -547,7 +548,7 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
       new_input_ids[new_idx] = old_input_ids[idx];
     }
     if (threadIdx.x == 0) {
-      // blockIdx.x*(batch_seq_len+1)+(batch_seq_len)
+      // blockIdx.x * (batch_seq_len+1) + batch_seq_len
       new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = eos_id;
       old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = eos_id;
     }
@@ -752,7 +753,7 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   int right_logit_idx = (logits_token_idx_in_batch + 1) * vocab_size;
 
   /*
-  step1. find max logit and rough Kth logit over the whole vocab
+  step1. find max logit in each thread and sample from these probs with nucleus sampling
   */
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
@@ -792,7 +793,7 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   }
   __syncthreads();
 
-  /* step2 hold one logit per thread which larger than Kth logit and sample
+  /* step2 hold one logit per thread and sample
    * from them */
   float topk_exp_sum, topk_exp = CUDA_FLOAT_INF_NEG;
   int topk_tid = vocab_size;

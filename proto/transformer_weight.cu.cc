@@ -32,18 +32,22 @@ Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
 void TransformerWeight<OpType_>::get_model_config(
-    const Transformer &transformer) {
-  _hidden_size = transformer.src_embedding().norm_scale_size();
+    const Transformer &transformer, bool only_decoder) {
+  _hidden_size = transformer.trg_embedding().norm_scale_size();
   _inner_size =
-      transformer.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+      transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step =
       transformer.src_embedding().position_embedding_size() / _hidden_size;
-  _src_vocab_size =
-      transformer.src_embedding().token_embedding_size() / _hidden_size;
+  if (!only_decoder) {
+    _src_vocab_size =
+        transformer.src_embedding().token_embedding_size() / _hidden_size;
+  }
   _trg_vocab_size =
       transformer.trg_embedding().token_embedding_size() / _hidden_size;
-  _n_enc_layer = transformer.encoder_stack_size();
-  _n_dec_layer = transformer.decoder_stack_size(); 
+  if (!only_decoder) {
+    _n_enc_layer = transformer.encoder_stack_size();
+  }
+  _n_dec_layer = transformer.decoder_stack_size();
   _head_num = transformer.model_conf().head_num();
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
@@ -383,7 +387,8 @@ std::string TransformerWeight<OpType_>::parse_dec_wei(
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::initializing(std::string proto_path) {
+std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
+                                                     bool only_decoder) {
   Transformer transformer;
   // Verify that the version of the library that we linked against is
   // compatible with the version of the headers we compiled against.
@@ -402,16 +407,21 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path) {
   delete raw_input;
   close(fd);
 
-  get_model_config(transformer);
+  get_model_config(transformer, only_decoder);
 
-  std::string res = parse_emb_wei(transformer.src_embedding(), "src");
-  if (!res.empty()) return res;
+  std::string res;
+  if (!only_decoder) {
+    res = parse_emb_wei(transformer.src_embedding(), "src");
+    if (!res.empty()) return res;
+  }
 
   res = parse_emb_wei(transformer.trg_embedding(), "trg");
   if (!res.empty()) return res;
 
-  res = parse_enc_wei(transformer);
-  if (!res.empty()) return res;
+  if (!only_decoder) {
+    res = parse_enc_wei(transformer);
+    if (!res.empty()) return res;
+  }
 
   res = parse_dec_wei(transformer);
   if (!res.empty()) return res;

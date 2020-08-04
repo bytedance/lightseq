@@ -5,13 +5,13 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <thrust/device_vector.h>
 #include <unistd.h>
+
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include <thrust/device_vector.h>
 
 #include "src/custom/byseqlib/proto/transformer.pb.h"
 #include "src/custom/byseqlib/tools/util.h"
@@ -28,7 +28,8 @@ class TransformerWeight {
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
-  void get_model_config(const Transformer &transformer);
+  void get_model_config(const Transformer &transformer,
+                        bool only_decoder = false);
   std::string parse_emb_wei(const EmbeddingLayer &layer, std::string source);
   std::string parse_enc_wei(const Transformer &transformer);
   std::string parse_dec_wei(const Transformer &transformer);
@@ -46,7 +47,7 @@ class TransformerWeight {
   thrust::device_vector<_DataType> _d_dec_wei;
 
  public:
-  std::string initializing(std::string proto_path);
+  std::string initializing(std::string proto_path, bool only_decoder = false);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
     // {token_emb, pos_emb, norm_scale, norm_bias}

@@ -62,25 +62,27 @@ Compute GPU memory size needed by transformer decoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-int Decoder<OpType_>::compute_buffer_bytesize() {
-  int cache_bytesize = 4 * _tw._n_dec_layer * _layer_size_self_k +
-                       2 * _tw._n_dec_layer * _layer_size_encdec_k +
-                       _max_batch_size * _tw._beam_size * _tw._hidden_size;
+long Decoder<OpType_>::compute_buffer_bytesize() {
+  long cache_bytesize = 4 * _tw._n_dec_layer * _layer_size_self_k +
+                        2 * _tw._n_dec_layer * _layer_size_encdec_k +
+                        _max_batch_size * _tw._beam_size * _tw._hidden_size;
+  // std::cout << cache_bytesize << std::endl;
   cache_bytesize *= sizeof(_DataType);
+  // std::cout << cache_bytesize << std::endl;
 
-  int decode_buffer_bytesize =
+  long decode_buffer_bytesize =
       _max_batch_size * _tw._beam_size * _tw._hidden_size * 4 +
       _max_batch_size * _tw._beam_size *
           max(_tw._hidden_size, _tw._inner_size) +
       _max_batch_size * _tw._head_num * _tw._beam_size * _tw._max_step;
   decode_buffer_bytesize *= sizeof(_DataType);
 
-  int sf = _max_batch_size * _tw._beam_size * _tw._trg_vocab_size * 2 +
-           _max_batch_size * _tw._beam_size * 2;
-  int si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
-           _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
-           _max_batch_size * _tw._beam_size + 1;
-  int beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
+  long sf = _max_batch_size * _tw._beam_size * _tw._trg_vocab_size * 2 +
+            _max_batch_size * _tw._beam_size * 2;
+  long si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
+            _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
+            _max_batch_size * _tw._beam_size + 1;
+  long beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
 
   return cache_bytesize + max(decode_buffer_bytesize, beam_buffer_bytesize);
 }
@@ -266,8 +268,12 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                                   cudaMemcpyHostToDevice, _stream));
 
   /* ---step2. autoregressive decoding--- */
+#ifdef DEBUG_RESULT
+  for (_cur_step = 0; _cur_step < 3; _cur_step++) {
+#else
   for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1; _cur_step++) {
-// for (_cur_step = 0; _cur_step < 3; _cur_step++) {
+#endif
+
 #ifdef DEBUG_RESULT
     std::cout << "run step " << _cur_step << std::endl;
 #endif
@@ -611,15 +617,15 @@ bool Decoder<OpType_>::sample() {
   if (_tw._sampling_method == "topk") {
     ker_topk_sample_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_d_alive_seq, _p_d_alive_seq_buf,
-        _tw._trg_vocab_size, _tw._topk, _p_d_sample_unfinished,
-        _p_d_curandstate, _tw._trg_vocab_size - 1);
+        _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
+        _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
   } else {
     ker_topp_sample_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_d_alive_seq, _p_d_alive_seq_buf,
-        _tw._trg_vocab_size, _tw._topp, _p_d_sample_unfinished,
-        _p_d_curandstate, _tw._trg_vocab_size - 1);
+        _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
+        _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);

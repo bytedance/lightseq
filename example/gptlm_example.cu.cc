@@ -27,8 +27,7 @@ int main(int argc, char *argv[]) {
   /* ---step2. load model weights into GPU memory--- */
   byseqlib::cuda::GptWeight<optype> tw_;
   // saved in custom proto file
-  // std::string model_weights_path = argv[1];
-  std::string model_weights_path = "/workspace/keyword_to_title.pb";
+  std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
   if (!res.empty()) {
     std::cout << res << std::endl;
@@ -58,7 +57,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // init gpu memory buffer
-  int buf_bytesize = encoder_->compute_buffer_bytesize();
+  long buf_bytesize = encoder_->compute_buffer_bytesize();
   thrust::device_vector<int> d_buf_ =
       std::vector<int>(buf_bytesize / sizeof(int) + 1, 0);
   encoder_->init_buffer(
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 10; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(

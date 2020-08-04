@@ -2,8 +2,8 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
-#include <cub/cub.cuh>
 
+#include <cub/cub.cuh>
 
 namespace byseqlib {
 namespace cuda {
@@ -55,7 +55,7 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
                               const int* real_seq_len, const int vocab_size,
                               const int k, int* all_finished,
                               curandState* curandstate, int eos_id);
-                              
+
 template <typename T>
 void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               int logits_seq_len, int max_thread_per_block,
@@ -64,7 +64,6 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               const int* real_seq_len, const int vocab_size,
                               const float p, int* unfinished,
                               curandState* curandstate, int eos_id);
-
 
 }  // namespace cuda
 }  // namespace byseqlib
