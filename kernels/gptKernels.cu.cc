@@ -765,31 +765,38 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   typedef cub::BlockRadixSort<float, 1024, 1> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage sort_temp_storage;
   BlockRadixSort(sort_temp_storage).SortDescending(max_logit_array);
-  float presum_max_logit;
+  float presum_max_logit_exp;
   max_logit = max_logit_array[0];
+
+  float block_max_logit = blockReduceMax(max_logit);
+  if (threadIdx.x == 0) {
+    s_max_logit = block_max_logit;
+  }
+  __syncthreads();
+
+  float biased_logit_exp = expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
+
   typedef cub::BlockScan<float, 1024> BlockScan;
   __shared__ typename BlockScan::TempStorage presum_temp_storage;
-  BlockScan(presum_temp_storage).InclusiveSum(max_logit, presum_max_logit);
+  BlockScan(presum_temp_storage).InclusiveSum(biased_logit_exp, presum_max_logit_exp);
 
-  __shared__ float s_presum_logit_threshold;
-  if (presum_max_logit > p) {
-    presum_max_logit = CUDA_FLOAT_INF_NEG;
+  float topp_exp_threshold;
+  if (threadIdx.x == blockDim.x-1) {
+    topp_exp_threshold = p * presum_max_logit_exp;
   }
-  float logit_threshold = blockReduceMax(presum_max_logit);
+  __shared__ float s_presum_logit_exp_threshold;
+  if (presum_max_logit_exp > topp_exp_threshold) {
+    presum_max_logit_exp = CUDA_FLOAT_INF_NEG;
+  }
+  float logit_exp_threshold = blockReduceMax(presum_max_logit_exp);
   if (threadIdx.x == 0) {
-    s_presum_logit_threshold = logit_threshold;
+    s_presum_logit_exp_threshold = logit_exp_threshold;
   }
   __syncthreads();
 
   __shared__ float s_logit_threshold;
-  if (presum_max_logit == s_presum_logit_threshold) {
+  if (presum_max_logit_exp == s_presum_logit_exp_threshold) {
     s_logit_threshold = max_logit;
-  }
-  __syncthreads();
-
-  max_logit = blockReduceMax(max_logit);
-  if (threadIdx.x == 0) {
-    s_max_logit = max_logit;
   }
   __syncthreads();
 
@@ -821,8 +828,6 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   /* calculate cumulative probability */
   float topk_prob = topk_exp / s_topk_exp_sum;
   float prefix_sum_prob;
-  // typedef cub::BlockScan<float, 1024> BlockScan;
-  // __shared__ typename BlockScan::TempStorage temp_storage;
   BlockScan(presum_temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
 
   __shared__ float random_x;

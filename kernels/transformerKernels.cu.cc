@@ -115,7 +115,7 @@ __global__ void select_beam_rough_topk(
   int batch_id = blockIdx.x / beam_size;
   int batch_start_pos = batch_id * beam_size * vocab_size;
   // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
-  __shared__ int l_n;                 // current iteration candidate number
+  __shared__ int l_n;  // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
     // zero the counter
@@ -1351,7 +1351,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
   int can_vocab_id = ori_can_idx % vocab_size;
   int rank_id;
   if (diverse_lambda != 0) {
-    rank_id = can_beam_id / gridDim.y; // rank in each beam
+    rank_id = can_beam_id / gridDim.y;  // rank in each beam
     can_beam_id %= gridDim.y;
   }
   int thread_vocab_id;
@@ -1664,6 +1664,7 @@ __global__ void ker_write_topk_result(const int* alive_seq, float* seq_score,
 
 /**
 @brief: ker_topk_sample
+quick rough topk sampling from logits
 
 @thread
 gridDim.x = batch_size
@@ -1787,17 +1788,8 @@ __global__ void ker_topk_sample(const T* logits, const T* logit_bias,
     if (s_tid != eos_id) unfinished[0] = 1;
   }
 
-  /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
-  // int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
-  // int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
-  // for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
-  //   int new_idx = idx + blockIdx.x;
-  //   new_input_ids[new_idx] = old_input_ids[idx];
-  // }
+  /* step3 write back new sampled ids */
   if (threadIdx.x == 0) {
-    // new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = s_tid;
-    // //  save the newly sampled ids to old_input_ids for next step inputs
-    // old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = s_tid;
     old_input_ids[last_token_idx_in_batch + 1] = s_tid;
   }
 }
@@ -1856,6 +1848,7 @@ template void ker_topk_sample_launcher<__half>(
 
 /**
 @brief: ker_topp_sample
+quick rough topp sampling from logits
 
 @thread
 gridDim.x = batch_size
@@ -1889,47 +1882,52 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
   int left_logit_idx = logits_token_idx_in_batch * vocab_size + threadIdx.x;
   int right_logit_idx = (logits_token_idx_in_batch + 1) * vocab_size;
 
-  /*
-  step1. find max logit and rough Kth logit over the whole vocab
-  */
+  /* step1. find max logit in each thread and sample from these probs with
+   * nucleus sampling */
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    max_logit = fmaxf(
-        max_logit,
-        (float)logits[idx] +
-            (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]));
+    max_logit = fmaxf(max_logit, (float)logits[idx]);
   }
   float max_logit_array[1];
   max_logit_array[0] = max_logit;
   typedef cub::BlockRadixSort<float, 1024, 1> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage sort_temp_storage;
   BlockRadixSort(sort_temp_storage).SortDescending(max_logit_array);
-  float presum_max_logit;
+  float presum_max_logit_exp;
   max_logit = max_logit_array[0];
+
+  float block_max_logit = blockReduceMax(max_logit);
+  if (threadIdx.x == 0) {
+    s_max_logit = block_max_logit;
+  }
+  __syncthreads();
+
+  float biased_logit_exp =
+      expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
+
   typedef cub::BlockScan<float, 1024> BlockScan;
   __shared__ typename BlockScan::TempStorage presum_temp_storage;
-  BlockScan(presum_temp_storage).InclusiveSum(max_logit, presum_max_logit);
+  BlockScan(presum_temp_storage)
+      .InclusiveSum(biased_logit_exp, presum_max_logit_exp);
 
-  __shared__ float s_presum_logit_threshold;
-  if (presum_max_logit > p) {
-    presum_max_logit = CUDA_FLOAT_INF_NEG;
+  float topp_exp_threshold;
+  if (threadIdx.x == blockDim.x - 1) {
+    topp_exp_threshold = p * presum_max_logit_exp;
   }
-  float logit_threshold = blockReduceMax(presum_max_logit);
+  __shared__ float s_presum_logit_exp_threshold;
+  if (presum_max_logit_exp > topp_exp_threshold) {
+    presum_max_logit_exp = CUDA_FLOAT_INF_NEG;
+  }
+  float logit_exp_threshold = blockReduceMax(presum_max_logit_exp);
   if (threadIdx.x == 0) {
-    s_presum_logit_threshold = logit_threshold;
+    s_presum_logit_exp_threshold = logit_exp_threshold;
   }
   __syncthreads();
 
   __shared__ float s_logit_threshold;
-  if (presum_max_logit == s_presum_logit_threshold) {
+  if (presum_max_logit_exp == s_presum_logit_exp_threshold) {
     s_logit_threshold = max_logit;
-  }
-  __syncthreads();
-
-  max_logit = blockReduceMax(max_logit);
-  if (threadIdx.x == 0) {
-    s_max_logit = max_logit;
   }
   __syncthreads();
 
@@ -1962,8 +1960,6 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
   /* calculate cumulative probability */
   float topk_prob = topk_exp / s_topk_exp_sum;
   float prefix_sum_prob;
-  // typedef cub::BlockScan<float, 1024> BlockScan;
-  // __shared__ typename BlockScan::TempStorage temp_storage;
   BlockScan(presum_temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
 
   __shared__ float random_x;
@@ -2004,17 +2000,8 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
     if (s_tid != eos_id) unfinished[0] = 1;
   }
 
-  // /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
-  // int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
-  // int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
-  // for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
-  //   int new_idx = idx + blockIdx.x;
-  //   new_input_ids[new_idx] = old_input_ids[idx];
-  // }
+  /* step3 write back new sampled ids */
   if (threadIdx.x == 0) {
-    // new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = s_tid;
-    // //  save the newly sampled ids to old_input_ids for next step inputs
-    // old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = s_tid;
     old_input_ids[token_idx_in_batch + 1] = s_tid;
   }
 }

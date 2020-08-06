@@ -66,9 +66,7 @@ long Decoder<OpType_>::compute_buffer_bytesize() {
   long cache_bytesize = 4 * _tw._n_dec_layer * _layer_size_self_k +
                         2 * _tw._n_dec_layer * _layer_size_encdec_k +
                         _max_batch_size * _tw._beam_size * _tw._hidden_size;
-  // std::cout << cache_bytesize << std::endl;
   cache_bytesize *= sizeof(_DataType);
-  // std::cout << cache_bytesize << std::endl;
 
   long decode_buffer_bytesize =
       _max_batch_size * _tw._beam_size * _tw._hidden_size * 4 +
@@ -635,9 +633,6 @@ bool Decoder<OpType_>::sample() {
   }
 #endif
 
-  // int* temp = _p_d_alive_seq;
-  // _p_d_alive_seq = _p_d_alive_seq_buf;
-  // _p_d_alive_seq_buf = temp;
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_sample_unfinished,
                                   sizeof(int), cudaMemcpyDeviceToHost,
                                   _stream));
@@ -711,17 +706,10 @@ bool Decoder<OpType_>::beam_search() {
                                      _stream, _tw._beam_size,
                                      _tw._diverse_lambda, _tw._trg_vocab_size);
   }
-  // tow sort ways, decided by the number of candidates
-  // if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
-  //   CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
-  //       (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
-  //       _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
-  //       sizeof(float) * 8, _stream));
-  // } else {
+
   thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
                       _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
                       thrust::greater<float>());
-  // }
 
   /*
     step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam

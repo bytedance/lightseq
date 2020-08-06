@@ -546,6 +546,7 @@ void GptEncoder<OpType_>::self_attention_with_cache() {
       _p_d_v, _p_d_v_cache_cur_layer, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num);
 
+  // copy new k and v to cache
   cudaStream_t stream;
   if (_batch_token_num > 360) {
     stream = _cache_stream;

@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
   /* ---step5. infer and log--- */
   auto start = std::chrono::high_resolution_clock::now();
   int sum_sample_step = 0;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(
         reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
@@ -125,11 +125,11 @@ int main(int argc, char *argv[]) {
         byseqlib::cuda::print_vec(
             d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
                 j * (decoder_->_cur_step + 1),
-            "Beam result: ", decoder_->_cur_step + 1);
+            "Beam result", decoder_->_cur_step + 1);
       }
     }
   }
-  byseqlib::cuda::print_time_duration(start, "infer time", stream_);
+  byseqlib::cuda::print_time_duration(start, "Infer time", stream_);
   std::cout << "Total sampled steps: " << sum_sample_step << std::endl;
   return 0;
 }
