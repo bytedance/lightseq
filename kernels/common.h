@@ -9,7 +9,7 @@ namespace cuda {
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
 const unsigned int WARP_SIZE = 32;
 const float CUDA_FLOAT_INF_NEG = -100000000.f;  // FIXME later
-const float CUDA_FLOAT_INF_POS = 100000000.f;  // FIXME later
+const float CUDA_FLOAT_INF_POS = 100000000.f;   // FIXME later
 const int CUDA_INT_INF = 2147483647;
 
 template <typename T>
@@ -93,7 +93,7 @@ __forceinline__ __device__ T blockReduceMax(T val) {
   return val;
 }
 
-/* Calculate the maximum of all elements in a block */
+/* Calculate the minimum of all elements in a block */
 template <typename T>
 __forceinline__ __device__ T blockReduceMin(T val) {
   static __shared__ T shared[32];

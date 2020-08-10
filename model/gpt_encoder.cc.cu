@@ -1,6 +1,6 @@
-#include "gpt_encoder.h"
-#include "kernels/gptKernels.h"
-#include "kernels/transformerKernels.h"
+#include "src/custom/byseqlib/kernels/gptKernels.h"
+#include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "src/custom/byseqlib/model/gpt_encoder.h"
 
 /**
 @file
@@ -44,14 +44,14 @@ Compute GPU memory size needed by gpt encoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-int GptEncoder<OpType_>::compute_buffer_bytesize() {
+long GptEncoder<OpType_>::compute_buffer_bytesize() {
   int si = _max_batch_size;
   int sz0 = _max_batch_dim;
   sz0 += 2 * _max_batch_dim * _tw._n_enc_layer;
-  int sz1 = _max_batch_dim * 6 +
-            _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  int sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
-  int sz3 = _max_batch_size * _tw._max_step * _tw._src_vocab_size;
+  long sz1 = _max_batch_dim * 6 +
+             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
+  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
+  long sz3 = _max_batch_size * _tw._max_step * _tw._src_vocab_size;
   return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
 }
 
@@ -149,9 +149,6 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
     self_attention();
     ffn_add_norm();
-#ifdef DEBUG_RESULT
-// if (_layer_id == 0) print_vec(_p_d_q, "_p_d_query", 1 * 2 * 768);
-#endif
   }
 
   // last layer norm
@@ -549,6 +546,7 @@ void GptEncoder<OpType_>::self_attention_with_cache() {
       _p_d_v, _p_d_v_cache_cur_layer, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num);
 
+  // copy new k and v to cache
   cudaStream_t stream;
   if (_batch_token_num > 360) {
     stream = _cache_stream;

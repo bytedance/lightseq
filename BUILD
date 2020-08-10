@@ -196,6 +196,38 @@ cc_binary(
 )
 
 cc_library(
+    name = "decoder_generate_server",
+    srcs = ["server/decoder_generate_server.cu.cc"],
+    copts = cuda_default_copts(),
+    deps = [
+        "transformer_decoder",
+        "transformer_encoder",
+        ":transformer_weight",
+        ":util",
+        "//src/core:model_config",
+        "//src/core:model_config_cuda",
+        "//src/core:model_config_proto",
+        "//src/servables/custom",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_binary(
+    name = "libdecodergen.so",
+    linkopts = ["-pthread"],
+    linkshared = 1,
+    deps = [
+        "transformer_encoder",
+        "transformer_proto",
+        ":decoder_generate_server",
+        ":transformer_decoder",
+        ":transformer_kernel",
+        ":transformer_weight",
+        ":util",
+    ],
+)
+
+cc_library(
     name = "gptlm_server",
     srcs = ["server/gptlm_server.cu.cc"],
     copts = cuda_default_copts(),
@@ -276,6 +308,24 @@ cc_binary(
 cc_binary(
     name = "transformer_generate_example",
     srcs = ["example/transformer_generate_example.cc.cu"],
+    deps = [
+        ":transformer_weight",
+        ":util",
+        "transformer_encoder",
+        "transformer_decoder",
+    ],
+    linkopts = [
+        "-L/usr/local/cuda/lib64/stubs",
+        "-L/usr/local/cuda/lib64",
+        "-pthread",
+        "-lcudart",
+        "-lcublas"
+    ],
+)
+
+cc_binary(
+    name = "decoder_generate_example",
+    srcs = ["example/decoder_example.cu.cc"],
     deps = [
         ":transformer_weight",
         ":util",

@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // init gpu memory buffer
-  int buf_bytesize = encoder_->compute_buffer_bytesize();
+  long buf_bytesize = encoder_->compute_buffer_bytesize();
   thrust::device_vector<int> d_buf_ =
       std::vector<int>(buf_bytesize / sizeof(int) + 1, 0);
   encoder_->init_buffer(

@@ -38,7 +38,7 @@ vocab_size: the vocab size of decoder
 max_step: max decode step
 length_norm: length penlty value for current step
 cur_step: current step
-diverse_lambda: lambda of diverse beam search
+diverse_lambda: lambda for diverse beam search
 */
 template <typename T, int beam_size>
 __global__ void select_beam_rough_topk(
@@ -55,6 +55,7 @@ __global__ void select_beam_rough_topk(
         can_score[pos] =
             seq_score[blockIdx.x];  // this beam's score will not be change
       } else {
+        // add the beam id offset in score to sort in each beam
         int batch_id = blockIdx.x / beam_size;
         can_score[pos] = seq_score[blockIdx.x] +
                          (blockIdx.x - batch_id) * min_log_probability;
@@ -115,8 +116,8 @@ __global__ void select_beam_rough_topk(
   int idx = left_idx;
   int batch_id = blockIdx.x / beam_size;
   int batch_start_pos = batch_id * beam_size * vocab_size;
-  int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
-  __shared__ int l_n;                 // current iteration candidate number
+  // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
+  __shared__ int l_n;  // current iteration candidate number
   for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
        iter++) {
     // zero the counter
@@ -127,7 +128,8 @@ __global__ void select_beam_rough_topk(
     int pos;
     int vocab_id = idx - block_start;
 
-    if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
+    // if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
+    if (vocab_id < vocab_size) {
       lgt = (float)(logits[idx]) + (float)__ldg(&logit_bias[vocab_id]);
       if (lgt >= s_topk)
         // pos: relative pos inside this iteration
@@ -1351,7 +1353,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
   int can_vocab_id = ori_can_idx % vocab_size;
   int rank_id;
   if (diverse_lambda != 0) {
-    rank_id = can_beam_id / gridDim.y;
+    rank_id = can_beam_id / gridDim.y;  // rank in each beam
     can_beam_id %= gridDim.y;
   }
   int thread_vocab_id;
@@ -1664,6 +1666,7 @@ __global__ void ker_write_topk_result(const int* alive_seq, float* seq_score,
 
 /**
 @brief: ker_topk_sample
+quick rough topk sampling from logits
 
 @thread
 gridDim.x = batch_size
@@ -1677,11 +1680,12 @@ unfinished: [1]
 curandstate: [batch_size]
 */
 template <typename T, int k>
-__global__ void ker_topk_sample(const T* logits, int* old_input_ids,
-                                int* new_input_ids, const int vocab_size,
-                                const int max_step, const int batch_seq_len,
-                                int logits_seq_len, int* unfinished,
-                                curandState* curandstate, int eos_id) {
+__global__ void ker_topk_sample(const T* logits, const T* logit_bias,
+                                int* old_input_ids, int* new_input_ids,
+                                const int vocab_size, const int max_step,
+                                const int batch_seq_len, int logits_seq_len,
+                                int* unfinished, curandState* curandstate,
+                                int eos_id) {
   int last_token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
@@ -1702,7 +1706,10 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
   __shared__ float s_max_logit, s_topk_logit;
   float rough_top_kth_logit = CUDA_FLOAT_INF_NEG;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    rough_top_kth_logit = fmaxf(rough_top_kth_logit, (float)logits[idx]);
+    rough_top_kth_logit = fmaxf(
+        rough_top_kth_logit,
+        (float)(logits[idx]) +
+            (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]));
   }
   float max_logit = blockReduceMax(rough_top_kth_logit);
   rough_top_kth_logit = blockRoughTopK<float, k>(rough_top_kth_logit);
@@ -1719,7 +1726,8 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
   int test_num = 0;
   __shared__ float s_topk_exp_sum;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    float logit = (float)logits[idx];
+    float logit = (float)logits[idx] +
+                  (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
     float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
     if (logit >= s_topk_logit) test_num++;
     if (logit >= s_topk_logit && logit_exp > topk_exp) {
@@ -1782,17 +1790,8 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
     if (s_tid != eos_id) unfinished[0] = 1;
   }
 
-  /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
-  // int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
-  // int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
-  // for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
-  //   int new_idx = idx + blockIdx.x;
-  //   new_input_ids[new_idx] = old_input_ids[idx];
-  // }
+  /* step3 write back new sampled ids */
   if (threadIdx.x == 0) {
-    // new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = s_tid;
-    // //  save the newly sampled ids to old_input_ids for next step inputs
-    // old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = s_tid;
     old_input_ids[last_token_idx_in_batch + 1] = s_tid;
   }
 }
@@ -1801,33 +1800,34 @@ template <typename T>
 void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, int* old_input_ids,
-                              int* new_input_ids, const int vocab_size,
-                              const int k, int* unfinished,
-                              curandState* curandstate, int eos_id) {
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const int k,
+                              int* unfinished, curandState* curandstate,
+                              int eos_id) {
   if (k == 1)
     ker_topk_sample<T, 1><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 2)
     ker_topk_sample<T, 2><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 4)
     ker_topk_sample<T, 4><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 8)
     ker_topk_sample<T, 8><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 16)
     ker_topk_sample<T, 16><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 32)
     ker_topk_sample<T, 32><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else {
     throw std::invalid_argument("topk argument should be in [1,2,4,8,16,32]");
@@ -1837,17 +1837,20 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
 template void ker_topk_sample_launcher<float>(
     int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const float* logits,
-    int* old_input_ids, int* new_input_idx, const int vocab_size, const int k,
-    int* unfinished, curandState* curandstate, int eos_id);
+    const float* logit_bias, int* old_input_ids, int* new_input_idx,
+    const int vocab_size, const int k, int* unfinished,
+    curandState* curandstate, int eos_id);
 
 template void ker_topk_sample_launcher<__half>(
     int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
-    int* old_input_ids, int* new_input_idx, const int vocab_size, const int k,
-    int* unfinished, curandState* curandstate, int eos_id);
+    const __half* logit_bias, int* old_input_ids, int* new_input_idx,
+    const int vocab_size, const int k, int* unfinished,
+    curandState* curandstate, int eos_id);
 
 /**
 @brief: ker_topp_sample
+quick rough topp sampling from logits
 
 @thread
 gridDim.x = batch_size
@@ -1861,10 +1864,11 @@ unfinished: [1]
 curandstate: [batch_size]
 */
 template <typename T>
-__global__ void ker_topp_sample(const T* logits, int* old_input_ids,
-                                int* new_input_ids, const int vocab_size,
-                                const int max_step, const int batch_seq_len,
-                                int logits_seq_len, int* unfinished, float p,
+__global__ void ker_topp_sample(const T* logits, const T* logit_bias,
+                                int* old_input_ids, int* new_input_ids,
+                                const int vocab_size, const int max_step,
+                                const int batch_seq_len, int logits_seq_len,
+                                int* unfinished, float p,
                                 curandState* curandstate, int eos_id) {
   int token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
@@ -1880,9 +1884,8 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   int left_logit_idx = logits_token_idx_in_batch * vocab_size + threadIdx.x;
   int right_logit_idx = (logits_token_idx_in_batch + 1) * vocab_size;
 
-  /*
-  step1. find max logit and rough Kth logit over the whole vocab
-  */
+  /* step1. find max logit in each thread and sample from these probs with
+   * nucleus sampling */
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
@@ -1893,31 +1896,40 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   typedef cub::BlockRadixSort<float, 1024, 1> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage sort_temp_storage;
   BlockRadixSort(sort_temp_storage).SortDescending(max_logit_array);
-  float presum_max_logit;
+  float presum_max_logit_exp;
   max_logit = max_logit_array[0];
+
+  float block_max_logit = blockReduceMax(max_logit);
+  if (threadIdx.x == 0) {
+    s_max_logit = block_max_logit;
+  }
+  __syncthreads();
+
+  float biased_logit_exp =
+      expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
+
   typedef cub::BlockScan<float, 1024> BlockScan;
   __shared__ typename BlockScan::TempStorage presum_temp_storage;
-  BlockScan(presum_temp_storage).InclusiveSum(max_logit, presum_max_logit);
+  BlockScan(presum_temp_storage)
+      .InclusiveSum(biased_logit_exp, presum_max_logit_exp);
 
-  __shared__ float s_presum_logit_threshold;
-  if (presum_max_logit > p) {
-    presum_max_logit = CUDA_FLOAT_INF_NEG;
+  float topp_exp_threshold;
+  if (threadIdx.x == blockDim.x - 1) {
+    topp_exp_threshold = p * presum_max_logit_exp;
   }
-  float logit_threshold = blockReduceMax(presum_max_logit);
+  __shared__ float s_presum_logit_exp_threshold;
+  if (presum_max_logit_exp > topp_exp_threshold) {
+    presum_max_logit_exp = CUDA_FLOAT_INF_NEG;
+  }
+  float logit_exp_threshold = blockReduceMax(presum_max_logit_exp);
   if (threadIdx.x == 0) {
-    s_presum_logit_threshold = logit_threshold;
+    s_presum_logit_exp_threshold = logit_exp_threshold;
   }
   __syncthreads();
 
   __shared__ float s_logit_threshold;
-  if (presum_max_logit == s_presum_logit_threshold) {
+  if (presum_max_logit_exp == s_presum_logit_exp_threshold) {
     s_logit_threshold = max_logit;
-  }
-  __syncthreads();
-
-  max_logit = blockReduceMax(max_logit);
-  if (threadIdx.x == 0) {
-    s_max_logit = max_logit;
   }
   __syncthreads();
 
@@ -1928,7 +1940,8 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   int test_num = 0;
   __shared__ float s_topk_exp_sum;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    float logit = (float)logits[idx];
+    float logit = (float)logits[idx] +
+                  (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
     float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
     if (logit >= s_logit_threshold) test_num++;
     if (logit >= s_logit_threshold && logit_exp > topk_exp) {
@@ -1949,8 +1962,6 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   /* calculate cumulative probability */
   float topk_prob = topk_exp / s_topk_exp_sum;
   float prefix_sum_prob;
-  // typedef cub::BlockScan<float, 1024> BlockScan;
-  // __shared__ typename BlockScan::TempStorage temp_storage;
   BlockScan(presum_temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
 
   __shared__ float random_x;
@@ -1991,17 +2002,8 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
     if (s_tid != eos_id) unfinished[0] = 1;
   }
 
-  // /* step3 copy old_input_ids to new_input_ids and add new sampled ids */
-  // int left_token_idx = blockIdx.x * batch_seq_len + threadIdx.x;
-  // int right_token_idx = (blockIdx.x + 1) * batch_seq_len;
-  // for (int idx = left_token_idx; idx < right_token_idx; idx += blockDim.x) {
-  //   int new_idx = idx + blockIdx.x;
-  //   new_input_ids[new_idx] = old_input_ids[idx];
-  // }
+  /* step3 write back new sampled ids */
   if (threadIdx.x == 0) {
-    // new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = s_tid;
-    // //  save the newly sampled ids to old_input_ids for next step inputs
-    // old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = s_tid;
     old_input_ids[token_idx_in_batch + 1] = s_tid;
   }
 }
@@ -2010,26 +2012,29 @@ template <typename T>
 void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, int* old_input_ids,
-                              int* new_input_ids, const int vocab_size,
-                              const float p, int* unfinished,
-                              curandState* curandstate, int eos_id) {
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const float p,
+                              int* unfinished, curandState* curandstate,
+                              int eos_id) {
   ker_topp_sample<T><<<batch_size, max_thread_per_block, 0, stream>>>(
-      logits, old_input_ids, new_input_ids, vocab_size, max_step, batch_seq_len,
-      logits_seq_len, unfinished, p, curandstate, eos_id);
+      logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+      batch_seq_len, logits_seq_len, unfinished, p, curandstate, eos_id);
 }
 
 template void ker_topp_sample_launcher<float>(
     int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const float* logits,
-    int* old_input_ids, int* new_input_idx, const int vocab_size, const float p,
-    int* unfinished, curandState* curandstate, int eos_id);
+    const float* logit_bias, int* old_input_ids, int* new_input_idx,
+    const int vocab_size, const float p, int* unfinished,
+    curandState* curandstate, int eos_id);
 
 template void ker_topp_sample_launcher<__half>(
     int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
-    int* old_input_ids, int* new_input_idx, const int vocab_size, const float p,
-    int* unfinished, curandState* curandstate, int eos_id);
+    const __half* logit_bias, int* old_input_ids, int* new_input_idx,
+    const int vocab_size, const float p, int* unfinished,
+    curandState* curandstate, int eos_id);
 
 __global__ void ker_curand_setup(curandState* state) {
   /* Each thread gets same seed, a different sequence

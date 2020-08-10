@@ -1,11 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <string>
-
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -13,8 +7,14 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "proto/transformer_weight.h"
-#include "tools/util.h"
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <string>
+
+#include "src/custom/byseqlib/proto/transformer_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
 /**
 @file
@@ -60,8 +60,7 @@ class Decoder {
   const _DataType* _p_d_encoder_output;
   int* _p_d_result;
   int* _p_d_sample_unfinished;
-  curandState *_p_d_curandstate;  //[batch_size]
-
+  curandState* _p_d_curandstate;  //[batch_size]
 
   std::vector<float> _h_alive_seq_probs;
   std::vector<float> _h_length_norm;
@@ -120,15 +119,15 @@ class Decoder {
       _atten_scaler;  // scaling factor of Scaled Dot-Product Attention
   const _DataType _output_scaler;  // output scaling factor of the liner project
                                    // after decoder
-  const int _layer_size_encdec_k;
-  const int _layer_size_self_k;
+  const long _layer_size_encdec_k;
+  const long _layer_size_self_k;
 
  public:
   Decoder(int max_batch_size, const int* p_d_padding_mask,
           const _DataType* p_d_encoder_output, int* p_d_result,
           TransformerWeight<OpType_>& tw, cudaStream_t stream,
           cublasHandle_t hd, bool output_topk = false);
-  int compute_buffer_bytesize();
+  long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);

@@ -299,7 +299,7 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
-  if (tw_._sampling_method != "") tw_._beam_size = 1;
+  if (tw_._sampling_method != "beam_search") tw_._beam_size = 1;
   int max_batch_size = model_config_.max_batch_size();
   int err;
   err = AllocateCudaBuffers(
@@ -344,8 +344,8 @@ int Context::Init() {
     return kModelSize;
   }
 
-  int buf_bytesize = max(encoder_->compute_buffer_bytesize(),
-                         decoder_->compute_buffer_bytesize());
+  long buf_bytesize = max(encoder_->compute_buffer_bytesize(),
+                          decoder_->compute_buffer_bytesize());
   err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
   if (err != kSuccess) {
     return err;

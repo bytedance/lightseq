@@ -37,10 +37,10 @@ Compute GPU memory size needed by transformer encoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-int Encoder<OpType_>::compute_buffer_bytesize() {
-  int sz1 = _max_batch_dim * 6 +
-            _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  int sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
+long Encoder<OpType_>::compute_buffer_bytesize() {
+  long sz1 = _max_batch_dim * 6 +
+             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
+  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
   return max(sz1, sz2) * sizeof(_DataType);
 }
 

@@ -1,11 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <string>
-
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -13,8 +7,14 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-#include "proto/gpt_weight.h"
-#include "tools/util.h"
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <string>
+
+#include "src/custom/byseqlib/proto/gpt_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
 namespace byseqlib {
 namespace cuda {
@@ -93,7 +93,7 @@ class GptEncoder {
   GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
              int *p_d_sample_id, const GptWeight<OpType_> &tw,
              cudaStream_t stream, cudaStream_t cache_stream, cublasHandle_t hd);
-  int compute_buffer_bytesize();
+  long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);

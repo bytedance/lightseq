@@ -1,9 +1,9 @@
 #include <algorithm>
 
-#include "model/decoder.h"
-#include "model/encoder.h"
-#include "proto/transformer_weight.h"
-#include "tools/util.h"
+#include "src/custom/byseqlib/model/decoder.h"
+#include "src/custom/byseqlib/model/encoder.h"
+#include "src/custom/byseqlib/proto/transformer_weight.h"
+#include "src/custom/byseqlib/tools/util.h"
 
 /**
 @file
@@ -28,13 +28,13 @@ int main(int argc, char *argv[]) {
   byseqlib::cuda::TransformerWeight<optype> tw_;
   // saved in custom proto file
   std::string model_weights_path = argv[1];
-  std::string res = tw_.initializing(model_weights_path);
+
+  std::string res = tw_.initializing(model_weights_path, true);
   if (!res.empty()) {
     std::cout << res << std::endl;
     return 0;
   }
-  // when use sampling methods for decoding, set beam_size=1 to save memory
-  if (tw_._sampling_method != "beam_search") {
+  if (tw_._sampling_method == "topk" || tw_._sampling_method == "topp") {
     tw_._beam_size = 1;
   }
 
@@ -43,29 +43,17 @@ int main(int argc, char *argv[]) {
       using thrust vector to avoid manage gpu memory by hand
   */
   // instantiate encoder
-  int max_batch_size = 16;
+  int max_batch_size = 64;
   thrust::device_vector<int> d_input_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_padding_mask_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
-  thrust::device_vector<int> d_encoder_output_ =
-      std::vector<int>(max_batch_size * tw_._max_step * tw_._hidden_size, 0);
+  thrust::device_vector<optraits::DataType> d_encoder_output_ =
+      std::vector<optraits::DataType>(
+          max_batch_size * tw_._max_step * tw_._hidden_size,
+          (optraits::DataType)0.0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._beam_size * tw_._max_step, 0);
-  std::shared_ptr<byseqlib::cuda::Encoder<optype>> encoder_ =
-      std::make_shared<byseqlib::cuda::Encoder<optype>>(
-          max_batch_size,
-          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
-          reinterpret_cast<int *>(
-              thrust::raw_pointer_cast(d_padding_mask_.data())),
-          reinterpret_cast<optraits::DataType *>(
-              thrust::raw_pointer_cast(d_encoder_output_.data())),
-          tw_, stream_, hd_);
-  res = encoder_->check();
-  if (!res.empty()) {
-    std::cout << res << std::endl;
-    return 1;
-  }
   // instantiate decoder
   std::shared_ptr<byseqlib::cuda::Decoder<optype>> decoder_ =
       std::make_shared<byseqlib::cuda::Decoder<optype>>(
@@ -81,55 +69,53 @@ int main(int argc, char *argv[]) {
     std::cout << res << std::endl;
     return 1;
   }
+
   // init gpu memory buffer
-  long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
-                               decoder_->compute_buffer_bytesize());
+  long buf_bytesize = decoder_->compute_buffer_bytesize();
+  std::cout << "decoder buf_bytesize: " << buf_bytesize << std::endl;
   thrust::device_vector<int> d_buf_ =
       std::vector<int>(buf_bytesize / sizeof(int), 0);
   // encoder and decoder use the same buffer to save gpu memory useage
-  encoder_->init_buffer(
-      reinterpret_cast<void *>(thrust::raw_pointer_cast(d_buf_.data())));
+
   decoder_->init_buffer(
       reinterpret_cast<void *>(thrust::raw_pointer_cast(d_buf_.data())));
   cudaStreamSynchronize(stream_);
 
-  /* ---step4. read input token ids from file--- */
+  /* ---step4. read encoder output from file--- */
   int batch_size;
   int batch_seq_len;
   std::vector<int> host_input;
-  // the first line of input file should
-  // be two integers: batch_size and batch_seq_len.
-  // followed by batch_size lines of
-  // batch_seq_len integers, e.g.
-  // 2 3
-  // 666 666 666
-  // 666 666 666
-  std::string input_file_name = argv[2];
-  byseqlib::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
-                                                batch_seq_len, host_input);
+  std::string encoder_output_file = argv[2];
+  std::ifstream fin(encoder_output_file);
+  fin >> batch_size >> batch_seq_len;
+  std::vector<float> h_encoder_output(
+      batch_size * batch_seq_len * tw_._hidden_size, 0);
+  for (int i = 0; i < batch_size * batch_seq_len * tw_._hidden_size; i++) {
+    fin >> h_encoder_output[i];
+  }
+
+  thrust::copy(h_encoder_output.begin(), h_encoder_output.end(),
+               d_encoder_output_.begin());
 
   /* ---step5. infer and log--- */
   auto start = std::chrono::high_resolution_clock::now();
   int sum_sample_step = 0;
   for (int i = 0; i < 1; i++) {
-    // copy inputs from cpu memory to gpu memory
-    cudaMemcpyAsync(
-        reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
-        host_input.data(), sizeof(int) * batch_size * batch_seq_len,
-        cudaMemcpyHostToDevice, stream_);
-    encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
     sum_sample_step += decoder_->_cur_step;
-    for (int ii = 0; ii < batch_size; ii++) {
-      for (int j = 0; j < tw_._beam_size; j++) {
-        byseqlib::cuda::print_vec(
-            d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
-                j * (decoder_->_cur_step + 1),
-            "Beam result", decoder_->_cur_step + 1);
-      }
+  }
+  for (int ii = 0; ii < batch_size; ii++) {
+    for (int j = 0; j < tw_._beam_size; j++) {
+      byseqlib::cuda::print_vec(
+          d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
+              j * (decoder_->_cur_step + 1),
+          "Beam result: ", decoder_->_cur_step + 1);
+      byseqlib::cuda::print_vec(
+          decoder_->_p_d_alive_seq_score + ii * tw_._beam_size + j,
+          "Beam score: ", 1);
     }
   }
-  byseqlib::cuda::print_time_duration(start, "Infer time", stream_);
+  byseqlib::cuda::print_time_duration(start, "infer time", stream_);
   std::cout << "Total sampled steps: " << sum_sample_step << std::endl;
   return 0;
 }

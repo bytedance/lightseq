@@ -29,6 +29,7 @@ token_id: input token id, [batch_size, token_seq_len]
 output: result, [batch_size, token_seq_len, hidden_size]
 real_seq_len: record seq len exclude padding, [batch_size]
 padding_id, the padding_id, default 0
+pos_offset: get real pos when decoding which gridDim.y=1
 */
 template <typename T>
 __global__ void ker_gpt_embedding(const T* token_emb, const T* pos_emb,
@@ -547,7 +548,7 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
       new_input_ids[new_idx] = old_input_ids[idx];
     }
     if (threadIdx.x == 0) {
-      // blockIdx.x*(batch_seq_len+1)+(batch_seq_len)
+      // blockIdx.x * (batch_seq_len+1) + batch_seq_len
       new_input_ids[(blockIdx.x + 1) * (batch_seq_len + 1) - 1] = eos_id;
       old_input_ids[gridDim.x * batch_seq_len + blockIdx.x] = eos_id;
     }
@@ -752,7 +753,7 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   int right_logit_idx = (logits_token_idx_in_batch + 1) * vocab_size;
 
   /*
-  step1. find max logit and rough Kth logit over the whole vocab
+  step1. find max logit in each thread and sample from these probs with nucleus sampling
   */
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
@@ -764,35 +765,42 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   typedef cub::BlockRadixSort<float, 1024, 1> BlockRadixSort;
   __shared__ typename BlockRadixSort::TempStorage sort_temp_storage;
   BlockRadixSort(sort_temp_storage).SortDescending(max_logit_array);
-  float presum_max_logit;
+  float presum_max_logit_exp;
   max_logit = max_logit_array[0];
+
+  float block_max_logit = blockReduceMax(max_logit);
+  if (threadIdx.x == 0) {
+    s_max_logit = block_max_logit;
+  }
+  __syncthreads();
+
+  float biased_logit_exp = expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
+
   typedef cub::BlockScan<float, 1024> BlockScan;
   __shared__ typename BlockScan::TempStorage presum_temp_storage;
-  BlockScan(presum_temp_storage).InclusiveSum(max_logit, presum_max_logit);
+  BlockScan(presum_temp_storage).InclusiveSum(biased_logit_exp, presum_max_logit_exp);
 
-  __shared__ float s_presum_logit_threshold;
-  if (presum_max_logit > p) {
-    presum_max_logit = CUDA_FLOAT_INF_NEG;
+  float topp_exp_threshold;
+  if (threadIdx.x == blockDim.x-1) {
+    topp_exp_threshold = p * presum_max_logit_exp;
   }
-  float logit_threshold = blockReduceMax(presum_max_logit);
+  __shared__ float s_presum_logit_exp_threshold;
+  if (presum_max_logit_exp > topp_exp_threshold) {
+    presum_max_logit_exp = CUDA_FLOAT_INF_NEG;
+  }
+  float logit_exp_threshold = blockReduceMax(presum_max_logit_exp);
   if (threadIdx.x == 0) {
-    s_presum_logit_threshold = logit_threshold;
+    s_presum_logit_exp_threshold = logit_exp_threshold;
   }
   __syncthreads();
 
   __shared__ float s_logit_threshold;
-  if (presum_max_logit == s_presum_logit_threshold) {
+  if (presum_max_logit_exp == s_presum_logit_exp_threshold) {
     s_logit_threshold = max_logit;
   }
   __syncthreads();
 
-  max_logit = blockReduceMax(max_logit);
-  if (threadIdx.x == 0) {
-    s_max_logit = max_logit;
-  }
-  __syncthreads();
-
-  /* step2 hold one logit per thread which larger than Kth logit and sample
+  /* step2 hold one logit per thread and sample
    * from them */
   float topk_exp_sum, topk_exp = CUDA_FLOAT_INF_NEG;
   int topk_tid = vocab_size;
@@ -820,8 +828,6 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   /* calculate cumulative probability */
   float topk_prob = topk_exp / s_topk_exp_sum;
   float prefix_sum_prob;
-  // typedef cub::BlockScan<float, 1024> BlockScan;
-  // __shared__ typename BlockScan::TempStorage temp_storage;
   BlockScan(presum_temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
 
   __shared__ float random_x;

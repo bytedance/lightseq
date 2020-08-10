@@ -9,7 +9,7 @@ namespace cuda {
 
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
-const float min_log_probability = -10000.f;
+const float min_log_probability = -2000.f;
 const float epsilon = 0.000001;
 
 template <typename T>
@@ -148,19 +148,21 @@ template <typename T>
 void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, int* old_input_ids,
-                              int* new_input_ids, const int vocab_size,
-                              const int k, int* all_finished,
-                              curandState* curandstate, int eos_id);
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const int k,
+                              int* all_finished, curandState* curandstate,
+                              int eos_id);
 
 template <typename T>
 void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, int* old_input_ids,
-                              int* new_input_ids, const int vocab_size,
-                              const float p, int* unfinished,
-                              curandState* curandstate, int eos_id);
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const float p,
+                              int* unfinished, curandState* curandstate,
+                              int eos_id);
 
 __global__ void ker_curand_setup(curandState* state);
 
