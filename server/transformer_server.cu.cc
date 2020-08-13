@@ -1,17 +1,18 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
 #include <unistd.h>
+
 #include <string>
+
 #include "cuda/include/cuda.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
-#include "src/servables/custom/custom.h"
-
 #include "src/custom/byseqlib/model/decoder.h"
 #include "src/custom/byseqlib/model/encoder.h"
 #include "src/custom/byseqlib/proto/transformer_weight.h"
 #include "src/custom/byseqlib/tools/util.h"
+#include "src/servables/custom/custom.h"
 
 /**
 @file
@@ -335,8 +336,8 @@ int Context::Init() {
     return kModelSize;
   }
 
-  int buf_bytesize = max(encoder_->compute_buffer_bytesize(),
-                         decoder_->compute_buffer_bytesize());
+  long buf_bytesize = max(encoder_->compute_buffer_bytesize(),
+                          decoder_->compute_buffer_bytesize());
   err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
   if (err != kSuccess) {
     return err;

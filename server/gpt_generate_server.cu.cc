@@ -26,7 +26,7 @@ const byseqlib::cuda::OperationType OPTYPE =
 namespace nvidia {
 namespace inferenceserver {
 namespace custom {
-namespace gptlm {
+namespace gptgeneration {
 
 // Integer error codes. TRTIS requires that success must be 0. All
 // other codes are interpreted by TRTIS as failures.
@@ -104,6 +104,7 @@ class Context {
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
   cudaStream_t stream_;
+  cudaStream_t cache_stream_;
   cublasHandle_t hd_;
 
   byseqlib::cuda::GptWeight<OPTYPE> tw_;
@@ -120,6 +121,7 @@ Context::Context(const std::string& instance_name,
       d_buf_(nullptr),
       d_output_(nullptr),
       stream_(nullptr),
+      cache_stream_(nullptr),
       hd_(nullptr) {}
 
 Context::~Context() {
@@ -140,6 +142,14 @@ Context::~Context() {
                 << cudaGetErrorString(cuerr);
     }
     stream_ = nullptr;
+  }
+  if (cache_stream_ != nullptr) {
+    cudaError_t cuerr = cudaStreamDestroy(cache_stream_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: "
+                << cudaGetErrorString(cuerr);
+    }
+    cache_stream_ = nullptr;
   }
 }
 
@@ -245,11 +255,11 @@ int Context::Init() {
     return kInputOutputShape;
   }
 
-  if (model_config_.output(0).data_type() != DataType::TYPE_FP32) {
+  if (model_config_.output(0).data_type() != DataType::TYPE_INT32) {
     return kInputOutputDataType;
   }
 
-  if (model_config_.output(0).name() != "loss") {
+  if (model_config_.output(0).name() != "outputs_ids") {
     return kOutputName;
   }
 
@@ -275,8 +285,8 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
-  err = AllocateCudaBuffers(&d_output_,
-                            max_batch_size * sizeof(DataType::TYPE_FP32));
+  err = AllocateCudaBuffers(
+      &d_output_, max_batch_size * tw_._max_step * datatype_bytesize_);
   if (err != kSuccess) {
     return err;
   }
@@ -284,7 +294,7 @@ int Context::Init() {
   encoder_ = std::make_shared<byseqlib::cuda::GptEncoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<float*>(d_output_), reinterpret_cast<int*>(d_output_),
-      tw_, stream_, stream_, hd_);
+      tw_, stream_, cache_stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -396,15 +406,16 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
       continue;
     }
 
-    encoder_->run_one_infer(payload.batch_size, batch_seq_len);
+    int sample_step =
+        encoder_->run_one_sample(payload.batch_size, batch_seq_len);
     // The output shape is [payload-batch-size, shape] if the model
     // configuration supports batching, or just [shape] if the
     // model configuration does not support batching.
-    std::vector<int64_t> output_shape = {payload.batch_size, 1};
+    std::vector<int64_t> output_shape = {payload.batch_size, sample_step};
     int64_t output_bytesize =
         output_shape[0] * output_shape[1] * datatype_bytesize_;
 
-    const char* output_name = "loss";
+    const char* output_name = "outputs_ids";
 
     void* obuffer;
     if (!output_fn(payload.output_context, output_name, output_shape.size(),
@@ -501,13 +512,13 @@ const char* CustomErrorString(void* custom_context, int errcode) {
     case kGpuNotSupported:
       return "execution on GPU not supported";
     case kInputOutputShape:
-      return "model must have two inputs and two outputs with the same shape";
+      return "model must have one input and one output with the same shape";
     case kInputName:
-      return "model inputs must be named 'src_ids:0' and 'INPUT1'";
+      return "model inputs must be named 'inputs_ids' and 'INPUT1'";
     case kOutputName:
-      return "model outputs must be named 'trg_ids:0' and 'OUTPUT1'";
+      return "model outputs must be named 'outputs_ids' and 'OUTPUT1'";
     case kInputOutputDataType:
-      return "model inputs and outputs must have TYPE_INT32 or TYPE_FP32 "
+      return "model inputs and outputs must be TYPE_INT32 "
              "data-type";
     case kInputContents:
       return "unable to get input tensor values";
@@ -553,7 +564,7 @@ int CustomExecute(void* custom_context, const uint32_t payload_cnt,
 
 }  // extern "C"
 
-}  // namespace gptlm
+}  // namespace gptgeneration
 }  // namespace custom
 }  // namespace inferenceserver
 }  // namespace nvidia
