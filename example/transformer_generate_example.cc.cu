@@ -12,7 +12,7 @@ Example of how to run transformer generation inference using our implementation.
 
 // Appoint precision.
 const byseqlib::cuda::OperationType optype =
-    byseqlib::cuda::OperationType::FP32;
+    byseqlib::cuda::OperationType::FP16;
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */
@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
       using thrust vector to avoid manage gpu memory by hand
   */
   // instantiate encoder
-  int max_batch_size = 16;
+  int max_batch_size = 8;
   thrust::device_vector<int> d_input_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_padding_mask_ =

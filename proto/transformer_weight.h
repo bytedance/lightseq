@@ -13,8 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "src/custom/byseqlib/proto/transformer.pb.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "transformer.pb.h"
+#include "tools/util.h"
 
 namespace byseqlib {
 namespace cuda {

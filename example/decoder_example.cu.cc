@@ -1,9 +1,9 @@
 #include <algorithm>
 
-#include "src/custom/byseqlib/model/decoder.h"
-#include "src/custom/byseqlib/model/encoder.h"
-#include "src/custom/byseqlib/proto/transformer_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "model/decoder.h"
+#include "model/encoder.h"
+#include "proto/transformer_weight.h"
+#include "tools/util.h"
 
 /**
 @file
@@ -44,8 +44,6 @@ int main(int argc, char *argv[]) {
   */
   // instantiate encoder
   int max_batch_size = 64;
-  thrust::device_vector<int> d_input_ =
-      std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_padding_mask_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<optraits::DataType> d_encoder_output_ =
@@ -100,9 +98,9 @@ int main(int argc, char *argv[]) {
   /* ---step5. infer and log--- */
   auto start = std::chrono::high_resolution_clock::now();
   int sum_sample_step = 0;
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 100; i++) {
     decoder_->run_one_infer(batch_size, batch_seq_len);
-    sum_sample_step += decoder_->_cur_step;
+    sum_sample_step += decoder_->_cur_step + 1;
   }
   for (int ii = 0; ii < batch_size; ii++) {
     for (int j = 0; j < tw_._beam_size; j++) {

@@ -1,9 +1,8 @@
 #include <unistd.h>
 
 #include "3rdparty/cub-1.8.0/cub/cub.cuh"
-
-#include "kernels/transformerKernels.h"
 #include "decoder.h"
+#include "kernels/transformerKernels.h"
 
 /**
 @file
@@ -258,6 +257,12 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   if (_is_sampling) {
     _batch_max_decode_length = _tw._max_step;
   }
+
+#ifdef DEBUG_RESULT
+  std::cout << "TEST" << std::endl;
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+#endif
+
   project_encoder_output();  // project encoder output
   // init the first step's token id with target start_id
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_alive_seq_probs,
@@ -315,6 +320,11 @@ Project encoder output
 template <OperationType OpType_>
 void Decoder<OpType_>::project_encoder_output() {
   int kv_dim = _tw._hidden_size * 2 * _tw._n_dec_layer;
+#ifdef DEBUG_RESULT
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_p_d_encoder_output, "_p_d_encoder_output(head):", 10);
+  print_vec(_p_d_trg_emb_wei[4], "encoder project(head):", 10);
+#endif
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, kv_dim, _batch_token_num, _tw._hidden_size,
       &_fone, _p_d_trg_emb_wei[4], _AType, kv_dim, _p_d_encoder_output, _BType,
@@ -322,6 +332,15 @@ void Decoder<OpType_>::project_encoder_output() {
       _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   // _p_d_encoder_out_buf: [batch_size, batch_seq_len, layer_num, 2,
   // hidden_size]
+
+#ifdef DEBUG_RESULT
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  std::cout << "TEST project_encoder_output" << std::endl;
+  print_vec(_p_d_encoder_out_buf, "encoder out(head):", 5);
+  print_vec(_p_d_encoder_out_buf +
+                _batch_token_num * _tw._hidden_size * _tw._n_dec_layer - 5,
+            "encoder out(tail):", 5);
+#endif
   ker_arrange_encdec_kv_launcher<_DataType>(
       _batch_token_num, _tw._n_dec_layer, _tw._hidden_size, _stream,
       _p_d_encoder_out_buf, _p_d_trg_emb_wei[5], _p_d_encdec_k_bgeem[0],

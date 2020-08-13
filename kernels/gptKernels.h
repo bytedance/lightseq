@@ -3,7 +3,6 @@
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 
-#include <cub/cub.cuh>
 
 namespace byseqlib {
 namespace cuda {

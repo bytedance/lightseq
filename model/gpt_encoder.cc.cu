@@ -1,6 +1,6 @@
-#include "src/custom/byseqlib/kernels/gptKernels.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/gpt_encoder.h"
+#include "kernels/gptKernels.h"
+#include "kernels/transformerKernels.h"
+#include "model/gpt_encoder.h"
 
 /**
 @file
