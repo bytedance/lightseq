@@ -41,8 +41,8 @@ class CMakeBuild(build_ext):
 
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable]
-        cmake_args += ['-DProtobuf_INCLUDE_DIR=/home/linuxbrew/.linuxbrew/include/',
-                       '-DProtobuf_LIBRARY=/home/linuxbrew/.linuxbrew/lib/libprotobuf.so']
+        # cmake_args += ['-DProtobuf_INCLUDE_DIR=/home/linuxbrew/.linuxbrew/include/',
+        #                '-DProtobuf_LIBRARY=/home/linuxbrew/.linuxbrew/lib/libprotobuf.so']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
