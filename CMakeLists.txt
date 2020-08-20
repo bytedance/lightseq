@@ -14,7 +14,7 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(FasterTransformer LANGUAGES CXX CUDA)
 
-set(CMAKE_CUDA_ARCHITECTURES "70")
+set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 10.0 REQUIRED)
 
 option(BUILD_TRT "Build in TensorRT mode" OFF)
