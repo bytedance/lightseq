@@ -5,6 +5,7 @@ import platform
 import subprocess
 
 from setuptools import setup, Extension
+import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
@@ -79,4 +80,5 @@ setup(
     ext_modules=[CMakeExtension('pyseqlib')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
+    packages=setuptools.find_packages(),
 )
