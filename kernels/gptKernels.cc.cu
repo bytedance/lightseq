@@ -1,6 +1,6 @@
-// #include "<cub/cub.cuh>"
 #include <random>
-#include "3rdparty/cub-1.8.0/cub/cub.cuh"
+
+// #include "3rdparty/cub-1.8.0/cub/cub.cuh"
 #include "common.h"
 #include "gptKernels.h"
 #include "transformerKernels.h"
@@ -753,7 +753,8 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   int right_logit_idx = (logits_token_idx_in_batch + 1) * vocab_size;
 
   /*
-  step1. find max logit in each thread and sample from these probs with nucleus sampling
+  step1. find max logit in each thread and sample from these probs with nucleus
+  sampling
   */
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
@@ -774,14 +775,16 @@ __global__ void ker_topp_sample(const T* logits, int* old_input_ids,
   }
   __syncthreads();
 
-  float biased_logit_exp = expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
+  float biased_logit_exp =
+      expf(fmaxf(max_logit - s_max_logit, logit_thresh_min));
 
   typedef cub::BlockScan<float, 1024> BlockScan;
   __shared__ typename BlockScan::TempStorage presum_temp_storage;
-  BlockScan(presum_temp_storage).InclusiveSum(biased_logit_exp, presum_max_logit_exp);
+  BlockScan(presum_temp_storage)
+      .InclusiveSum(biased_logit_exp, presum_max_logit_exp);
 
   float topp_exp_threshold;
-  if (threadIdx.x == blockDim.x-1) {
+  if (threadIdx.x == blockDim.x - 1) {
     topp_exp_threshold = p * presum_max_logit_exp;
   }
   __shared__ float s_presum_logit_exp_threshold;

@@ -1,6 +1,7 @@
 #include <unistd.h>
 
-#include "3rdparty/cub-1.8.0/cub/cub.cuh"
+#include <cub/cub.cuh>
+// #include "3rdparty/cub-1.8.0/cub/cub.cuh"
 #include "decoder.h"
 #include "kernels/transformerKernels.h"
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.18)
 
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
@@ -17,13 +17,11 @@ target_include_directories(transformer_proto
 
 add_library(gpt_weight STATIC gpt_weight.cc)
 target_link_libraries(gpt_weight PUBLIC utils gpt_proto)
-target_include_directories(
-  gpt_weight INTERFACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
-                       ${Protobuf_INCLUDE_DIRS})
+target_include_directories(gpt_weight INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+                                                ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(transformer_weight STATIC transformer_weight.cc)
 target_link_libraries(transformer_weight PUBLIC utils transformer_proto)
 target_include_directories(
-  transformer_weight
-  INTERFACE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}
-            ${Protobuf_INCLUDE_DIRS})
+  transformer_weight INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+                               ${CMAKE_CURRENT_BINARY_DIR})

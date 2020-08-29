@@ -11,14 +11,16 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations under
 # the License.
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(FasterTransformer LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
-find_package(CUDA 10.0 REQUIRED)
+find_package(CUDA 11 REQUIRED)
 
 option(BUILD_TRT "Build in TensorRT mode" OFF)
 option(BUILD_TF "Build in TensorFlow mode" OFF)
+
+# set(Protobuf_USE_STATIC_LIBS ON)
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
@@ -49,49 +51,50 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
 
-if(SM STREQUAL 70
-   OR SM STREQUAL 75
-   OR SM STREQUAL 61
-   OR SM STREQUAL 60)
-  set(CMAKE_CUDA_FLAGS
-      "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_${SM},code=\\\"sm_${SM},compute_${SM}\\\" -rdc=true"
-  )
-  if(SM STREQUAL 70 OR SM STREQUAL 75)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}    -DWMMA")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -DWMMA")
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
-  endif()
-  message("-- Assign GPU architecture (sm=${SM})")
+# if(SM STREQUAL 70
+#    OR SM STREQUAL 75
+#    OR SM STREQUAL 61
+#    OR SM STREQUAL 60)
+#   set(CMAKE_CUDA_FLAGS
+#       "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_${SM},code=\\\"sm_${SM},compute_${SM}\\\" -rdc=true"
+#   )
+#   if(SM STREQUAL 70 OR SM STREQUAL 75)
+#     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}    -DWMMA")
+#     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -DWMMA")
+#     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
+#   endif()
+#   message("-- Assign GPU architecture (sm=${SM})")
 
-else()
-  set(CMAKE_CUDA_FLAGS
-      "${CMAKE_CUDA_FLAGS}  \
-                      -gencode=arch=compute_60,code=\\\"sm_60,compute_60\\\" \
-                      -gencode=arch=compute_61,code=\\\"sm_61,compute_61\\\" \
-                      -gencode=arch=compute_70,code=\\\"sm_70,compute_70\\\" \
-                      -gencode=arch=compute_75,code=\\\"sm_75,compute_75\\\" \
-                      -rdc=true")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}    -DWMMA")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -DWMMA")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
-  message("-- Assign GPU architecture (sm=60,61,70,75)")
-endif()
+# else()
+#   set(CMAKE_CUDA_FLAGS
+#       "${CMAKE_CUDA_FLAGS}  \
+#                       -gencode=arch=compute_60,code=\\\"sm_60,compute_60\\\" \
+#                       -gencode=arch=compute_61,code=\\\"sm_61,compute_61\\\" \
+#                       -gencode=arch=compute_70,code=\\\"sm_70,compute_70\\\" \
+#                       -gencode=arch=compute_75,code=\\\"sm_75,compute_75\\\" \
+#                       -rdc=true")
+#   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}    -DWMMA")
+#   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -DWMMA")
+#   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -DWMMA")
+#   message("-- Assign GPU architecture (sm=60,61,70,75)")
+# endif()
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(CMAKE_CXX_STANDARD STREQUAL "11")
+if(CMAKE_CXX_STANDARD STREQUAL "14")
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++11")
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++14")
 endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -fPIC")
-set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -Xcompiler -O2 -Xcompiler -fPIC")
+set(CMAKE_CUDA_FLAGS_RELEASE
+    "${CMAKE_CUDA_FLAGS_RELEASE} -Xcompiler -O2 -Xcompiler -fPIC")
 
 # set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

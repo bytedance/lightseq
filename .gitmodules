@@ -1,7 +1,3 @@
-[submodule "3rdparty/cub-1.8.0"]
-	path = 3rdparty/cub-1.8.0
-	url = https://github.com/NVlabs/cub.git
-	branch = 1.8.0
 [submodule "3rdparty/pybind11"]
 	path = 3rdparty/pybind11
 	url = https://github.com/pybind/pybind11.git

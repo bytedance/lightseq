@@ -1,3 +1,8 @@
 test_case/
 .vscode
 build/
+dist/
+*.egg-info/
+*.so
+*.pb
+wheelhouse/

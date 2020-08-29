@@ -1,0 +1,13 @@
+# Common
+README.md
+CHANGELOG.md
+docker-compose.yml
+Dockerfile
+# git
+.git/
+.gitattributes
+.gitignore
+#cpp
+build/
+dist/
+wheelhouse/

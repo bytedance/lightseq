@@ -2,7 +2,6 @@
 
 #include "model/decoder.h"
 #include "model/encoder.h"
-#include "proto/transformer_weight.h"
 #include "tools/util.h"
 
 /**

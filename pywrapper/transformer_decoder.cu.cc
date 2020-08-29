@@ -11,21 +11,11 @@ namespace py = pybind11;
 const byseqlib::cuda::OperationType optype =
     byseqlib::cuda::OperationType::FP32;
 
-struct Pet {
-  Pet(const std::string &name) : name(name) {}
-  void setName(const std::string &name_) { name = name_; }
-  const std::string &getName() const { return name; }
-
-  std::string name;
-};
-
 class TransformerDecoder {
  private:
   typedef byseqlib::cuda::OperationTypeTraits<optype> optraits;
-  // std::shared_ptr<byseqlib::cuda::Decoder<optype>> decoder_;
   byseqlib::cuda::Decoder<optype> *decoder_;
 
-  // thrust::device_vector<optraits::DataType> d_encoder_output_;
   optraits::DataType *d_encoder_output_;
   int *d_output_;
   int _max_batch_size;
@@ -108,7 +98,6 @@ class TransformerDecoder {
       std::cout << "failed to init GPU for transformer: " << std::endl;
       std::runtime_error(std::string(cudaGetErrorString(cuerr)));
     }
-
   }
 
   py::array_t<int> infer(
@@ -147,11 +136,6 @@ class TransformerDecoder {
 };
 
 PYBIND11_MODULE(pyseqlib, m) {
-  py::class_<Pet>(m, "Pet")
-      .def(py::init<const std::string &>())
-      .def("setName", &Pet::setName)
-      .def("getName", &Pet::getName);
-
   py::class_<TransformerDecoder>(m, "TransformerDecoder")
       .def(py::init<const std::string, const int>())
       .def("infer", &TransformerDecoder::infer);

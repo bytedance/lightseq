@@ -1,7 +1,6 @@
 #include <algorithm>
 
 #include "model/gpt_encoder.h"
-#include "proto/gpt_weight.h"
 #include "tools/util.h"
 
 /**
