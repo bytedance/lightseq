@@ -1,7 +1,43 @@
 # Performance
 
+The following two tables is a comparison of performance between Byseqlib and Faster Transformer, Which is tested on Tesla T4 with a model of Transformer-base. We also provide a TF baseline which's code is from Faster Transformer.
+
+Beam search
+
+| batch_size | beam_size | seq_len | TF(ms)  | FT(ms) | byseqlib(ms) | FT speedup | byseqlib speedup |
+| ---------- | --------- | ------- | ------- | ------ | ------------ | ---------- | ---------------- |
+| 1          | 4         | 32      | 419.53  | 26.25  | 29.66        | 15.98      | 14.14            |
+| 1          | 4         | 64      | 806.38  | 54.02  | 63.04        | 14.93      | 12.79            |
+| 8          | 4         | 32      | 439.64  | 35.99  | 34.77        | 12.22      | 12.64            |
+| 8          | 4         | 64      | 891.54  | 79.82  | 79.43        | 11.17      | 11.22            |
+| 32         | 4         | 32      | 536     | 82.82  | 59.49        | 6.47       | 9.01             |
+| 32         | 4         | 64      | 1116.74 | 198.95 | 155.08       | 5.61       | 7.20             |
+| 64         | 4         | 32      | 668.45  | 144.53 | 101.54       | 4.62       | 6.58             |
+| 64         | 4         | 64      | 1476.17 | 351.14 | 277.4        | 4.20       | 5.32             |
+| 128        | 4         | 32      | 996.88  | 271.8  | 200.49       | 3.67       | 4.97             |
+| 128        | 4         | 64      | 2157.85 | 671.76 | 502.91       | 3.21       | 4.29             |
+
+<br>
+Sampling
+
+| batch_size | topk/topp | seq_len | FT(ms) | byseqlib(ms) | byseqlib speedup |
+| ---------- | --------- | ------- | ------ | ------------ | ---------------- |
+| 1          | 0.75      | 32      | 34.4   | 29.66        | 1.16             |
+| 1          | 0.75      | 64      | 71.45  | 59.72        | 1.20             |
+| 32         | 0.75      | 32      | 56.61  | 40.40        | 1.40             |
+| 32         | 0.75      | 64      | 120.39 | 100.36       | 1.20             |
+| 128        | 0.75      | 32      | 111.4  | 94.68        | 1.18             |
+| 128        | 0.75      | 64      | 246.97 | 270.55       | 0.91             |
+| 1          | 32        | 32      | 34.35  | 28.06        | 1.22             |
+| 1          | 32        | 64      | 72.48  | 56.4         | 1.29             |
+| 32         | 32        | 32      | 40.15  | 39.23        | 1.02             |
+| 32         | 32        | 64      | 87.46  | 98.62        | 0.89             |
+| 128        | 32        | 32      | 99     | 90.83        | 1.09             |
+| 128        | 32        | 64      | 222.62 | 262          | 0.85             |
+
 The following table is a comparison on a fr2en translation model which is a Transformer-big with a
 beam size of 4 and a target vocabulary size of approximately 30k.
+
 <table>
    <tr>
       <td>batch_size</td>
