@@ -1887,7 +1887,8 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
   __shared__ float s_max_logit;
   float max_logit = CUDA_FLOAT_INF_NEG;
   for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    max_logit = fmaxf(max_logit, (float)logits[idx]);
+    max_logit = fmaxf(max_logit, (float)logits[idx]) +
+                (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
   }
   float max_logit_array[1];
   max_logit_array[0] = max_logit;
