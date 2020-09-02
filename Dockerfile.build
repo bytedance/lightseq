@@ -2,7 +2,7 @@ FROM  quay.io/pypa/manylinux2014_x86_64
 
 ENV http_proxy=sys-proxy-rd-relay.byted.org:8118 
 ENV https_proxy=sys-proxy-rd-relay.byted.org:8118
-ENV no_proxy="*.byted.com"
+ENV no_proxy="*.byted.*"
 
 # install cuda toolkit
 RUN curl -O -L -C - https://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda_11.0.3_450.51.06_linux.run && \
