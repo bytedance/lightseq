@@ -26,14 +26,21 @@ fake_inputs = {
         [batch_size, src_seq_len], maxval=50000, dtype=tf.int64
     ),
 }
+# multi-encoder model
 model = tf.saved_model.load("/data00/home/xiongying.taka/rewriting_model/1")
+
+#get encoder output
 test_enc_out, _ = model.serve_encoder(fake_inputs)
 test_enc_out = test_enc_out.numpy()
+
+# initialize byseqlib decoder
 decoder = pyseqlib.TransformerDecoder(
     "/data00/home/xiongying.taka/projects/bytedseq/transformer_rewriting.pb", 32
 )
-# test_enc_out = np.load("/data00/home/xiongying.taka/test_vtm.npy")
+
+# run decoder inference
 res = decoder.infer(test_enc_out)
+
 print(res.shape)
 start = time.time()
 res = None
