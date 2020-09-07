@@ -60,7 +60,7 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
             build_args += ["--target", "pyseqlib"]
-            build_args += ["--", "-j4"]
+            build_args += ["--", "-j"]
 
         env = os.environ.copy()
         env["CXXFLAGS"] = '{} -DVERSION_INFO=\\"{}\\"'.format(

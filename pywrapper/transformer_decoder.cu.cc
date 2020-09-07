@@ -126,7 +126,7 @@ class TransformerDecoder {
     decoder_->run_one_infer(batch_size, batch_seq_len);
     int tokens_size = decoder_->_cur_step + 1;
     int beam_size = tw_._beam_size;
-    auto tokens = py::array_t<int>({batch_size * beam_size, tokens_size});
+    auto tokens = py::array_t<int>({batch_size, beam_size, tokens_size});
     int *tokens_data = tokens.mutable_data(0, 0);
     byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
                                                sizeof(int) * tokens.size(),

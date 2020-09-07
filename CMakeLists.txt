@@ -20,7 +20,7 @@ find_package(CUDA 11 REQUIRED)
 option(BUILD_TRT "Build in TensorRT mode" OFF)
 option(BUILD_TF "Build in TensorFlow mode" OFF)
 
-# set(Protobuf_USE_STATIC_LIBS ON)
+set(Protobuf_USE_STATIC_LIBS ON)
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 

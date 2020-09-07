@@ -13,8 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "transformer.pb.h"
 #include "tools/util.h"
+#include "transformer.pb.h"
 
 namespace byseqlib {
 namespace cuda {
@@ -100,6 +100,28 @@ class TransformerWeight {
   std::string _sampling_method;
   int _topk;
   float _topp;
+
+  void print_model_config() {
+    std::cout << "<MODEL CONFIG>" << std::endl;
+    std::cout << "encoder layers: " << _n_enc_layer << std::endl;
+    std::cout << "decoder layers: " << _n_dec_layer << std::endl;
+    std::cout << "hidden size: " << _hidden_size << std::endl;
+    std::cout << "inner size: " << _inner_size << std::endl;
+    std::cout << "head number: " << _head_num << std::endl;
+    std::cout << "dim per head: " << _dim_per_head << std::endl;
+    std::cout << "src vocab size: " << _src_vocab_size << std::endl;
+    std::cout << "trg vocab size: " << _trg_vocab_size << std::endl;
+    std::cout << std::endl;
+    std::cout << "<GENERATOR CONFIG>" << std::endl;
+    std::cout << "beam size: " << _beam_size << std::endl;
+    std::cout << "extra decode length(max decode length - src input length): "
+              << _extra_decode_length << std::endl;
+    std::cout << "length penalty: " << _length_penalty << std::endl;
+    std::cout << "diverse lambda: " << _diverse_lambda << std::endl;
+    std::cout << "sampling method: " << _sampling_method << std::endl;
+    std::cout << "topk: " << _topk << std::endl;
+    std::cout << "topp: " << _topp << std::endl;
+  }
 };
 
 }  // namespace cuda

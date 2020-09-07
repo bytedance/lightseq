@@ -4,12 +4,15 @@ set(transformer_files decoder.cc.cu encoder.cc.cu)
 add_library(transformer_model STATIC ${transformer_files})
 target_link_libraries(transformer_model PUBLIC cuda_kernels)
 target_link_libraries(transformer_model PUBLIC transformer_weight)
-target_link_libraries(transformer_model PUBLIC -lcublas -lcudart)
-set_target_properties(transformer_model PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS
+target_link_libraries(transformer_model PUBLIC -lcublas)
+# set_target_properties(transformer_model PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS
+# ON)
+set_target_properties(transformer_model PROPERTIES CUDA_SEPARABLE_COMPILATION
                                                    ON)
 
 add_library(gpt_model STATIC gpt_encoder.cc.cu)
 target_link_libraries(gpt_model PUBLIC cuda_kernels)
 target_link_libraries(gpt_model PUBLIC gpt_weight)
-target_link_libraries(gpt_model PUBLIC -lcublas -lcudart)
-set_target_properties(gpt_model PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+target_link_libraries(gpt_model PUBLIC -lcublas)
+# set_target_properties(gpt_model PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+set_target_properties(gpt_model PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
