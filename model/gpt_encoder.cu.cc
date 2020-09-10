@@ -1,6 +1,6 @@
-#include "src/custom/byseqlib/kernels/gptKernels.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/gpt_encoder.h"
+#include "src/custom/lightseq/kernels/gptKernels.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
+#include "src/custom/lightseq/model/gpt_encoder.h"
 
 /**
 @file
@@ -10,7 +10,7 @@ GPT encoder, composed by gemm lib and
 
 // #define DEBUG_RESULT
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -731,4 +731,4 @@ template class GptEncoder<OperationType::FP16>;
 template class GptEncoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

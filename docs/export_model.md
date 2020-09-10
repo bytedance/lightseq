@@ -1,6 +1,6 @@
 ## Export model
 In order to serve your own model, you need to export model trained from deeplearning framework(E.g.
-TenforFlow, PyTorch) to custom model proto defined by Byseqlib. The following explains the custom
+TenforFlow, PyTorch) to custom model proto defined by LightSeq. The following explains the custom
 transformer model format.
 
 ### transformer model proto

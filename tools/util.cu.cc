@@ -1,6 +1,6 @@
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/tools/util.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <typename T>
@@ -166,4 +166,4 @@ void read_batch_tokenids_from_file(std::string file_name, int& batch_size,
 }
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

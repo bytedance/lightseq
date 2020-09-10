@@ -19,7 +19,7 @@
 Util functions
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /* GPU function guard */
@@ -145,4 +145,4 @@ void read_batch_tokenids_from_file(std::string, int& batch_size,
                                    std::vector<int>& input_ids);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

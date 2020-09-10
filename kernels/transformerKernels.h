@@ -5,7 +5,7 @@
 
 #include <cub/cub.cuh>
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 const float logit_thresh_max = 64.f;
@@ -168,4 +168,4 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
 __global__ void ker_curand_setup(curandState* state);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

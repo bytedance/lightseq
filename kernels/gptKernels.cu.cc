@@ -1,16 +1,16 @@
 #include <cub/cub.cuh>
 #include <random>
 
-#include "src/custom/byseqlib/kernels/common.h"
-#include "src/custom/byseqlib/kernels/gptKernels.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "src/custom/lightseq/kernels/common.h"
+#include "src/custom/lightseq/kernels/gptKernels.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
 /**
 @file
 Implemented the cuda kernel function and its launcher
 that required by GPT model.
 Currently, fp16 and fp32 versions are provided
 */
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /**
@@ -910,4 +910,4 @@ template void ker_topp_sample_launcher<__half>(
     curandState* curandstate, int eos_id);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

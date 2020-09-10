@@ -12,8 +12,8 @@
 #include <iostream>
 #include <string>
 
-#include "src/custom/byseqlib/proto/transformer_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/proto/transformer_weight.h"
+#include "src/custom/lightseq/tools/util.h"
 
 /**
 @file
@@ -21,7 +21,7 @@ Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -86,4 +86,4 @@ class Encoder {
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq
