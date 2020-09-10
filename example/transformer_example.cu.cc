@@ -1,9 +1,9 @@
 #include <algorithm>
 
-#include "src/custom/byseqlib/model/decoder.h"
-#include "src/custom/byseqlib/model/encoder.h"
-#include "src/custom/byseqlib/proto/transformer_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/model/decoder.h"
+#include "src/custom/lightseq/model/encoder.h"
+#include "src/custom/lightseq/proto/transformer_weight.h"
+#include "src/custom/lightseq/tools/util.h"
 
 /**
 @file
@@ -11,8 +11,8 @@ Example of how to run transformer inference using our implementation.
 */
 
 // Appoint precision.
-const byseqlib::cuda::OperationType optype =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType optype =
+    lightseq::cuda::OperationType::FP32;
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */
@@ -22,10 +22,10 @@ int main(int argc, char *argv[]) {
   cudaStreamCreate(&stream_);
   cublasCreate(&hd_);
   cublasSetStream(hd_, stream_);
-  typedef byseqlib::cuda::OperationTypeTraits<optype> optraits;
+  typedef lightseq::cuda::OperationTypeTraits<optype> optraits;
 
   /* ---step2. load model weights into GPU memory--- */
-  byseqlib::cuda::TransformerWeight<optype> tw_;
+  lightseq::cuda::TransformerWeight<optype> tw_;
   // saved in custom proto file
   std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
@@ -48,8 +48,8 @@ int main(int argc, char *argv[]) {
       std::vector<int>(max_batch_size * tw_._max_step * tw_._hidden_size, 0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
-  std::shared_ptr<byseqlib::cuda::Encoder<optype>> encoder_ =
-      std::make_shared<byseqlib::cuda::Encoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Encoder<optype>> encoder_ =
+      std::make_shared<lightseq::cuda::Encoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
           reinterpret_cast<int *>(
@@ -63,8 +63,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // instantiate decoder
-  std::shared_ptr<byseqlib::cuda::Decoder<optype>> decoder_ =
-      std::make_shared<byseqlib::cuda::Decoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Decoder<optype>> decoder_ =
+      std::make_shared<lightseq::cuda::Decoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(
               thrust::raw_pointer_cast(d_padding_mask_.data())),
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
   // 666 666 666
   // 666 666 666
   std::string input_file_name = argv[2];
-  byseqlib::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
+  lightseq::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
@@ -114,9 +114,9 @@ int main(int argc, char *argv[]) {
         cudaMemcpyHostToDevice, stream_);
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
-    byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
+    lightseq::cuda::print_time_duration(start, "one infer time", stream_);
     for (int ii = 0; ii < batch_size; ii++) {
-      byseqlib::cuda::print_vec(
+      lightseq::cuda::print_vec(
           d_output_.data() + ii * (decoder_->_cur_step + 1), "finial res",
           decoder_->_cur_step + 1);
     }

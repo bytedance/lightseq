@@ -13,10 +13,10 @@
 #include <string>
 #include <vector>
 
-#include "src/custom/byseqlib/proto/transformer.pb.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/proto/transformer.pb.h"
+#include "src/custom/lightseq/tools/util.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /*
@@ -103,4 +103,4 @@ class TransformerWeight {
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

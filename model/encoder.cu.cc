@@ -1,5 +1,5 @@
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/encoder.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
+#include "src/custom/lightseq/model/encoder.h"
 
 /**
 @file
@@ -9,7 +9,7 @@ Transformer encoder, composed by gemm lib and
 
 // #define DEBUG_RESULT
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -224,4 +224,4 @@ template class Encoder<OperationType::FP16>;
 template class Encoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

@@ -1,10 +1,10 @@
 # Performance
 
-The following two tables is a comparison of performance between Byseqlib and Faster Transformer, Which is tested on Tesla T4 with a model of Transformer-base. We also provide a TF baseline which's code is from Faster Transformer.
+The following two tables is a comparison of performance between LightSeq and Faster Transformer, Which is tested on Tesla T4 with a model of Transformer-base. We also provide a TF baseline which's code is from Faster Transformer.
 
 Beam search
 
-| batch_size | beam_size | seq_len | TF(ms)  | FT(ms) | byseqlib(ms) | FT speedup | byseqlib speedup |
+| batch_size | beam_size | seq_len | TF(ms)  | FT(ms) | lightseq(ms) | FT speedup | lightseq speedup |
 | ---------- | --------- | ------- | ------- | ------ | ------------ | ---------- | ---------------- |
 | 1          | 4         | 32      | 419.53  | 26.25  | 29.66        | 15.98      | 14.14            |
 | 1          | 4         | 64      | 806.38  | 54.02  | 63.04        | 14.93      | 12.79            |
@@ -20,7 +20,7 @@ Beam search
 <br>
 Sampling
 
-| batch_size | topk/topp | seq_len | FT(ms) | byseqlib(ms) | byseqlib speedup |
+| batch_size | topk/topp | seq_len | FT(ms) | lightseq(ms) | lightseq speedup |
 | ---------- | --------- | ------- | ------ | ------------ | ---------------- |
 | 1          | 0.75      | 32      | 34.4   | 29.66        | 1.16             |
 | 1          | 0.75      | 64      | 71.45  | 59.72        | 1.20             |

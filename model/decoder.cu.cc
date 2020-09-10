@@ -2,8 +2,8 @@
 
 #include <cub/cub.cuh>
 
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/decoder.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
+#include "src/custom/lightseq/model/decoder.h"
 
 /**
 @file
@@ -13,7 +13,7 @@ Transformer decoder, composed by gemm lib and
 
 // #define DEBUG_RESULT
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -778,4 +778,4 @@ template class Decoder<OperationType::FP16>;
 template class Decoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

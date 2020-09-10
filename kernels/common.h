@@ -3,7 +3,7 @@
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
@@ -220,4 +220,4 @@ __forceinline__ __host__ __device__ float2 safe_half2_to_float2(half2 vhalf2) {
 }
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

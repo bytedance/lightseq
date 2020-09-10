@@ -8,9 +8,9 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
-#include "src/custom/byseqlib/model/gpt_encoder.h"
-#include "src/custom/byseqlib/proto/gpt_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/model/gpt_encoder.h"
+#include "src/custom/lightseq/proto/gpt_weight.h"
+#include "src/custom/lightseq/tools/util.h"
 #include "src/servables/custom/custom.h"
 
 /**
@@ -20,8 +20,8 @@ GPT Language Model server based on tensorrt inference server.
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
-const byseqlib::cuda::OperationType OPTYPE =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType OPTYPE =
+    lightseq::cuda::OperationType::FP32;
 
 namespace nvidia {
 namespace inferenceserver {
@@ -69,7 +69,7 @@ class Context {
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  typedef byseqlib::cuda::OperationTypeTraits<OPTYPE> _optraits;
+  typedef lightseq::cuda::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
   int AllocateCudaBuffers(void** pdata, size_t byte_size);
 
@@ -106,8 +106,8 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  byseqlib::cuda::GptWeight<OPTYPE> tw_;
-  std::shared_ptr<byseqlib::cuda::GptEncoder<OPTYPE>> encoder_;
+  lightseq::cuda::GptWeight<OPTYPE> tw_;
+  std::shared_ptr<lightseq::cuda::GptEncoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -281,7 +281,7 @@ int Context::Init() {
     return err;
   }
 
-  encoder_ = std::make_shared<byseqlib::cuda::GptEncoder<OPTYPE>>(
+  encoder_ = std::make_shared<lightseq::cuda::GptEncoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<float*>(d_output_), reinterpret_cast<int*>(d_output_),
       tw_, stream_, stream_, hd_);
