@@ -1,8 +1,9 @@
 #include <unistd.h>
+
 #include <cub/cub.cuh>
 
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
-#include "src/custom/byseqlib/model/decoder.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
+#include "src/custom/lightseq/model/decoder.h"
 
 /**
 @file
@@ -10,17 +11,16 @@ Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-//#define DEBUG_RESULT
+// #define DEBUG_RESULT
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
 Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
                           const _DataType* p_d_encoder_output, int* p_d_result,
-                          const TransformerWeight<OpType_>& tw,
-                          cudaStream_t stream, cublasHandle_t hd,
-                          bool output_topk)
+                          TransformerWeight<OpType_>& tw, cudaStream_t stream,
+                          cublasHandle_t hd, bool output_topk)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -44,7 +44,8 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _output_scaler(sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
-      _h_length_norm(tw._max_step, 1.f) {
+      _h_length_norm(tw._max_step, 1.f),
+      _h_unfinished(1) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
   }
@@ -61,25 +62,25 @@ Compute GPU memory size needed by transformer decoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-int Decoder<OpType_>::compute_buffer_bytesize() {
-  int cache_bytesize = 4 * _tw._n_dec_layer * _layer_size_self_k +
-                       2 * _tw._n_dec_layer * _layer_size_encdec_k +
-                       _max_batch_size * _tw._beam_size * _tw._hidden_size;
+long Decoder<OpType_>::compute_buffer_bytesize() {
+  long cache_bytesize = 4 * _tw._n_dec_layer * _layer_size_self_k +
+                        2 * _tw._n_dec_layer * _layer_size_encdec_k +
+                        _max_batch_size * _tw._beam_size * _tw._hidden_size;
   cache_bytesize *= sizeof(_DataType);
 
-  int decode_buffer_bytesize =
+  long decode_buffer_bytesize =
       _max_batch_size * _tw._beam_size * _tw._hidden_size * 4 +
       _max_batch_size * _tw._beam_size *
           max(_tw._hidden_size, _tw._inner_size) +
       _max_batch_size * _tw._head_num * _tw._beam_size * _tw._max_step;
   decode_buffer_bytesize *= sizeof(_DataType);
 
-  int sf = _max_batch_size * _tw._beam_size * _tw._trg_vocab_size * 2 +
-           _max_batch_size * _tw._beam_size * 2;
-  int si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
-           _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
-           _max_batch_size * _tw._beam_size + 1;
-  int beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
+  long sf = _max_batch_size * _tw._beam_size * _tw._trg_vocab_size * 2 +
+            _max_batch_size * _tw._beam_size * 2;
+  long si = _max_batch_size * _tw._beam_size * _tw._max_step * 2 +
+            _max_batch_size * _tw._beam_size * _tw._trg_vocab_size +
+            _max_batch_size * _tw._beam_size + 1;
+  long beam_buffer_bytesize = sf * sizeof(float) + si * sizeof(int);
 
   return cache_bytesize + max(decode_buffer_bytesize, beam_buffer_bytesize);
 }
@@ -193,6 +194,12 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   // candidate token number for every beam, selected by rough top-beam_size op
   _p_d_can_num = pint;
   pint += _max_batch_size * _tw._beam_size + 1;
+
+  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_sample_unfinished, sizeof(int)));
+  CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
+                             _max_batch_size * sizeof(curandState)));
+  ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
+
   CHECK_GPU_ERROR(cudaGetLastError());
   std::cout << "decoder buffer init succeed" << std::endl;
   return;
@@ -246,6 +253,11 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   _step_token_num = batch_size * _tw._beam_size;
   _batch_max_decode_length =
       min(_tw._max_step, batch_seq_len + _tw._extra_decode_length) - 1;
+  _is_sampling =
+      (_tw._sampling_method == "topk" || _tw._sampling_method == "topp");
+  if (_is_sampling) {
+    _batch_max_decode_length = _tw._max_step;
+  }
   project_encoder_output();  // project encoder output
   // init the first step's token id with target start_id
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_alive_seq_probs,
@@ -254,8 +266,12 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                                   cudaMemcpyHostToDevice, _stream));
 
   /* ---step2. autoregressive decoding--- */
-  for (_cur_step = 0; _cur_step < _batch_max_decode_length; _cur_step++) {
-// for (_cur_step = 0; _cur_step < 3; _cur_step++) {
+#ifdef DEBUG_RESULT
+  for (_cur_step = 0; _cur_step < 3; _cur_step++) {
+#else
+  for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1; _cur_step++) {
+#endif
+
 #ifdef DEBUG_RESULT
     std::cout << "run step " << _cur_step << std::endl;
 #endif
@@ -265,7 +281,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   }
 
   /* ---step3. output the decoding result--- */
-  if (_output_topk) {
+  if (_output_topk || _is_sampling) {
     if (_cur_step == _batch_max_decode_length) {
       _cur_step -= 1;
     }
@@ -321,7 +337,7 @@ template <OperationType OpType_>
 bool Decoder<OpType_>::run_step() {
   embedding();
   decoder_stack();
-  return beam_search();
+  return _is_sampling ? sample() : beam_search();
 }
 
 /**
@@ -335,6 +351,11 @@ void Decoder<OpType_>::embedding() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_trg_emb_wei[0],
       _p_d_trg_emb_wei[1], _p_d_alive_seq, _p_d_cur_step_query, _cur_step,
       _tw._max_step, _tw._trg_vocab_size);
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_cur_step_query, "decoder embedding(head):", 5);
+  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
+            "decoder embedding(tail):", 5);
+#endif
   return;
 }
 
@@ -378,6 +399,12 @@ void Decoder<OpType_>::self_attention() {
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5]);
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "self attn ln(tail): ", 5);
+#endif
+
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -386,12 +413,43 @@ void Decoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_query_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_self_step_qkv, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_self_step_qkv, "self qkv(head): ", 5);
+  print_vec(_p_d_self_step_qkv + _step_token_num * _tw._hidden_size * 3 - 5,
+            "self qkv(tail): ", 5);
+  print_vec(_p_d_self_k_bgeem1[_layer_id],
+            "self attn k before arrange(head): ", 5);
+  print_vec(_p_d_self_k_bgeem1[_layer_id] +
+                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
+            "self attn k before arrange(tail): ", 5);
+  print_vec(_p_d_self_v_bgeem1[_layer_id],
+            "self attn v before arrange(head): ", 5);
+  print_vec(_p_d_self_v_bgeem1[_layer_id] +
+                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
+            "self attn v before arrange(tail): ", 5);
+#endif
+
   // get q, k, v by split and reshape qkv
   ker_arrange_decself_qkv_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_self_step_qkv,
       _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
       _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "self attn q(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "self attn q(tail): ", 5);
+  print_vec(_p_d_self_k_bgeem1[_layer_id], "self attn k(head): ", 5);
+  print_vec(_p_d_self_k_bgeem1[_layer_id] +
+                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
+            "self attn k(tail): ", 5);
+  print_vec(_p_d_self_v_bgeem1[_layer_id], "self attn v(head): ", 5);
+  print_vec(_p_d_self_v_bgeem1[_layer_id] +
+                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
+            "self attn v(tail): ", 5);
+#endif
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -404,6 +462,12 @@ void Decoder<OpType_>::self_attention() {
   ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
                                            _cur_step + 1, _stream, _p_d_c);
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_c, "self attn corr(head): ", 5);
+  print_vec(_p_d_c + _step_token_num * _tw._head_num * (_cur_step + 1) - 5,
+            "self attn corr(tail): ", 5);
+#endif
+
   /* ---step 3. new_q = correlation * v--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._dim_per_head, 1, _cur_step + 1,
@@ -412,6 +476,12 @@ void Decoder<OpType_>::self_attention() {
       _cur_step + 1, &_fzero, _p_d_query_buf1, _CType, _tw._dim_per_head,
       _tw._dim_per_head, _step_token_num * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "self attn before ffn(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "self attn before ffn(tail): ", 5);
+#endif
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -427,6 +497,12 @@ Encode-Decoder attention
 */
 template <OperationType OpType_>
 void Decoder<OpType_>::encdec_attention() {
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_cur_step_query, "self attn output(head): ", 5);
+  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
+            "self attn output(tail): ", 5);
+#endif
+
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -484,6 +560,11 @@ void Decoder<OpType_>::encdec_attention() {
 
 template <OperationType OpType_>
 void Decoder<OpType_>::ffn_add_norm() {
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_cur_step_query, "encdec attn ln output(head): ", 5);
+  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
+            "encdec attn ln output(tail): ", 5);
+#endif
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -512,7 +593,78 @@ void Decoder<OpType_>::ffn_add_norm() {
 }
 
 template <OperationType OpType_>
+bool Decoder<OpType_>::sample() {
+  /* ---step 1. project hidden states to vocab logits--- */
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
+      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
+      &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
+      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_logit_buf, "logits(head):", 5);
+  print_vec(
+      _p_d_logit_buf + _batch_size * _tw._beam_size * _tw._trg_vocab_size - 5,
+      "logits(tail):", 5);
+#endif
+
+  CHECK_GPU_ERROR(
+      cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
+  // /* ---step 2. sample new tokens from logits */
+  if (_tw._sampling_method == "topk") {
+    ker_topk_sample_launcher<_DataType>(
+        _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
+        _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
+        _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+  } else {
+    ker_topp_sample_launcher<_DataType>(
+        _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
+        _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
+        _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+  }
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
+  for (int ii = 0; ii < _batch_size; ii++) {
+    print_vec(_p_d_alive_seq + ii * _tw._max_step,
+              "Batch token ids: ", _cur_step + 2);
+  }
+#endif
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_sample_unfinished,
+                                  sizeof(int), cudaMemcpyDeviceToHost,
+                                  _stream));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+
+  if (_cur_step > 0) {
+    ker_refresh_cache_launcher<_DataType>(
+        _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
+        _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
+        _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
+        _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
+        _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
+        _tw._max_step, false);
+    _DataType** ftmp = _p_d_self_k_bgeem2;
+    _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
+    _p_d_self_k_bgeem1 = ftmp;
+    ftmp = _p_d_self_v_bgeem2;
+    _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
+    _p_d_self_v_bgeem1 = ftmp;
+  }
+  return _h_unfinished == 1 ? false : true;
+}
+
+template <OperationType OpType_>
 bool Decoder<OpType_>::beam_search() {
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_cur_step_query, "before logits(head):", 5);
+  print_vec(
+      _p_d_cur_step_query + _batch_size * _tw._beam_size * _tw._hidden_size - 5,
+      "before logits(tail):", 5);
+#endif
+
   /* ---step 0. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
@@ -520,6 +672,12 @@ bool Decoder<OpType_>::beam_search() {
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_logit_buf, "logits(head):", 5);
+  print_vec(
+      _p_d_logit_buf + _batch_size * _tw._beam_size * _tw._trg_vocab_size - 5,
+      "logits(tail):", 5);
+#endif
 
   /*
     step 1. logits bias and softmax,
@@ -532,17 +690,26 @@ bool Decoder<OpType_>::beam_search() {
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
                                   cudaMemcpyDeviceToHost, _stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
-  // tow sort ways, decided by the number of candidates
-  if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
-    CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
-        (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
-        _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
-        sizeof(float) * 8, _stream));
-  } else {
-    thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
-                        _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
-                        thrust::greater<float>());
+  if (_tw._diverse_lambda != 0) {
+    if (_h_can_num_batch < _cub_sort_buffer_bytes / 160) {
+      CHECK_GPU_ERROR(cub::DeviceRadixSort::SortPairsDescending(
+          (float*)_p_d_logit_buf, _cub_sort_buffer_bytes, _p_d_can_score,
+          _p_d_can_score, _p_d_can_idx, _p_d_can_idx, _h_can_num_batch, 0,
+          sizeof(float) * 8, _stream));
+    } else {
+      thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
+                          _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
+                          thrust::greater<float>());
+    }
+    ker_diverse_beam_search_launcher(_p_d_can_score, _p_d_can_idx, _p_d_can_num,
+                                     _step_token_num, _max_thread_per_block,
+                                     _stream, _tw._beam_size,
+                                     _tw._diverse_lambda, _tw._trg_vocab_size);
   }
+
+  thrust::sort_by_key(thrust::cuda::par.on(_stream), _p_d_can_score,
+                      _p_d_can_score + _h_can_num_batch, _p_d_can_idx,
+                      thrust::greater<float>());
 
   /*
     step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam
@@ -554,7 +721,8 @@ bool Decoder<OpType_>::beam_search() {
                        _stream>>>(
       _p_d_can_idx, _p_d_can_score, _p_d_can_num + 1, _p_d_alive_seq,
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
-      _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step]);
+      _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step],
+      _tw._diverse_lambda);
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
@@ -576,7 +744,7 @@ bool Decoder<OpType_>::beam_search() {
         _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
         _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
         _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step);
+        _tw._max_step, _tw._diverse_lambda != 0);
     _DataType** ftmp = _p_d_self_k_bgeem2;
     _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
     _p_d_self_k_bgeem1 = ftmp;
@@ -600,7 +768,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
       _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
       _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
       _h_length_norm[_cur_step], _cur_step, _step_token_num,
-      _max_thread_per_block, _stream, _tw._beam_size);
+      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda);
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
   return;
@@ -610,4 +778,4 @@ template class Decoder<OperationType::FP16>;
 template class Decoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

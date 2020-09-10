@@ -1,4 +1,4 @@
-#include "src/custom/byseqlib/proto/gpt_weight.h"
+#include "src/custom/lightseq/proto/gpt_weight.h"
 
 /**
 @file
@@ -8,7 +8,7 @@ Weights in proto file will always be in fp32. For fp16, the weights
   will be casted from fp32 into fp16
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /**
@@ -42,6 +42,18 @@ void GptWeight<OpType_>::get_model_config(const Gpt &gpt) {
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
   _padding_id = gpt.model_conf().src_padding_id();
+  if (gpt.model_conf().sampling_method() != "") {
+    _sampling_method = gpt.model_conf().sampling_method();
+  }
+  if (gpt.model_conf().topk() != 0) {
+    _topk = gpt.model_conf().topk();
+  }
+  if (gpt.model_conf().topp() != 0.0) {
+    _topp = gpt.model_conf().topp();
+  }
+  if (gpt.model_conf().eos_id() != 0) {
+    _eos_id = gpt.model_conf().eos_id();
+  }
 }
 
 /**
@@ -228,4 +240,4 @@ template class GptWeight<OperationType::FP16>;
 template class GptWeight<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

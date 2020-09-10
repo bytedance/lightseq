@@ -1,17 +1,18 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
 #include <unistd.h>
+
 #include <string>
+
 #include "cuda/include/cuda.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
+#include "src/custom/lightseq/model/decoder.h"
+#include "src/custom/lightseq/model/encoder.h"
+#include "src/custom/lightseq/proto/transformer_weight.h"
+#include "src/custom/lightseq/tools/util.h"
 #include "src/servables/custom/custom.h"
-
-#include "src/custom/byseqlib/model/decoder.h"
-#include "src/custom/byseqlib/model/encoder.h"
-#include "src/custom/byseqlib/proto/transformer_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
 
 /**
 @file
@@ -20,8 +21,8 @@ Transformer server based on tensorrt inference server.
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
-const byseqlib::cuda::OperationType OPTYPE =
-    byseqlib::cuda::OperationType::FP16;
+const lightseq::cuda::OperationType OPTYPE =
+    lightseq::cuda::OperationType::FP16;
 
 namespace nvidia {
 namespace inferenceserver {
@@ -69,7 +70,7 @@ class Context {
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  typedef byseqlib::cuda::OperationTypeTraits<OPTYPE> _optraits;
+  typedef lightseq::cuda::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
   int AllocateCudaBuffers(void** pdata, size_t byte_size);
 
@@ -108,9 +109,9 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  byseqlib::cuda::TransformerWeight<OPTYPE> tw_;
-  std::shared_ptr<byseqlib::cuda::Decoder<OPTYPE>> decoder_;
-  std::shared_ptr<byseqlib::cuda::Encoder<OPTYPE>> encoder_;
+  lightseq::cuda::TransformerWeight<OPTYPE> tw_;
+  std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_;
+  std::shared_ptr<lightseq::cuda::Encoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -315,7 +316,7 @@ int Context::Init() {
     return err;
   }
 
-  encoder_ = std::make_shared<byseqlib::cuda::Encoder<OPTYPE>>(
+  encoder_ = std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_), tw_, stream_,
@@ -325,7 +326,7 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kModelSize;
   }
-  decoder_ = std::make_shared<byseqlib::cuda::Decoder<OPTYPE>>(
+  decoder_ = std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
       reinterpret_cast<int*>(d_output_), tw_, stream_, hd_);
@@ -335,8 +336,8 @@ int Context::Init() {
     return kModelSize;
   }
 
-  int buf_bytesize = max(encoder_->compute_buffer_bytesize(),
-                         decoder_->compute_buffer_bytesize());
+  long buf_bytesize = max(encoder_->compute_buffer_bytesize(),
+                          decoder_->compute_buffer_bytesize());
   err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
   if (err != kSuccess) {
     return err;

@@ -13,10 +13,10 @@
 
 #include <thrust/device_vector.h>
 
-#include "src/custom/byseqlib/proto/gpt.pb.h"
-#include "src/custom/byseqlib/tools/util.h"
+#include "src/custom/lightseq/proto/gpt.pb.h"
+#include "src/custom/lightseq/tools/util.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /*
@@ -67,7 +67,11 @@ class GptWeight {
 
   int _head_num;
   int _padding_id;  // for src
+  std::string _sampling_method = "topk";
+  int _topk = 4;
+  float _topp = 0.75;
+  int _eos_id;
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq
