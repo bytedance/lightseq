@@ -1,14 +1,16 @@
 #pragma once
-
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <curand_kernel.h>
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
 const unsigned int WARP_SIZE = 32;
 const float CUDA_FLOAT_INF_NEG = -100000000.f;  // FIXME later
+const float CUDA_FLOAT_INF_POS = 100000000.f;   // FIXME later
+const int CUDA_INT_INF = 2147483647;
 
 template <typename T>
 __forceinline__ __device__ T gelu(T x) {
@@ -48,6 +50,13 @@ __forceinline__ __device__ T warpReduceMax(T val) {
   return val;
 }
 
+template <typename T>
+__forceinline__ __device__ T warpReduceMin(T val) {
+  for (int mask = (WARP_SIZE >> 1); mask > 0; mask >>= 1)
+    val = min(val, __shfl_xor_sync(WARP_REDUCE_MASK, val, mask, WARP_SIZE));
+  return val;
+}
+
 /* Calculate the sum of all elements in a block */
 template <typename T>
 __forceinline__ __device__ T blockReduceSum(T val) {
@@ -81,6 +90,24 @@ __forceinline__ __device__ T blockReduceMax(T val) {
   val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane]
                                                  : CUDA_FLOAT_INF_NEG;
   val = warpReduceMax<T>(val);
+  return val;
+}
+
+/* Calculate the minimum of all elements in a block */
+template <typename T>
+__forceinline__ __device__ T blockReduceMin(T val) {
+  static __shared__ T shared[32];
+  int lane = threadIdx.x & 0x1f;
+  int wid = threadIdx.x >> 5;
+
+  val = warpReduceMin<T>(val);
+
+  if (lane == 0) shared[wid] = val;
+  __syncthreads();
+
+  val = (threadIdx.x < ((blockDim.x + 31) >> 5)) ? shared[lane]
+                                                 : CUDA_FLOAT_INF_POS;
+  val = warpReduceMin<T>(val);
   return val;
 }
 
@@ -193,4 +220,4 @@ __forceinline__ __host__ __device__ float2 safe_half2_to_float2(half2 vhalf2) {
 }
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

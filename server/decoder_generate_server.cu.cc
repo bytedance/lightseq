@@ -23,7 +23,7 @@ Generate(Transformer multi target outputs) server
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 const lightseq::cuda::OperationType OPTYPE =
-    lightseq::cuda::OperationType::FP32;
+    lightseq::cuda::OperationType::FP16;
 
 namespace nvidia {
 namespace inferenceserver {
@@ -99,7 +99,6 @@ class Context {
   int datatype_bytesize_;
 
   // CUDA memory buffers for input and output tensors.
-  void* d_input_;
   void* d_padding_mask_;
   void* d_encoder_output_;
   void* d_buf_;
@@ -112,7 +111,6 @@ class Context {
 
   lightseq::cuda::TransformerWeight<OPTYPE> tw_;
   std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_;
-  std::shared_ptr<lightseq::cuda::Encoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -121,7 +119,6 @@ Context::Context(const std::string& instance_name,
       model_config_(model_config),
       gpu_device_(gpu_device),
       datatype_(DataType::TYPE_INVALID),
-      d_input_(nullptr),
       d_padding_mask_(nullptr),
       d_encoder_output_(nullptr),
       d_buf_(nullptr),
@@ -151,14 +148,6 @@ Context::~Context() {
 }
 
 int Context::FreeCudaBuffers() {
-  if (d_input_ != nullptr) {
-    cudaError_t cuerr = cudaFree(d_input_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
-    }
-    d_input_ = nullptr;
-  }
-
   if (d_padding_mask_ != nullptr) {
     cudaError_t cuerr = cudaFree(d_padding_mask_);
     if (cuerr != cudaSuccess) {
@@ -255,12 +244,12 @@ int Context::Init() {
   }
 
   datatype_ = model_config_.input(0).data_type();
-  if (datatype_ != DataType::TYPE_INT32) {
+  if (datatype_ != DataType::TYPE_FP32 && datatype_ != DataType::TYPE_FP16) {
     return kInputOutputDataType;
   }
   datatype_bytesize_ = GetDataTypeByteSize(datatype_);
 
-  if (model_config_.input(0).name() != "src_ids:0") {
+  if (model_config_.input(0).name() != "encoder_output:0") {
     return kInputName;
   }
 
@@ -268,7 +257,7 @@ int Context::Init() {
     return kInputOutputShape;
   }
 
-  if (model_config_.output(0).data_type() != datatype_) {
+  if (model_config_.output(0).data_type() != DataType::TYPE_INT32) {
     return kInputOutputDataType;
   }
 
@@ -294,21 +283,16 @@ int Context::Init() {
   std::string res =
       "load model weight from " + model_path + "/transformer.pb\n";
   LOG_INFO << res;
-  res = tw_.initializing(model_path + "/transformer.pb");
+  res = tw_.initializing(model_path + "/transformer.pb", true);
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
-  if (tw_._sampling_method != "beam_search") tw_._beam_size = 1;
+  if (tw_._sampling_method != "") tw_._beam_size = 1;
   int max_batch_size = model_config_.max_batch_size();
   int err;
-  err = AllocateCudaBuffers(
-      &d_input_, max_batch_size * tw_._max_step * datatype_bytesize_);
-  if (err != kSuccess) {
-    return err;
-  }
-  err = AllocateCudaBuffers(
-      &d_padding_mask_, max_batch_size * tw_._max_step * datatype_bytesize_);
+  err = AllocateCudaBuffers(&d_padding_mask_,
+                            max_batch_size * tw_._max_step * sizeof(int));
   if (err != kSuccess) {
     return err;
   }
@@ -319,21 +303,11 @@ int Context::Init() {
     return err;
   }
   err = AllocateCudaBuffers(&d_output_, max_batch_size * tw_._beam_size *
-                                            tw_._max_step * datatype_bytesize_);
+                                            tw_._max_step * sizeof(int));
   if (err != kSuccess) {
     return err;
   }
 
-  encoder_ = std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
-      max_batch_size, reinterpret_cast<int*>(d_input_),
-      reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<_optraits::DataType*>(d_encoder_output_), tw_, stream_,
-      hd_);
-  res = encoder_->check();
-  if (!res.empty()) {
-    LOG_ERROR << res << std::endl;
-    return kModelSize;
-  }
   decoder_ = std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
@@ -344,14 +318,12 @@ int Context::Init() {
     return kModelSize;
   }
 
-  long buf_bytesize = max(encoder_->compute_buffer_bytesize(),
-                          decoder_->compute_buffer_bytesize());
+  long buf_bytesize = decoder_->compute_buffer_bytesize();
   err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
   if (err != kSuccess) {
     return err;
   }
   // encoder and decoder use the same buffer to save gpu memory useage
-  encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
 
   // Wait for all init finish.
@@ -441,28 +413,27 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
                 << ", skip this request" << std::endl;
       return kInputSize;
     }
-    const uint64_t batchn_element_count = payload.batch_size * batch_seq_len;
+    const uint64_t batchn_element_count =
+        payload.batch_size * batch_seq_len * tw_._hidden_size;
     const uint64_t batchn_byte_size = batchn_element_count * datatype_bytesize_;
 
     // Copy the input tensors into the appropriate CUDA memory buffer.
-    err = GetInputTensorGPU(input_fn, payload.input_context, "src_ids:0",
-                            batchn_byte_size, d_input_);
+    err = GetInputTensorGPU(input_fn, payload.input_context, "encoder_output:0",
+                            batchn_byte_size, d_encoder_output_);
     if (err != kSuccess) {
       payload.error_code = err;
       continue;
     }
 
-    encoder_->run_one_infer(payload.batch_size, batch_seq_len);
     decoder_->run_one_infer(payload.batch_size, batch_seq_len);
     // The output shape is [payload-batch-size, shape] if the model
     // configuration supports batching, or just [shape] if the
     // model configuration does not support batching.
     std::vector<int64_t> output_shape = {payload.batch_size, tw_._beam_size,
                                          decoder_->_cur_step + 1};
-    int64_t output_bytesize = output_shape[0] * output_shape[1] *
-                              output_shape[2] * datatype_bytesize_;
-    int64_t score_bytesize =
-        output_shape[0] * output_shape[1] * datatype_bytesize_;
+    int64_t output_bytesize =
+        output_shape[0] * output_shape[1] * output_shape[2] * sizeof(int);
+    int64_t score_bytesize = output_shape[0] * output_shape[1] * sizeof(float);
 
     const char* output_name = "trg_ids:0";
     const char* score_name = "score";
@@ -568,9 +539,9 @@ const char* CustomErrorString(void* custom_context, int errcode) {
     case kGpuNotSupported:
       return "execution on GPU not supported";
     case kInputOutputShape:
-      return "model must have two inputs and two outputs with the same shape";
+      return "model must one inputs and two outputs with the same shape";
     case kInputName:
-      return "model inputs must be named 'src_ids:0' and 'INPUT1'";
+      return "model inputs must be named 'encoder_output:0' and 'INPUT1'";
     case kOutputName:
       return "model outputs must be named 'trg_ids:0' and 'OUTPUT1'";
     case kInputOutputDataType:

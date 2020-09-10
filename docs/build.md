@@ -1,6 +1,6 @@
 ## Build from source code
 
-Byseqlib is built using Docker and trtis containers from
+LightSeq is built using Docker and trtis containers from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). Before building you must install Docker and
 nvidia-docker and login to the NGC registry.
 
@@ -14,21 +14,21 @@ docker build -t tensorrtserver_build --target trtserver_build .
 ```
 
 ### Start container
-Now you should start container and mount Byseqlib to it.
+Now you should start container and mount LightSeq to it.
 ```shell
 cd ${cur_dir}
-git clone https://github.com/bytedance/byseqlib.git
-cp -r ./byseqlib ./tensorrt-inference-server/src/custom/byseqlib 
+git clone https://github.com/bytedance/lightseq.git
+cp -r ./lightseq ./tensorrt-inference-server/src/custom/lightseq 
 docker run --gpus all -it --rm -v ${cur_dir}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build
 ```
 
 ### Build
-Finally, build Byseqlib inside container
+Finally, build LightSeq inside container
 ```shell
 # inside container
 cd /workspace
 # For compatibility with fp16
 sed -i '/COMPUTE_CAPABILITIES/s/5.2,6.0,6.1,7.0,7.5/6.0,6.1,7.0,7.5/g' ./.bazelrc
-bazel build -c opt src/custom/byseqlib/...
+bazel build -c opt src/custom/lightseq/...
 ```
 

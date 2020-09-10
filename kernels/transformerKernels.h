@@ -1,13 +1,16 @@
 #pragma once
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <curand_kernel.h>
 
-namespace byseqlib {
+#include <cub/cub.cuh>
+
+namespace lightseq {
 namespace cuda {
 
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
-const float min_log_probability = -10000.f;
+const float min_log_probability = -2000.f;
 const float epsilon = 0.000001;
 
 template <typename T>
@@ -34,7 +37,14 @@ void select_beam_rough_topk_launcher(
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size);
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda);
+
+void ker_diverse_beam_search_launcher(float* can_score, int* can_ids,
+                                      int* num_beam_can, int step_token_num,
+                                      int max_thread_per_block,
+                                      cudaStream_t stream, int beam_size,
+                                      float diverse_lambda, int vocab_size);
 
 template <typename T>
 void ker_bias_relu_launcher(int batch_token_num, int block_dim,
@@ -70,7 +80,7 @@ void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
                                 T* new_self_k_bgeem, T* new_self_v_bgeem,
                                 int self_k_bgeem_offset, int beam_size,
                                 int dim_per_head, int head_num, int vocab_size,
-                                int cur_step, int max_step);
+                                int cur_step, int max_step, bool diverse);
 
 template <typename T>
 void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,
@@ -113,7 +123,8 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    const int* old_alive_seq, int* new_alive_seq,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
-                                   int cur_step, float length_norm);
+                                   int cur_step, float length_norm,
+                                   float diverse_lambda);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
                                                   int* output, int max_step,
@@ -134,5 +145,27 @@ __forceinline__ __host__ __device__ float length_norm(int length, float alpha) {
   return pow((5.f + length) / 6.f, -alpha);
 }
 
+template <typename T>
+void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
+                              const int max_step, int logits_seq_len,
+                              int max_thread_per_block, cudaStream_t stream,
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const int k,
+                              int* all_finished, curandState* curandstate,
+                              int eos_id);
+
+template <typename T>
+void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
+                              const int max_step, int logits_seq_len,
+                              int max_thread_per_block, cudaStream_t stream,
+                              const T* logits, const T* logit_bias,
+                              int* old_input_ids, int* new_input_ids,
+                              const int vocab_size, const float p,
+                              int* unfinished, curandState* curandstate,
+                              int eos_id);
+
+__global__ void ker_curand_setup(curandState* state);
+
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

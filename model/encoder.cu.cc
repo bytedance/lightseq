@@ -1,5 +1,5 @@
-#include "src/custom/byseqlib/model/encoder.h"
-#include "src/custom/byseqlib/kernels/transformerKernels.h"
+#include "src/custom/lightseq/kernels/transformerKernels.h"
+#include "src/custom/lightseq/model/encoder.h"
 
 /**
 @file
@@ -7,9 +7,9 @@ Transformer encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-//#define DEBUG_RESULT
+// #define DEBUG_RESULT
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -37,10 +37,10 @@ Compute GPU memory size needed by transformer encoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-int Encoder<OpType_>::compute_buffer_bytesize() {
-  int sz1 = _max_batch_dim * 6 +
-            _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  int sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
+long Encoder<OpType_>::compute_buffer_bytesize() {
+  long sz1 = _max_batch_dim * 6 +
+             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
+  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
   return max(sz1, sz2) * sizeof(_DataType);
 }
 
@@ -224,4 +224,4 @@ template class Encoder<OperationType::FP16>;
 template class Encoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq
