@@ -5,24 +5,22 @@ RUN apt-get update && apt-get install -yq --no-install-recommends \
     gnupg2 curl ca-certificates && \
     curl -fsSL https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
     echo "deb https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -yq --no-install-recommends \
-    cuda-cudart-11-0=11.0.221-1 \
+    apt-get update && apt-get install -yq --no-install-recommends \
+    cuda-cudart-11-0 \
     cuda-compat-11-0 \
-    cuda-nvml-dev-11-0=11.0.167-1 \
-    cuda-command-line-tools-11-0=11.0.3-1 \
-    cuda-nvprof-11-0=11.0.221-1 \
-    libnpp-dev-11-0=11.1.0.245-1 \
-    cuda-libraries-dev-11-0=11.0.3-1 \
-    cuda-minimal-build-11-0=11.0.3-1 \
-    libcublas-dev-11-0=11.2.0.252-1 \
-    libcusparse-11-0=11.1.1.245-1 \
-    libcusparse-dev-11-0=11.1.1.245-1 \
-    cuda-libraries-11-0=11.0.3-1 \
-    libnpp-11-0=11.1.0.245-1 \
-    cuda-nvtx-11-0=11.0.167-1 \
-    libcublas-11-0=11.2.0.252-1 \
+    cuda-nvml-dev-11-0 \
+    cuda-command-line-tools-11-0 \
+    cuda-nvprof-11-0 \
+    libnpp-dev-11-0 \
+    cuda-libraries-dev-11-0 \
+    cuda-minimal-build-11-0 \
+    libcublas-dev-11-0 \
+    libcusparse-11-0 \
+    libcusparse-dev-11-0 \
+    cuda-libraries-11-0 \
+    libnpp-11-0 \
+    cuda-nvtx-11-0 \
+    libcublas-11-0 \
     && ln -s cuda-11.0 /usr/local/cuda && \
     rm -rf /var/lib/apt/lists/*
 
@@ -34,13 +32,13 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_P
 RUN apt-get update && apt-get install -yq --no-install-recommends automake libtool curl make g++ unzip && rm -rf /var/lib/apt/lists/* && \
     https_proxy=sys-proxy-rd-relay.byted.org:8118 curl -O -L -C - \
     https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
-    tar xf protobuf-cpp-3.13.0.tar.gz && cd protobuf-3.13.0 && ./autogen.sh && ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
+    tar xf protobuf-cpp-3.13.0.tar.gz && rm protobuf-cpp-3.13.0.tar.gz && cd protobuf-3.13.0 && ./autogen.sh && ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
     make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 
 # install cmake
 RUN mkdir cmake && cd cmake && \
     https_proxy=sys-proxy-rd-relay.byted.org:8118 curl -O -L -C - https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh && \
-    sh cmake-3.18.2-Linux-x86_64.sh --skip-license && ln -s /cmake/bin/cmake /usr/bin/cmake
+    sh cmake-3.18.2-Linux-x86_64.sh --skip-license && rm cmake-3.18.2-Linux-x86_64.sh && ln -s /cmake/bin/cmake /usr/bin/cmake
 
 # install python3-dev dependency
 RUN apt-get update && \
@@ -51,5 +49,3 @@ RUN apt-get update && \
     python3-setuptools \
     python3-wheel \
     && rm -rf /var/lib/apt/lists/*
-
-ENV PATH=/opt/common_tools:${PATH}
