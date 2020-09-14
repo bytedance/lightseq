@@ -1,7 +1,7 @@
 ![logo](./docs/images/logo.png)
 
 <h3 align="center">
-<p>A High Performance Inference Library for Sequence Processing and Generation
+<p>High Performance Inference Library for Sequence Processing and Generation
 </h3>
 
 
