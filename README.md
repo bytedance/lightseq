@@ -1,4 +1,3 @@
-# LightSeq: A High Performance Inference Library for Sequence Processing and Generation
 ![logo](./docs/images/logo.png)
 
 <h3 align="center">
