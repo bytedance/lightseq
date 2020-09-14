@@ -366,7 +366,7 @@ bool Decoder<OpType_>::run_step() {
   } else if (_tw._sampling_method == "beam_search") {
     return beam_search();
   } else {
-    std::runtime_error("not supported sampling_method");
+    throw std::runtime_error("not supported sampling_method");
   }
 }// namespace cuda
 

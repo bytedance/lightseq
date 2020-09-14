@@ -30,19 +30,19 @@ class TransformerDecoder {
     _max_batch_size = max_batch_size;
     cudaError_t cuerr = cudaSetDevice(0);
     if (cuerr != cudaSuccess) {
-      std::runtime_error(cudaGetErrorString(cuerr));
+      throw std::runtime_error(cudaGetErrorString(cuerr));
     }
     cuerr = cudaStreamCreate(&stream_);
     if (cuerr != cudaSuccess) {
-      std::runtime_error(cudaGetErrorString(cuerr));
+      throw std::runtime_error(cudaGetErrorString(cuerr));
     }
     cublasStatus_t cublaserr = cublasCreate(&hd_);
     if (cublaserr != CUBLAS_STATUS_SUCCESS) {
-      std::runtime_error("Failed to creat cublas handle ");
+      throw std::runtime_error("Failed to creat cublas handle ");
     }
     cublaserr = cublasSetStream(hd_, stream_);
     if (cublaserr != CUBLAS_STATUS_SUCCESS) {
-      std::runtime_error("Failed to set stream for cublas handle");
+      throw std::runtime_error("Failed to set stream for cublas handle");
     }
 
     /* ---step2. load model weights into GPU memory--- */
