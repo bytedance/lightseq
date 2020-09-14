@@ -1,8 +1,5 @@
+# LightSeq: A High Performance Inference Library for Sequence Processing and Generation
 ![logo](./docs/images/logo.png)
-
-<h3 align="center">
-<p>High Performance Inference Library for Sequence Processing and Generation
-</h3>
 
 
 LightSeq is a high performance inference library for sequence processing and generation implemented
