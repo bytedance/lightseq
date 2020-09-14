@@ -44,6 +44,7 @@ class Decoder {
   bool sample();
   bool beam_search();
   void update_new_seq_probs();
+  bool topk_greedy_search();
 
   // constructor init var
   const int _max_batch_size;

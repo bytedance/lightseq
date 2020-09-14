@@ -57,7 +57,7 @@ class TransformerDecoder {
     if (tw_._sampling_method == "topk" || tw_._sampling_method == "topp") {
       tw_._beam_size = 1;
     }
-
+    tw_.print_model_config();
     /*
       step3. instantiate encoder and decoder, init the gpu memory buffer.
         using thrust vector to avoid manage gpu memory by hand

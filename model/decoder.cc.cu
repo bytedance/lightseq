@@ -357,8 +357,18 @@ template <OperationType OpType_>
 bool Decoder<OpType_>::run_step() {
   embedding();
   decoder_stack();
-  return _is_sampling ? sample() : beam_search();
-}
+  if (_tw._sampling_method == "topk") {
+    return sample();
+  } else if (_tw._sampling_method == "topp") {
+    return sample();
+  } else if (_tw._sampling_method == "topk_greedy") {
+    return topk_greedy_search();
+  } else if (_tw._sampling_method == "beam_search") {
+    return beam_search();
+  } else {
+    std::runtime_error("not supported sampling_method");
+  }
+}// namespace cuda
 
 /**
 Decode embedding
@@ -792,6 +802,67 @@ void Decoder<OpType_>::update_new_seq_probs() {
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
   return;
+}
+
+template <OperationType OpType_>
+bool Decoder<OpType_>::topk_greedy_search() {
+  if (_cur_step == 0) {
+    return beam_search();
+  }
+
+  /* ---step 1. project hidden states to vocab logits--- */
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
+      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
+      &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
+      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_logit_buf, "logits(head):", 5);
+  print_vec(
+      _p_d_logit_buf + _batch_size * _tw._beam_size * _tw._trg_vocab_size - 5,
+      "logits(tail):", 5);
+#endif
+
+  CHECK_GPU_ERROR(
+      cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
+  // /* ---step 2. sample new tokens from logits */
+  ker_topk_sample_launcher<_DataType>(
+      _batch_size * _tw._beam_size, (_cur_step + 1), _tw._max_step, 1,
+      _max_thread_per_block, _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6],
+      _p_d_alive_seq, _p_d_alive_seq_buf, _tw._trg_vocab_size, 1,
+      _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
+  for (int ii = 0; ii < _batch_size; ii++) {
+    print_vec(_p_d_alive_seq + ii * _tw._max_step,
+              "Batch token ids: ", _cur_step + 2);
+  }
+#endif
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_sample_unfinished,
+                                  sizeof(int), cudaMemcpyDeviceToHost,
+                                  _stream));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+
+  if (_cur_step > 0) {
+    ker_refresh_cache_launcher<_DataType>(
+        _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
+        _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
+        _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
+        _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
+        _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
+        _tw._max_step, false);
+    _DataType** ftmp = _p_d_self_k_bgeem2;
+    _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
+    _p_d_self_k_bgeem1 = ftmp;
+    ftmp = _p_d_self_v_bgeem2;
+    _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
+    _p_d_self_v_bgeem1 = ftmp;
+  }
+  return _h_unfinished == 1 ? false : true;
 }
 
 template class Decoder<OperationType::FP16>;
