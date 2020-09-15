@@ -1,51 +1,76 @@
-FROM hub.byted.org/base/lab.debian:latest
+# FROM hub.byted.org/base/lab.debian:latest
+FROM  quay.io/pypa/manylinux2014_x86_64
 
 # install cuda dev packages
-RUN apt-get update && apt-get install -yq --no-install-recommends \
-    gnupg2 curl ca-certificates && \
-    curl -fsSL https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
-    echo "deb https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
-    apt-get update && apt-get install -yq --no-install-recommends \
-    cuda-cudart-11-0 \
-    cuda-compat-11-0 \
-    cuda-nvml-dev-11-0 \
-    cuda-command-line-tools-11-0 \
-    cuda-nvprof-11-0 \
-    libnpp-dev-11-0 \
-    cuda-libraries-dev-11-0 \
-    cuda-minimal-build-11-0 \
-    libcublas-dev-11-0 \
-    libcusparse-11-0 \
-    libcusparse-dev-11-0 \
-    cuda-libraries-11-0 \
-    libnpp-11-0 \
-    cuda-nvtx-11-0 \
-    libcublas-11-0 \
-    && ln -s cuda-11.0 /usr/local/cuda && \
-    rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -yq --no-install-recommends \
+#     gnupg2 curl ca-certificates && \
+#     curl -fsSL https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
+#     echo "deb https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
+#     apt-get update && apt-get install -yq --no-install-recommends \
+#     cuda-cudart-11-0 \
+#     cuda-compat-11-0 \
+#     cuda-nvml-dev-11-0 \
+#     cuda-command-line-tools-11-0 \
+#     cuda-nvprof-11-0 \
+#     libnpp-dev-11-0 \
+#     cuda-libraries-dev-11-0 \
+#     cuda-minimal-build-11-0 \
+#     libcublas-dev-11-0 \
+#     libcusparse-11-0 \
+#     libcusparse-dev-11-0 \
+#     cuda-libraries-11-0 \
+#     libnpp-11-0 \
+#     cuda-nvtx-11-0 \
+#     libcublas-11-0 \
+#     && ln -s cuda-11.0 /usr/local/cuda && \
+#     rm -rf /var/lib/apt/lists/*
 
-ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+RUN \
+    # yum upgrade -y && yum install -y \
+    # gnupg2 curl ca-certificates && \
+    # NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
+    # curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/7fa2af80.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
+    # echo "$NVIDIA_GPGKEY_SUM  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c --strict  - && \
+    yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo &&\
+    yum install -y \
+    cuda-libraries-11-0-11.0.3-1 \
+    cuda-nvtx-11-0-11.0.167-1 \
+    libnpp-11-0-11.1.0.245-1 \
+    libcublas-11-0-11.2.0.252-1 \
+    cuda-nvml-devel-11-0-11.0.167-1 \
+    cuda-command-line-tools-11-0-11.0.3-1 \
+    libcublas-devel-11-0-11.2.0.252-1 \
+    cuda-cudart-devel-11-0-11.0.221-1 \
+    cuda-libraries-devel-11-0-11.0.3-1 \
+    cuda-minimal-build-11-0-11.0.3-1 \
+    cuda-nvprof-11-0-11.0.221-1 \
+    libnpp-devel-11-0-11.1.0.245-1 \
+    && ln -s cuda-11.0 /usr/local/cuda \
+    && yum clean all \
+    && rm -rf /var/cache/yum/*
+
 
 # install protobuf from source
-RUN apt-get update && apt-get install -yq --no-install-recommends automake libtool curl make g++ unzip && rm -rf /var/lib/apt/lists/* && \
-    https_proxy=sys-proxy-rd-relay.byted.org:8118 curl -O -L -C - \
-    https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
+RUN yum install -y autoconf automake libtool curl make gcc-c++ unzip &&\
+    yum clean all &&\
+    rm -rf /var/cache/yum/* &&\
+    curl -O -L -C - https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
     tar xf protobuf-cpp-3.13.0.tar.gz && rm protobuf-cpp-3.13.0.tar.gz && cd protobuf-3.13.0 && ./autogen.sh && ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
     make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 
 # install cmake
 RUN mkdir cmake && cd cmake && \
-    https_proxy=sys-proxy-rd-relay.byted.org:8118 curl -O -L -C - https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh && \
+    curl -O -L -C - https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh && \
     sh cmake-3.18.2-Linux-x86_64.sh --skip-license && rm cmake-3.18.2-Linux-x86_64.sh && ln -s /cmake/bin/cmake /usr/bin/cmake
 
-# install python3-dev dependency
-RUN apt-get update && \
-    apt-get install -yq --no-install-recommends \
-    build-essential \
-    python3-dev \
-    python3-pip \
-    python3-setuptools \
-    python3-wheel \
-    && rm -rf /var/lib/apt/lists/*
+# nvidia-docker 1.0
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
+    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+
+
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
+
+
+

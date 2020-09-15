@@ -12,12 +12,12 @@ function repair_wheel {
 
 # Compile wheels
 for PYBIN in /opt/python/*/bin; do
-    "${PYBIN}/pip" wheel /io/ --no-deps --no-clean -w wheelhouse/
+    "${PYBIN}/pip" wheel /workspace/ --no-deps --no-clean -w workspace/output/wheels
 done
 
-rm -rf /io/wheelhouse
+# rm -rf /io/wheelhouse
 
 # Bundle external shared libraries into the wheels
-for whl in wheelhouse/*.whl; do
-    repair_wheel "$whl" 
-done
+# for whl in wheelhouse/*.whl; do
+#     repair_wheel "$whl" 
+# done

@@ -78,10 +78,10 @@ class CMakeBuild(build_ext):
 
 setup(
     name="pyseqlib",
-    version="0.0.1",
+    version="0.0.2",
     author="Ying Xiong",
     author_email="xiongying.taka@bytedance.com",
-    description="Byseqlib is a high performance inference library for SOTA NLU/NLG models",
+    description="python wrapper of Byseqlib, Byseqlib is a high performance inference library for SOTA NLU/NLG models",
     long_description="",
     ext_modules=[CMakeExtension("pyseqlib")],
     cmdclass=dict(build_ext=CMakeBuild),
