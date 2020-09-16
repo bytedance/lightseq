@@ -1,0 +1,30 @@
+FROM nvidia/cuda:11.0-devel
+
+RUN rm /etc/apt/sources.list.d/cuda.list && \
+    apt-get update && apt-get install -yq --no-install-recommends \
+    automake libtool curl make g++ unzip && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -O -L -C - \
+    https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
+    tar xf protobuf-cpp-3.13.0.tar.gz && \
+    rm protobuf-cpp-3.13.0.tar.gz && \
+    cd protobuf-3.13.0 && ./autogen.sh && \
+    ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
+    make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
+
+# install cmake
+RUN mkdir cmake && cd cmake && \
+    curl -O -L -C - \
+    https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh && \
+    sh cmake-3.18.2-Linux-x86_64.sh --skip-license && \
+    rm cmake-3.18.2-Linux-x86_64.sh && ln -s /cmake/bin/cmake /usr/bin/cmake
+
+# install python3-dev dependency
+RUN apt-get update && \
+    apt-get install -yq --no-install-recommends \
+    build-essential \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    && rm -rf /var/lib/apt/lists/*
