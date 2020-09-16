@@ -8,8 +8,13 @@
 
 namespace py = pybind11;
 
+#ifdef FP16_MODE
+const byseqlib::cuda::OperationType optype =
+    byseqlib::cuda::OperationType::FP16;
+#else
 const byseqlib::cuda::OperationType optype =
     byseqlib::cuda::OperationType::FP32;
+#endif
 
 class TransformerDecoder {
  private:

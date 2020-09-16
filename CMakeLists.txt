@@ -4,8 +4,7 @@ project(FasterTransformer LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 11 REQUIRED)
 
-option(BUILD_TRT "Build in TensorRT mode" OFF)
-option(BUILD_TF "Build in TensorFlow mode" OFF)
+option(FP16_MODE "inference with fp16" ON)
 
 set(Protobuf_USE_STATIC_LIBS ON)
 
@@ -40,6 +39,11 @@ set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 include_directories(${COMMON_HEADER_DIRS})
 
 link_directories(${COMMON_LIB_DIRS})
+
+if(FP16_MODE)
+    add_definitions(-DFP16_MODE)
+    message(STATUS "FP16_MODE is ON")
+endif()
 
 add_subdirectory(kernels)
 add_subdirectory(tools)

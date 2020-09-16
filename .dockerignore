@@ -12,3 +12,6 @@ build/
 dist/
 wheelhouse/
 output/
+*.pb
+*.pkl*
+*.bin
