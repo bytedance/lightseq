@@ -4,7 +4,7 @@ project(FasterTransformer LANGUAGES CXX CUDA)
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 11 REQUIRED)
 
-option(FP16_MODE "inference with fp16" ON)
+option(FP16_MODE "inference with fp16" OFF)
 
 set(Protobuf_USE_STATIC_LIBS ON)
 
@@ -42,7 +42,9 @@ link_directories(${COMMON_LIB_DIRS})
 
 if(FP16_MODE)
     add_definitions(-DFP16_MODE)
-    message(STATUS "FP16_MODE is ON")
+    message(STATUS "Build using fp16 precision")
+else()
+    message(STATUS "Build using fp32 precision")
 endif()
 
 add_subdirectory(kernels)

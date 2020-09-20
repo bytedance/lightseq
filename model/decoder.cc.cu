@@ -259,11 +259,6 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     _batch_max_decode_length = _tw._max_step;
   }
 
-#ifdef DEBUG_RESULT
-  std::cout << "TEST" << std::endl;
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
-#endif
-
   project_encoder_output();  // project encoder output
   // init the first step's token id with target start_id
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_alive_seq_probs,
@@ -279,7 +274,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
 #ifdef DEBUG_RESULT
-    std::cout << "run step " << _cur_step << std::endl;
+    std::cout << "*** run step " << _cur_step << " ***" << std::endl;
 #endif
     if (run_step()) {  // one step
       break;
@@ -368,7 +363,7 @@ bool Decoder<OpType_>::run_step() {
   } else {
     throw std::runtime_error("not supported sampling_method");
   }
-}// namespace cuda
+}  // namespace cuda
 
 /**
 Decode embedding
