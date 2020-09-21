@@ -269,6 +269,8 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   /* ---step2. autoregressive decoding--- */
 #ifdef DEBUG_RESULT
   for (_cur_step = 0; _cur_step < 3; _cur_step++) {
+    // for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1;
+    // _cur_step++) {
 #else
   for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1; _cur_step++) {
 #endif
@@ -833,15 +835,16 @@ bool Decoder<OpType_>::topk_greedy_search() {
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
   for (int ii = 0; ii < _batch_size; ii++) {
-    print_vec(_p_d_alive_seq + ii * _tw._max_step,
-              "Batch token ids: ", _cur_step + 2);
+    for (int jj = 0; jj < _tw._beam_size; jj++) {
+      print_vec(_p_d_alive_seq + (ii * _tw._beam_size + jj) * _tw._max_step,
+                "Batch token ids: ", _cur_step + 2);
+    }
   }
 #endif
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_sample_unfinished,
                                   sizeof(int), cudaMemcpyDeviceToHost,
                                   _stream));
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 
   if (_cur_step > 0) {
     ker_refresh_cache_launcher<_DataType>(
@@ -858,6 +861,8 @@ bool Decoder<OpType_>::topk_greedy_search() {
     _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
     _p_d_self_v_bgeem1 = ftmp;
   }
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+
   return _h_unfinished == 1 ? false : true;
 }
 

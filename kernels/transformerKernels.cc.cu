@@ -1721,71 +1721,93 @@ __global__ void ker_topk_sample(const T* logits, const T* logit_bias,
   }
   __syncthreads();
 
-  /* step2 hold one logit per thread which larger than Kth logit and sample
-   * from them */
-  float topk_exp_sum, topk_exp = CUDA_FLOAT_INF_NEG;
-  int topk_tid = vocab_size;
-  int test_num = 0;
-  __shared__ float s_topk_exp_sum;
-  for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
-    float logit = (float)logits[idx] +
-                  (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
-    float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
-    if (logit >= s_topk_logit) test_num++;
-    if (logit >= s_topk_logit && logit_exp > topk_exp) {
-      topk_exp = logit_exp;
-      topk_tid = idx - left_logit_idx + threadIdx.x;
-    }
-  }
-
-  test_num = blockReduceSum(test_num);
-
-  if (topk_tid == vocab_size) topk_exp = 0;
-  topk_exp_sum = blockReduceSum(topk_exp);
-  if (threadIdx.x == 0) {
-    s_topk_exp_sum = topk_exp_sum;
-  }
-  __syncthreads();
-
-  /* calculate cumulative probability */
-  float topk_prob = topk_exp / s_topk_exp_sum;
-  float prefix_sum_prob;
-  typedef cub::BlockScan<float, 1024> BlockScan;
-  __shared__ typename BlockScan::TempStorage temp_storage;
-  BlockScan(temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
-
-  __shared__ float random_x;
-  if (threadIdx.x == 0) {
-    random_x = curand_uniform(curandstate + blockIdx.x);
-  }
-  __syncthreads();
-
   __shared__ int s_tid;
-  if (threadIdx.x == 0) {
+
+  if (k != 1) {
+    /* step2 hold one logit per thread which larger than Kth logit and sample
+     * from them */
+    float topk_exp_sum, topk_exp = CUDA_FLOAT_INF_NEG;
+    int topk_tid = vocab_size;
+    // int test_num = 0;
+    __shared__ float s_topk_exp_sum;
+    for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
+      float logit =
+          (float)logits[idx] +
+          (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
+      float logit_exp = expf(fmaxf(logit - s_max_logit, logit_thresh_min));
+      // if (logit >= s_topk_logit) test_num++;
+      if (logit >= s_topk_logit && logit_exp > topk_exp) {
+        topk_exp = logit_exp;
+        topk_tid = idx - left_logit_idx + threadIdx.x;
+      }
+    }
+
+    // test_num = blockReduceSum(test_num);
+    // __shared__ int s_test_num;
+    // if (threadIdx.x == 0) {
+    //   s_test_num = test_num;
+    //   if (s_test_num != 1) printf("sample from top %d\n", s_test_num);
+    //   // printf("sample from top %s", test_num);
+    // }
+    // __syncthreads();
+
+    if (topk_tid == vocab_size) topk_exp = 0;
+    topk_exp_sum = blockReduceSum(topk_exp);
+    if (threadIdx.x == 0) {
+      s_topk_exp_sum = topk_exp_sum;
+    }
+    __syncthreads();
+
+    /* calculate cumulative probability */
+    float topk_prob = topk_exp / s_topk_exp_sum;
+    float prefix_sum_prob;
+    typedef cub::BlockScan<float, 1024> BlockScan;
+    __shared__ typename BlockScan::TempStorage temp_storage;
+    BlockScan(temp_storage).InclusiveSum(topk_prob, prefix_sum_prob);
+
+    __shared__ float random_x;
+    if (threadIdx.x == 0) {
+      random_x = curand_uniform(curandstate + blockIdx.x);
+    }
+    __syncthreads();
+
+    if (threadIdx.x == 0) {
+      s_tid = vocab_size;
+    }
+    __syncthreads();
+
+    int threadID = threadIdx.x;
+    __shared__ int s_threadID;
+    __shared__ float s_max_prob;
+    if (random_x > prefix_sum_prob) threadID = blockDim.x;
+    threadID = blockReduceMin(threadID);
+    float max_prob = blockReduceMax(topk_prob);
+    if (threadIdx.x == 0) {
+      s_threadID = threadID;
+      s_max_prob = max_prob;
+    }
+    __syncthreads();
+    if (threadIdx.x == s_threadID) {
+      s_tid = topk_tid;
+    }
+    __syncthreads();
+
+    if (s_tid == vocab_size && topk_prob == s_max_prob) {
+      s_tid = topk_tid;
+    }
+    __syncthreads();
+  } else {
     s_tid = vocab_size;
+    for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
+      float logit =
+          (float)logits[idx] +
+          (float)__ldg(&logit_bias[idx - left_logit_idx + threadIdx.x]);
+      if (logit == s_max_logit) {
+        s_tid = idx - left_logit_idx + threadIdx.x;
+      }
+    }
+    __syncthreads();
   }
-  __syncthreads();
-
-  int threadID = threadIdx.x;
-  __shared__ int s_threadID;
-  __shared__ float s_max_prob;
-  if (random_x > prefix_sum_prob) threadID = blockDim.x;
-  threadID = blockReduceMin(threadID);
-  float max_prob = blockReduceMax(topk_prob);
-  if (threadIdx.x == 0) {
-    s_threadID = threadID;
-    s_max_prob = max_prob;
-  }
-  __syncthreads();
-  if (threadIdx.x == s_threadID) {
-    s_tid = topk_tid;
-  }
-  __syncthreads();
-
-  if (s_tid == vocab_size && topk_prob == s_max_prob) {
-    s_tid = topk_tid;
-  }
-  __syncthreads();
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
   if (threadIdx.x == 0) {

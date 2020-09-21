@@ -12,7 +12,7 @@ function repair_wheel {
 
 # Compile wheels
 for PYBIN in /opt/python/*/bin; do
-    "${PYBIN}/pip" wheel /workspace/ --no-deps --no-clean -w workspace/output/wheels
+    "${PYBIN}/pip" wheel /workspace/ --no-deps -w /workspace/output/wheels
 done
 
 # rm -rf /io/wheelhouse
