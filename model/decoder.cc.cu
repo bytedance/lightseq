@@ -665,21 +665,21 @@ bool Decoder<OpType_>::sample() {
                                   _stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 
-  if (_cur_step > 0) {
-    ker_refresh_cache_launcher<_DataType>(
-        _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-        _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
-        _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
-        _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
-        _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step, false);
-    _DataType** ftmp = _p_d_self_k_bgeem2;
-    _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
-    _p_d_self_k_bgeem1 = ftmp;
-    ftmp = _p_d_self_v_bgeem2;
-    _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
-    _p_d_self_v_bgeem1 = ftmp;
-  }
+  // if (_cur_step > 0) {
+  //   ker_refresh_cache_launcher<_DataType>(
+  //       _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
+  //       _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
+  //       _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
+  //       _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
+  //       _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
+  //       _tw._max_step, false);
+  //   _DataType** ftmp = _p_d_self_k_bgeem2;
+  //   _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
+  //   _p_d_self_k_bgeem1 = ftmp;
+  //   ftmp = _p_d_self_v_bgeem2;
+  //   _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
+  //   _p_d_self_v_bgeem1 = ftmp;
+  // }
   return _h_unfinished == 1 ? false : true;
 }
 
@@ -827,10 +827,10 @@ bool Decoder<OpType_>::topk_greedy_search() {
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   // /* ---step 2. sample new tokens from logits */
   ker_topk_sample_launcher<_DataType>(
-      _batch_size * _tw._beam_size, (_cur_step + 1), _tw._max_step, 1,
-      _max_thread_per_block, _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6],
-      _p_d_alive_seq, _p_d_alive_seq_buf, _tw._trg_vocab_size, 1,
-      _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+      _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
+      _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
+      _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
+      _p_d_curandstate, _tw._trg_vocab_size - 1);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -846,21 +846,21 @@ bool Decoder<OpType_>::topk_greedy_search() {
                                   sizeof(int), cudaMemcpyDeviceToHost,
                                   _stream));
 
-  if (_cur_step > 0) {
-    ker_refresh_cache_launcher<_DataType>(
-        _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-        _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
-        _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
-        _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
-        _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step, false);
-    _DataType** ftmp = _p_d_self_k_bgeem2;
-    _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
-    _p_d_self_k_bgeem1 = ftmp;
-    ftmp = _p_d_self_v_bgeem2;
-    _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
-    _p_d_self_v_bgeem1 = ftmp;
-  }
+  // if (_cur_step > 0) {
+  //   ker_refresh_cache_launcher<_DataType>(
+  //       _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
+  //       _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
+  //       _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
+  //       _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
+  //       _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
+  //       _tw._max_step, false);
+  //   _DataType** ftmp = _p_d_self_k_bgeem2;
+  //   _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
+  //   _p_d_self_k_bgeem1 = ftmp;
+  //   ftmp = _p_d_self_v_bgeem2;
+  //   _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
+  //   _p_d_self_v_bgeem1 = ftmp;
+  // }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 
   return _h_unfinished == 1 ? false : true;
