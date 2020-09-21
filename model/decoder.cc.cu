@@ -801,6 +801,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
 
 template <OperationType OpType_>
 bool Decoder<OpType_>::topk_greedy_search() {
+  _tw._diverse_lambda = 0;
   if (_cur_step == 0) {
     return beam_search();
   }
