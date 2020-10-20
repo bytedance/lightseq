@@ -320,7 +320,9 @@ void Decoder<OpType_>::project_encoder_output() {
   int kv_dim = _tw._hidden_size * 2 * _tw._n_dec_layer;
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
-  print_vec(_p_d_encoder_output, "_p_d_encoder_output(head):", 10);
+  print_vec(_p_d_encoder_output, "_p_d_encoder_output(head):", 5);
+  print_vec(_p_d_encoder_output + _batch_token_num * _tw._hidden_size - 5,
+            "_p_d_encoder_output(tail)", 5);
   print_vec(_p_d_trg_emb_wei[4], "encoder project(head):", 10);
 #endif
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -333,7 +335,6 @@ void Decoder<OpType_>::project_encoder_output() {
 
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
-  std::cout << "TEST project_encoder_output" << std::endl;
   print_vec(_p_d_encoder_out_buf, "encoder out(head):", 5);
   print_vec(_p_d_encoder_out_buf +
                 _batch_token_num * _tw._hidden_size * _tw._n_dec_layer - 5,
@@ -343,7 +344,7 @@ void Decoder<OpType_>::project_encoder_output() {
       _batch_token_num, _tw._n_dec_layer, _tw._hidden_size, _stream,
       _p_d_encoder_out_buf, _p_d_trg_emb_wei[5], _p_d_encdec_k_bgeem[0],
       _p_d_encdec_v_bgeem[0], _layer_size_encdec_k, _batch_seq_len,
-      _tw._dim_per_head, _tw._head_num);
+      _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
   return;
 }
 
@@ -377,7 +378,7 @@ void Decoder<OpType_>::embedding() {
   ker_dec_embedding_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_trg_emb_wei[0],
       _p_d_trg_emb_wei[1], _p_d_alive_seq, _p_d_cur_step_query, _cur_step,
-      _tw._max_step, _tw._trg_vocab_size);
+      _tw._max_step, _tw._trg_vocab_size, _max_thread_per_block);
 #ifdef DEBUG_RESULT
   print_vec(_p_d_cur_step_query, "decoder embedding(head):", 5);
   print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
@@ -409,9 +410,9 @@ void Decoder<OpType_>::decoder_stack() {
   }
 
   // last layer norm
-  ker_norm_layer_launcher<_DataType>(_step_token_num, _tw._hidden_size, _stream,
-                                     _p_d_cur_step_query, _p_d_trg_emb_wei[2],
-                                     _p_d_trg_emb_wei[3]);
+  ker_norm_layer_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
   return;
 }
 
@@ -424,7 +425,8 @@ void Decoder<OpType_>::self_attention() {
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
-      _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5]);
+      _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
+      _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
@@ -462,7 +464,8 @@ void Decoder<OpType_>::self_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_self_step_qkv,
       _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
       _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
-      _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step);
+      _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
+      _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn q(head): ", 5);
@@ -534,7 +537,8 @@ void Decoder<OpType_>::encdec_attention() {
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
-      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11]);
+      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
+      _max_thread_per_block);
 
   /* ---step 1. new_q = ori_q * q_wei + bias, reshape new_q for multi-head
    * gemm--- */
@@ -547,7 +551,7 @@ void Decoder<OpType_>::encdec_attention() {
   ker_arrange_encdec_q_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_query_buf2,
       _p_d_dec_wei[_weight_offset + 9], _p_d_query_buf1, _tw._beam_size,
-      _tw._dim_per_head, _tw._head_num);
+      _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -573,7 +577,8 @@ void Decoder<OpType_>::encdec_attention() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   ker_arrange_atten_output_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_query_buf1,
-      _p_d_query_buf2, _tw._beam_size, _tw._dim_per_head, _tw._head_num);
+      _p_d_query_buf2, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
+      _max_thread_per_block);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -596,7 +601,8 @@ void Decoder<OpType_>::ffn_add_norm() {
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
-      _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17]);
+      _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
+      _max_thread_per_block);
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -665,21 +671,6 @@ bool Decoder<OpType_>::sample() {
                                   _stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 
-  // if (_cur_step > 0) {
-  //   ker_refresh_cache_launcher<_DataType>(
-  //       _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-  //       _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
-  //       _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
-  //       _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
-  //       _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-  //       _tw._max_step, false);
-  //   _DataType** ftmp = _p_d_self_k_bgeem2;
-  //   _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
-  //   _p_d_self_k_bgeem1 = ftmp;
-  //   ftmp = _p_d_self_v_bgeem2;
-  //   _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
-  //   _p_d_self_v_bgeem1 = ftmp;
-  // }
   return _h_unfinished == 1 ? false : true;
 }
 
@@ -767,7 +758,7 @@ bool Decoder<OpType_>::beam_search() {
   if (_cur_step > 0) {
     ker_refresh_cache_launcher<_DataType>(
         _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-        _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
+        _max_thread_per_block, _stream, _p_d_can_num + 1, _p_d_can_idx,
         _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
         _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
         _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
@@ -846,21 +837,6 @@ bool Decoder<OpType_>::topk_greedy_search() {
                                   sizeof(int), cudaMemcpyDeviceToHost,
                                   _stream));
 
-  // if (_cur_step > 0) {
-  //   ker_refresh_cache_launcher<_DataType>(
-  //       _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-  //       _tw._hidden_size, _stream, _p_d_can_num + 1, _p_d_can_idx,
-  //       _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
-  //       _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
-  //       _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-  //       _tw._max_step, false);
-  //   _DataType** ftmp = _p_d_self_k_bgeem2;
-  //   _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
-  //   _p_d_self_k_bgeem1 = ftmp;
-  //   ftmp = _p_d_self_v_bgeem2;
-  //   _p_d_self_v_bgeem2 = _p_d_self_v_bgeem1;
-  //   _p_d_self_v_bgeem1 = ftmp;
-  // }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 
   return _h_unfinished == 1 ? false : true;

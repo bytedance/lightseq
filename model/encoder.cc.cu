@@ -105,16 +105,16 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   ker_enc_embedding_launcher<_DataType>(
       batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
       _p_d_src_emb_wei[1], _p_d_token_id, _p_d_output, _p_d_padding_mask,
-      _tw._padding_id);
+      _tw._padding_id, _max_thread_per_block);
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
     self_attention();
     ffn_add_norm();
   }
   // last layer norm
-  ker_norm_layer_launcher<_DataType>(_batch_token_num, _tw._hidden_size,
-                                     _stream, _p_d_output, _p_d_src_emb_wei[2],
-                                     _p_d_src_emb_wei[3]);
+  ker_norm_layer_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+      _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {         // batch_id
@@ -138,7 +138,7 @@ void Encoder<OpType_>::self_attention() {
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
-      _p_d_enc_wei[_weight_offset + 5]);
+      _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block);
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
@@ -152,7 +152,7 @@ void Encoder<OpType_>::self_attention() {
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
-      _tw._dim_per_head, _tw._head_num);
+      _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -180,7 +180,7 @@ void Encoder<OpType_>::self_attention() {
   // will not be use again before the next multi-head-attention
   ker_arrange_atten_output_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _p_d_v,
-      _batch_seq_len, _tw._dim_per_head, _tw._head_num);
+      _batch_seq_len, _tw._dim_per_head, _tw._head_num,_max_thread_per_block);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -197,7 +197,7 @@ void Encoder<OpType_>::ffn_add_norm() {
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
       _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
-      _p_d_enc_wei[_weight_offset + 11]);
+      _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block);
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(

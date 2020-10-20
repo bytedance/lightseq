@@ -11,7 +11,7 @@ Example of how to run transformer generation inference using our implementation.
 
 // Appoint precision.
 const byseqlib::cuda::OperationType optype =
-    byseqlib::cuda::OperationType::FP16;
+    byseqlib::cuda::OperationType::FP32;
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */

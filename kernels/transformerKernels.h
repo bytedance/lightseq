@@ -18,18 +18,20 @@ void ker_enc_embedding_launcher(int batch_size, int batch_seq_len,
                                 int hidden_size, cudaStream_t stream,
                                 const T* token_emb, const T* pos_emb,
                                 const int* token_id, T* output,
-                                int* padding_mask, int padding_id);
+                                int* padding_mask, int padding_id,
+                                int max_thread_per_block);
 
 template <typename T>
 void ker_norm_layer_launcher(int token_num, int hidden_size,
                              cudaStream_t stream, T* matrix, const T* scale,
-                             const T* bias);
+                             const T* bias, int max_thread_per_block);
 
 template <typename T>
 void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     cudaStream_t stream, T* input, T* output,
                                     const T* scale, const T* bias,
-                                    const T* residual_bias);
+                                    const T* residual_bias,
+                                    const int max_thread_per_block);
 
 template <typename T>
 void select_beam_rough_topk_launcher(
@@ -56,21 +58,23 @@ void ker_dec_embedding_launcher(int step_token_num, int hidden_size,
                                 cudaStream_t stream, const T* token_emb,
                                 const T* pos_emb, const int* token_id,
                                 T* output, int step, int max_step,
-                                int vocab_size);
+                                int vocab_size, int max_thread_per_block);
 
 template <typename T>
 void ker_arrange_encself_qkv_launcher(int batch_token_num, int hidden_size,
                                       cudaStream_t stream, const T* ori_qkv,
                                       const T* qkv_bias, T* new_qkv,
                                       int max_batch_dim, int batch_seq_len,
-                                      int dim_per_head, int head_num);
+                                      int dim_per_head, int head_num,
+                                      int max_thread_per_block);
 
 template <typename T>
 void ker_arrange_decself_qkv_launcher(int step_token_num, int hidden_size,
                                       cudaStream_t stream, const T* ori_qkv,
                                       const T* qkv_bias, T* new_q, T* new_k,
                                       T* new_v, int head_num, int dim_per_head,
-                                      int max_step, int step_id);
+                                      int max_step, int step_id,
+                                      int max_thread_per_block);
 
 template <typename T>
 void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
@@ -88,13 +92,14 @@ void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,
                                     const T* ori_kv, const T* kv_bias, T* new_k,
                                     T* new_v, int offset_per_layer,
                                     int batch_seq_len, int dim_per_head,
-                                    int head_num);
+                                    int head_num, int max_thread_per_block);
 
 template <typename T>
 void ker_arrange_encdec_q_launcher(int step_token_num, int hidden_size,
                                    cudaStream_t stream, const T* ori_q,
                                    const T* q_bias, T* new_q, int beam_size,
-                                   int dim_per_head, int head_num);
+                                   int dim_per_head, int head_num,
+                                   int max_thread_per_block);
 
 template <typename T>
 void ker_correlation_softmax_encself_launcher(int batch_size, int batch_seq_len,
@@ -116,7 +121,8 @@ template <typename T>
 void ker_arrange_atten_output_launcher(int batch_token_num, int hidden_size,
                                        cudaStream_t stream, const T* ori_q,
                                        T* new_q, int beam_size,
-                                       int dim_per_head, int head_num);
+                                       int dim_per_head, int head_num,
+                                       int max_thread_per_block);
 
 __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    const int* num_can_per_beam,
