@@ -48,7 +48,8 @@ was used as the benchmark of Tensorflow.
 More results is available [here](./docs/performance.md).
 
 * Neural machine translation
-<img src="./docs/images/nmt.png" width="400" div align="center"/>
+<img src="./docs/images/nmt1.png" width="400" div align="center"/>
+<img src="./docs/images/nmt2.png" width="400" div align="center"/>
 
 * Text generation
 <img src="./docs/images/generation.png" width="400" div align="center"/>
