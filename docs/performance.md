@@ -17,7 +17,7 @@ Beam search
 | 128        | 4         | 32      | 996.88  | 271.8  | 200.49       | 3.67       | 4.97             |
 | 128        | 4         | 64      | 2157.85 | 671.76 | 502.91       | 3.21       | 4.29             |
 
-<br>
+
 Sampling
 
 | batch_size | topk/topp | seq_len | FT(ms) | lightseq(ms) | lightseq speedup |
