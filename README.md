@@ -170,4 +170,5 @@ work:
 - Device deployment.
 
 ## Contact
-Any questions or suggestions, please feel free to contact us with wangxiaohui.neo@bytedance.com
+Any questions or suggestions, please feel free to contact us.
+wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com
