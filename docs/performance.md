@@ -17,7 +17,7 @@ Beam search
 | 128        | 4         | 32      | 996.88  | 271.8  | 200.49       | 3.67       | 4.97             |
 | 128        | 4         | 64      | 2157.85 | 671.76 | 502.91       | 3.21       | 4.29             |
 
-<br>
+
 Sampling
 
 | batch_size | topk/topp | seq_len | FT(ms) | lightseq(ms) | lightseq speedup |
@@ -43,11 +43,11 @@ beam size of 4 and a target vocabulary size of approximately 30k.
       <td>batch_size</td>
       <td>seq_len</td>
       <td>tf-fp32-p4, ms</td>
-      <td>byseq-fp32-p4, ms</td>
-      <td>byseq-fp16-t4, ms</td>
-      <td>byseq-fp32-p4/tf-fp32-p4, speedup</td>
-      <td>byseq-fp16-t4/byseq-fp32-p4, speedup</td>
-      <td>byseq-fp16-t4/tf-fp32-p4, speedup</td>
+      <td>lightseq-fp32-p4, ms</td>
+      <td>lightseq-fp16-t4, ms</td>
+      <td>lightseq-fp32-p4 vs. tf-fp32-p4, speedup</td>
+      <td>lightseq-fp16-t4 vs. lightseq-fp32-p4, speedup</td>
+      <td>lightseq-fp16-t4 vs. tf-fp32-p4, speedup</td>
    </tr>
    <tr>
       <td rowspan="8">1</td>
@@ -353,11 +353,11 @@ beam size of 4 and a target vocabulary size of approximately 30k.
       <td>batch_size</td>
       <td>seq_len</td>
       <td>tf-fp32-p4, ms</td>
-      <td>byseq-fp32-p4, ms</td>
-      <td>byseq-fp16-t4, ms</td>
-      <td>byseq-fp32-p4/tf-fp32-p4, speedup</td>
-      <td>byseq-fp16-t4/byseq-fp32-p4, speedup</td>
-      <td>byseq-fp16-t4/tf-fp32-p4, speedup</td>
+      <td>lightseq-fp32-p4, ms</td>
+      <td>lightseq-fp16-t4, ms</td>
+      <td>lightseq-fp32-p4 vs. tf-fp32-p4, speedup</td>
+      <td>lightseq-fp16-t4 vs. lightseq-fp32-p4, speedup</td>
+      <td>lightseq-fp16-t4 vs. tf-fp32-p4, speedup</td>
    </tr>
    <tr>
       <td rowspan="6">1</td>
