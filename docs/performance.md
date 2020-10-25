@@ -35,7 +35,6 @@ Sampling
 | 128        | 32        | 32      | 99     | 90.83        | 1.09             |
 | 128        | 32        | 64      | 222.62 | 262          | 0.85             |
 
-<br>
 The following table is a comparison on a fr2en translation model which is a Transformer-big with a
 beam size of 4 and a target vocabulary size of approximately 30k. FP32 models are tested on Tesla P4,
 and FP16 models are tested on Tesla T4.
@@ -75,7 +74,6 @@ and FP16 models are tested on Tesla T4.
 | 8          | 58      | 2683        | 617               | 254               | 4.34                           | 2.43                                 | 10.56                          |
 | 8          | 70      | 4251        | 949               | 382               | 4.47                           | 2.48                                 | 11.13                          |
 
-<br>
 The following table is a comparison on a en2zh translation model which is a
 Transformer-deep(Compared with Transformer-big, it has 16 layers of encoder and other configurations
 remain the same) with a
