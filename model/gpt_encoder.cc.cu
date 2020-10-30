@@ -103,9 +103,9 @@ Some requirements needed by custom cuda kernel function
 */
 template <OperationType OpType_>
 std::string GptEncoder<OpType_>::check() {
-  if (_max_thread_per_block < _tw._hidden_size) {
-    return "violate hidden_size <= max_thread_per_block";
-  }
+  // if (_max_thread_per_block < _tw._hidden_size) {
+  //   return "violate hidden_size <= max_thread_per_block";
+  // }
   if (_tw._inner_size & 1) {
     return "violate inner_size % 2 = 0";
   }

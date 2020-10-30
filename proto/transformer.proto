@@ -100,6 +100,7 @@ message ModelConf {
   string sampling_method = 8;
   float topp = 9;
   int32 topk = 10;
+  int32 trg_end_id = 11;
 }
 
 message Transformer {

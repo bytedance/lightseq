@@ -511,7 +511,7 @@ __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
     val = input[i] - s_mean;
     output[i] = val * s_var * __ldg(&scale[i - block_start]) +
                 __ldg(&bias[i - block_start]);
-    input[i] += __ldg(&residual_bias[i - block_start]);
+    input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
   }
 }
 
@@ -563,7 +563,7 @@ __global__ void ker_norm_layer_resual<__half>(__half* input, __half* output,
     local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
     poutput[i] = __float22half2_rn(local_f2);
-    local_f2 = safe_half2_to_float2(pinput[i]);
+    // local_f2 = safe_half2_to_float2(pinput[i]);
     float2 residual_bias_val =
         __half22float2(__ldg(&presidual_bias[i - block_start]));
     float2 new_input_f2;
@@ -1785,12 +1785,12 @@ last of seq
 */
 __global__ void ker_write_topk_result(const int* alive_seq, float* seq_score,
                                       int* res_seq, int vocab_size,
-                                      int max_step, int beam_size) {
+                                      int max_step, int beam_size, int end_id) {
   res_seq[blockIdx.x * blockDim.x + threadIdx.x] =
       alive_seq[blockIdx.x * max_step + threadIdx.x + 1];
   if (threadIdx.x == 0) {
     seq_score[blockIdx.x] -= (blockIdx.x / beam_size) * min_log_probability;
-    res_seq[blockIdx.x * blockDim.x + blockDim.x - 1] = vocab_size - 1;
+    res_seq[blockIdx.x * blockDim.x + blockDim.x - 1] = end_id;
   }
 }
 
@@ -2188,6 +2188,67 @@ template void ker_topp_sample_launcher<__half>(
     const __half* logit_bias, int* old_input_ids, int* new_input_idx,
     const int vocab_size, const float p, int* unfinished,
     curandState* curandstate, int eos_id);
+
+/**
+@brief: ker_bias_gelu
+add bias, activated by gelu
+
+@thread
+gridDim.x = batch_size * batch_seq_len
+blockDim.x = max_thread_per_block
+
+@param
+input: [batch_size * batch_seq_len, feature_dim]
+bias: [feature_dim]
+feature_dim: the dim of input feature
+*/
+template <typename T>
+__global__ void ker_bias_gelu(T* input, const T* bias, int feature_dim) {
+  int offset = blockIdx.x * feature_dim;
+  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
+    int cur_offset = offset + idx;
+    input[cur_offset] = gelu<float>(input[cur_offset] + __ldg(&bias[idx]));
+  }
+}
+
+/* fp16 version */
+template <>
+__global__ void ker_bias_gelu<__half>(__half* input, const __half* bias,
+                                      int feature_dim) {
+  int offset = blockIdx.x * feature_dim;
+  half2* pinput = (half2*)input;
+  const half2* pbias = (const half2*)bias;
+  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
+    int cur_offset = offset + idx;
+    pinput[cur_offset] =
+        gelu<half2>(__hadd2(pinput[cur_offset], __ldg(&pbias[idx])));
+  }
+}
+
+template <typename T>
+void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
+                            cudaStream_t stream, T* input, const T* bias,
+                            int feature_dim) {
+  ker_bias_gelu<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
+}
+
+template <>
+void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
+                                    cudaStream_t stream, __half* input,
+                                    const __half* bias, int feature_dim) {
+  ker_bias_gelu<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
+}
+
+template void ker_bias_gelu_launcher<float>(int batch_token_num, int block_dim,
+                                            cudaStream_t stream, float* input,
+                                            const float* bias, int feature_dim);
+
+template void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
+                                             cudaStream_t stream, __half* input,
+                                             const __half* bias,
+                                             int feature_dim);
 
 __global__ void ker_curand_setup(curandState* state) {
   /* Each thread gets same seed, a different sequence

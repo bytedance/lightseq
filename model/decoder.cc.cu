@@ -210,9 +210,9 @@ Some requirements needed by custom cuda kernel function
 */
 template <OperationType OpType_>
 std::string Decoder<OpType_>::check() {
-  if (_max_thread_per_block < _tw._hidden_size) {
-    return "violate hidden_size <= max_thread_per_block";
-  }
+  // if (_max_thread_per_block < _tw._hidden_size) {
+  //   return "violate hidden_size <= max_thread_per_block";
+  // }
   if (_tw._inner_size & 1) {
     return "violate inner_size % 2 = 0";
   }
@@ -254,7 +254,8 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   _batch_max_decode_length =
       min(_tw._max_step, batch_seq_len + _tw._extra_decode_length) - 1;
   _is_sampling =
-      (_tw._sampling_method == "topk" || _tw._sampling_method == "topp");
+      (_tw._sampling_method == "topk" || _tw._sampling_method == "topp" ||
+       _tw._sampling_method == "topk_greedy");
   if (_is_sampling) {
     _batch_max_decode_length = _tw._max_step;
   }
@@ -289,9 +290,9 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _cur_step -= 1;
     }
     ker_write_topk_result<<<_batch_size * _tw._beam_size, _cur_step + 1, 0,
-                            _stream>>>(_p_d_alive_seq, _p_d_alive_seq_score,
-                                       _p_d_result, _tw._trg_vocab_size,
-                                       _tw._max_step, _tw._beam_size);
+                            _stream>>>(
+        _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, _tw._trg_vocab_size,
+        _tw._max_step, _tw._beam_size, _tw._end_id);
     return;
   }
   if (_tw._length_penalty >= 0.f || _cur_step == _batch_max_decode_length) {
@@ -447,16 +448,6 @@ void Decoder<OpType_>::self_attention() {
   print_vec(_p_d_self_step_qkv, "self qkv(head): ", 5);
   print_vec(_p_d_self_step_qkv + _step_token_num * _tw._hidden_size * 3 - 5,
             "self qkv(tail): ", 5);
-  print_vec(_p_d_self_k_bgeem1[_layer_id],
-            "self attn k before arrange(head): ", 5);
-  print_vec(_p_d_self_k_bgeem1[_layer_id] +
-                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
-            "self attn k before arrange(tail): ", 5);
-  print_vec(_p_d_self_v_bgeem1[_layer_id],
-            "self attn v before arrange(head): ", 5);
-  print_vec(_p_d_self_v_bgeem1[_layer_id] +
-                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
-            "self attn v before arrange(tail): ", 5);
 #endif
 
   // get q, k, v by split and reshape qkv
@@ -471,14 +462,24 @@ void Decoder<OpType_>::self_attention() {
   print_vec(_p_d_query_buf1, "self attn q(head): ", 5);
   print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
             "self attn q(tail): ", 5);
-  print_vec(_p_d_self_k_bgeem1[_layer_id], "self attn k(head): ", 5);
   print_vec(_p_d_self_k_bgeem1[_layer_id] +
-                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
-            "self attn k(tail): ", 5);
-  print_vec(_p_d_self_v_bgeem1[_layer_id], "self attn v(head): ", 5);
+                _cur_step * _tw._hidden_size / _tw._head_num,
+            "self attn k(head): ", 5);
+  print_vec(
+      _p_d_self_k_bgeem1[_layer_id] +
+          _step_token_num * _tw._hidden_size * _tw._max_step -
+          ((_tw._max_step - _cur_step - 1) * _tw._hidden_size / _tw._head_num) -
+          5,
+      "self attn k(tail): ", 5);
   print_vec(_p_d_self_v_bgeem1[_layer_id] +
-                _step_token_num * _tw._hidden_size * (_cur_step + 1) - 5,
-            "self attn v(tail): ", 5);
+                _cur_step * _tw._hidden_size / _tw._head_num,
+            "self attn v(head): ", 5);
+  print_vec(
+      _p_d_self_v_bgeem1[_layer_id] +
+          _step_token_num * _tw._hidden_size * _tw._max_step -
+          ((_tw._max_step - _cur_step - 1) * _tw._hidden_size / _tw._head_num) -
+          5,
+      "self attn v(tail): ", 5);
 #endif
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
@@ -520,6 +521,12 @@ void Decoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_fone,
       _p_d_cur_step_query, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_cur_step_query, "self attn out(head): ", 3);
+  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 3,
+            "self attn out(tail): ", 3);
+#endif
 }
 
 /**
@@ -527,18 +534,18 @@ Encode-Decoder attention
 */
 template <OperationType OpType_>
 void Decoder<OpType_>::encdec_attention() {
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "self attn output(head): ", 5);
-  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
-            "self attn output(tail): ", 5);
-#endif
-
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
       _max_thread_per_block);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "encdec attn ln(tail): ", 5);
+#endif
 
   /* ---step 1. new_q = ori_q * q_wei + bias, reshape new_q for multi-head
    * gemm--- */
@@ -592,17 +599,18 @@ void Decoder<OpType_>::encdec_attention() {
 
 template <OperationType OpType_>
 void Decoder<OpType_>::ffn_add_norm() {
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "encdec attn ln output(head): ", 5);
-  print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 5,
-            "encdec attn ln output(tail): ", 5);
-#endif
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
       _max_thread_per_block);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "ffn ln(tail): ", 5);
+#endif
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -611,7 +619,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_query_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  ker_bias_relu_launcher<_DataType>(
+  ker_bias_gelu_launcher<_DataType>(
       _step_token_num, _max_thread_per_block, _stream, _p_d_query_buf2,
       _p_d_dec_wei[_weight_offset + 15], _tw._inner_size);
 
@@ -630,7 +638,7 @@ bool Decoder<OpType_>::sample() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
@@ -650,13 +658,13 @@ bool Decoder<OpType_>::sample() {
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
         _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
   } else {
     ker_topp_sample_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
         _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._trg_vocab_size - 1);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -676,25 +684,17 @@ bool Decoder<OpType_>::sample() {
 
 template <OperationType OpType_>
 bool Decoder<OpType_>::beam_search() {
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "before logits(head):", 5);
-  print_vec(
-      _p_d_cur_step_query + _batch_size * _tw._beam_size * _tw._hidden_size - 5,
-      "before logits(tail):", 5);
-#endif
-
   /* ---step 0. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 #ifdef DEBUG_RESULT
   print_vec(_p_d_logit_buf, "logits(head):", 5);
-  print_vec(
-      _p_d_logit_buf + _batch_size * _tw._beam_size * _tw._trg_vocab_size - 5,
-      "logits(tail):", 5);
+  print_vec(_p_d_logit_buf + _step_token_num * _tw._trg_vocab_size - 5,
+            "logits(tail):", 5);
 #endif
 
   /*
@@ -802,7 +802,7 @@ bool Decoder<OpType_>::topk_greedy_search() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
@@ -821,7 +821,7 @@ bool Decoder<OpType_>::topk_greedy_search() {
       _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
       _stream, _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq,
       _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
-      _p_d_curandstate, _tw._trg_vocab_size - 1);
+      _p_d_curandstate, _tw._end_id);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);

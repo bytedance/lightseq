@@ -23,6 +23,7 @@ class TransformerDecoder {
 
   optraits::DataType *d_encoder_output_;
   int *d_output_;
+  int *d_padding_mask_;
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;
@@ -69,8 +70,11 @@ class TransformerDecoder {
     */
 
     // instantiate encoder
-    thrust::device_vector<int> d_padding_mask_ =
-        std::vector<int>(_max_batch_size * tw_._max_step, 0);
+    // FIXME: padding mask should be passed from user
+    // thrust::device_vector<int> d_padding_mask_ =
+    //     std::vector<int>(_max_batch_size * tw_._max_step, 0);
+    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+        &d_padding_mask_, _max_batch_size * tw_._max_step * sizeof(int)));
 
     byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
@@ -81,10 +85,8 @@ class TransformerDecoder {
         _max_batch_size * tw_._beam_size * tw_._max_step * sizeof(int)));
 
     decoder_ = new byseqlib::cuda::Decoder<optype>(
-        _max_batch_size,
-        reinterpret_cast<int *>(
-            thrust::raw_pointer_cast(d_padding_mask_.data())),
-        d_encoder_output_, d_output_, tw_, stream_, hd_, true);
+        _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
+        stream_, hd_, true);
     res = decoder_->check();
     if (!res.empty()) {
       throw std::runtime_error(res);
@@ -107,9 +109,13 @@ class TransformerDecoder {
 
   py::array_t<int> infer(
       py::array_t<float, py::array::c_style | py::array::forcecast>
-          encoder_output) {
+          encoder_output,
+      py::array_t<int, py::array::c_style | py::array::forcecast>
+          encoder_mask) {
     auto encoder_out = encoder_output.mutable_unchecked<3>();
+    auto encoder_mask_out = encoder_mask.mutable_unchecked<2>();
     const float *encoder_output_data = encoder_out.data(0, 0, 0);
+    const int *encoder_mask_data = encoder_mask_out.data(0, 0);
     std::vector<optraits::DataType> h_encoder_out(encoder_out.size());
     for (auto i = 0; i < encoder_out.size(); i++) {
       optraits::DataType data;
@@ -124,6 +130,10 @@ class TransformerDecoder {
     byseqlib::cuda::CHECK_GPU_ERROR(
         cudaMemcpyAsync(d_encoder_output_, h_encoder_out.data(),
                         sizeof(optraits::DataType) * encoder_out.size(),
+                        cudaMemcpyHostToDevice, stream_));
+    byseqlib::cuda::CHECK_GPU_ERROR(
+        cudaMemcpyAsync(d_padding_mask_, encoder_mask_data,
+                        sizeof(int) * encoder_mask_out.size(),
                         cudaMemcpyHostToDevice, stream_));
 
     int batch_size = encoder_out.shape(0);

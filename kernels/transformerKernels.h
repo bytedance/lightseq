@@ -11,7 +11,7 @@ namespace cuda {
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
 const float min_log_probability = -2000.f;
-const float epsilon = 0.000001;
+const float epsilon = 0.000000000001;
 
 template <typename T>
 void ker_enc_embedding_launcher(int batch_size, int batch_seq_len,
@@ -144,7 +144,7 @@ __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq,
 
 __global__ void ker_write_topk_result(const int* alive_seq, float* seq_score,
                                       int* res_seq, int vocab_size,
-                                      int max_step, int beam_size);
+                                      int max_step, int beam_size, int end_id);
 
 __forceinline__ __host__ __device__ float length_norm(int length, float alpha) {
   if (alpha < 0.f) return 1.f / length;
@@ -170,6 +170,11 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               const int vocab_size, const float p,
                               int* unfinished, curandState* curandstate,
                               int eos_id);
+
+template <typename T>
+void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
+                            cudaStream_t stream, T* input, const T* bias,
+                            int feature_dim);
 
 __global__ void ker_curand_setup(curandState* state);
 

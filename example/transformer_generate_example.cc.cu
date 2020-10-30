@@ -36,6 +36,7 @@ int main(int argc, char *argv[]) {
   if (tw_._sampling_method != "beam_search") {
     tw_._beam_size = 1;
   }
+  tw_.print_model_config();
 
   /*
     step3. instantiate encoder and decoder, init the gpu memory buffer.
@@ -83,13 +84,15 @@ int main(int argc, char *argv[]) {
   // init gpu memory buffer
   long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
                                decoder_->compute_buffer_bytesize());
-  thrust::device_vector<int> d_buf_ =
-      std::vector<int>(buf_bytesize / sizeof(int), 0);
+  // thrust::device_vector<int> d_buf_ =
+  //     std::vector<int>(buf_bytesize / sizeof(int), 0);
+  void *d_buf_;
   // encoder and decoder use the same buffer to save gpu memory useage
-  encoder_->init_buffer(
-      reinterpret_cast<void *>(thrust::raw_pointer_cast(d_buf_.data())));
-  decoder_->init_buffer(
-      reinterpret_cast<void *>(thrust::raw_pointer_cast(d_buf_.data())));
+  byseqlib::cuda::CHECK_GPU_ERROR(
+      cudaMalloc(&d_buf_, buf_bytesize));
+  // encoder and decoder use the same buffer to save gpu memory useage
+  encoder_->init_buffer(d_buf_);
+  decoder_->init_buffer(d_buf_);
   cudaStreamSynchronize(stream_);
 
   /* ---step4. read input token ids from file--- */

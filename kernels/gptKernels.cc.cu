@@ -115,66 +115,7 @@ template void ker_gpt_embedding_launcher<__half>(
     const __half* token_emb, const __half* pos_emb, const int* token_id,
     __half* output, int* real_seq_len, int padding_id, int pos_offset);
 
-/**
-@brief: ker_bias_gelu
-add bias, activated by gelu
 
-@thread
-gridDim.x = batch_size * batch_seq_len
-blockDim.x = max_thread_per_block
-
-@param
-input: [batch_size * batch_seq_len, feature_dim]
-bias: [feature_dim]
-feature_dim: the dim of input feature
-*/
-template <typename T>
-__global__ void ker_bias_gelu(T* input, const T* bias, int feature_dim) {
-  int offset = blockIdx.x * feature_dim;
-  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
-    int cur_offset = offset + idx;
-    input[cur_offset] = gelu<float>(input[cur_offset] + __ldg(&bias[idx]));
-  }
-}
-
-/* fp16 version */
-template <>
-__global__ void ker_bias_gelu<__half>(__half* input, const __half* bias,
-                                      int feature_dim) {
-  int offset = blockIdx.x * feature_dim;
-  half2* pinput = (half2*)input;
-  const half2* pbias = (const half2*)bias;
-  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
-    int cur_offset = offset + idx;
-    pinput[cur_offset] =
-        gelu<half2>(__hadd2(pinput[cur_offset], __ldg(&pbias[idx])));
-  }
-}
-
-template <typename T>
-void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
-                            cudaStream_t stream, T* input, const T* bias,
-                            int feature_dim) {
-  ker_bias_gelu<T>
-      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
-}
-
-template <>
-void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
-                                    cudaStream_t stream, __half* input,
-                                    const __half* bias, int feature_dim) {
-  ker_bias_gelu<__half>
-      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
-}
-
-template void ker_bias_gelu_launcher<float>(int batch_token_num, int block_dim,
-                                            cudaStream_t stream, float* input,
-                                            const float* bias, int feature_dim);
-
-template void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
-                                             cudaStream_t stream, __half* input,
-                                             const __half* bias,
-                                             int feature_dim);
 /**
 @brief: ker_correlation_softmax_gpt
 query-key correlation softmax for encoder self attention

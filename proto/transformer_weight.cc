@@ -37,7 +37,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _inner_size =
       transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step =
-      transformer.src_embedding().position_embedding_size() / _hidden_size;
+      transformer.trg_embedding().position_embedding_size() / _hidden_size;
   if (!only_decoder) {
     _src_vocab_size =
         transformer.src_embedding().token_embedding_size() / _hidden_size;
@@ -57,6 +57,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _length_penalty = transformer.model_conf().length_penalty();
   _padding_id = transformer.model_conf().src_padding_id();
   _start_id = transformer.model_conf().trg_start_id();
+  _end_id = transformer.model_conf().trg_end_id();
   _diverse_lambda = transformer.model_conf().diverse_lambda();
   _sampling_method = transformer.model_conf().sampling_method();
   _topk = transformer.model_conf().topk();

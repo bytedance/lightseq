@@ -96,6 +96,7 @@ class TransformerWeight {
   float _length_penalty;
   int _padding_id;  // for src
   int _start_id;    // for trg
+  int _end_id;
   float _diverse_lambda;
   std::string _sampling_method;
   int _topk;
