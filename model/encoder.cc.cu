@@ -1,5 +1,5 @@
-#include "kernels/transformerKernels.h"
 #include "encoder.h"
+#include "kernels/transformerKernels.h"
 
 /**
 @file
@@ -212,9 +212,16 @@ void Encoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  ker_bias_relu_launcher<_DataType>(
-      _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-      _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
+
+  if (_tw._use_gelu) {
+    ker_bias_gelu_launcher<_DataType>(
+        _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
+        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
+  } else {
+    ker_bias_relu_launcher<_DataType>(
+        _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
+        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
+  }
 
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(

@@ -103,6 +103,7 @@ message ModelConf {
   int32 trg_end_id = 11; // eos of target embedding
   bool is_post_ln = 12; // Pre-LN or Post-LN
   bool no_scale_embedding = 13; // whether to scale embedding by sqrt(emb_dim)
+  bool use_gelu = 14; // use gelu for activation otherwise relu
 }
 
 message Transformer {

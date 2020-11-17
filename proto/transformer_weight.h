@@ -103,6 +103,7 @@ class TransformerWeight {
   float _topp;
   bool _is_post_ln;
   bool _no_scale_embedding;
+  bool _use_gelu;
 
   void print_model_config() {
     std::cout << "***model config>" << std::endl;
@@ -116,8 +117,9 @@ class TransformerWeight {
     std::cout << "trg vocab size: " << _trg_vocab_size << std::endl;
     std::cout << "is_post_ln: " << _is_post_ln << std::endl;
     std::cout << "no_scale_embedding: " << _no_scale_embedding << std::endl;
+    std::cout << "use_gelu: " << _use_gelu << std::endl;
     std::cout << std::endl;
-    std::cout << "<GENERATOR CONFIG>" << std::endl;
+    std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
     std::cout << "extra decode length(max decode length - src input length): "
               << _extra_decode_length << std::endl;
