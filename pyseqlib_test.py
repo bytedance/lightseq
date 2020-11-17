@@ -4,7 +4,7 @@ import numpy as np
 
 # import tensorflow as tf
 import pickle
-import pyseqlib
+import lightseq
 
 # physical_devices = tf.config.list_physical_devices("GPU")
 # try:
@@ -66,7 +66,7 @@ def get_multilingual_dict():
 def test_rewriting():
     test_enc_out = pickle.load(open("test_enc_out.pkl", "rb"))
     test_mask = np.zeros(test_enc_out.shape[:2])
-    decoder = pyseqlib.TransformerDecoder("rewriting_decoder.pb", 32)
+    decoder = lightseq.TransformerDecoder("rewriting_decoder.pb", 32)
     print(test_enc_out.shape)
     res = decoder.infer(test_enc_out, test_mask)
 
@@ -94,7 +94,7 @@ def test_rewriting():
 def test_multilingual_title():
     test_enc_out = pickle.load(open("test_en_encout.pkl", "rb"))
     test_mask = np.zeros(test_enc_out.shape[:2])
-    decoder = pyseqlib.TransformerDecoder("mullin_title_en_decoder.pb", 8)
+    decoder = lightseq.TransformerDecoder("mullin_title_en_decoder.pb", 8)
     print(test_enc_out.shape)
     start = time.time()
     for _ in range(10):

@@ -150,7 +150,7 @@ class TransformerDecoder {
   }
 };
 
-PYBIND11_MODULE(pyseqlib, m) {
+PYBIND11_MODULE(lightseq, m) {
   py::class_<TransformerDecoder>(m, "TransformerDecoder")
       .def(py::init<const std::string, const int>())
       .def("infer", &TransformerDecoder::infer);

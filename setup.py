@@ -60,7 +60,7 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
             cmake_args += ["-DFP16_MODE=ON"]
-            build_args += ["--target", "pyseqlib"]
+            build_args += ["--target", "lightseq"]
             build_args += ["--", "-j"]
 
         env = os.environ.copy()
@@ -78,13 +78,13 @@ class CMakeBuild(build_ext):
 
 
 setup(
-    name="pyseqlib",
-    version="0.1.0-mul",
+    name="lightseq",
+    version="0.1.0",
     author="Ying Xiong",
     author_email="xiongying.taka@bytedance.com",
-    description="python wrapper of Byseqlib, Byseqlib is a high performance inference library for SOTA NLU/NLG models",
+    description="python wrapper of LightSeq, LightSeq is a high performance inference library for SOTA NLU/NLG models",
     long_description="",
-    ext_modules=[CMakeExtension("pyseqlib")],
+    ext_modules=[CMakeExtension("lightseq")],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
     packages=setuptools.find_packages(),
