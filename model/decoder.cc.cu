@@ -638,7 +638,7 @@ bool Decoder<OpType_>::sample() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
@@ -687,7 +687,7 @@ bool Decoder<OpType_>::beam_search() {
   /* ---step 0. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
@@ -802,7 +802,7 @@ bool Decoder<OpType_>::topk_greedy_search() {
   /* ---step 1. project hidden states to vocab logits--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_fone, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_output_scaler, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
