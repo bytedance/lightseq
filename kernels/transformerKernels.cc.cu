@@ -479,7 +479,7 @@ residual_bias: [hidden_size]
 template <typename T>
 __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
                                       const T* bias, const T* residual_bias,
-                                      const int hidden_size, bool is_pre_ln) {
+                                      const int hidden_size, bool is_post_ln) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -511,7 +511,7 @@ __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
     val = input[i] - s_mean;
     output[i] = val * s_var * __ldg(&scale[i - block_start]) +
                 __ldg(&bias[i - block_start]);
-    if (is_pre_ln) {
+    if (is_post_ln) {
       input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
     } else {
       input[i] += __ldg(&residual_bias[i - block_start]);
@@ -522,7 +522,7 @@ __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
 template <>
 __global__ void ker_norm_layer_resual<__half>(
     __half* input, __half* output, const __half* scale, const __half* bias,
-    const __half* residual_bias, const int half_hidden_size, bool is_pre_ln) {
+    const __half* residual_bias, const int half_hidden_size, bool is_post_ln) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -565,7 +565,7 @@ __global__ void ker_norm_layer_resual<__half>(
     local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
     poutput[i] = __float22half2_rn(local_f2);
-    if (!is_pre_ln) {
+    if (!is_post_ln) {
       local_f2 = safe_half2_to_float2(pinput[i]);
     }
     float2 residual_bias_val =
@@ -583,9 +583,9 @@ void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     const T* scale, const T* bias,
                                     const T* residual_bias,
                                     const int max_thread_per_block,
-                                    bool is_pre_ln) {
+                                    bool is_post_ln) {
   ker_norm_layer_resual<T><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size, is_pre_ln);
+      input, output, scale, bias, residual_bias, hidden_size, is_post_ln);
 }
 
 template <>
@@ -595,21 +595,22 @@ void ker_norm_layer_resual_launcher<__half>(int token_num, int hidden_size,
                                             const __half* bias,
                                             const __half* residual_bias,
                                             const int max_thread_per_block,
-                                            bool is_pre_ln) {
+                                            bool is_post_ln) {
   ker_norm_layer_resual<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size / 2, is_pre_ln);
+      input, output, scale, bias, residual_bias, hidden_size / 2, is_post_ln);
 }
 
 template void ker_norm_layer_resual_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float* input,
     float* output, const float* scale, const float* bias,
-    const float* residual_bias, const int max_thread_per_block, bool is_pre_ln);
+    const float* residual_bias, const int max_thread_per_block,
+    bool is_post_ln);
 
 template void ker_norm_layer_resual_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half* input,
     __half* output, const __half* scale, const __half* bias,
     const __half* residual_bias, const int max_thread_per_block,
-    bool is_pre_ln);
+    bool is_post_ln);
 
 /**
 @brief: ker_enc_embedding
@@ -1476,7 +1477,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
                                    int cur_step, float length_norm,
-                                   float diverse_lambda) {
+                                   float diverse_lambda, int eos_id) {
   // step1 update alive_seq
   int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
   int ori_can_idx = can_idx[can_pos];  // can_beam_id * vocab_size + vocab_id
@@ -1502,7 +1503,6 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                               blockDim.x)] = thread_vocab_id;
 
   // step2 update seq_probs if alive seq when not eos
-  int eos_id = vocab_size - 1;
   if (can_vocab_id != eos_id) {
     // alive seq
     if (threadIdx.x == 0) {

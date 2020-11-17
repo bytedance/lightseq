@@ -32,7 +32,7 @@ void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     const T* scale, const T* bias,
                                     const T* residual_bias,
                                     const int max_thread_per_block,
-                                    bool is_pre_ln = false);
+                                    bool is_post_ln = false);
 
 template <typename T>
 void select_beam_rough_topk_launcher(
@@ -131,7 +131,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
                                    int cur_step, float length_norm,
-                                   float diverse_lambda);
+                                   float diverse_lambda, int eos_id);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
                                                   int* output, int max_step,

@@ -62,7 +62,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _sampling_method = transformer.model_conf().sampling_method();
   _topk = transformer.model_conf().topk();
   _topp = transformer.model_conf().topp();
-  _is_pre_ln = transformer.model_conf().is_pre_ln();
+  _is_post_ln = transformer.model_conf().is_post_ln();
 }
 
 /**

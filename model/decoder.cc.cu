@@ -427,7 +427,7 @@ void Decoder<OpType_>::self_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-      _max_thread_per_block,_tw._is_pre_ln);
+      _max_thread_per_block, _tw._is_post_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
@@ -539,7 +539,7 @@ void Decoder<OpType_>::encdec_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
-      _max_thread_per_block, _tw._is_pre_ln);
+      _max_thread_per_block, _tw._is_post_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
@@ -604,7 +604,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
-      _max_thread_per_block, _tw._is_pre_ln);
+      _max_thread_per_block, _tw._is_post_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);
@@ -740,13 +740,22 @@ bool Decoder<OpType_>::beam_search() {
       _p_d_can_idx, _p_d_can_score, _p_d_can_num + 1, _p_d_alive_seq,
       _p_d_alive_seq_buf, _p_d_alive_seq_probs, _p_d_alive_seq_score,
       _p_d_can_num, _tw._trg_vocab_size, _cur_step, _h_length_norm[_cur_step],
-      _tw._diverse_lambda);
+      _tw._diverse_lambda, _tw._end_id);
   int* tmp = _p_d_alive_seq_buf;
   _p_d_alive_seq_buf = _p_d_alive_seq;
   _p_d_alive_seq = tmp;
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_can_num_batch, _p_d_can_num, sizeof(int),
                                   cudaMemcpyDeviceToHost, _stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+
+#ifdef DEBUG_RESULT
+  for (int ii = 0; ii < _batch_size; ii++) {
+    for (int jj = 0; jj < 1; jj++) {
+      print_vec(_p_d_alive_seq + (ii * _tw._beam_size + jj) * _tw._max_step,
+                "Batch token ids: ", _cur_step + 2);
+    }
+  }
+#endif
   if (_h_can_num_batch == _step_token_num) {
 #ifdef DEBUG_RESULT
     std::cout << "early stop beam search!" << std::endl;

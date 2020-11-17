@@ -101,7 +101,7 @@ message ModelConf {
   float topp = 9; // parameter for topp sampling
   int32 topk = 10; // parameter for topk sampling
   int32 trg_end_id = 11; // eos of target embedding
-  bool is_pre_ln = 12; // Pre-LN or Post-LN
+  bool is_post_ln = 12; // Pre-LN or Post-LN
 }
 
 message Transformer {
