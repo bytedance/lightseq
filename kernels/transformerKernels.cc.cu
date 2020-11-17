@@ -479,7 +479,7 @@ residual_bias: [hidden_size]
 template <typename T>
 __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
                                       const T* bias, const T* residual_bias,
-                                      const int hidden_size) {
+                                      const int hidden_size, bool is_pre_ln) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -511,16 +511,18 @@ __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
     val = input[i] - s_mean;
     output[i] = val * s_var * __ldg(&scale[i - block_start]) +
                 __ldg(&bias[i - block_start]);
-    input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
+    if (is_pre_ln) {
+      input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
+    } else {
+      input[i] += __ldg(&residual_bias[i - block_start]);
+    }
   }
 }
 
 template <>
-__global__ void ker_norm_layer_resual<__half>(__half* input, __half* output,
-                                              const __half* scale,
-                                              const __half* bias,
-                                              const __half* residual_bias,
-                                              const int half_hidden_size) {
+__global__ void ker_norm_layer_resual<__half>(
+    __half* input, __half* output, const __half* scale, const __half* bias,
+    const __half* residual_bias, const int half_hidden_size, bool is_pre_ln) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -563,7 +565,9 @@ __global__ void ker_norm_layer_resual<__half>(__half* input, __half* output,
     local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
     poutput[i] = __float22half2_rn(local_f2);
-    // local_f2 = safe_half2_to_float2(pinput[i]);
+    if (!is_pre_ln) {
+      local_f2 = safe_half2_to_float2(pinput[i]);
+    }
     float2 residual_bias_val =
         __half22float2(__ldg(&presidual_bias[i - block_start]));
     float2 new_input_f2;
@@ -578,9 +582,10 @@ void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     cudaStream_t stream, T* input, T* output,
                                     const T* scale, const T* bias,
                                     const T* residual_bias,
-                                    const int max_thread_per_block) {
+                                    const int max_thread_per_block,
+                                    bool is_pre_ln) {
   ker_norm_layer_resual<T><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size);
+      input, output, scale, bias, residual_bias, hidden_size, is_pre_ln);
 }
 
 template <>
@@ -589,20 +594,22 @@ void ker_norm_layer_resual_launcher<__half>(int token_num, int hidden_size,
                                             __half* output, const __half* scale,
                                             const __half* bias,
                                             const __half* residual_bias,
-                                            const int max_thread_per_block) {
+                                            const int max_thread_per_block,
+                                            bool is_pre_ln) {
   ker_norm_layer_resual<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size / 2);
+      input, output, scale, bias, residual_bias, hidden_size / 2, is_pre_ln);
 }
 
 template void ker_norm_layer_resual_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float* input,
     float* output, const float* scale, const float* bias,
-    const float* residual_bias, const int max_thread_per_block);
+    const float* residual_bias, const int max_thread_per_block, bool is_pre_ln);
 
 template void ker_norm_layer_resual_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half* input,
     __half* output, const __half* scale, const __half* bias,
-    const __half* residual_bias, const int max_thread_per_block);
+    const __half* residual_bias, const int max_thread_per_block,
+    bool is_pre_ln);
 
 /**
 @brief: ker_enc_embedding

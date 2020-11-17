@@ -427,7 +427,7 @@ void Decoder<OpType_>::self_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-      _max_thread_per_block);
+      _max_thread_per_block,_tw._is_pre_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
@@ -539,7 +539,7 @@ void Decoder<OpType_>::encdec_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
-      _max_thread_per_block);
+      _max_thread_per_block, _tw._is_pre_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
@@ -604,7 +604,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
-      _max_thread_per_block);
+      _max_thread_per_block, _tw._is_pre_ln);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);

@@ -31,7 +31,8 @@ void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     cudaStream_t stream, T* input, T* output,
                                     const T* scale, const T* bias,
                                     const T* residual_bias,
-                                    const int max_thread_per_block);
+                                    const int max_thread_per_block,
+                                    bool is_pre_ln = false);
 
 template <typename T>
 void select_beam_rough_topk_launcher(

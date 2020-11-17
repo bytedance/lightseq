@@ -101,6 +101,7 @@ class TransformerWeight {
   std::string _sampling_method;
   int _topk;
   float _topp;
+  bool _is_pre_ln;
 
   void print_model_config() {
     std::cout << "<MODEL CONFIG>" << std::endl;

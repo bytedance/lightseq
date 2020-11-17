@@ -97,10 +97,11 @@ message ModelConf {
   int32 src_padding_id = 5;  // source padding id
   int32 trg_start_id = 6;    // target start id
   float diverse_lambda = 7; // diverse beam search lambda
-  string sampling_method = 8;
-  float topp = 9;
-  int32 topk = 10;
-  int32 trg_end_id = 11;
+  string sampling_method = 8; // choice of beam_search, topk, topp, topk_greedy
+  float topp = 9; // parameter for topp sampling
+  int32 topk = 10; // parameter for topk sampling
+  int32 trg_end_id = 11; // eos of target embedding
+  bool is_pre_ln = 12; // Pre-LN or Post-LN
 }
 
 message Transformer {
