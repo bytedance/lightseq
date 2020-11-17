@@ -63,6 +63,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _topk = transformer.model_conf().topk();
   _topp = transformer.model_conf().topp();
   _is_post_ln = transformer.model_conf().is_post_ln();
+  _no_scale_embedding = transformer.model_conf().no_scale_embedding();
 }
 
 /**

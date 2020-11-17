@@ -102,9 +102,10 @@ class TransformerWeight {
   int _topk;
   float _topp;
   bool _is_post_ln;
+  bool _no_scale_embedding;
 
   void print_model_config() {
-    std::cout << "<MODEL CONFIG>" << std::endl;
+    std::cout << "***model config>" << std::endl;
     std::cout << "encoder layers: " << _n_enc_layer << std::endl;
     std::cout << "decoder layers: " << _n_dec_layer << std::endl;
     std::cout << "hidden size: " << _hidden_size << std::endl;
@@ -114,6 +115,7 @@ class TransformerWeight {
     std::cout << "src vocab size: " << _src_vocab_size << std::endl;
     std::cout << "trg vocab size: " << _trg_vocab_size << std::endl;
     std::cout << "is_post_ln: " << _is_post_ln << std::endl;
+    std::cout << "no_scale_embedding: " << _no_scale_embedding << std::endl;
     std::cout << std::endl;
     std::cout << "<GENERATOR CONFIG>" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
