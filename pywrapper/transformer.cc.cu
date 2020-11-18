@@ -148,7 +148,7 @@ class Transformer {
     int batch_seq_len = input_seq_out.shape(1);
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
-    int tokens_size = decoder_->_cur_step;
+    int tokens_size = decoder_->_cur_step + 1;
     beam_size = tw_._beam_size;
     int output_k = multiple_output ? beam_size : 1;
     auto tokens = py::array_t<int>({batch_size, output_k, tokens_size});
