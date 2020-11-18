@@ -17,6 +17,7 @@ const byseqlib::cuda::OperationType transformer_optytpe =
 namespace py = pybind11;
 
 namespace byseqlib::cuda {
+
 class Transformer {
  private:
   typedef byseqlib::cuda::OperationTypeTraits<transformer_optytpe> optraits;
@@ -31,6 +32,8 @@ class Transformer {
   cudaStream_t stream_;
   cublasHandle_t hd_;
   byseqlib::cuda::TransformerWeight<transformer_optytpe> tw_;
+  std::set<std::string> available_sampling_methods = {"beam_search", "topk",
+                                                      "topp", "topk_greedy"};
 
  public:
   Transformer(const std::string weight_path, const int max_batch_size)
@@ -119,27 +122,46 @@ class Transformer {
     }
   }
 
-  py::array_t<int> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+  std::tuple<py::array_t<int>, py::array_t<int>> infer(
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
+      bool multiple_output = false, std::string sampling_method = "",
+      int beam_size = -1, float length_penalty = -1, float topp = -1,
+      float topk = -1, float diverse_lambda = -1) {
+    if (available_sampling_methods.find(sampling_method) !=
+        available_sampling_methods.end()) {
+      tw_._sampling_method = sampling_method;
+    }
+    if (sampling_method == "topk" || sampling_method == "topp") {
+      multiple_output = false;
+    }
+    if (sampling_method == "topk_greedy") {
+      multiple_output = true;
+    }
+    decoder_->_output_topk = multiple_output;
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
 
     byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
         d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
         cudaMemcpyHostToDevice, stream_));
-
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
     int tokens_size = decoder_->_cur_step;
-    int beam_size = tw_._beam_size;
-    auto tokens = py::array_t<int>({batch_size, tokens_size});
+    beam_size = tw_._beam_size;
+    int output_k = multiple_output ? beam_size : 1;
+    auto tokens = py::array_t<int>({batch_size, output_k, tokens_size});
     int *tokens_data = tokens.mutable_data(0, 0);
     byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));
-    return tokens;
+    auto scores = py::array_t<int>({batch_size, output_k});
+    // int *scores_data = scores.mutable_data(0, 0);
+    // byseqlib::cuda::CHECK_GPU_ERROR(
+    //     cudaMemcpy(scores_data, decoder_->_p_d_alive_seq_score,
+    //                sizeof(int) * scores.size(), cudaMemcpyDeviceToHost));
+    return std::make_tuple(tokens, scores);
   }
 };
-}  // namespace byseqlib
+}  // namespace byseqlib::cuda

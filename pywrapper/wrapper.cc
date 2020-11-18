@@ -13,5 +13,10 @@ PYBIND11_MODULE(lightseq, m) {
 
   py::class_<byseqlib::cuda::Transformer>(m, "Transformer")
       .def(py::init<const std::string, const int>())
-      .def("infer", &byseqlib::cuda::Transformer::infer);
+      .def("infer", &byseqlib::cuda::Transformer::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"),
+           py::arg("multiple_output") = false, py::arg("sampling_method") = "",
+           py::arg("beam_size") = -1, py::arg("length_penalty") = -1.0f,
+           py::arg("topp") = -1.0f, py::arg("topk") = -1.0f,
+           py::arg("diverse_lambda") = -1.0f);
 }

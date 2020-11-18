@@ -126,7 +126,7 @@ def test_en_correction():
     transformer = lightseq.Transformer("transformer_en_correction.pb", 8)
     start = time.time()
     for _ in range(10):
-        res = transformer.infer(test_input)
+        res = transformer.infer(test_input, multiple_output=True, sampling_method="topk_greedy")
     print((time.time() - start) / 10)
     print(res)
     # id2token = get_multilingual_dict()
@@ -159,7 +159,7 @@ def get_q2q_dict():
 
 def test_q2q_transformer():
 
-    test_input = np.array([[5001, 2 ,36 ,13 ,15, 5002]])
+    test_input = np.array([[5001, 2, 36, 13, 15, 5002]])
     transformer = lightseq.Transformer("q2q_transformer.pb", 8)
     start = time.time()
     for _ in range(1):
