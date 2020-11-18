@@ -106,7 +106,7 @@ class TransformerWeight {
   bool _use_gelu;
 
   void print_model_config() {
-    std::cout << "***model config>" << std::endl;
+    std::cout << "***model config***" << std::endl;
     std::cout << "encoder layers: " << _n_enc_layer << std::endl;
     std::cout << "decoder layers: " << _n_dec_layer << std::endl;
     std::cout << "hidden size: " << _hidden_size << std::endl;
