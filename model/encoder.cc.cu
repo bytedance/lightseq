@@ -7,8 +7,6 @@ Transformer encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-// #define DEBUG_RESULT
-
 namespace byseqlib {
 namespace cuda {
 

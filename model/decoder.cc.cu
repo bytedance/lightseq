@@ -11,8 +11,6 @@ Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-// #define DEBUG_RESULT
-
 namespace byseqlib {
 namespace cuda {
 
@@ -269,14 +267,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                                   cudaMemcpyHostToDevice, _stream));
 
   /* ---step2. autoregressive decoding--- */
-#ifdef DEBUG_RESULT
-  for (_cur_step = 0; _cur_step < 3; _cur_step++) {
-    // for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1;
-    // _cur_step++) {
-#else
   for (_cur_step = 0; _cur_step < _batch_max_decode_length - 1; _cur_step++) {
-#endif
-
 #ifdef DEBUG_RESULT
     std::cout << "*** run step " << _cur_step << " ***" << std::endl;
 #endif

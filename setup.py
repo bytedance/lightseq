@@ -60,6 +60,7 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
             cmake_args += ["-DFP16_MODE=ON"]
+            # cmake_args += ["-DDEBUG_MODE=ON"]
             build_args += ["--target", "lightseq"]
             build_args += ["--", "-j"]
 

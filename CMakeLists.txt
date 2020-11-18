@@ -5,6 +5,7 @@ set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 11 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
+option(DEBUG_MODE "debug computation result" OFF)
 
 set(Protobuf_USE_STATIC_LIBS ON)
 
@@ -45,6 +46,11 @@ if(FP16_MODE)
     message(STATUS "Build using fp16 precision")
 else()
     message(STATUS "Build using fp32 precision")
+endif()
+
+if(DEBUG_MODE)
+    add_definitions(-DDEBUG_RESULT)
+    message(STATUS "Debug computation result")
 endif()
 
 add_subdirectory(kernels)
