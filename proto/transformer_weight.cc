@@ -58,6 +58,9 @@ void TransformerWeight<OpType_>::get_model_config(
   _padding_id = transformer.model_conf().src_padding_id();
   _start_id = transformer.model_conf().trg_start_id();
   _end_id = transformer.model_conf().trg_end_id();
+  if (_end_id == 0) {
+    _end_id = _trg_vocab_size - 1;
+  }
   _diverse_lambda = transformer.model_conf().diverse_lambda();
   _sampling_method = transformer.model_conf().sampling_method();
   _topk = transformer.model_conf().topk();

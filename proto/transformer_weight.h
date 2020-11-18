@@ -118,6 +118,8 @@ class TransformerWeight {
     std::cout << "is_post_ln: " << _is_post_ln << std::endl;
     std::cout << "no_scale_embedding: " << _no_scale_embedding << std::endl;
     std::cout << "use_gelu: " << _use_gelu << std::endl;
+    std::cout << "start_id: " << _start_id << std::endl;
+    std::cout << "end_id: " << _end_id << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
