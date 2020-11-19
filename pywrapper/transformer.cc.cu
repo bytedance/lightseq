@@ -140,12 +140,15 @@ class Transformer {
     decoder_->_output_topk = multiple_output;
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
-
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
-        d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
-        cudaMemcpyHostToDevice, stream_));
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
+    if (batch_size > _max_batch_size){
+      throw std::runtime_error("batch size of input greater than max_batch_size");
+    }
+      byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
+          d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
+          cudaMemcpyHostToDevice, stream_));
+
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
     int tokens_size = decoder_->_cur_step + 1;
