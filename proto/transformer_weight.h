@@ -120,6 +120,7 @@ class TransformerWeight {
     std::cout << "use_gelu: " << _use_gelu << std::endl;
     std::cout << "start_id: " << _start_id << std::endl;
     std::cout << "end_id: " << _end_id << std::endl;
+    std::cout << "padding_id: " << _padding_id << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;

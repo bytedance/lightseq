@@ -47,7 +47,7 @@ class CMakeBuild(build_ext):
             "-DPYTHON_EXECUTABLE=" + sys.executable,
         ]
 
-        cfg = "Debug" if self.debug else "Release"
+        cfg = "Release"
         build_args = ["--config", cfg]
 
         if platform.system() == "Windows":
@@ -60,7 +60,8 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
             cmake_args += ["-DFP16_MODE=ON"]
-            # cmake_args += ["-DDEBUG_MODE=ON"]
+            if self.debug:
+                cmake_args += ["-DDEBUG_MODE=ON"]
             build_args += ["--target", "lightseq"]
             build_args += ["--", "-j"]
 
