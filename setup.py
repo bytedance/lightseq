@@ -59,7 +59,7 @@ class CMakeBuild(build_ext):
             build_args += ["--", "/m"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            cmake_args += ["-DFP16_MODE=ON"]
+            # cmake_args += ["-DFP16_MODE=ON"]
             if self.debug:
                 cmake_args += ["-DDEBUG_MODE=ON"]
             build_args += ["--target", "lightseq"]
