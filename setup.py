@@ -9,6 +9,9 @@ import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
+ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
+
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir="", *args, **kwargs):
@@ -59,8 +62,9 @@ class CMakeBuild(build_ext):
             build_args += ["--", "/m"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            # cmake_args += ["-DFP16_MODE=ON"]
-            if self.debug:
+            if not ENABLE_FP32:
+                cmake_args += ["-DFP16_MODE=ON"]
+            if ENABLE_DEBUG:
                 cmake_args += ["-DDEBUG_MODE=ON"]
             build_args += ["--target", "lightseq"]
             build_args += ["--", "-j"]
