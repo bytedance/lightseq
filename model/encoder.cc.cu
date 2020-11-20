@@ -121,7 +121,7 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {         // batch_id
-    for (int j = 0; j < _batch_token_num; j++) {  // token_id
+    for (int j = 0; j < _batch_seq_len; j++) {    // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
