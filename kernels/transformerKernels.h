@@ -41,7 +41,7 @@ void select_beam_rough_topk_launcher(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda);
+    float diverse_lambda, int end_id);
 
 void ker_diverse_beam_search_launcher(float* can_score, int* can_ids,
                                       int* num_beam_can, int step_token_num,
@@ -78,14 +78,12 @@ void ker_arrange_decself_qkv_launcher(int step_token_num, int hidden_size,
                                       int max_thread_per_block);
 
 template <typename T>
-void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
-                                cudaStream_t stream,
-                                const int* num_can_per_beam, const int* can_idx,
-                                const T* self_k_bgeem, const T* self_v_bgeem,
-                                T* new_self_k_bgeem, T* new_self_v_bgeem,
-                                int self_k_bgeem_offset, int beam_size,
-                                int dim_per_head, int head_num, int vocab_size,
-                                int cur_step, int max_step, bool diverse);
+void ker_refresh_cache_launcher(
+    int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
+    const int* num_can_per_beam, const int* can_idx, const T* self_k_bgeem,
+    const T* self_v_bgeem, T* new_self_k_bgeem, T* new_self_v_bgeem,
+    int self_k_bgeem_offset, int beam_size, int dim_per_head, int head_num,
+    int vocab_size, int cur_step, int max_step, bool diverse, int end_id);
 
 template <typename T>
 void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,
@@ -131,7 +129,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
                                    int cur_step, float length_norm,
-                                   float diverse_lambda, int eos_id);
+                                   float diverse_lambda, int end_id);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
                                                   int* output, int max_step,
@@ -140,8 +138,8 @@ __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
 __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq,
                                                   const float* seq_score,
                                                   int* output, int max_step,
-                                                  int beam_size,
-                                                  int vocab_size);
+                                                  int beam_size, int vocab_size,
+                                                  int end_id);
 
 __global__ void ker_write_topk_result(const int* alive_seq, float* seq_score,
                                       int* res_seq, int vocab_size,

@@ -47,8 +47,8 @@ __global__ void select_beam_rough_topk(
     const T* logits, const T* logit_bias, const float* seq_probs,
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
-    float length_norm, int cur_step, float diverse_lambda) {
-  if (alive_seq[blockIdx.x * max_step + cur_step] == vocab_size - 1) {
+    float length_norm, int cur_step, float diverse_lambda, int end_id) {
+  if (alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
       num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
@@ -62,8 +62,7 @@ __global__ void select_beam_rough_topk(
         can_score[pos] = seq_score[blockIdx.x] +
                          (blockIdx.x - batch_id) * min_log_probability;
       }
-      can_idx[pos] =
-          vocab_size - 1 + (blockIdx.x % beam_size) * vocab_size;  // EOS
+      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size;  // EOS
     }
     return;
   }
@@ -175,43 +174,43 @@ void select_beam_rough_topk_launcher(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda) {
+    float diverse_lambda, int end_id) {
   if (beam_size == 1)
     select_beam_rough_topk<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 2)
     select_beam_rough_topk<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 4)
     select_beam_rough_topk<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 8)
     select_beam_rough_topk<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 16)
     select_beam_rough_topk<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 32)
     select_beam_rough_topk<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda);
+            cur_step, diverse_lambda, end_id);
 }
 
 template void select_beam_rough_topk_launcher<float>(
@@ -220,7 +219,7 @@ template void select_beam_rough_topk_launcher<float>(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda);
+    float diverse_lambda, int end_id);
 
 template void select_beam_rough_topk_launcher<__half>(
     const __half* logits, const __half* logit_bias, const float* seq_probs,
@@ -228,7 +227,7 @@ template void select_beam_rough_topk_launcher<__half>(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda);
+    float diverse_lambda, int end_id);
 
 /**
 @brief: ker_diverse_beam_search
@@ -1477,7 +1476,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    float* seq_probs, float* seq_score,
                                    int* num_finish_beam, int vocab_size,
                                    int cur_step, float length_norm,
-                                   float diverse_lambda, int eos_id) {
+                                   float diverse_lambda, int end_id) {
   // step1 update alive_seq
   int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
   int ori_can_idx = can_idx[can_pos];  // can_beam_id * vocab_size + vocab_id
@@ -1490,7 +1489,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
   }
   int thread_vocab_id;
   if (threadIdx.x > cur_step + 1) {
-    thread_vocab_id = vocab_size - 1;
+    thread_vocab_id = end_id;
   } else if (threadIdx.x == cur_step + 1) {
     // add current step generate vocabulary id
     thread_vocab_id = can_vocab_id;
@@ -1503,7 +1502,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                               blockDim.x)] = thread_vocab_id;
 
   // step2 update seq_probs if alive seq when not eos
-  if (can_vocab_id != eos_id) {
+  if (can_vocab_id != end_id) {
     // alive seq
     if (threadIdx.x == 0) {
       if (diverse_lambda == 0) {
@@ -1573,7 +1572,7 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
                                   T* new_self_v_bgeem, int self_k_bgeem_offset,
                                   int beam_size, int dim_per_head, int head_num,
                                   int vocab_size, int cur_step, int max_step,
-                                  bool diverse) {
+                                  bool diverse, int end_id) {
   int layer_id = blockIdx.x / (cur_step + 1);
   int step_id = blockIdx.x % (cur_step + 1);
   int kv_id = blockIdx.y & 1;
@@ -1589,7 +1588,7 @@ __global__ void ker_refresh_cache(const int* num_can_per_beam,
     int can_beam_id =
         can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
     if (diverse) can_beam_id %= beam_size;
-    if (can_idx[can_pos] % vocab_size == vocab_size - 1) {
+    if (can_idx[can_pos] % vocab_size == end_id) {
       return;
     }
 
@@ -1615,7 +1614,7 @@ __global__ void ker_refresh_cache<__half>(
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse) {
+    bool diverse, int end_id) {
   int layer_id = blockIdx.x / (cur_step + 1);
   int step_id = blockIdx.x % (cur_step + 1);
   int kv_id = blockIdx.y & 1;
@@ -1631,7 +1630,7 @@ __global__ void ker_refresh_cache<__half>(
     int can_beam_id =
         can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
     if (diverse) can_beam_id %= beam_size;
-    if (can_idx[can_pos] % vocab_size == vocab_size - 1) {
+    if (can_idx[can_pos] % vocab_size == end_id) {
       return;
     }
 
@@ -1652,18 +1651,16 @@ __global__ void ker_refresh_cache<__half>(
 }
 
 template <typename T>
-void ker_refresh_cache_launcher(int grid_dim_x, int grid_dim_y, int block_dim,
-                                cudaStream_t stream,
-                                const int* num_can_per_beam, const int* can_idx,
-                                const T* self_k_bgeem, const T* self_v_bgeem,
-                                T* new_self_k_bgeem, T* new_self_v_bgeem,
-                                int self_k_bgeem_offset, int beam_size,
-                                int dim_per_head, int head_num, int vocab_size,
-                                int cur_step, int max_step, bool diverse) {
+void ker_refresh_cache_launcher(
+    int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
+    const int* num_can_per_beam, const int* can_idx, const T* self_k_bgeem,
+    const T* self_v_bgeem, T* new_self_k_bgeem, T* new_self_v_bgeem,
+    int self_k_bgeem_offset, int beam_size, int dim_per_head, int head_num,
+    int vocab_size, int cur_step, int max_step, bool diverse, int end_id) {
   ker_refresh_cache<T><<<dim3(grid_dim_x, grid_dim_y), block_dim, 0, stream>>>(
       num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem, new_self_k_bgeem,
       new_self_v_bgeem, self_k_bgeem_offset, beam_size, dim_per_head, head_num,
-      vocab_size, cur_step, max_step, diverse);
+      vocab_size, cur_step, max_step, diverse, end_id);
 }
 
 template <>
@@ -1673,13 +1670,13 @@ void ker_refresh_cache_launcher<__half>(
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse) {
+    bool diverse, int end_id) {
   ker_refresh_cache<__half>
       <<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
           num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem,
           new_self_k_bgeem, new_self_v_bgeem, self_k_bgeem_offset / 2,
           beam_size, dim_per_head / 2, head_num, vocab_size, cur_step, max_step,
-          diverse);
+          diverse, end_id);
 }
 
 template void ker_refresh_cache_launcher<float>(
@@ -1687,7 +1684,7 @@ template void ker_refresh_cache_launcher<float>(
     const int* num_can_per_beam, const int* can_idx, const float* self_k_bgeem,
     const float* self_v_bgeem, float* new_self_k_bgeem, float* new_self_v_bgeem,
     int self_k_bgeem_offset, int beam_size, int dim_per_head, int head_num,
-    int vocab_size, int cur_step, int max_step, bool diverse);
+    int vocab_size, int cur_step, int max_step, bool diverse, int end_id);
 
 template void ker_refresh_cache_launcher<__half>(
     int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
@@ -1695,7 +1692,7 @@ template void ker_refresh_cache_launcher<__half>(
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse);
+    bool diverse, int end_id);
 
 /**
 @brief: ker_write_trg_tokenid_pos_penalty
@@ -1742,8 +1739,8 @@ last of seq
 __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq,
                                                   const float* seq_score,
                                                   int* output, int max_step,
-                                                  int beam_size,
-                                                  int vocab_size) {
+                                                  int beam_size, int vocab_size,
+                                                  int end_id) {
   __shared__ float seq_final_score;
   __shared__ int res_beam_id;
   if (threadIdx.x == 0) {
@@ -1753,8 +1750,8 @@ __global__ void ker_write_trg_tokenid_neg_penalty(const int* alive_seq,
   for (int beam_id = 0; beam_id < beam_size; beam_id++) {
     int target_id = targetid_3dim(blockIdx.x, beam_id, threadIdx.x + 1,
                                   beam_size, max_step);
-    int seq_len = blockReduceSum(
-        int(alive_seq[target_id] != vocab_size - 1));  // compute seq len
+    int seq_len =
+        blockReduceSum(int(alive_seq[target_id] != end_id));  // compute seq len
     if (threadIdx.x == 0) {
       float cur_beam_score = seq_score[blockIdx.x * beam_size + beam_id] -
                              blockIdx.x * min_log_probability;  // recover prob

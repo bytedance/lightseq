@@ -295,7 +295,7 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     ker_write_trg_tokenid_neg_penalty<<<_batch_size, _cur_step + 1, 0,
                                         _stream>>>(
         _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, _tw._max_step,
-        _tw._beam_size, _tw._trg_vocab_size);
+        _tw._beam_size, _tw._trg_vocab_size, _tw._end_id);
   }
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {
@@ -770,7 +770,7 @@ bool Decoder<OpType_>::beam_search() {
         _p_d_self_k_bgeem1[0], _p_d_self_v_bgeem1[0], _p_d_self_k_bgeem2[0],
         _p_d_self_v_bgeem2[0], _layer_size_self_k, _tw._beam_size,
         _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step, _tw._diverse_lambda != 0);
+        _tw._max_step, _tw._diverse_lambda != 0, _tw._end_id);
     _DataType** ftmp = _p_d_self_k_bgeem2;
     _p_d_self_k_bgeem2 = _p_d_self_k_bgeem1;
     _p_d_self_k_bgeem1 = ftmp;
@@ -794,7 +794,8 @@ void Decoder<OpType_>::update_new_seq_probs() {
       _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
       _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
       _h_length_norm[_cur_step], _cur_step, _step_token_num,
-      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda);
+      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
+      _tw._end_id);
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
   return;
