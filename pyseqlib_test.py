@@ -122,12 +122,12 @@ def test_rewriting():
 
 
 def test_en_correction():
-    test_input = np.array([[894, 213, 7, 334, 479, 2]])
+    test_input = np.array([[894, 213, 7, 334, 479, 2] for _ in range(4)])
     transformer = lightseq.Transformer("transformer_en_correction.pb", 8)
     start = time.time()
-    for _ in range(10):
-        res = transformer.infer(test_input, multiple_output=True, sampling_method="topk_greedy")
-    print((time.time() - start) / 10)
+    for _ in range(1):
+        res = transformer.infer(test_input, multiple_output=True)
+    print((time.time() - start) / 1)
     print(res)
     # id2token = get_multilingual_dict()
     # batch_size, beam_size, _ = res.shape

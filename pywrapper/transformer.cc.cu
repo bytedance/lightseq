@@ -122,7 +122,7 @@ class Transformer {
     }
   }
 
-  std::tuple<py::array_t<int>, py::array_t<int>> infer(
+  std::tuple<py::array_t<int>, py::array_t<float>> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
       bool multiple_output = false, std::string sampling_method = "",
       int beam_size = -1, float length_penalty = -1, float topp = -1,
@@ -159,11 +159,11 @@ class Transformer {
     byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));
-    auto scores = py::array_t<int>({batch_size, output_k});
-    // int *scores_data = scores.mutable_data(0, 0);
-    // byseqlib::cuda::CHECK_GPU_ERROR(
-    //     cudaMemcpy(scores_data, decoder_->_p_d_alive_seq_score,
-    //                sizeof(int) * scores.size(), cudaMemcpyDeviceToHost));
+    auto scores = py::array_t<float>({batch_size, output_k});
+    float *scores_data = scores.mutable_data(0, 0);
+    byseqlib::cuda::CHECK_GPU_ERROR(
+        cudaMemcpy(scores_data, decoder_->_p_d_alive_seq_score,
+                   sizeof(float) * scores.size(), cudaMemcpyDeviceToHost));
     return std::make_tuple(tokens, scores);
   }
 };

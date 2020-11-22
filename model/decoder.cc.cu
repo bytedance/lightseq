@@ -749,12 +749,17 @@ bool Decoder<OpType_>::beam_search() {
 
 #ifdef DEBUG_RESULT
   for (int ii = 0; ii < _batch_size; ii++) {
-    for (int jj = 0; jj < 1; jj++) {
+    for (int jj = 0; jj < _tw._beam_size; jj++) {
       print_vec(_p_d_alive_seq + (ii * _tw._beam_size + jj) * _tw._max_step,
                 "Batch token ids: ", _cur_step + 2);
+      print_vec(_p_d_alive_seq_probs + ii * _tw._beam_size + jj,
+                "Batch probs: ", 1);
+      print_vec(_p_d_alive_seq_score + ii * _tw._beam_size + jj,
+                "Batch scores: ", 1);
     }
   }
 #endif
+
   if (_h_can_num_batch == _step_token_num) {
 #ifdef DEBUG_RESULT
     std::cout << "early stop beam search!" << std::endl;
