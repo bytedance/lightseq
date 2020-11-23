@@ -1,17 +1,17 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
+#include <cuda.h>
 #include <unistd.h>
 
 #include <string>
 
-#include "cuda/include/cuda.h"
-#include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
-#include "src/core/model_config_cuda.h"
-#include "src/custom/byseqlib/model/gpt_encoder.h"
-#include "src/custom/byseqlib/proto/gpt_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
-#include "src/servables/custom/custom.h"
+#include "model/gpt_encoder.h"
+#include "model_config.pb.h"
+#include "proto/gpt_weight.h"
+#include "server/custom.h"
+#include "server/model_config.h"
+#include "server/model_config_cuda.h"
+#include "tools/util.h"
 
 /**
 @file

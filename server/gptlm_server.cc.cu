@@ -1,23 +1,21 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
+#include <cuda.h>
 #include <unistd.h>
 
 #include <string>
 
-#include "cuda/include/cuda.h"
-#include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
-#include "src/core/model_config_cuda.h"
-#include "src/custom/byseqlib/model/decoder.h"
-#include "src/custom/byseqlib/model/encoder.h"
-#include "src/custom/byseqlib/proto/transformer_weight.h"
-#include "src/custom/byseqlib/tools/util.h"
-#include "src/servables/custom/custom.h"
+#include "model/gpt_encoder.h"
+#include "model_config.pb.h"
+#include "proto/gpt_weight.h"
+#include "server/custom.h"
+#include "server/model_config.h"
+#include "server/model_config_cuda.h"
+#include "tools/util.h"
 
 /**
 @file
-Generate(Transformer multi target outputs) server
-  based on tensorrt inference server.
+GPT Language Model server based on tensorrt inference server.
 */
 
 #define LOG_ERROR std::cerr
@@ -28,7 +26,7 @@ const byseqlib::cuda::OperationType OPTYPE =
 namespace nvidia {
 namespace inferenceserver {
 namespace custom {
-namespace generate {
+namespace gptlm {
 
 // Integer error codes. TRTIS requires that success must be 0. All
 // other codes are interpreted by TRTIS as failures.
@@ -100,8 +98,6 @@ class Context {
 
   // CUDA memory buffers for input and output tensors.
   void* d_input_;
-  void* d_padding_mask_;
-  void* d_encoder_output_;
   void* d_buf_;
   void* d_output_;
 
@@ -110,9 +106,8 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  byseqlib::cuda::TransformerWeight<OPTYPE> tw_;
-  std::shared_ptr<byseqlib::cuda::Decoder<OPTYPE>> decoder_;
-  std::shared_ptr<byseqlib::cuda::Encoder<OPTYPE>> encoder_;
+  byseqlib::cuda::GptWeight<OPTYPE> tw_;
+  std::shared_ptr<byseqlib::cuda::GptEncoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -122,8 +117,6 @@ Context::Context(const std::string& instance_name,
       gpu_device_(gpu_device),
       datatype_(DataType::TYPE_INVALID),
       d_input_(nullptr),
-      d_padding_mask_(nullptr),
-      d_encoder_output_(nullptr),
       d_buf_(nullptr),
       d_output_(nullptr),
       stream_(nullptr),
@@ -157,22 +150,6 @@ int Context::FreeCudaBuffers() {
       LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
     }
     d_input_ = nullptr;
-  }
-
-  if (d_padding_mask_ != nullptr) {
-    cudaError_t cuerr = cudaFree(d_padding_mask_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
-    }
-    d_padding_mask_ = nullptr;
-  }
-
-  if (d_encoder_output_ != nullptr) {
-    cudaError_t cuerr = cudaFree(d_encoder_output_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
-    }
-    d_encoder_output_ = nullptr;
   }
 
   if (d_buf_ != nullptr) {
@@ -260,27 +237,19 @@ int Context::Init() {
   }
   datatype_bytesize_ = GetDataTypeByteSize(datatype_);
 
-  if (model_config_.input(0).name() != "src_ids:0") {
+  if (model_config_.input(0).name() != "inputs_ids") {
     return kInputName;
   }
 
-  if (model_config_.output_size() != 2) {
+  if (model_config_.output_size() != 1) {
     return kInputOutputShape;
   }
 
-  if (model_config_.output(0).data_type() != datatype_) {
+  if (model_config_.output(0).data_type() != DataType::TYPE_FP32) {
     return kInputOutputDataType;
   }
 
-  if (model_config_.output(1).data_type() != DataType::TYPE_FP32) {
-    return kInputOutputDataType;
-  }
-
-  if (model_config_.output(0).name() != "trg_ids:0") {
-    return kOutputName;
-  }
-
-  if (model_config_.output(1).name() != "score") {
+  if (model_config_.output(0).name() != "loss") {
     return kOutputName;
   }
 
@@ -291,15 +260,14 @@ int Context::Init() {
   }
   std::string model_path = mz;
   model_path += "/" + model_config_.name();
-  std::string res =
-      "load model weight from " + model_path + "/transformer.pb\n";
+  std::string res = "load model weight from " + model_path + "/gpt.pb\n";
   LOG_INFO << res;
-  res = tw_.initializing(model_path + "/transformer.pb");
+  res = tw_.initializing(model_path + "/gpt.pb");
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
-  if (tw_._sampling_method != "beam_search") tw_._beam_size = 1;
+
   int max_batch_size = model_config_.max_batch_size();
   int err;
   err = AllocateCudaBuffers(
@@ -307,62 +275,38 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
-  err = AllocateCudaBuffers(
-      &d_padding_mask_, max_batch_size * tw_._max_step * datatype_bytesize_);
-  if (err != kSuccess) {
-    return err;
-  }
-  err = AllocateCudaBuffers(
-      &d_encoder_output_,
-      max_batch_size * tw_._max_step * tw_._hidden_size * datatype_bytesize_);
-  if (err != kSuccess) {
-    return err;
-  }
-  err = AllocateCudaBuffers(&d_output_, max_batch_size * tw_._beam_size *
-                                            tw_._max_step * datatype_bytesize_);
+  err = AllocateCudaBuffers(&d_output_,
+                            max_batch_size * sizeof(DataType::TYPE_FP32));
   if (err != kSuccess) {
     return err;
   }
 
-  encoder_ = std::make_shared<byseqlib::cuda::Encoder<OPTYPE>>(
+  encoder_ = std::make_shared<byseqlib::cuda::GptEncoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
-      reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<_optraits::DataType*>(d_encoder_output_), tw_, stream_,
-      hd_);
+      reinterpret_cast<float*>(d_output_), reinterpret_cast<int*>(d_output_),
+      tw_, stream_, stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kModelSize;
   }
-  decoder_ = std::make_shared<byseqlib::cuda::Decoder<OPTYPE>>(
-      max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
-      reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
-      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_, true);
-  res = decoder_->check();
-  if (!res.empty()) {
-    LOG_ERROR << res << std::endl;
-    return kModelSize;
-  }
 
-  long buf_bytesize = max(encoder_->compute_buffer_bytesize(),
-                          decoder_->compute_buffer_bytesize());
+  long buf_bytesize = encoder_->compute_buffer_bytesize();
   err = AllocateCudaBuffers(&d_buf_, buf_bytesize);
   if (err != kSuccess) {
     return err;
   }
-  // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
-  decoder_->init_buffer(d_buf_);
 
   // Wait for all init finish.
   cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "failed to init GPU for transformer: "
-              << cudaGetErrorString(cuerr) << std::endl;
+    LOG_ERROR << "failed to init GPU for gpt: " << cudaGetErrorString(cuerr)
+              << std::endl;
     return kCudaExecute;
   }
-  LOG_INFO << "Transformer Generate, release-version[" << __DATE__ << " "
-           << __TIME__ << "], Trtis instance init succeed!" << std::endl;
+  LOG_INFO << "GPT, release-version[" << __DATE__ << " " << __TIME__
+           << "], Trtis instance init succeed!" << std::endl;
   return kSuccess;
 }
 
@@ -396,7 +340,7 @@ int Context::GetInputTensorGPU(CustomGetNextInputFn_t input_fn,
         reinterpret_cast<char*>(input) + total_content_byte_size, content,
         content_byte_size, cudaMemcpyHostToDevice, stream_);
     if (cuerr != cudaSuccess) {
-      LOG_ERROR << "failed to copy input values to GPU for transformer: "
+      LOG_ERROR << "failed to copy input values to GPU for gpt: "
                 << cudaGetErrorString(cuerr) << std::endl;
       LOG_ERROR << "try to copy " << total_content_byte_size + content_byte_size
                 << " bytes from input" << std::endl;
@@ -445,7 +389,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
     const uint64_t batchn_byte_size = batchn_element_count * datatype_bytesize_;
 
     // Copy the input tensors into the appropriate CUDA memory buffer.
-    err = GetInputTensorGPU(input_fn, payload.input_context, "src_ids:0",
+    err = GetInputTensorGPU(input_fn, payload.input_context, "inputs_ids",
                             batchn_byte_size, d_input_);
     if (err != kSuccess) {
       payload.error_code = err;
@@ -453,34 +397,25 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
     }
 
     encoder_->run_one_infer(payload.batch_size, batch_seq_len);
-    decoder_->run_one_infer(payload.batch_size, batch_seq_len);
     // The output shape is [payload-batch-size, shape] if the model
     // configuration supports batching, or just [shape] if the
     // model configuration does not support batching.
-    std::vector<int64_t> output_shape = {payload.batch_size, tw_._beam_size,
-                                         decoder_->_cur_step + 1};
-    int64_t output_bytesize = output_shape[0] * output_shape[1] *
-                              output_shape[2] * datatype_bytesize_;
-    int64_t score_bytesize =
+    std::vector<int64_t> output_shape = {payload.batch_size, 1};
+    int64_t output_bytesize =
         output_shape[0] * output_shape[1] * datatype_bytesize_;
 
-    const char* output_name = "trg_ids:0";
-    const char* score_name = "score";
+    const char* output_name = "loss";
+
     void* obuffer;
     if (!output_fn(payload.output_context, output_name, output_shape.size(),
                    &output_shape[0], output_bytesize, &obuffer)) {
       payload.error_code = kOutputBuffer;
       break;
     }
-    void* sbuffer;
-    if (!output_fn(payload.output_context, score_name, 2, &output_shape[0],
-                   score_bytesize, &sbuffer)) {
-      payload.error_code = kOutputBuffer;
-      break;
-    }
+
     // If no error but the 'obuffer' is returned as nullptr, then
     // skip writing this output.
-    if (obuffer == nullptr || sbuffer == nullptr) {
+    if (obuffer == nullptr) {
       continue;
     }
 
@@ -494,10 +429,8 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
 
     cuerr = cudaMemcpyAsync(obuffer, d_output_, output_bytesize,
                             cudaMemcpyDeviceToHost, stream_);
-    cuerr = cudaMemcpyAsync(sbuffer, decoder_->_p_d_alive_seq_score,
-                            score_bytesize, cudaMemcpyDeviceToHost, stream_);
     if (cuerr != cudaSuccess) {
-      LOG_ERROR << "failed to copy output values from GPU for transformer: "
+      LOG_ERROR << "failed to copy output values from GPU for gpt: "
                 << cudaGetErrorString(cuerr) << std::endl;
       payload.error_code = kCudaMemcpy;
       break;
@@ -507,7 +440,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
   // Wait for all compute and memcpy to complete.
   cudaError_t cuerr = cudaStreamSynchronize(stream_);
   if (cuerr != cudaSuccess) {
-    LOG_ERROR << "failed to synchronize GPU for transformer: "
+    LOG_ERROR << "failed to synchronize GPU for gpt: "
               << cudaGetErrorString(cuerr) << std::endl;
     return kCudaExecute;
   }
@@ -597,9 +530,9 @@ const char* CustomErrorString(void* custom_context, int errcode) {
     case kCpuExecute:
       return "cpu execution failed";
     case kWeightLoad:
-      return "load transformer weight in .pb failed";
+      return "load gpt weight in .pb failed";
     case kModelSize:
-      return "inappropriate transformer model size";
+      return "inappropriate gpt model size";
     default:
       break;
   }
@@ -620,7 +553,7 @@ int CustomExecute(void* custom_context, const uint32_t payload_cnt,
 
 }  // extern "C"
 
-}  // namespace generate
+}  // namespace gptlm
 }  // namespace custom
 }  // namespace inferenceserver
 }  // namespace nvidia

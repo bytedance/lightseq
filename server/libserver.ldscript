@@ -1,0 +1,8 @@
+{
+  global:
+    CustomErrorString;
+    CustomExecute;
+    CustomFinalize;
+    CustomInitialize;
+  local: *;
+};

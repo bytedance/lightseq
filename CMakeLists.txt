@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(FasterTransformer LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
-find_package(CUDA 11 REQUIRED)
+find_package(CUDA 10.1 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
@@ -20,15 +20,15 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
-set(CMAKE_CUDA_RUNTIME_LIBRARY "Shared")
+set(CMAKE_CUDA_RUNTIME_LIBRARY "Static")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++14")
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++11")
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -fPIC")
 set(CMAKE_CUDA_FLAGS_RELEASE
@@ -60,3 +60,4 @@ add_subdirectory(model)
 add_subdirectory(example)
 add_subdirectory(3rdparty/pybind11)
 add_subdirectory(pywrapper)
+add_subdirectory(server)

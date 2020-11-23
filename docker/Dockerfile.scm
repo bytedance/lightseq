@@ -1,8 +1,12 @@
-FROM hub.byted.org/base/lab.debian
+FROM hub.byted.org/base/toutiao.debian
 
 ENV http_proxy="http://sys-proxy-rd-relay.byted.org:8118"
 ENV https_proxy="http://sys-proxy-rd-relay.byted.org:8118"
 ENV no_proxy="byted.org"
+
+
+ENV CUDA_VERSION 10.1.243
+ENV CUDA_PKG_VERSION 10-1=$CUDA_VERSION-1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg2 curl ca-certificates build-essential \
@@ -18,25 +22,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     sshpass \
     openssh-client && \
-    curl -fsSL https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
-    echo "deb https://mirrors.aliyun.com/nvidia-cuda/ubuntu1804/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
+    curl -fsSL https://mirrors.aliyun.com/nvidia-cuda/ubuntu1604/x86_64/7fa2af80.pub | apt-key add - && \
+    echo "deb https://mirrors.aliyun.com/nvidia-cuda/ubuntu1604/x86_64/ /" > /etc/apt/sources.list.d/cuda.list && \
     apt-get update && apt-get install -y --no-install-recommends \
-    cuda-cudart-11-0=11.0.221-1 \
-    cuda-compat-11-0 \
-    cuda-libraries-11-0=11.0.3-1 \
-    libnpp-11-0=11.1.0.245-1 \
-    cuda-nvtx-11-0=11.0.167-1 \
-    libcublas-11-0=11.2.0.252-1 \
-    cuda-nvml-dev-11-0=11.0.167-1 \
-    cuda-command-line-tools-11-0=11.0.3-1 \
-    cuda-nvprof-11-0=11.0.221-1 \
-    libnpp-dev-11-0=11.1.0.245-1 \
-    cuda-libraries-dev-11-0=11.0.3-1 \
-    cuda-minimal-build-11-0=11.0.3-1 \
-    libcublas-dev-11-0=11.2.0.252-1 \
-    libcusparse-11-0=11.1.1.245-1 \
-    libcusparse-dev-11-0=11.1.1.245-1 \
-    && ln -s cuda-11.0 /usr/local/cuda && \
+    cuda-cudart-$CUDA_PKG_VERSION \
+    cuda-compat-10-1 \
+    cuda-libraries-$CUDA_PKG_VERSION \
+    cuda-npp-$CUDA_PKG_VERSION \
+    cuda-nvtx-$CUDA_PKG_VERSION \
+    libcublas10=10.2.1.243-1 \
+    cuda-nvml-dev-$CUDA_PKG_VERSION \
+    cuda-command-line-tools-$CUDA_PKG_VERSION \
+    cuda-nvprof-$CUDA_PKG_VERSION \
+    cuda-npp-dev-$CUDA_PKG_VERSION \
+    cuda-libraries-dev-$CUDA_PKG_VERSION \
+    cuda-minimal-build-$CUDA_PKG_VERSION \
+    libcublas-dev=10.2.1.243-1 \
+    && apt-mark hold libcublas10 libcublas-dev && ln -s cuda-10.1 /usr/local/cuda && \
     rm -rf /var/lib/apt/lists/*
 
 # install protobuf

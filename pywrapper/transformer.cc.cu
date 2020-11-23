@@ -16,8 +16,8 @@ const byseqlib::cuda::OperationType transformer_optytpe =
 
 namespace py = pybind11;
 
-namespace byseqlib::cuda {
-
+namespace byseqlib {
+namespace cuda {
 class Transformer {
  private:
   typedef byseqlib::cuda::OperationTypeTraits<transformer_optytpe> optraits;
@@ -142,12 +142,13 @@ class Transformer {
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
-    if (batch_size > _max_batch_size){
-      throw std::runtime_error("batch size of input greater than max_batch_size");
+    if (batch_size > _max_batch_size) {
+      throw std::runtime_error(
+          "batch size of input greater than max_batch_size");
     }
-      byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
-          d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
-          cudaMemcpyHostToDevice, stream_));
+    byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
+        d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
+        cudaMemcpyHostToDevice, stream_));
 
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
@@ -167,4 +168,5 @@ class Transformer {
     return std::make_tuple(tokens, scores);
   }
 };
-}  // namespace byseqlib::cuda
+}  // namespace cuda
+}

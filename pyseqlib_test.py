@@ -163,17 +163,18 @@ def test_q2q_transformer():
     transformer = lightseq.Transformer("q2q_transformer.pb", 8)
     start = time.time()
     for _ in range(1):
-        res = transformer.infer(test_input)
+        res = transformer.infer(test_input,multiple_output=True)
     print((time.time() - start) / 1)
     print(res)
+    res = res[0]
     id2token = get_q2q_dict()
-    batch_size, _ = res.shape
+    batch_size,beam_size, _ = res.shape
     for batch_id in range(batch_size):
-        for beam_id in range(1):
+        for beam_id in range(beam_size):
             print(
                 "batch {0} beam {1}: ".format(batch_id, beam_id)
                 + " ".join(
-                    id2token[i] for i in res[batch_id, :] if id2token[i] != "<EOS>"
+                    id2token[i] for i in res[batch_id,beam_id, :] if id2token[i] != "<EOS>"
                 )
             )
 
@@ -188,5 +189,5 @@ def test_q2q_transformer():
 # print((time.time() - start) / 100)
 
 if __name__ == "__main__":
-    test_en_correction()
-    # test_q2q_transformer()
+    # test_en_correction()
+    test_q2q_transformer()

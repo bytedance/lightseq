@@ -1,6 +1,3 @@
-// #include "3rdparty/cub-1.8.0/cub/cub.cuh"
-// #include <cub/cub.cuh>
-
 #include "common.h"
 #include "transformerKernels.h"
 

@@ -16,7 +16,8 @@ const byseqlib::cuda::OperationType decoder_optype =
     byseqlib::cuda::OperationType::FP32;
 #endif
 
-namespace byseqlib::cuda {
+namespace byseqlib {
+namespace cuda {
 class TransformerDecoder {
  private:
   typedef byseqlib::cuda::OperationTypeTraits<decoder_optype> optraits;
@@ -150,5 +151,5 @@ class TransformerDecoder {
     return tokens;
   }
 };
-
-}  // namespace byseqlib::cuda
+}  // namespace cuda
+}  // namespace byseqlib
