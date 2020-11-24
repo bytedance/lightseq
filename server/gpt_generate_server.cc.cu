@@ -20,8 +20,13 @@ GPT Language Model server based on tensorrt inference server.
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
+#ifdef FP16_MODE
+const byseqlib::cuda::OperationType OPTYPE =
+    byseqlib::cuda::OperationType::FP16;
+#else
 const byseqlib::cuda::OperationType OPTYPE =
     byseqlib::cuda::OperationType::FP32;
+#endif
 
 namespace nvidia {
 namespace inferenceserver {

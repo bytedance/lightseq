@@ -1,18 +1,18 @@
 // Copyright (c) 2019, ByteDance CORPORATION. All rights reserved.
 
+#include <cuda.h>
 #include <unistd.h>
 
 #include <string>
 
-#include <cuda.h>
-#include "server/model_config.h"
-#include "model_config.pb.h"
-#include "server/model_config_cuda.h"
 #include "model/decoder.h"
 #include "model/encoder.h"
+#include "model_config.pb.h"
 #include "proto/transformer_weight.h"
-#include "tools/util.h"
 #include "server/custom.h"
+#include "server/model_config.h"
+#include "server/model_config_cuda.h"
+#include "tools/util.h"
 
 /**
 @file
@@ -22,9 +22,13 @@ Generate(Transformer multi target outputs) server
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
+#ifdef FP16_MODE
+const byseqlib::cuda::OperationType OPTYPE =
+    byseqlib::cuda::OperationType::FP16;
+#else
 const byseqlib::cuda::OperationType OPTYPE =
     byseqlib::cuda::OperationType::FP32;
-
+#endif
 namespace nvidia {
 namespace inferenceserver {
 namespace custom {
