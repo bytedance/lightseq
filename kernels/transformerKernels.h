@@ -132,6 +132,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                                    float diverse_lambda, int end_id);
 
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
+                                                  float* seq_scores,
                                                   int* output, int max_step,
                                                   int beam_size);
 

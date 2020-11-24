@@ -289,7 +289,8 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   if (_tw._length_penalty >= 0.f || _cur_step == _batch_max_decode_length) {
     ker_write_trg_tokenid_pos_penalty<<<_batch_size, _cur_step + 1, 0,
                                         _stream>>>(
-        _p_d_alive_seq, _p_d_result, _tw._max_step, _tw._beam_size);
+        _p_d_alive_seq, _p_d_alive_seq_score, _p_d_result, _tw._max_step,
+        _tw._beam_size);
   } else {
     ker_write_trg_tokenid_neg_penalty<<<_batch_size, _cur_step + 1, 0,
                                         _stream>>>(

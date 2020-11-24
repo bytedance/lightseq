@@ -1708,11 +1708,15 @@ output: [batch_size, cur_step + 1], no <start> and at least one <eos> in the
 last of seq
 */
 __global__ void ker_write_trg_tokenid_pos_penalty(const int* alive_seq,
-                                                  int* output, int max_step,
-                                                  int beam_size) {
+                                                  float* seq_score, int* output,
+                                                  int max_step, int beam_size) {
   int target_id =
       targetid_3dim(blockIdx.x, 0, threadIdx.x + 1, beam_size, max_step);
   output[blockIdx.x * blockDim.x + threadIdx.x] = alive_seq[target_id];
+  if (threadIdx.x == 0) {
+    seq_score[blockIdx.x] =
+        seq_score[blockIdx.x * beam_size] - blockIdx.x * min_log_probability;
+  }
 }
 
 /**
