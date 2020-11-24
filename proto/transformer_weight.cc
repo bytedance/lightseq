@@ -1,5 +1,6 @@
 #include "transformer_weight.h"
 
+#include <fstream>
 /**
 @file
 Load the model weights which stored in custom proto file into GPU memory.
@@ -400,19 +401,11 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
   // Verify that the version of the library that we linked against is
   // compatible with the version of the headers we compiled against.
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-  int fd = open(proto_path.c_str(), O_RDONLY);
-  if (!fd) {
-    return "Proto file [" + proto_path + "] not found.";
-  }
-  google::protobuf::io::ZeroCopyInputStream *raw_input =
-      new google::protobuf::io::FileInputStream(fd);
-  if (!transformer.ParseFromZeroCopyStream(raw_input)) {
-    delete raw_input;
-    close(fd);
+
+  std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
+  if (!transformer.ParseFromIstream(&raw_input)) {
     return "Parse weights from [" + proto_path + "] failed.";
   }
-  delete raw_input;
-  close(fd);
 
   get_model_config(transformer, only_decoder);
 
