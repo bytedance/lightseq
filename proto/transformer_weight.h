@@ -16,7 +16,7 @@
 #include "tools/util.h"
 #include "transformer.pb.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /*
@@ -135,4 +135,4 @@ class TransformerWeight {
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

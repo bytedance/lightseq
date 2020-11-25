@@ -16,7 +16,7 @@
 #include "proto/gpt_weight.h"
 #include "tools/util.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -102,4 +102,4 @@ class GptEncoder {
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

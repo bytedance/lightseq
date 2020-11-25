@@ -9,8 +9,8 @@ Example of how to run gpt inference using our implementation.
 */
 
 // Appoint precision.
-const byseqlib::cuda::OperationType optype =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType optype =
+    lightseq::cuda::OperationType::FP32;
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
   cublasSetStream(hd_, stream_);
 
   /* ---step2. load model weights into GPU memory--- */
-  byseqlib::cuda::GptWeight<optype> tw_;
+  lightseq::cuda::GptWeight<optype> tw_;
   // saved in custom proto file
   std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
@@ -43,8 +43,8 @@ int main(int argc, char *argv[]) {
   thrust::device_vector<int> d_sample_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<float> d_ppl_ = std::vector<float>(max_batch_size, 0.f);
-  std::shared_ptr<byseqlib::cuda::GptEncoder<optype>> encoder_ =
-      std::make_shared<byseqlib::cuda::GptEncoder<optype>>(
+  std::shared_ptr<lightseq::cuda::GptEncoder<optype>> encoder_ =
+      std::make_shared<lightseq::cuda::GptEncoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
           reinterpret_cast<float *>(thrust::raw_pointer_cast(d_sample_.data())),
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
   // 666 666 666
   // 666 666 666
   std::string input_file_name = argv[2];
-  byseqlib::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
+  lightseq::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]) {
     sample_output += batch_seq_len;
     sum_sample_step += sample_step - batch_seq_len;
   }
-  byseqlib::cuda::print_vec(d_sample_.data(), "sample_output",
+  lightseq::cuda::print_vec(d_sample_.data(), "sample_output",
                             batch_size * sample_step);
-  byseqlib::cuda::print_time_duration(start, "one infer time", stream_);
+  lightseq::cuda::print_time_duration(start, "one infer time", stream_);
   std::cout << "Total sampled steps: " << sum_sample_step << std::endl;
   return 0;
 }

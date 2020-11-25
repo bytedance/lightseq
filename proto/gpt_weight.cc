@@ -10,7 +10,7 @@ Weights in proto file will always be in fp32. For fp16, the weights
   will be casted from fp32 into fp16
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /**
@@ -234,4 +234,4 @@ template class GptWeight<OperationType::FP16>;
 template class GptWeight<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

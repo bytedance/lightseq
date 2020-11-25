@@ -1,12 +1,12 @@
-# Byseqlib
-Byseqlib is a high performance inference library for SOTA NLU/NLG models. It's built on
+# LightSeq
+LightSeq is a high performance inference library for SOTA NLU/NLG models. It's built on
 CUDA official library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and custom kernel functions which are specially fused and
 optimized for these widely used models. In addition to model components, we also provide codes
 manage model weights trained from deepleanring framework and servers as a custom backend for
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
-to as trtis in the later discussion). With Byseqlib, you can easily deploy efficient model services or develop
+to as trtis in the later discussion). With LightSeq, you can easily deploy efficient model services or develop
 your own model architectures just with a little code modification.
 
 
@@ -26,7 +26,7 @@ a beam size of 4 and a target vocabulary size of approximately 30k. The implemen
 was used as the benchmark of tf-transformer. Due to the lack of tf-beam-search in the fp16
 version, we only tested the fp32 version of the tf-transformer for fair comparison.
 
-The following table is a comparison of Byseqlib and TensorFlow tested on Tesla P4 and Tesla T4. To
+The following table is a comparison of LightSeq and TensorFlow tested on Tesla P4 and Tesla T4. To
 save space, we only show the results of batch_size = 8. More results is available
 [here](./docs/performance.md).
 <table>
@@ -167,19 +167,19 @@ docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
 cd /quick_start
 ```
 ### Use our pre-build lib
-To quickly deploy your model that supported by Byseqlib currently, you can download the pre-built libraries
+To quickly deploy your model that supported by LightSeq currently, you can download the pre-built libraries
 from the GitHub release page corresponding to the release version you are interested in. In each release
 version, we will upload binary executable example and dynamic link library of models which is a
 custom backend of trtis.
 ```shell
-wget https://github.com/bytedance/byseqlib/releases/download/${VERSION}/${VERSION}_libs.tar.gz
+wget https://github.com/bytedance/lightseq/releases/download/${VERSION}/${VERSION}_libs.tar.gz
 tar -zxvf ${VERSION}_libs.tar.gz
 ```
 ### Run local inference demo
 To run local inference demo, you need to prepare model weights saved in custom proto defined by
-Byseqlib and input token ids. We provide a GPT-LM model and its corresponding input token ids:
+LightSeq and input token ids. We provide a GPT-LM model and its corresponding input token ids:
 ```shell
-wget https://github.com/bytedance/byseqlib/releases/download/v0.0.1/v0.0.1_gptlm.pkg.tar.gz
+wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.pkg.tar.gz
 tar -zxvf v0.0.1_gptlm.pkg.tar.gz
 # fp32 example
 ./{VERSION}_libs/gptlm_example.fp32 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
@@ -201,7 +201,7 @@ models/
 With the pre-built libraries and example weights mentioned above, you can easily run a server:
 ```shell
 mkdir -p ./model_zoo/gptlm/1
-wget https://github.com/bytedance/byseqlib/releases/download/v0.0.1/v0.0.1_gptlm.config.pbtxt
+wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.config.pbtxt
 mv v0.0.1_gptlm.config.pbtxt model_zoo/gptlm/config.pbtxt
 cp ./v0.0.1_gptlm.pkg/gpt.pb model_zoo/gptlm/gpt.pb
 cp ./{VERSION}_libs/libgptlm.so.fp32 model_zoo/gptlm/1/libgptlm.so
@@ -215,12 +215,12 @@ client](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 
 ### Serve your own model
 In order to serve your own model, you need to [export model](./docs/export_model.md) trained from deeplearning framework(E.g.
-TenforFlow, PyTorch) to custom model proto defined by Byseqlib. Furthermore, you may need to [build from
+TenforFlow, PyTorch) to custom model proto defined by LightSeq. Furthermore, you may need to [build from
 source code](./docs/build.md) if you want to modify the model architectures or serve a new model not supported by
-Byseqlib currently.
+LightSeq currently.
 
 ## Limitations and Future Plans
-Byseqlib does not support CPU inference for now and its compilation relies heavily on trtis, we will
+LightSeq does not support CPU inference for now and its compilation relies heavily on trtis, we will
 try to solve these problems in future. Furthermore, the following will be the focus of our future
 work:
 - Support more model architectures and decoding search algorithms.

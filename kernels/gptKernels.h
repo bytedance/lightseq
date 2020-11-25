@@ -5,7 +5,7 @@
 
 #include "3rdparty/cub/cub/cub.cuh"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <typename T>
@@ -63,4 +63,4 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               curandState* curandstate, int eos_id);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

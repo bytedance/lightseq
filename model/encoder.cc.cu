@@ -7,7 +7,7 @@ Transformer encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -235,4 +235,4 @@ template class Encoder<OperationType::FP16>;
 template class Encoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

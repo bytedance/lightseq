@@ -9,19 +9,19 @@
 namespace py = pybind11;
 
 #ifdef FP16_MODE
-const byseqlib::cuda::OperationType decoder_optype =
-    byseqlib::cuda::OperationType::FP16;
+const lightseq::cuda::OperationType decoder_optype =
+    lightseq::cuda::OperationType::FP16;
 #else
-const byseqlib::cuda::OperationType decoder_optype =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType decoder_optype =
+    lightseq::cuda::OperationType::FP32;
 #endif
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 class TransformerDecoder {
  private:
-  typedef byseqlib::cuda::OperationTypeTraits<decoder_optype> optraits;
-  byseqlib::cuda::Decoder<decoder_optype> *decoder_;
+  typedef lightseq::cuda::OperationTypeTraits<decoder_optype> optraits;
+  lightseq::cuda::Decoder<decoder_optype> *decoder_;
 
   optraits::DataType *d_encoder_output_;
   int *d_output_;
@@ -29,7 +29,7 @@ class TransformerDecoder {
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;
-  byseqlib::cuda::TransformerWeight<decoder_optype> tw_;
+  lightseq::cuda::TransformerWeight<decoder_optype> tw_;
 
  public:
   TransformerDecoder(const std::string weight_path, const int max_batch_size)
@@ -75,18 +75,18 @@ class TransformerDecoder {
     // FIXME: padding mask should be passed from user
     // thrust::device_vector<int> d_padding_mask_ =
     //     std::vector<int>(_max_batch_size * tw_._max_step, 0);
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_padding_mask_, _max_batch_size * tw_._max_step * sizeof(int)));
 
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                                 sizeof(optraits::DataType)));
 
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_output_,
         _max_batch_size * tw_._beam_size * tw_._max_step * sizeof(int)));
 
-    decoder_ = new byseqlib::cuda::Decoder<decoder_optype>(
+    decoder_ = new lightseq::cuda::Decoder<decoder_optype>(
         _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
         stream_, hd_, true);
     res = decoder_->check();
@@ -99,7 +99,7 @@ class TransformerDecoder {
 
     void *d_buf_;
     // encoder and decoder use the same buffer to save gpu memory useage
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((void **)&d_buf_, (size_t)buf_bytesize));
     decoder_->init_buffer(d_buf_);
     cuerr = cudaStreamSynchronize(stream_);
@@ -121,7 +121,7 @@ class TransformerDecoder {
     std::vector<optraits::DataType> h_encoder_out(encoder_out.size());
     for (auto i = 0; i < encoder_out.size(); i++) {
       optraits::DataType data;
-      if (decoder_optype == byseqlib::cuda::OperationType::FP16) {
+      if (decoder_optype == lightseq::cuda::OperationType::FP16) {
         data = __float2half_rn(encoder_output_data[i]);
       } else {
         data = encoder_output_data[i];
@@ -129,11 +129,11 @@ class TransformerDecoder {
       h_encoder_out[i] = data;
     }
 
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMemcpyAsync(d_encoder_output_, h_encoder_out.data(),
                         sizeof(optraits::DataType) * encoder_out.size(),
                         cudaMemcpyHostToDevice, stream_));
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMemcpyAsync(d_padding_mask_, encoder_mask_data,
                         sizeof(int) * encoder_mask_out.size(),
                         cudaMemcpyHostToDevice, stream_));
@@ -145,11 +145,11 @@ class TransformerDecoder {
     int beam_size = tw_._beam_size;
     auto tokens = py::array_t<int>({batch_size, beam_size, tokens_size});
     int *tokens_data = tokens.mutable_data(0, 0);
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));
     return tokens;
   }
 };
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

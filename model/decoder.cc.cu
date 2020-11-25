@@ -10,7 +10,7 @@ Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
@@ -860,4 +860,4 @@ template class Decoder<OperationType::FP16>;
 template class Decoder<OperationType::FP32>;
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

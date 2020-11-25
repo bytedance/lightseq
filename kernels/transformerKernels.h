@@ -5,7 +5,7 @@
 
 #include "3rdparty/cub/cub/cub.cuh"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 const float logit_thresh_max = 64.f;
@@ -179,4 +179,4 @@ void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
 __global__ void ker_curand_setup(curandState* state);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

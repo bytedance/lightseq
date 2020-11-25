@@ -10,7 +10,7 @@ Implemented the cuda kernel function and its launcher
 that required by GPT model.
 Currently, fp16 and fp32 versions are provided
 */
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /**
@@ -854,4 +854,4 @@ template void ker_topp_sample_launcher<__half>(
     curandState* curandstate, int eos_id);
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

@@ -16,7 +16,7 @@
 #include "gpt.pb.h"
 #include "tools/util.h"
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /*
@@ -74,4 +74,4 @@ class GptWeight {
 };
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

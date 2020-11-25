@@ -22,11 +22,11 @@ Transformer server based on tensorrt inference server.
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 #ifdef FP16_MODE
-const byseqlib::cuda::OperationType OPTYPE =
-    byseqlib::cuda::OperationType::FP16;
+const lightseq::cuda::OperationType OPTYPE =
+    lightseq::cuda::OperationType::FP16;
 #else
-const byseqlib::cuda::OperationType OPTYPE =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType OPTYPE =
+    lightseq::cuda::OperationType::FP32;
 #endif
 
 namespace nvidia {
@@ -75,7 +75,7 @@ class Context {
               CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  typedef byseqlib::cuda::OperationTypeTraits<OPTYPE> _optraits;
+  typedef lightseq::cuda::OperationTypeTraits<OPTYPE> _optraits;
   int FreeCudaBuffers();
   int AllocateCudaBuffers(void** pdata, size_t byte_size);
 
@@ -114,9 +114,9 @@ class Context {
   cudaStream_t stream_;
   cublasHandle_t hd_;
 
-  byseqlib::cuda::TransformerWeight<OPTYPE> tw_;
-  std::shared_ptr<byseqlib::cuda::Decoder<OPTYPE>> decoder_;
-  std::shared_ptr<byseqlib::cuda::Encoder<OPTYPE>> encoder_;
+  lightseq::cuda::TransformerWeight<OPTYPE> tw_;
+  std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_;
+  std::shared_ptr<lightseq::cuda::Encoder<OPTYPE>> encoder_;
 };
 
 Context::Context(const std::string& instance_name,
@@ -321,7 +321,7 @@ int Context::Init() {
     return err;
   }
 
-  encoder_ = std::make_shared<byseqlib::cuda::Encoder<OPTYPE>>(
+  encoder_ = std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_), tw_, stream_,
@@ -331,7 +331,7 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kModelSize;
   }
-  decoder_ = std::make_shared<byseqlib::cuda::Decoder<OPTYPE>>(
+  decoder_ = std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
       reinterpret_cast<int*>(d_output_), tw_, stream_, hd_);

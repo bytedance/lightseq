@@ -10,8 +10,8 @@ Example of how to run transformer generation inference using our implementation.
 */
 
 // Appoint precision.
-const byseqlib::cuda::OperationType optype =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType optype =
+    lightseq::cuda::OperationType::FP32;
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */
@@ -21,10 +21,10 @@ int main(int argc, char *argv[]) {
   cudaStreamCreate(&stream_);
   cublasCreate(&hd_);
   cublasSetStream(hd_, stream_);
-  typedef byseqlib::cuda::OperationTypeTraits<optype> optraits;
+  typedef lightseq::cuda::OperationTypeTraits<optype> optraits;
 
   /* ---step2. load model weights into GPU memory--- */
-  byseqlib::cuda::TransformerWeight<optype> tw_;
+  lightseq::cuda::TransformerWeight<optype> tw_;
   // saved in custom proto file
   std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
@@ -52,8 +52,8 @@ int main(int argc, char *argv[]) {
       std::vector<int>(max_batch_size * tw_._max_step * tw_._hidden_size, 0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._beam_size * tw_._max_step, 0);
-  std::shared_ptr<byseqlib::cuda::Encoder<optype>> encoder_ =
-      std::make_shared<byseqlib::cuda::Encoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Encoder<optype>> encoder_ =
+      std::make_shared<lightseq::cuda::Encoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
           reinterpret_cast<int *>(
@@ -67,8 +67,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // instantiate decoder
-  std::shared_ptr<byseqlib::cuda::Decoder<optype>> decoder_ =
-      std::make_shared<byseqlib::cuda::Decoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Decoder<optype>> decoder_ =
+      std::make_shared<lightseq::cuda::Decoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(
               thrust::raw_pointer_cast(d_padding_mask_.data())),
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
   //     std::vector<int>(buf_bytesize / sizeof(int), 0);
   void *d_buf_;
   // encoder and decoder use the same buffer to save gpu memory useage
-  byseqlib::cuda::CHECK_GPU_ERROR(
+  lightseq::cuda::CHECK_GPU_ERROR(
       cudaMalloc(&d_buf_, buf_bytesize));
   // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   // 666 666 666
   // 666 666 666
   std::string input_file_name = argv[2];
-  byseqlib::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
+  lightseq::cuda::read_batch_tokenids_from_file(input_file_name, batch_size,
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
@@ -124,14 +124,14 @@ int main(int argc, char *argv[]) {
     sum_sample_step += decoder_->_cur_step;
     for (int ii = 0; ii < batch_size; ii++) {
       for (int j = 0; j < tw_._beam_size; j++) {
-        byseqlib::cuda::print_vec(
+        lightseq::cuda::print_vec(
             d_output_.data() + ii * tw_._beam_size * (decoder_->_cur_step + 1) +
                 j * (decoder_->_cur_step + 1),
             "Beam result", decoder_->_cur_step + 1);
       }
     }
   }
-  byseqlib::cuda::print_time_duration(start, "Infer time", stream_);
+  lightseq::cuda::print_time_duration(start, "Infer time", stream_);
   std::cout << "Total sampled steps: " << sum_sample_step << std::endl;
   return 0;
 }

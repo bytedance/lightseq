@@ -7,13 +7,13 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(lightseq, m) {
-  py::class_<byseqlib::cuda::TransformerDecoder>(m, "TransformerDecoder")
+  py::class_<lightseq::cuda::TransformerDecoder>(m, "TransformerDecoder")
       .def(py::init<const std::string, const int>())
-      .def("infer", &byseqlib::cuda::TransformerDecoder::infer);
+      .def("infer", &lightseq::cuda::TransformerDecoder::infer);
 
-  py::class_<byseqlib::cuda::Transformer>(m, "Transformer")
+  py::class_<lightseq::cuda::Transformer>(m, "Transformer")
       .def(py::init<const std::string, const int>())
-      .def("infer", &byseqlib::cuda::Transformer::infer,
+      .def("infer", &lightseq::cuda::Transformer::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"),
            py::arg("multiple_output") = false, py::arg("sampling_method") = "",
            py::arg("beam_size") = -1, py::arg("length_penalty") = -1.0f,

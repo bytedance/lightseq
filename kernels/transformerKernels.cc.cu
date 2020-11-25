@@ -7,7 +7,7 @@ Implemented the cuda kernel function and its launcher
 that required by transformer model.
 Currently, fp16 and fp32 versions are provided
 */
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 
 /**
@@ -2262,4 +2262,4 @@ __global__ void ker_curand_setup(curandState* state) {
 }
 
 }  // namespace cuda
-}  // namespace byseqlib
+}  // namespace lightseq

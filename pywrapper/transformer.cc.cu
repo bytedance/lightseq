@@ -7,22 +7,22 @@
 #include "tools/util.h"
 
 #ifdef FP16_MODE
-const byseqlib::cuda::OperationType transformer_optytpe =
-    byseqlib::cuda::OperationType::FP16;
+const lightseq::cuda::OperationType transformer_optytpe =
+    lightseq::cuda::OperationType::FP16;
 #else
-const byseqlib::cuda::OperationType transformer_optytpe =
-    byseqlib::cuda::OperationType::FP32;
+const lightseq::cuda::OperationType transformer_optytpe =
+    lightseq::cuda::OperationType::FP32;
 #endif
 
 namespace py = pybind11;
 
-namespace byseqlib {
+namespace lightseq {
 namespace cuda {
 class Transformer {
  private:
-  typedef byseqlib::cuda::OperationTypeTraits<transformer_optytpe> optraits;
-  byseqlib::cuda::Encoder<transformer_optytpe> *encoder_;
-  byseqlib::cuda::Decoder<transformer_optytpe> *decoder_;
+  typedef lightseq::cuda::OperationTypeTraits<transformer_optytpe> optraits;
+  lightseq::cuda::Encoder<transformer_optytpe> *encoder_;
+  lightseq::cuda::Decoder<transformer_optytpe> *decoder_;
 
   optraits::DataType *d_encoder_output_;
   int *d_input_;
@@ -31,7 +31,7 @@ class Transformer {
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;
-  byseqlib::cuda::TransformerWeight<transformer_optytpe> tw_;
+  lightseq::cuda::TransformerWeight<transformer_optytpe> tw_;
   std::set<std::string> available_sampling_methods = {"beam_search", "topk",
                                                       "topp", "topk_greedy"};
 
@@ -77,19 +77,19 @@ class Transformer {
     */
 
     // register device memory for inputs and outputs
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int)));
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_padding_mask_, _max_batch_size * tw_._max_step * sizeof(int)));
 
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                                 sizeof(optraits::DataType)));
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMalloc(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
         &d_output_,
         _max_batch_size * tw_._beam_size * tw_._max_step * sizeof(int)));
 
-    encoder_ = new byseqlib::cuda::Encoder<transformer_optytpe>(
+    encoder_ = new lightseq::cuda::Encoder<transformer_optytpe>(
         max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
         stream_, hd_);
     res = encoder_->check();
@@ -97,7 +97,7 @@ class Transformer {
       throw std::runtime_error(res);
     }
 
-    decoder_ = new byseqlib::cuda::Decoder<transformer_optytpe>(
+    decoder_ = new lightseq::cuda::Decoder<transformer_optytpe>(
         _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
         stream_, hd_, true);
     res = decoder_->check();
@@ -111,7 +111,7 @@ class Transformer {
 
     void *d_buf_;
     // encoder and decoder use the same buffer to save gpu memory useage
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((void **)&d_buf_, (size_t)buf_bytesize));
     encoder_->init_buffer(d_buf_);
     decoder_->init_buffer(d_buf_);
@@ -146,7 +146,7 @@ class Transformer {
       throw std::runtime_error(
           "batch size of input greater than max_batch_size");
     }
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
         d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
         cudaMemcpyHostToDevice, stream_));
 
@@ -157,12 +157,12 @@ class Transformer {
     int output_k = multiple_output ? beam_size : 1;
     auto tokens = py::array_t<int>({batch_size, output_k, tokens_size});
     int *tokens_data = tokens.mutable_data(0, 0);
-    byseqlib::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));
     auto scores = py::array_t<float>({batch_size, output_k});
     float *scores_data = scores.mutable_data(0, 0);
-    byseqlib::cuda::CHECK_GPU_ERROR(
+    lightseq::cuda::CHECK_GPU_ERROR(
         cudaMemcpy(scores_data, decoder_->_p_d_alive_seq_score,
                    sizeof(float) * scores.size(), cudaMemcpyDeviceToHost));
     return std::make_tuple(tokens, scores);
