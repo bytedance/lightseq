@@ -1,41 +1,22 @@
 # Build from source code
 
-<!-- Byseqlib is built using Docker and trtis containers from
-[NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). Before building you must install Docker and
-nvidia-docker and login to the NGC registry.
-
-### Build docker image for compilation.
-Fistly, you need to build the docker image which is the trtis build environment.
-```shell
-cur_dir=$(pwd)
-git clone https://github.com/NVIDIA/tensorrt-inference-server.git
-cd tensorrt-inference-server && git checkout r19.05
-docker build -t tensorrtserver_build --target trtserver_build .
-```
-
-### Start container
-Now you should start container and mount Byseqlib to it.
-```shell
-cd ${cur_dir}
-git clone https://github.com/bytedance/byseqlib.git
-cp -r ./byseqlib ./tensorrt-inference-server/src/custom/byseqlib 
-docker run --gpus all -it --rm -v ${cur_dir}/tensorrt-inference-server/src:/workspace/src tensorrtserver_build
-```
-
-### Build
-Finally, build Byseqlib inside container
-```shell
-# inside container
-cd /workspace
-# For compatibility with fp16
-sed -i '/COMPUTE_CAPABILITIES/s/5.2,6.0,6.1,7.0,7.5/6.0,6.1,7.0,7.5/g' ./.bazelrc
-bazel build -c opt src/custom/byseqlib/...
-``` -->
 ## Requirements
-- cuda >= 10.1
-- protobuf == 3.11.2
+- cudatoolkit-dev >= 10.1
+- protobuf >= 3.13
+- cmake >= 3.18
 
-protobuf need to be built and installed from source.
+To install cudatoolkit-dev, you could run `conda install -c conda-forge cudatoolkit-dev` or follow the [official guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile), the runfile installation with `--toolkit` arg is recommended. 
+
+After installation, check the installation of `nvcc` and static libraries (*.a) in `${CUDA_PATH}/lib64`.
+
+To install cmake
+```shell
+$ curl -O -L -C - https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh
+$ sh cmake-3.18.2-Linux-x86_64.sh --skip-license
+$ rm cmake-3.18.2-Linux-x86_64.sh && ln -s ${CMAKE_PATH}/bin/cmake /usr/bin/cmake
+```
+
+Protobuf need to be built and installed from source.
 ```shell
 $ curl -O -L -C - https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz
 $ tar xf protobuf-cpp-3.13.0.tar.gz
@@ -43,18 +24,24 @@ $ cd protobuf-3.13.0 && ./autogen.sh
 $ ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
 $ make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 ```
+`make install` and `ldconfig` may need run with `sudo`
 
 ## Build
 
 To build all targets.
 
 ```shell
-$ makedir build && cd build
-$ cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON  .. && make -j
+$ mkdir build && cd build
+$ cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON .. && make -j
 ```
-You can also add -DDEBUG_MODE=1 to output intermediate result for debugging.
+You can also add -DDEBUG_MODE=ON to output intermediate result for debugging.
 
-To build python wrapper wheels.
+To build lightseq wheels.
 ```shell
 $ pip wheel $PROJECT_DIR --no-deps -w $PROJECT_DIR/output/
+```
+
+To install python lightseq in development models
+```shell
+$ ENABLE_FP32=1 ENABLE_DEBUG=1 pip3 install -e $PROJECT_DIR
 ```
