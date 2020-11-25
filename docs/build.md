@@ -1,4 +1,4 @@
-## Build from source code
+# Build from source code
 
 <!-- Byseqlib is built using Docker and trtis containers from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). Before building you must install Docker and
@@ -31,11 +31,30 @@ cd /workspace
 sed -i '/COMPUTE_CAPABILITIES/s/5.2,6.0,6.1,7.0,7.5/6.0,6.1,7.0,7.5/g' ./.bazelrc
 bazel build -c opt src/custom/byseqlib/...
 ``` -->
-
-- cuda == 10.1
+## Requirements
+- cuda >= 10.1
 - protobuf == 3.11.2
 
+protobuf need to be built and installed from source.
+```shell
+$ curl -O -L -C - https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz
+$ tar xf protobuf-cpp-3.13.0.tar.gz
+$ cd protobuf-3.13.0 && ./autogen.sh
+$ ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
+$ make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 ```
-$make build && cd build
-$cmake -DSM=xx -DCMAKE_BUILD_TYPE=Release -DProtobuf_INCLUDE_DIR=~/anaconda3/include/ -DProtobuf_LIBRARY=~/anaconda3/lib64/libprotobuf.so ..
+
+## Build
+
+To build all targets.
+
+```shell
+$ makedir build && cd build
+$ ENABLE_FP32=1 cmake -DCMAKE_BUILD_TYPE=Release .. && make -j
+```
+You can also add ENABLE_DEBUG=1 to output intermediate result for debugging.
+
+To build python wrapper wheels.
+```shell
+$ pip wheel $PROJECT_DIR --no-deps -w $PROJECT_DIR/output/
 ```
