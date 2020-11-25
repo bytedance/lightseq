@@ -50,9 +50,9 @@ To build all targets.
 
 ```shell
 $ makedir build && cd build
-$ ENABLE_FP32=1 cmake -DCMAKE_BUILD_TYPE=Release .. && make -j
+$ cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON  .. && make -j
 ```
-You can also add ENABLE_DEBUG=1 to output intermediate result for debugging.
+You can also add -DDEBUG_MODE=1 to output intermediate result for debugging.
 
 To build python wrapper wheels.
 ```shell
