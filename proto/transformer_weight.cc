@@ -64,6 +64,9 @@ void TransformerWeight<OpType_>::get_model_config(
   }
   _diverse_lambda = transformer.model_conf().diverse_lambda();
   _sampling_method = transformer.model_conf().sampling_method();
+  if (_sampling_method == "") {
+    _sampling_method = "beam_search";
+  }
   _topk = transformer.model_conf().topk();
   _topp = transformer.model_conf().topp();
   _is_post_ln = transformer.model_conf().is_post_ln();
