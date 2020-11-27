@@ -13,8 +13,8 @@
 #include <iostream>
 #include <string>
 
-#include "src/custom/lightseq/proto/gpt_weight.h"
-#include "src/custom/lightseq/tools/util.h"
+#include "proto/gpt_weight.h"
+#include "tools/util.h"
 
 namespace lightseq {
 namespace cuda {

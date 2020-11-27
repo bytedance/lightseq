@@ -13,8 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "src/custom/lightseq/proto/transformer.pb.h"
-#include "src/custom/lightseq/tools/util.h"
+#include "tools/util.h"
+#include "transformer.pb.h"
 
 namespace lightseq {
 namespace cuda {
@@ -96,10 +96,42 @@ class TransformerWeight {
   float _length_penalty;
   int _padding_id;  // for src
   int _start_id;    // for trg
+  int _end_id;
   float _diverse_lambda;
   std::string _sampling_method;
   int _topk;
   float _topp;
+  bool _is_post_ln;
+  bool _no_scale_embedding;
+  bool _use_gelu;
+
+  void print_model_config() {
+    std::cout << "***model config***" << std::endl;
+    std::cout << "encoder layers: " << _n_enc_layer << std::endl;
+    std::cout << "decoder layers: " << _n_dec_layer << std::endl;
+    std::cout << "hidden size: " << _hidden_size << std::endl;
+    std::cout << "inner size: " << _inner_size << std::endl;
+    std::cout << "head number: " << _head_num << std::endl;
+    std::cout << "dim per head: " << _dim_per_head << std::endl;
+    std::cout << "src vocab size: " << _src_vocab_size << std::endl;
+    std::cout << "trg vocab size: " << _trg_vocab_size << std::endl;
+    std::cout << "is_post_ln: " << _is_post_ln << std::endl;
+    std::cout << "no_scale_embedding: " << _no_scale_embedding << std::endl;
+    std::cout << "use_gelu: " << _use_gelu << std::endl;
+    std::cout << "start_id: " << _start_id << std::endl;
+    std::cout << "end_id: " << _end_id << std::endl;
+    std::cout << "padding_id: " << _padding_id << std::endl;
+    std::cout << std::endl;
+    std::cout << "***generator config***" << std::endl;
+    std::cout << "beam size: " << _beam_size << std::endl;
+    std::cout << "extra decode length(max decode length - src input length): "
+              << _extra_decode_length << std::endl;
+    std::cout << "length penalty: " << _length_penalty << std::endl;
+    std::cout << "diverse lambda: " << _diverse_lambda << std::endl;
+    std::cout << "sampling method: " << _sampling_method << std::endl;
+    std::cout << "topk: " << _topk << std::endl;
+    std::cout << "topp: " << _topp << std::endl;
+  }
 };
 
 }  // namespace cuda

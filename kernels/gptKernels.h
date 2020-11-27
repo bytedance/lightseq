@@ -3,7 +3,7 @@
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 
-#include <cub/cub.cuh>
+#include "3rdparty/cub/cub/cub.cuh"
 
 namespace lightseq {
 namespace cuda {
@@ -16,10 +16,7 @@ void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
                                 int* real_seq_len, int padding_id,
                                 int pos_offset);
 
-template <typename T>
-void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
-                            cudaStream_t stream, T* input, const T* bias,
-                            int feature_dim);
+
 
 template <typename T>
 void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,
