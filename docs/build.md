@@ -24,7 +24,7 @@ $ cd protobuf-3.13.0 && ./autogen.sh
 $ ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
 $ make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 ```
-`make install` and `ldconfig` may need run with `sudo`
+`make install` and `ldconfig` may need to run with `sudo`. If you are encountered with any problem, check [this](https://github.com/protocolbuffers/protobuf/blob/master/src/README.md)
 
 ## Build
 
