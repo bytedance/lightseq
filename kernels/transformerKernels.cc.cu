@@ -45,7 +45,7 @@ __global__ void select_beam_rough_topk(
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, float diverse_lambda, int end_id) {
-  if (alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
+  if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
       num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
@@ -1499,7 +1499,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                               blockDim.x)] = thread_vocab_id;
 
   // step2 update seq_probs if alive seq when not eos
-  if (can_vocab_id != end_id) {
+  if (cur_step == 0 || can_vocab_id != end_id) {
     // alive seq
     if (threadIdx.x == 0) {
       if (diverse_lambda == 0) {
@@ -1627,7 +1627,7 @@ __global__ void ker_refresh_cache<__half>(
     int can_beam_id =
         can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
     if (diverse) can_beam_id %= beam_size;
-    if (can_idx[can_pos] % vocab_size == end_id) {
+    if (cur_step != 0 && can_idx[can_pos] % vocab_size == end_id) {
       return;
     }
 
@@ -1824,7 +1824,7 @@ __global__ void ker_topk_sample(const T* logits, const T* logit_bias,
   int last_token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (old_input_ids[last_token_idx_in_batch] == eos_id) {
+  if (batch_seq_len > 1 && old_input_ids[last_token_idx_in_batch] == eos_id) {
     if (threadIdx.x == 0) {
       old_input_ids[last_token_idx_in_batch + 1] = eos_id;
     }
@@ -2030,7 +2030,7 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
   int token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (old_input_ids[token_idx_in_batch] == eos_id) {
+  if (batch_seq_len > 1 && old_input_ids[token_idx_in_batch] == eos_id) {
     if (threadIdx.x == 0) {
       old_input_ids[token_idx_in_batch + 1] = eos_id;
     }
