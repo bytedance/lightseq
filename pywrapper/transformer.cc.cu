@@ -146,6 +146,9 @@ class Transformer {
       throw std::runtime_error(
           "batch size of input greater than max_batch_size");
     }
+    if (batch_seq_len > tw_._max_step) {
+      throw std::runtime_error("seq len of input greater than max_step");
+    }
     lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
         d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
         cudaMemcpyHostToDevice, stream_));
@@ -169,4 +172,4 @@ class Transformer {
   }
 };
 }  // namespace cuda
-}
+}  // namespace lightseq
