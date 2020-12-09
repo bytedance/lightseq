@@ -5,16 +5,16 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <thrust/device_vector.h>
 #include <unistd.h>
+
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include <thrust/device_vector.h>
-
-#include "src/custom/lightseq/proto/gpt.pb.h"
-#include "src/custom/lightseq/tools/util.h"
+#include "gpt.pb.h"
+#include "tools/util.h"
 
 namespace lightseq {
 namespace cuda {
