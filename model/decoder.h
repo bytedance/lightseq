@@ -13,8 +13,8 @@
 #include <iostream>
 #include <string>
 
-#include "src/custom/lightseq/proto/transformer_weight.h"
-#include "src/custom/lightseq/tools/util.h"
+#include "proto/transformer_weight.h"
+#include "tools/util.h"
 
 /**
 @file
@@ -44,6 +44,7 @@ class Decoder {
   bool sample();
   bool beam_search();
   void update_new_seq_probs();
+  bool topk_greedy_search();
 
   // constructor init var
   const int _max_batch_size;
@@ -54,7 +55,6 @@ class Decoder {
   TransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
-  const bool _output_topk;
 
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
@@ -133,6 +133,7 @@ class Decoder {
   void run_one_infer(int batch_size, int batch_seq_len);
   int _cur_step;
   float* _p_d_alive_seq_score;
+  bool _output_topk;
 };
 
 }  // namespace cuda

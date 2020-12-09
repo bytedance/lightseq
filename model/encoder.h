@@ -12,8 +12,8 @@
 #include <iostream>
 #include <string>
 
-#include "src/custom/lightseq/proto/transformer_weight.h"
-#include "src/custom/lightseq/tools/util.h"
+#include "proto/transformer_weight.h"
+#include "tools/util.h"
 
 /**
 @file
