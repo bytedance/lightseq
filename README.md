@@ -56,40 +56,63 @@ More results is available [here](./docs/performance.md).
 
 
 ## Code Structure
-```python
-├── BUILD # bazel build file
-├── 3rdparty
-│   └── cub-1.8.0 # CUB lib
-├── kernels # cuda kernel function
-│   ├── common.h  # common function
-│   ├── gptKernels.cu.cc # kernel function needed by gpt
-│   ├── gptKernels.h
-│   ├── transformerKernels.cu.cc # kernel function needed by transformer
-│   └── transformerKernels.h
-├── model # model infer component
-│   ├── decoder.cu.cc # transformer decoder
-│   ├── decoder.h 
-│   ├── encoder.cu.cc # transformer encoder
-│   ├── encoder.h
-│   ├── gpt_encoder.cu.cc # gpt
-│   └── gpt_encoder.h
-├── proto # proto for model weights
-│   ├── gpt.proto
-│   ├── gpt_weight.cu.cc # model weights loader
-│   ├── gpt_weight.h
-│   ├── transformer.proto
-│   ├── transformer_weight.cu.cc # model weights loader
-│   └── transformer_weight.h
-├── example # local inference demo
-│   ├── gptlm_example.cu.cc # gptlm demo
-│   ├── gpt_generation.cu.cc # gpt generation demo
-│   └── transformer_example.cu.cc # transformer demo
-├── server # model inference server based on TRTIS
-│   ├── generate_server.cu.cc # transfomer genearate server, multi-target for one source
-│   ├── gptlm_server.cu.cc # gptlm server
-│   ├── gpt_generate_server.cu.cc # gpt generation server
-│   └── transformer_server.cu.cc # transfomer server, one target for one source
-└── tools # development tools. e.g. runtime guard, debug
+```shell
+├── CMakeLists.txt # cmake build file
+├── CONTRIBUTING.md 
+├── example
+│   ├── CMakeLists.txt
+│   ├── decoder_example.cc.cu # transformer decoder only example
+│   ├── gpt_generation.cc.cu # GPT generation example
+│   ├── gptlm_example.cc.cu # GPT language model example
+│   ├── transformer_example.cc.cu # Transformer translation example
+│   └── transformer_generate_example.cc.cu # Transformer generation example
+├── kernels
+│   ├── CMakeLists.txt
+│   ├── common.h # common kernel functions 
+│   ├── gptKernels.cc.cu # GPT kernel functions
+│   ├── gptKernels.h
+│   ├── transformerKernels.cc.cu # Transformer kernel functions
+│   └── transformerKernels.h
+├── LICENSE
+├── model
+│   ├── CMakeLists.txt
+│   ├── decoder.cc.cu # Transformer decoder
+│   ├── decoder.h
+│   ├── encoder.cc.cu # Transformer encoder
+│   ├── encoder.h
+│   ├── gpt_encoder.cc.cu # GPT encoder
+│   └── gpt_encoder.h
+├── NOTICE
+├── proto
+│   ├── CMakeLists.txt
+│   ├── gpt.proto # proto file to save GPT model
+│   ├── gpt_weight.cc # GPT weight class
+│   ├── gpt_weight.h
+│   ├── transformer.proto # # proto file to save Transformer model
+│   ├── transformer_weight.cc # Transformer weight class
+│   └── transformer_weight.h
+├── pywrapper
+│   ├── CMakeLists.txt
+│   ├── transformer.cc.cu # python wrapper for Transformer
+│   ├── transformer_decoder.cc.cu # python wrapper for Transformer decoder
+│   └── wrapper.cc # pybind registeration
+├── README.md
+├── server # custom engine for Triton
+│   ├── CMakeLists.txt
+│   ├── custom.h # Triton dependeny
+│   ├── decoder_generate_server.cc.cu
+│   ├── generate_server.cc.cu
+│   ├── gpt_generate_server.cc.cu
+│   ├── gptlm_server.cc.cu
+│   ├── libserver.ldscript # Triton dependeny
+│   ├── model_config_cuda.h # Triton dependeny
+│   ├── model_config.h # Triton dependeny
+│   ├── model_config.proto # Triton dependeny
+│   └── transformer_server.cc.cu 
+└── tools
+    ├── CMakeLists.txt
+    ├── util.cc.cu
+    └── util.h
 ```
 ## Requirements
 - Install Docker and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
