@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(FasterTransformer LANGUAGES CXX CUDA)
+project(LightSeq LANGUAGES CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 10.1 REQUIRED)
