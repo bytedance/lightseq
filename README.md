@@ -193,5 +193,8 @@ work:
 - Device deployment.
 
 ## Contact
+Check this [Blog](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#) for more technical details of LightSeq.
+Join the lark group in the blog to reach us instantly(lark registration required).
+
 Any questions or suggestions, please feel free to contact us.
 wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com
