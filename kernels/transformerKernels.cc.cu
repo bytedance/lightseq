@@ -1221,9 +1221,11 @@ src_padding_mask: [batch_size, batch_seq_len],
 template <typename T>
 __global__ void ker_correlation_softmax_encself(T* correlation,
                                                 const int* src_padding_mask) {
-  if (src_padding_mask[blockIdx.x * blockDim.x + blockIdx.y % blockDim.x])
-    return;
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
+  if (src_padding_mask[blockIdx.x * blockDim.x + blockIdx.y % blockDim.x]) {
+    correlation[idx] = (T) 0.f;
+    return;
+  }
   int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];
   float val = (float)correlation[idx];
 

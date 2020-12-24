@@ -1,5 +1,6 @@
 #include "encoder.h"
 #include "kernels/transformerKernels.h"
+#include "kernels/multilgKernels.h"
 
 /**
 @file
@@ -75,8 +76,11 @@ std::string Encoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_p_d_src_emb_wei.size() != 4) {
+  if (_tw._is_multilingual == false && _p_d_src_emb_wei.size() != 4) {
     return "violate p_d_src_emb_wei.size() = 4";
+  }
+  if (_tw._is_multilingual && _p_d_src_emb_wei.size() != 5) {
+    return "violate p_d_src_emb_wei.size() = 5";
   }
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
@@ -100,14 +104,29 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
   /* ---step2. encoder feedforward--- */
-  ker_enc_embedding_launcher<_DataType>(
-      batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
-      _p_d_src_emb_wei[1], _p_d_token_id, _p_d_output, _p_d_padding_mask,
-      _tw._padding_id, _max_thread_per_block);
+  if (_tw._is_multilingual) {
+    ker_multilg_enc_emb_launcher<_DataType>(
+        batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
+        _p_d_src_emb_wei[1], _p_d_src_emb_wei[4],
+        //_p_d_src_emb_wei[1], _p_d_src_emb_wei[1],
+	_p_d_token_id, _p_d_output, _p_d_padding_mask,
+        _tw._padding_id, _max_thread_per_block);
+  } else {
+    ker_enc_embedding_launcher<_DataType>(
+        batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
+        _p_d_src_emb_wei[1],
+	_p_d_token_id, _p_d_output, _p_d_padding_mask,
+        _tw._padding_id, _max_thread_per_block);
+  }
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_output, "encoder embedding(head):", 5);
-  print_vec(_p_d_output + _batch_token_num * _tw._hidden_size - 5,
-            "encoder embedding(tail):", 5);
+  for (int i = 0; i < _batch_size; i++) {         // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {    // token_id
+      std::cout << "emb out: token-" << j << std::endl;
+      print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "emb out", 10);
+    }
+  }  // not normal
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -151,6 +170,7 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
