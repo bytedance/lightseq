@@ -17,6 +17,7 @@ void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
                                 int pos_offset);
 
 
+
 template <typename T>
 void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,
                                           int head_num, cudaStream_t stream,

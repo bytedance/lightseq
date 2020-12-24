@@ -5,8 +5,6 @@
 - protobuf >= 3.13
 - cmake >= 3.18
 
-There are submodules in this repository which you should clone with `--recurse-submodules`.
-
 To install cudatoolkit-dev, you could run `conda install -c conda-forge cudatoolkit-dev` or follow the [official guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile), the runfile installation with `--toolkit` arg is recommended. 
 
 After installation, check the installation of `nvcc` and static libraries (*.a) in `${CUDA_PATH}/lib64`.

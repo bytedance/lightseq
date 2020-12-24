@@ -10,8 +10,13 @@ Example of how to run transformer inference using our implementation.
 */
 
 // Appoint precision.
-const lightseq::cuda::OperationType optype =
+#ifdef FP16_MODE
+const lightseq::cuda::OperationType OPTYPE =
+    lightseq::cuda::OperationType::FP16;
+#else
+const lightseq::cuda::OperationType OPTYPE =
     lightseq::cuda::OperationType::FP32;
+#endif
 
 int main(int argc, char *argv[]) {
   /* ---step1. init environment--- */
@@ -21,10 +26,10 @@ int main(int argc, char *argv[]) {
   cudaStreamCreate(&stream_);
   cublasCreate(&hd_);
   cublasSetStream(hd_, stream_);
-  typedef lightseq::cuda::OperationTypeTraits<optype> optraits;
+  typedef lightseq::cuda::OperationTypeTraits<OPTYPE> optraits;
 
   /* ---step2. load model weights into GPU memory--- */
-  lightseq::cuda::TransformerWeight<optype> tw_;
+  lightseq::cuda::TransformerWeight<OPTYPE> tw_;
   // saved in custom proto file
   std::string model_weights_path = argv[1];
   std::string res = tw_.initializing(model_weights_path);
@@ -47,8 +52,8 @@ int main(int argc, char *argv[]) {
       std::vector<int>(max_batch_size * tw_._max_step * tw_._hidden_size, 0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
-  std::shared_ptr<lightseq::cuda::Encoder<optype>> encoder_ =
-      std::make_shared<lightseq::cuda::Encoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Encoder<OPTYPE>> encoder_ =
+      std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
           reinterpret_cast<int *>(
@@ -62,15 +67,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // instantiate decoder
-  std::shared_ptr<lightseq::cuda::Decoder<optype>> decoder_ =
-      std::make_shared<lightseq::cuda::Decoder<optype>>(
+  std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_ =
+      std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
           max_batch_size,
           reinterpret_cast<int *>(
               thrust::raw_pointer_cast(d_padding_mask_.data())),
           reinterpret_cast<optraits::DataType *>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_output_.data())),
-          tw_, stream_, hd_);
+          tw_, stream_, hd_, false,
+          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())));
   res = decoder_->check();
   if (!res.empty()) {
     std::cout << res << std::endl;
@@ -104,7 +110,7 @@ int main(int argc, char *argv[]) {
                                                 batch_seq_len, host_input);
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // copy inputs from cpu memory to gpu memory
     cudaMemcpyAsync(

@@ -72,6 +72,7 @@ void TransformerWeight<OpType_>::get_model_config(
   _is_post_ln = transformer.model_conf().is_post_ln();
   _no_scale_embedding = transformer.model_conf().no_scale_embedding();
   _use_gelu = transformer.model_conf().use_gelu();
+  _is_multilingual = transformer.model_conf().is_multilingual();
 }
 
 /**
@@ -92,23 +93,23 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
 
   offset.push_back(idx);
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
-    return "wrong token_embedding_size !";
+    return "Wrong token_embedding_size !";
   for (float ele : layer.token_embedding()) value.push_back(ele);
   idx += vocab_size * _hidden_size;
 
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
-    return "wrong position_embedding_size !";
+    return "Wrong position_embedding_size !";
   for (float ele : layer.position_embedding()) value.push_back(ele);
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_scale_size() != _hidden_size) return "wrong norm_scale_size !";
+  if (layer.norm_scale_size() != _hidden_size) return "Wrong norm_scale_size !";
   for (float ele : layer.norm_scale()) value.push_back(ele);
   idx += _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_bias_size() != _hidden_size) return "wrong norm_bias_size !";
+  if (layer.norm_bias_size() != _hidden_size) return "Wrong norm_bias_size !";
   for (float ele : layer.norm_bias()) value.push_back(ele);
   idx += _hidden_size;
 
@@ -125,7 +126,7 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
     offset.push_back(idx);
     if (layer.encode_output_project_kernel_kv_size() !=
         _hidden_size * _hidden_size * 2 * _n_dec_layer)
-      return "wrong encode_output_project_kernel_kv_size !";
+      return "Wrong encode_output_project_kernel_kv_size !";
     for (float ele : layer.encode_output_project_kernel_kv())
       value.push_back(ele);
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
@@ -133,25 +134,57 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
     offset.push_back(idx);
     if (layer.encode_output_project_bias_kv_size() !=
         _hidden_size * 2 * _n_dec_layer)
-      return "wrong encode_output_project_bias_kv_size !";
+      return "Wrong encode_output_project_bias_kv_size !";
     for (float ele : layer.encode_output_project_bias_kv())
       value.push_back(ele);
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
     if (layer.shared_bias_size() != vocab_size)
-      return "wrong shared_bias_size !";
+      return "Wrong shared_bias_size !";
     for (float ele : layer.shared_bias()) value.push_back(ele);
     idx += vocab_size;
 
     std::vector<_DataType> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
-    for (int e : offset)
+    for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
-  }
-  std::cout << "finish initializing " << source
+    }
+  } // trg
+
+  if (_is_multilingual) {
+    // fill in language embedding
+    std::vector<_DataType> raw_value;
+    for (float e : layer.lang_emb()) {
+      raw_value.push_back(float2required(e));
+    }
+
+    if (source == "src") {
+      _d_src_lang_emb = raw_value;
+      _p_d_src_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+    } else {
+      if (layer.lang_emb_size() / _hidden_size != 
+          layer.trg_vocab_mask_size() / _trg_vocab_size) {
+        return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
+      }
+      _d_trg_lang_emb = raw_value;
+      _p_d_trg_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+      // fill in target vocab mask
+      std::vector<int> h_mask;
+      for (int ele : layer.trg_vocab_mask()) h_mask.push_back(ele);
+      _d_trg_vocab_mask = h_mask;
+      _p_d_trg_vocab_mask = thrust::raw_pointer_cast(_d_trg_vocab_mask.data());
+    }
+
+    std::cout << "Finish loading multi lingual weights from host to device"
+              << std::endl;
+  }  
+
+  std::cout << "Finish loading " << source
             << "_emb_wei from host to device" << std::endl;
   return "";
 }
@@ -169,27 +202,27 @@ std::string TransformerWeight<OpType_>::parse_enc_wei(
   for (auto enc_layer : transformer.encoder_stack()) {
     offset.push_back(idx);
     if (enc_layer.multihead_norm_scale_size() != _hidden_size)
-      return "wrong multihead_norm_scale_size !";
+      return "Wrong multihead_norm_scale_size !";
     for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.multihead_norm_bias_size() != _hidden_size)
-      return "wrong multihead_norm_bias_size !";
+      return "Wrong multihead_norm_bias_size !";
     for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.multihead_project_kernel_qkv_size() !=
         _hidden_size * _hidden_size * 3)
-      return "wrong multihead_project_kernel_qkv_size !";
+      return "Wrong multihead_project_kernel_qkv_size !";
     for (float ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(ele);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
     if (enc_layer.multihead_project_bias_qkv_size() != _hidden_size * 3)
-      return "wrong multihead_project_bias_qkv_size !";
+      return "Wrong multihead_project_bias_qkv_size !";
     for (float ele : enc_layer.multihead_project_bias_qkv())
       value.push_back(ele);
     idx += _hidden_size * 3;
@@ -197,51 +230,51 @@ std::string TransformerWeight<OpType_>::parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.multihead_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
-      return "wrong multihead_project_kernel_output_size !";
+      return "Wrong multihead_project_kernel_output_size !";
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.multihead_project_bias_output_size() != _hidden_size)
-      return "wrong multihead_project_bias_output_size !";
+      return "Wrong multihead_project_bias_output_size !";
     for (float ele : enc_layer.multihead_project_bias_output())
       value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_norm_scale_size() != _hidden_size)
-      return "wrong ffn_norm_scale_size !";
+      return "Wrong ffn_norm_scale_size !";
     for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_norm_bias_size() != _hidden_size)
-      return "wrong ffn_norm_bias_size !";
+      return "Wrong ffn_norm_bias_size !";
     for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
-      return "wrong ffn_first_kernel_size !";
+      return "Wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_first_bias_size() != _inner_size)
-      return "wrong ffn_first_bias_size !";
+      return "Wrong ffn_first_bias_size !";
     for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
     idx += _inner_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
-      return "wrong ffn_second_kernel_size !";
+      return "Wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_second_bias_size() != _hidden_size)
-      return "wrong ffn_second_bias_size !";
+      return "Wrong ffn_second_bias_size !";
     for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
@@ -253,7 +286,7 @@ std::string TransformerWeight<OpType_>::parse_enc_wei(
 
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
-  std::cout << "finish initializing enc_wei from host to device" << std::endl;
+  std::cout << "Finish loading enc_wei from host to device" << std::endl;
   return "";
 }
 
@@ -270,115 +303,115 @@ std::string TransformerWeight<OpType_>::parse_dec_wei(
   for (auto dec_layer : transformer.decoder_stack()) {
     offset.push_back(idx);
     if (dec_layer.self_norm_scale_size() != _hidden_size)
-      return "wrong self_norm_scale size !";
+      return "Wrong self_norm_scale size !";
     for (float ele : dec_layer.self_norm_scale()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.self_norm_bias_size() != _hidden_size)
-      return "wrong self_norm_bias_size !";
+      return "Wrong self_norm_bias_size !";
     for (float ele : dec_layer.self_norm_bias()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.self_project_kernel_qkv_size() !=
         _hidden_size * _hidden_size * 3)
-      return "wrong self_project_kernel_qkv size !";
+      return "Wrong self_project_kernel_qkv size !";
     for (float ele : dec_layer.self_project_kernel_qkv()) value.push_back(ele);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
     if (dec_layer.self_project_bias_qkv_size() != _hidden_size * 3)
-      return "wrong self_project_bias_qkv size !";
+      return "Wrong self_project_bias_qkv size !";
     for (float ele : dec_layer.self_project_bias_qkv()) value.push_back(ele);
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
     if (dec_layer.self_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
-      return "wrong self_project_kernel_output size !";
+      return "Wrong self_project_kernel_output size !";
     for (float ele : dec_layer.self_project_kernel_output())
       value.push_back(ele);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.self_project_bias_output_size() != _hidden_size)
-      return "wrong self_project_bias_output size !";
+      return "Wrong self_project_bias_output size !";
     for (float ele : dec_layer.self_project_bias_output()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_norm_scale_size() != _hidden_size)
-      return "wrong encdec_norm_scale size !";
+      return "Wrong encdec_norm_scale size !";
     for (float ele : dec_layer.encdec_norm_scale()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_norm_bias_size() != _hidden_size)
-      return "wrong encdec_norm_bias_size !";
+      return "Wrong encdec_norm_bias_size !";
     for (float ele : dec_layer.encdec_norm_bias()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
-      return "wrong encdec_project_kernel_q size !";
+      return "Wrong encdec_project_kernel_q size !";
     for (float ele : dec_layer.encdec_project_kernel_q()) value.push_back(ele);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_project_bias_q_size() != _hidden_size)
-      return "wrong encdec_project_bias_q size !";
+      return "Wrong encdec_project_bias_q size !";
     for (float ele : dec_layer.encdec_project_bias_q()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
-      return "wrong encdec_project_kernel_output size !";
+      return "Wrong encdec_project_kernel_output size !";
     for (float ele : dec_layer.encdec_project_kernel_output())
       value.push_back(ele);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.encdec_project_bias_output_size() != _hidden_size)
-      return "wrong encdec_project_bias_output size !";
+      return "Wrong encdec_project_bias_output size !";
     for (float ele : dec_layer.encdec_project_bias_output())
       value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_norm_scale_size() != _hidden_size)
-      return "wrong ffn_norm_scale_size !";
+      return "Wrong ffn_norm_scale_size !";
     for (float ele : dec_layer.ffn_norm_scale()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_norm_bias_size() != _hidden_size)
-      return "wrong ffn_norm_bias_size !";
+      return "Wrong ffn_norm_bias_size !";
     for (float ele : dec_layer.ffn_norm_bias()) value.push_back(ele);
     idx += _hidden_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
-      return "wrong ffn_first_kernel_size !";
+      return "Wrong ffn_first_kernel_size !";
     for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_first_bias_size() != _inner_size)
-      return "wrong ffn_first_bias_size !";
+      return "Wrong ffn_first_bias_size !";
     for (float ele : dec_layer.ffn_first_bias()) value.push_back(ele);
     idx += _inner_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
-      return "wrong ffn_second_kernel_size !";
+      return "Wrong ffn_second_kernel_size !";
     for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_second_bias_size() != _hidden_size)
-      return "wrong ffn_second_bias_size !";
+      return "Wrong ffn_second_bias_size !";
     for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
@@ -390,7 +423,7 @@ std::string TransformerWeight<OpType_>::parse_dec_wei(
 
   for (int e : offset)
     _p_d_dec_wei.push_back(thrust::raw_pointer_cast(_d_dec_wei.data()) + e);
-  std::cout << "finish initializing dec_wei from host to device" << std::endl;
+  std::cout << "Finish loading dec_wei from host to device" << std::endl;
   return "";
 }
 
@@ -412,6 +445,10 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
 
   get_model_config(transformer, only_decoder);
 
+  if (_hidden_size % 4 != 0) {
+    return "hidden_size should be a multiple of 4 to avoid misaligned address in CUDA";
+  }
+
   std::string res;
   if (!only_decoder) {
     res = parse_emb_wei(transformer.src_embedding(), "src");
@@ -429,7 +466,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
   res = parse_dec_wei(transformer);
   if (!res.empty()) return res;
 
-  std::cout << "finish initializing all weight from host to device"
+  std::cout << "Finish loading all weight from host to device"
             << std::endl;
   // Optional:  Delete all global objects allocated by libprotobuf.
   // google::protobuf::ShutdownProtobufLibrary();
