@@ -814,8 +814,11 @@ __global__ void ker_arrange_encself_qkv(const T* ori_qkv, const T* qkv_bias,
     int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                                   batch_seq_len, dim_per_head);
     new_qkv[qkv_offset + target_id] =
-        ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i] +
-        __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
+        ori_qkv[(blockIdx.x * gridDim.y) * hidden_size +
+                i / dim_per_head * (gridDim.y * dim_per_head) +
+                blockIdx.y * dim_per_head + i % dim_per_head] +
+        __ldg(&qkv_bias[i / dim_per_head * (gridDim.y * dim_per_head) +
+                        blockIdx.y * dim_per_head + i % dim_per_head]);
   }
 }
 
@@ -836,9 +839,12 @@ __global__ void ker_arrange_encself_qkv<__half>(
     const half2* p_ori_qkv = (const half2*)ori_qkv;
     const half2* p_bias = (const half2*)qkv_bias;
     half2* p_new_qkv = (half2*)new_qkv;
-    p_new_qkv[qkv_offset + target_id] = __hadd2(
-        p_ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i],
-        __ldg(&p_bias[blockIdx.y * hidden_size + i]));
+    p_new_qkv[qkv_offset + target_id] =
+        __hadd2(p_ori_qkv[(blockIdx.x * gridDim.y) * hidden_size +
+                          i / dim_per_head * (gridDim.y * dim_per_head) +
+                          blockIdx.y * dim_per_head + i % dim_per_head],
+                __ldg(&p_bias[i / dim_per_head * (gridDim.y * dim_per_head) +
+                              blockIdx.y * dim_per_head + i % dim_per_head]));
   }
 }
 
