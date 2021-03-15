@@ -124,14 +124,14 @@ We provide python api to call lightseq, and you only need to install `lightseq` 
 pip install lightseq
 ```
 
-And check these files `proto/*.proto` to prepare your model weights. We provide a example Transformer model weights for you to test.
+And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
 ```
 curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
 tar -zxvf transformer_weight.tar.gz
 ```
 
-Finally you can run lightseq in only few lines!
+Finally you can run lightseq in only a few lines!
 
 ```python
 import lightseq
