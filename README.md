@@ -118,7 +118,7 @@ More results is available [here](./docs/performance.md).
 
 ## Quick Start
 ### Run python wrapper
-We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver greater than 410.48 
+We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver nor older than 418.40.04
 
 ```
 pip install lightseq
