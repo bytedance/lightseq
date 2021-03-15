@@ -114,12 +114,43 @@ More results is available [here](./docs/performance.md).
     ├── util.cc.cu
     └── util.h
 ```
-## Requirements
+
+
+## Quick Start
+### Run python wrapper
+We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver nor older than 418.40.04
+
+```
+pip install lightseq
+```
+
+And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
+
+```
+curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
+tar -zxvf transformer_weight.tar.gz
+```
+
+Finally you can run lightseq in only a few lines!
+
+```python
+import lightseq
+import numpy as np
+
+test_input = np.array([[5001, 2, 36, 5002]])
+transformer = lightseq.Transformer("transformer.pb", 32) # 32 is max batch size, it will decide GPU memory occupancy.
+result = transformer.infer(test_input)
+```
+
+Python api doesn't support GPT for now, and we will get it ready as soon as possible.
+
+### Run inference server
+#### Requirements
+
 - Install Docker and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
 - GPU driver version >= 410.48
 - [Login to the NGC registry](https://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html).
 
-## Quick Start
 To avoid problems caused by inconsistent environments, you can use the pre-built TRTIS container from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). To start the given container, you need to install
 [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) and make your GPU driver version >= 410.48
@@ -152,7 +183,6 @@ tar -zxvf v0.0.1_gptlm.pkg.tar.gz
 ./{VERSION}_libs/gptlm_example.fp16 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
 ```
 
-### Run inference server
 To run the end-to-end model server based on TRTIS, you need to prepare a custom backend [model
 repository](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/model_repository.html#custom-backends) like this:
 ```shell
