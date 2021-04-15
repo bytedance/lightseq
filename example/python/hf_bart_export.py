@@ -502,7 +502,7 @@ if __name__ == "__main__":
     head_number = 12  # for bart-large, we have 16
     generation_method = "beam_search"  ## in order to get score, we should use `beam_search` inference method
     beam_size = 4
-    max_step = 1024
+    max_step = 50 # max step for generation, it decides GPU memory occupancy
     extra_decode_length = 50  ## maximum_generation_length = min(src_length + extra_decode_length, max_step)
     length_penalty = 1.0
     extract_transformer_weights(

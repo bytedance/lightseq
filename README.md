@@ -117,12 +117,48 @@ More results is available [here](./docs/performance.md).
 
 
 ## Quick Start
-### Run python wrapper
-We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver nor older than 418.40.04
+
+### Run from HuggingFace bart
+
+We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
+
+```bash
+pip install torch tensorflow transformers lightseq
+cd example/python
+```
+
+then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
+
+```bash
+python hf_bart_export.py
+python ls_bart.py
+```
+
+on our Tesla V100 we can get following output, 47x speedup have been obtained from running LightSeq rather than HuggingFace.
 
 ```
-pip install lightseq
+=========================lightseq=========================
+lightseq generating...
+lightseq time: 0.034502994269132614s
+lightseq results:
+I love that girl, but she does not love me.
+She is so beautiful that I can not help glance at her.
+Nothing's gonna change my love for you.
+Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
+=========================huggingface=========================
+huggingface generating...
+huggingface time: 1.6297104470431805s
+huggingface results:
+I love that girl, but she does not love me.
+She is so beautiful that I can not help glance at her.
+Nothing's gonna change my love for you.
+Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 ```
+
+LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
+
+### Run python wrapper
+We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver not older than 418.40.04.
 
 And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
