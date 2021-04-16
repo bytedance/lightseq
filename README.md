@@ -33,7 +33,7 @@ The following is a support matrix of LightSeq compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
 
-<img src="./docs/images/support.png" width="400" div align="center"/>
+<img src="./docs/images/support.png" width="100%" div align="center"/>
 
 ## Performance
 Here, we show our experimental results on neural machine translation and text generation. 
