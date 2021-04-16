@@ -258,9 +258,23 @@ work:
 - Int8 inference.
 - Device deployment.
 
+## Cite us
+Our paper has been accepted by NAACL 2021 (Industry Track).
+If you use LightSeq in your research publication, please cite this paper.
+
+```
+@article{wang2021lightseq,
+      title={LightSeq: A High Performance Inference Library for Transformers}, 
+      author={Xiaohui Wang and Ying Xiong and Yang Wei and Mingxuan Wang and Lei Li},
+      journal={arXiv preprint arXiv:2010.13887},
+      year={2021}
+}
+```
+
+
 ## Contact
 Check this [Blog](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#) for more technical details of LightSeq.
-Join the lark group in the blog to reach us instantly(lark registration required).
+Join the lark group in the blog to reach us instantly (lark registration required).
 
 Any questions or suggestions, please feel free to contact us.
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com
+wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com
