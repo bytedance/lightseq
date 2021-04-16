@@ -158,7 +158,7 @@ Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 ### Run python wrapper
-We provide python api to call lightseq, and you only need to install `lightseq` with `pip`. Because lightseq run on GPU, make sure you have GPU driver not older than 418.40.04.
+We provide python api to call lightseq, all you need is to install `lightseq` with `pip`, and make sure you have GPU driver not older than 418.40.04.
 
 And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
