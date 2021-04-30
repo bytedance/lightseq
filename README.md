@@ -1,6 +1,7 @@
 # LightSeq: A High Performance Inference Library for Sequence Processing and Generation
 ![logo](./docs/images/logo.png)
 
+[中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
 
 LightSeq is a high performance inference library for sequence processing and generation implemented
 in CUDA. 
@@ -273,7 +274,6 @@ If you use LightSeq in your research publication, please cite this paper.
 
 
 ## Contact
-Check this [Blog](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#) for more technical details of LightSeq.
 Join the lark group in the blog to reach us instantly (lark registration required).
 
 Any questions or suggestions, please feel free to contact us.
