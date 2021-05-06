@@ -135,20 +135,20 @@ python hf_bart_export.py
 python ls_bart.py
 ```
 
-on our Tesla V100 we can get following output, 47x speedup have been obtained from running LightSeq rather than HuggingFace.
+on our Tesla V100 we can get following output, 10x speedup have been obtained from running LightSeq rather than HuggingFace.
 
 ```
-=========================lightseq=========================
+=========lightseq=========
 lightseq generating...
-lightseq time: 0.034502994269132614s
+lightseq time: 0.03398153930902481s
 lightseq results:
 I love that girl, but she does not love me.
 She is so beautiful that I can not help glance at her.
 Nothing's gonna change my love for you.
 Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
-=========================huggingface=========================
+=========huggingface=========
 huggingface generating...
-huggingface time: 1.6297104470431805s
+huggingface time: 0.3320543058216572s
 huggingface results:
 I love that girl, but she does not love me.
 She is so beautiful that I can not help glance at her.
