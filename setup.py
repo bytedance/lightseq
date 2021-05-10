@@ -3,6 +3,7 @@ import re
 import sys
 import platform
 import subprocess
+import multiprocessing
 
 from setuptools import setup, Extension
 import setuptools
@@ -62,12 +63,10 @@ class CMakeBuild(build_ext):
             build_args += ["--", "/m"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            if not ENABLE_FP32:
-                cmake_args += ["-DFP16_MODE=ON"]
-            if ENABLE_DEBUG:
-                cmake_args += ["-DDEBUG_MODE=ON"]
+            cmake_args += ["-DFP16_MODE=OFF"] if ENABLE_FP32 else ["-DFP16_MODE=ON"]
+            cmake_args += ["-DDEBUG_MODE=ON"] if ENABLE_DEBUG else ["-DDEBUG_MODE=OFF"]
             build_args += ["--target", "lightseq"]
-            build_args += ["--", "-j"]
+            build_args += ["--", "-j{}".format(multiprocessing.cpu_count())]
 
         env = os.environ.copy()
         env["CXXFLAGS"] = '{} -DVERSION_INFO=\\"{}\\"'.format(
@@ -83,13 +82,26 @@ class CMakeBuild(build_ext):
         )
 
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+
 setup(
     name="lightseq",
-    version="0.1.0",
-    author="Ying Xiong",
-    author_email="xiongying.taka@bytedance.com",
-    description="python wrapper of LightSeq, LightSeq is a high performance inference library for SOTA NLU/NLG models",
-    long_description="",
+    version="1.2.0",
+    author="Xiaohui Wang, Ying Xiong, Yang Wei",
+    author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, \
+weiyang.god@bytedance.com",
+    description="LightSeq is a high performance inference library "
+    "for sequence processing and generation implemented in CUDA",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/bytedance/lightseq",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: Apache Software License",
+        "Operating System :: POSIX :: Linux",
+    ],
     ext_modules=[CMakeExtension("lightseq")],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
