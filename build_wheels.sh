@@ -16,9 +16,6 @@ cd $PROJECT_DIR
 echo $LIBRARY_PATH
 export LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 export PATH=/usr/local/cuda/bin:${PATH}
-export http_proxy="http://sys-proxy-rd-relay.byted.org:8118"
-export https_proxy="http://sys-proxy-rd-relay.byted.org:8118"
-export no_proxy="byted.org"
 
 CONDA_PATH=/miniconda
 
