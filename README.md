@@ -1,14 +1,15 @@
 # LightSeq: A High Performance Inference Library for Sequence Processing and Generation
-![logo](./docs/images/logo.png)
+
+![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
 [中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
 
 LightSeq is a high performance inference library for sequence processing and generation implemented
-in CUDA. 
+in CUDA.
 It enables highly efficient computation of modern NLP models such as **BERT**, **GPT2**,
-**Transformer**, etc. 
+**Transformer**, etc.
 It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*， *Language
-Modelling*, and other related tasks using these models. 
+Modelling*, and other related tasks using these models.
 
 The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
@@ -21,8 +22,8 @@ Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 to as TRTIS in the later discussion). With LightSeq, you can easily deploy efficient model services or develop
 your own model architectures just with a little code modification.
 
-
 ## Features
+
 - Comprehensive sequence modeling support, including Bert, GPT, Transformer and their VAE variants.
 - Various search methods, such as beam search, diverse beam search, topp/topk sampling.
 - Out-of-the-box rich middlewares for model service based on TRTIS, such as dynamic batch,
@@ -34,29 +35,30 @@ The following is a support matrix of LightSeq compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
 
-<img src="./docs/images/support.png" width="100%" div align="center"/>
+![support](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/support.png)
 
 ## Performance
-Here, we show our experimental results on neural machine translation and text generation. 
+
+Here, we show our experimental results on neural machine translation and text generation.
 The models of these two tasks are Transformer-base, but use beam search and sampling search methods
 respectively.
 We choose Tensorflow and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) as a comparison.
 The implementation from
 [tensor2tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py)
-was used as the benchmark of Tensorflow. 
+was used as the benchmark of Tensorflow.
 
 More results is available [here](./docs/performance.md).
 
-* Neural machine translation
-<img src="./docs/images/nmt1.png" width="400" div align="center"/>
-<img src="./docs/images/nmt2.png" width="400" div align="center"/>
+- Neural machine translation
+![nmt2](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt2.png)
+![nmt1](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt1.png)
 
-* Text generation
-<img src="./docs/images/generation.png" width="400" div align="center"/>
-
+- Text generation
+![generation](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/generation.png)
 
 ## Code Structure
+
 ```shell
 ├── CMakeLists.txt # cmake build file
 ├── CONTRIBUTING.md 
@@ -116,28 +118,27 @@ More results is available [here](./docs/performance.md).
     └── util.h
 ```
 
-
 ## Quick Start
 
 ### Run from HuggingFace bart
 
 We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
 
-```bash
+```shell
 pip install torch tensorflow transformers lightseq
 cd example/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
-```bash
+```shell
 python hf_bart_export.py
 python ls_bart.py
 ```
 
 on our Tesla V100 we can get following output, 10x speedup have been obtained from running LightSeq rather than HuggingFace.
 
-```
+```log
 =========lightseq=========
 lightseq generating...
 lightseq time: 0.03398153930902481s
@@ -159,11 +160,12 @@ Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 ### Run python wrapper
+
 We provide python api to call lightseq, all you need is to install `lightseq` with `pip`, and make sure you have GPU driver not older than 418.40.04.
 
 And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
-```
+```shell
 curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
 tar -zxvf transformer_weight.tar.gz
 ```
@@ -182,6 +184,7 @@ result = transformer.infer(test_input)
 Python api doesn't support GPT for now, and we will get it ready as soon as possible.
 
 ### Run inference server
+
 #### Requirements
 
 - Install Docker and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
@@ -191,6 +194,7 @@ Python api doesn't support GPT for now, and we will get it ready as soon as poss
 To avoid problems caused by inconsistent environments, you can use the pre-built TRTIS container from
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com/). To start the given container, you need to install
 [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) and make your GPU driver version >= 410.48
+
 ```shell
 docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
 # 
@@ -199,18 +203,24 @@ docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
 # inside container
 cd /quick_start
 ```
+
 ### Use our pre-build lib
+
 To quickly deploy your model that supported by LightSeq currently, you can download the pre-built libraries
 from the GitHub release page corresponding to the release version you are interested in. In each release
 version, we will upload binary executable example and dynamic link library of models which is a
 custom backend of TRTIS.
+
 ```shell
 wget https://github.com/bytedance/lightseq/releases/download/${VERSION}/${VERSION}_libs.tar.gz
 tar -zxvf ${VERSION}_libs.tar.gz
 ```
+
 ### Run local inference demo
+
 To run local inference demo, you need to prepare model weights saved in custom proto defined by
 LightSeq and input token ids. We provide a GPT-LM model and its corresponding input token ids:
+
 ```shell
 wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.pkg.tar.gz
 tar -zxvf v0.0.1_gptlm.pkg.tar.gz
@@ -222,6 +232,7 @@ tar -zxvf v0.0.1_gptlm.pkg.tar.gz
 
 To run the end-to-end model server based on TRTIS, you need to prepare a custom backend [model
 repository](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/model_repository.html#custom-backends) like this:
+
 ```shell
 models/
   <model-name>/
@@ -230,7 +241,9 @@ models/
     1/
       libyyy.so # custom dynamic link library
 ```
+
 With the pre-built libraries and example weights mentioned above, you can easily run a server:
+
 ```shell
 mkdir -p ./model_zoo/gptlm/1
 wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.config.pbtxt
@@ -242,28 +255,33 @@ cp ./{VERSION}_libs/libgptlm.so.fp32 model_zoo/gptlm/1/libgptlm.so
 export MODEL_ZOO="/quick_start/model_zoo"
 trtserver --model-store=${MODEL_ZOO}
 ```
+
 After starting server, Invoking the [TRTIS
 client](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/client.html) will get the inference result.
 
 ### Serve your own model
+
 In order to serve your own model, you need to [export model](./docs/export_model.md) trained from deeplearning framework(E.g.
 TenforFlow, PyTorch) to custom model proto defined by LightSeq. Furthermore, you may need to [build from
 source code](./docs/build.md) if you want to modify the model architectures or serve a new model not supported by
 LightSeq currently.
 
 ## Limitations and Future Plans
+
 LightSeq does not support CPU inference for now and its compilation relies heavily on TRTIS, we will
 try to solve these problems in future. Furthermore, the following will be the focus of our future
 work:
+
 - Support more model architectures and decoding search algorithms.
 - Int8 inference.
 - Device deployment.
 
-## Cite us
+## Cite Us
+
 Our paper has been accepted by NAACL 2021 (Industry Track).
 If you use LightSeq in your research publication, please cite this paper.
 
-```
+```tex
 @article{wang2021lightseq,
       title={LightSeq: A High Performance Inference Library for Transformers}, 
       author={Xiaohui Wang and Ying Xiong and Yang Wei and Mingxuan Wang and Lei Li},
@@ -272,9 +290,7 @@ If you use LightSeq in your research publication, please cite this paper.
 }
 ```
 
-
 ## Contact
-Join the lark group in the blog to reach us instantly (lark registration required).
 
 Any questions or suggestions, please feel free to contact us.
 wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com
