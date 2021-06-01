@@ -229,7 +229,6 @@ def extract_gpt_weights(
     )
 
     # fill in conf
-
     gpt.model_conf.head_num = head_num
     gpt.model_conf.src_padding_id = 1
     gpt.model_conf.sampling_method = generation_method
