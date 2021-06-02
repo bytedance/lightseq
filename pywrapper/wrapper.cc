@@ -3,6 +3,7 @@
 
 #include "pywrapper/transformer.cc.cu"
 #include "pywrapper/transformer_decoder.cc.cu"
+#include "pywrapper/gpt.cc.cu"
 
 namespace py = pybind11;
 
@@ -19,4 +20,13 @@ PYBIND11_MODULE(lightseq, m) {
            py::arg("beam_size") = -1, py::arg("length_penalty") = -1.0f,
            py::arg("topp") = -1.0f, py::arg("topk") = -1.0f,
            py::arg("diverse_lambda") = -1.0f);
+
+    py::class_<lightseq::cuda::Gpt>(m, "Gpt")
+      .def(py::init<const std::string, const int>())
+      .def("infer", &lightseq::cuda::Gpt::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"),
+           py::arg("sampling_method") = "")
+      .def("sample", &lightseq::cuda::Gpt::sample,
+           py::return_value_policy::reference_internal, py::arg("input_seq"),
+           py::arg("sampling_method") = "");
 }
