@@ -19,99 +19,99 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'H\003',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\tgpt.proto\"\xf8\x02\n\x0c\x45ncoderLayer\x12\x1c\n\x14multihead_norm_scale\x18\x01 \x03(\x02\x12\x1b\n\x13multihead_norm_bias\x18\x02 \x03(\x02\x12$\n\x1cmultihead_project_kernel_qkv\x18\x03 \x03(\x02\x12\"\n\x1amultihead_project_bias_qkv\x18\x04 \x03(\x02\x12\'\n\x1fmultihead_project_kernel_output\x18\x05 \x03(\x02\x12%\n\x1dmultihead_project_bias_output\x18\x06 \x03(\x02\x12\x16\n\x0e\x66\x66n_norm_scale\x18\x07 \x03(\x02\x12\x15\n\rffn_norm_bias\x18\x08 \x03(\x02\x12\x18\n\x10\x66\x66n_first_kernel\x18\t \x03(\x02\x12\x16\n\x0e\x66\x66n_first_bias\x18\n \x03(\x02\x12\x19\n\x11\x66\x66n_second_kernel\x18\x0b \x03(\x02\x12\x17\n\x0f\x66\x66n_second_bias\x18\x0c \x03(\x02\"l\n\x0e\x45mbeddingLayer\x12\x17\n\x0ftoken_embedding\x18\x01 \x03(\x02\x12\x1a\n\x12position_embedding\x18\x02 \x03(\x02\x12\x12\n\nnorm_scale\x18\x03 \x03(\x02\x12\x11\n\tnorm_bias\x18\x04 \x03(\x02\"z\n\tModelConf\x12\x10\n\x08head_num\x18\x01 \x01(\x05\x12\x16\n\x0esrc_padding_id\x18\x02 \x01(\x05\x12\x17\n\x0fsampling_method\x18\x03 \x01(\t\x12\x0c\n\x04topp\x18\x04 \x01(\x02\x12\x0c\n\x04topk\x18\x05 \x01(\x05\x12\x0e\n\x06\x65os_id\x18\x06 \x01(\x05\"s\n\x03Gpt\x12&\n\rsrc_embedding\x18\x01 \x01(\x0b\x32\x0f.EmbeddingLayer\x12$\n\rencoder_stack\x18\x02 \x03(\x0b\x32\r.EncoderLayer\x12\x1e\n\nmodel_conf\x18\x03 \x01(\x0b\x32\n.ModelConfB\x02H\x03\x62\x06proto3'
+  serialized_pb=b'\n\tgpt.proto\"\xfb\x02\n\x0fGptEncoderLayer\x12\x1c\n\x14multihead_norm_scale\x18\x01 \x03(\x02\x12\x1b\n\x13multihead_norm_bias\x18\x02 \x03(\x02\x12$\n\x1cmultihead_project_kernel_qkv\x18\x03 \x03(\x02\x12\"\n\x1amultihead_project_bias_qkv\x18\x04 \x03(\x02\x12\'\n\x1fmultihead_project_kernel_output\x18\x05 \x03(\x02\x12%\n\x1dmultihead_project_bias_output\x18\x06 \x03(\x02\x12\x16\n\x0e\x66\x66n_norm_scale\x18\x07 \x03(\x02\x12\x15\n\rffn_norm_bias\x18\x08 \x03(\x02\x12\x18\n\x10\x66\x66n_first_kernel\x18\t \x03(\x02\x12\x16\n\x0e\x66\x66n_first_bias\x18\n \x03(\x02\x12\x19\n\x11\x66\x66n_second_kernel\x18\x0b \x03(\x02\x12\x17\n\x0f\x66\x66n_second_bias\x18\x0c \x03(\x02\"o\n\x11GptEmbeddingLayer\x12\x17\n\x0ftoken_embedding\x18\x01 \x03(\x02\x12\x1a\n\x12position_embedding\x18\x02 \x03(\x02\x12\x12\n\nnorm_scale\x18\x03 \x03(\x02\x12\x11\n\tnorm_bias\x18\x04 \x03(\x02\"}\n\x0cGptModelConf\x12\x10\n\x08head_num\x18\x01 \x01(\x05\x12\x16\n\x0esrc_padding_id\x18\x02 \x01(\x05\x12\x17\n\x0fsampling_method\x18\x03 \x01(\t\x12\x0c\n\x04topp\x18\x04 \x01(\x02\x12\x0c\n\x04topk\x18\x05 \x01(\x05\x12\x0e\n\x06\x65os_id\x18\x06 \x01(\x05\"|\n\x03Gpt\x12)\n\rsrc_embedding\x18\x01 \x01(\x0b\x32\x12.GptEmbeddingLayer\x12\'\n\rencoder_stack\x18\x02 \x03(\x0b\x32\x10.GptEncoderLayer\x12!\n\nmodel_conf\x18\x03 \x01(\x0b\x32\r.GptModelConfB\x02H\x03\x62\x06proto3'
 )
 
 
 
 
-_ENCODERLAYER = _descriptor.Descriptor(
-  name='EncoderLayer',
-  full_name='EncoderLayer',
+_GPTENCODERLAYER = _descriptor.Descriptor(
+  name='GptEncoderLayer',
+  full_name='GptEncoderLayer',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='multihead_norm_scale', full_name='EncoderLayer.multihead_norm_scale', index=0,
+      name='multihead_norm_scale', full_name='GptEncoderLayer.multihead_norm_scale', index=0,
       number=1, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='multihead_norm_bias', full_name='EncoderLayer.multihead_norm_bias', index=1,
+      name='multihead_norm_bias', full_name='GptEncoderLayer.multihead_norm_bias', index=1,
       number=2, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='multihead_project_kernel_qkv', full_name='EncoderLayer.multihead_project_kernel_qkv', index=2,
+      name='multihead_project_kernel_qkv', full_name='GptEncoderLayer.multihead_project_kernel_qkv', index=2,
       number=3, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='multihead_project_bias_qkv', full_name='EncoderLayer.multihead_project_bias_qkv', index=3,
+      name='multihead_project_bias_qkv', full_name='GptEncoderLayer.multihead_project_bias_qkv', index=3,
       number=4, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='multihead_project_kernel_output', full_name='EncoderLayer.multihead_project_kernel_output', index=4,
+      name='multihead_project_kernel_output', full_name='GptEncoderLayer.multihead_project_kernel_output', index=4,
       number=5, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='multihead_project_bias_output', full_name='EncoderLayer.multihead_project_bias_output', index=5,
+      name='multihead_project_bias_output', full_name='GptEncoderLayer.multihead_project_bias_output', index=5,
       number=6, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_norm_scale', full_name='EncoderLayer.ffn_norm_scale', index=6,
+      name='ffn_norm_scale', full_name='GptEncoderLayer.ffn_norm_scale', index=6,
       number=7, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_norm_bias', full_name='EncoderLayer.ffn_norm_bias', index=7,
+      name='ffn_norm_bias', full_name='GptEncoderLayer.ffn_norm_bias', index=7,
       number=8, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_first_kernel', full_name='EncoderLayer.ffn_first_kernel', index=8,
+      name='ffn_first_kernel', full_name='GptEncoderLayer.ffn_first_kernel', index=8,
       number=9, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_first_bias', full_name='EncoderLayer.ffn_first_bias', index=9,
+      name='ffn_first_bias', full_name='GptEncoderLayer.ffn_first_bias', index=9,
       number=10, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_second_kernel', full_name='EncoderLayer.ffn_second_kernel', index=10,
+      name='ffn_second_kernel', full_name='GptEncoderLayer.ffn_second_kernel', index=10,
       number=11, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ffn_second_bias', full_name='EncoderLayer.ffn_second_bias', index=11,
+      name='ffn_second_bias', full_name='GptEncoderLayer.ffn_second_bias', index=11,
       number=12, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -130,41 +130,41 @@ _ENCODERLAYER = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=14,
-  serialized_end=390,
+  serialized_end=393,
 )
 
 
-_EMBEDDINGLAYER = _descriptor.Descriptor(
-  name='EmbeddingLayer',
-  full_name='EmbeddingLayer',
+_GPTEMBEDDINGLAYER = _descriptor.Descriptor(
+  name='GptEmbeddingLayer',
+  full_name='GptEmbeddingLayer',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='token_embedding', full_name='EmbeddingLayer.token_embedding', index=0,
+      name='token_embedding', full_name='GptEmbeddingLayer.token_embedding', index=0,
       number=1, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='position_embedding', full_name='EmbeddingLayer.position_embedding', index=1,
+      name='position_embedding', full_name='GptEmbeddingLayer.position_embedding', index=1,
       number=2, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='norm_scale', full_name='EmbeddingLayer.norm_scale', index=2,
+      name='norm_scale', full_name='GptEmbeddingLayer.norm_scale', index=2,
       number=3, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='norm_bias', full_name='EmbeddingLayer.norm_bias', index=3,
+      name='norm_bias', full_name='GptEmbeddingLayer.norm_bias', index=3,
       number=4, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -182,56 +182,56 @@ _EMBEDDINGLAYER = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=392,
-  serialized_end=500,
+  serialized_start=395,
+  serialized_end=506,
 )
 
 
-_MODELCONF = _descriptor.Descriptor(
-  name='ModelConf',
-  full_name='ModelConf',
+_GPTMODELCONF = _descriptor.Descriptor(
+  name='GptModelConf',
+  full_name='GptModelConf',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='head_num', full_name='ModelConf.head_num', index=0,
+      name='head_num', full_name='GptModelConf.head_num', index=0,
       number=1, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='src_padding_id', full_name='ModelConf.src_padding_id', index=1,
+      name='src_padding_id', full_name='GptModelConf.src_padding_id', index=1,
       number=2, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='sampling_method', full_name='ModelConf.sampling_method', index=2,
+      name='sampling_method', full_name='GptModelConf.sampling_method', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='topp', full_name='ModelConf.topp', index=3,
+      name='topp', full_name='GptModelConf.topp', index=3,
       number=4, type=2, cpp_type=6, label=1,
       has_default_value=False, default_value=float(0),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='topk', full_name='ModelConf.topk', index=4,
+      name='topk', full_name='GptModelConf.topk', index=4,
       number=5, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='eos_id', full_name='ModelConf.eos_id', index=5,
+      name='eos_id', full_name='GptModelConf.eos_id', index=5,
       number=6, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
@@ -249,8 +249,8 @@ _MODELCONF = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=502,
-  serialized_end=624,
+  serialized_start=508,
+  serialized_end=633,
 )
 
 
@@ -295,39 +295,39 @@ _GPT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=626,
-  serialized_end=741,
+  serialized_start=635,
+  serialized_end=759,
 )
 
-_GPT.fields_by_name['src_embedding'].message_type = _EMBEDDINGLAYER
-_GPT.fields_by_name['encoder_stack'].message_type = _ENCODERLAYER
-_GPT.fields_by_name['model_conf'].message_type = _MODELCONF
-DESCRIPTOR.message_types_by_name['EncoderLayer'] = _ENCODERLAYER
-DESCRIPTOR.message_types_by_name['EmbeddingLayer'] = _EMBEDDINGLAYER
-DESCRIPTOR.message_types_by_name['ModelConf'] = _MODELCONF
+_GPT.fields_by_name['src_embedding'].message_type = _GPTEMBEDDINGLAYER
+_GPT.fields_by_name['encoder_stack'].message_type = _GPTENCODERLAYER
+_GPT.fields_by_name['model_conf'].message_type = _GPTMODELCONF
+DESCRIPTOR.message_types_by_name['GptEncoderLayer'] = _GPTENCODERLAYER
+DESCRIPTOR.message_types_by_name['GptEmbeddingLayer'] = _GPTEMBEDDINGLAYER
+DESCRIPTOR.message_types_by_name['GptModelConf'] = _GPTMODELCONF
 DESCRIPTOR.message_types_by_name['Gpt'] = _GPT
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-EncoderLayer = _reflection.GeneratedProtocolMessageType('EncoderLayer', (_message.Message,), {
-  'DESCRIPTOR' : _ENCODERLAYER,
+GptEncoderLayer = _reflection.GeneratedProtocolMessageType('GptEncoderLayer', (_message.Message,), {
+  'DESCRIPTOR' : _GPTENCODERLAYER,
   '__module__' : 'gpt_pb2'
-  # @@protoc_insertion_point(class_scope:EncoderLayer)
+  # @@protoc_insertion_point(class_scope:GptEncoderLayer)
   })
-_sym_db.RegisterMessage(EncoderLayer)
+_sym_db.RegisterMessage(GptEncoderLayer)
 
-EmbeddingLayer = _reflection.GeneratedProtocolMessageType('EmbeddingLayer', (_message.Message,), {
-  'DESCRIPTOR' : _EMBEDDINGLAYER,
+GptEmbeddingLayer = _reflection.GeneratedProtocolMessageType('GptEmbeddingLayer', (_message.Message,), {
+  'DESCRIPTOR' : _GPTEMBEDDINGLAYER,
   '__module__' : 'gpt_pb2'
-  # @@protoc_insertion_point(class_scope:EmbeddingLayer)
+  # @@protoc_insertion_point(class_scope:GptEmbeddingLayer)
   })
-_sym_db.RegisterMessage(EmbeddingLayer)
+_sym_db.RegisterMessage(GptEmbeddingLayer)
 
-ModelConf = _reflection.GeneratedProtocolMessageType('ModelConf', (_message.Message,), {
-  'DESCRIPTOR' : _MODELCONF,
+GptModelConf = _reflection.GeneratedProtocolMessageType('GptModelConf', (_message.Message,), {
+  'DESCRIPTOR' : _GPTMODELCONF,
   '__module__' : 'gpt_pb2'
-  # @@protoc_insertion_point(class_scope:ModelConf)
+  # @@protoc_insertion_point(class_scope:GptModelConf)
   })
-_sym_db.RegisterMessage(ModelConf)
+_sym_db.RegisterMessage(GptModelConf)
 
 Gpt = _reflection.GeneratedProtocolMessageType('Gpt', (_message.Message,), {
   'DESCRIPTOR' : _GPT,
