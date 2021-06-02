@@ -69,15 +69,6 @@ trg_emb_mapping_dict = OrderedDict(
     }
 )
 
-# shared_trg_emb_mapping_dict = OrderedDict(
-#     {
-#         "norm_scale": "layer_norm_emb weight",
-#         "norm_bias": "layer_norm_emb bias",
-#         "shared_bias": "pred_layer bias",
-#     }
-# )
-
-
 def check_rule(tensor_name, rule):
     if "Adam" in tensor_name or "adam" in tensor_name:
         return False
