@@ -89,7 +89,7 @@ namespace lightseq {
           throw std::runtime_error(res);
         }
 
-        long buf_bytesize = encoder_->compute_buffer_bytesize();
+        size_t buf_bytesize = encoder_->compute_buffer_bytesize();
         std::cout << "gpt2 buf_bytesize: " << buf_bytesize << std::endl;
 
         void* d_buf_;

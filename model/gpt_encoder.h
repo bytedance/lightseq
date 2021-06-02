@@ -93,7 +93,7 @@ class GptEncoder {
   GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
              int *p_d_sample_id, const GptWeight<OpType_> &tw,
              cudaStream_t stream, cudaStream_t cache_stream, cublasHandle_t hd);
-  long compute_buffer_bytesize();
+  size_t compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
