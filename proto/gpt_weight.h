@@ -29,7 +29,7 @@ class GptWeight {
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
   void get_model_config(const Gpt &gpt);
-  std::string parse_emb_wei(const EmbeddingLayer &layer);
+  std::string parse_emb_wei(const GptEmbeddingLayer &layer);
   std::string parse_enc_wei(const Gpt &gpt);
 
   // store the weights pointer

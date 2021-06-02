@@ -7,7 +7,7 @@ option optimize_for = LITE_RUNTIME;
 // "Feed-Forward Networks"
 // plz see https://arxiv.org/abs/1706.03762 for details
 
-message EncoderLayer {
+message GptEncoderLayer {
   // layer norm before "Multi-Head Attention"
   repeated float multihead_norm_scale = 1;
   repeated float multihead_norm_bias = 2;
@@ -39,7 +39,7 @@ message EncoderLayer {
   repeated float ffn_second_bias = 12;
 }
 
-message EmbeddingLayer {
+message GptEmbeddingLayer {
   // token embedding table
   // for encoder, it is in [src_vocab_size, hidden_size]
   // so, look it up directly will get the input token embedding
@@ -50,7 +50,7 @@ message EmbeddingLayer {
   repeated float norm_bias = 4;
 }
 
-message ModelConf {
+message GptModelConf {
   int32 head_num = 1;
   int32 src_padding_id = 2;
   string sampling_method = 3;
@@ -60,7 +60,7 @@ message ModelConf {
 }
 
 message Gpt {
-  EmbeddingLayer src_embedding = 1;
-  repeated EncoderLayer encoder_stack = 2;
-  ModelConf model_conf = 3;
+  GptEmbeddingLayer src_embedding = 1;
+  repeated GptEncoderLayer encoder_stack = 2;
+  GptModelConf model_conf = 3;
 }

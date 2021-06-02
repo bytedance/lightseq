@@ -62,7 +62,7 @@ void GptWeight<OpType_>::get_model_config(const Gpt &gpt) {
 Load the weights of embedding layer into GPU memory.
 */
 template <OperationType OpType_>
-std::string GptWeight<OpType_>::parse_emb_wei(const EmbeddingLayer &layer) {
+std::string GptWeight<OpType_>::parse_emb_wei(const GptEmbeddingLayer &layer) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
