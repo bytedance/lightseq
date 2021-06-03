@@ -30,11 +30,10 @@ namespace lightseq {
       cudaStream_t cache_stream_;
       cublasHandle_t hd_;
       lightseq::cuda::GptWeight<gpt_optype> tw_;
-      std::set<std::string> available_sampling_methods = { "beam_search", "topk",
-                                                          "topp", "topk_greedy" };
+      std::set<std::string> available_sampling_methods = { "topk", "topp" };
 
     public:
-      Gpt(const std::string weight_path, const int max_batch_size)
+      Gpt(const std::string weight_path, const int max_batch_size, const int max_step = 50)
         : stream_(nullptr), hd_(nullptr), encoder_(nullptr) {
         /* ---step1. init environment--- */
         _max_batch_size = max_batch_size;
@@ -67,6 +66,8 @@ namespace lightseq {
         if (!res.empty()) {
           throw std::runtime_error(res);
         }
+        // set max_step before buffer init
+        tw_._max_step = max_step;
 
         /*
           step3. instantiate gpt encoder, init the gpu memory buffer.
@@ -105,13 +106,7 @@ namespace lightseq {
       }
 
       py::array_t<float> infer(
-        py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-        std::string sampling_method = "") {
-        if (available_sampling_methods.find(sampling_method) !=
-          available_sampling_methods.end()) {
-          tw_._sampling_method = sampling_method;
-        }
-
+        py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
         auto input_seq_out = input_seq.mutable_unchecked<2>();
         const int* input_seq_data = input_seq_out.data(0, 0);
         int batch_size = input_seq_out.shape(0);
@@ -138,11 +133,18 @@ namespace lightseq {
 
       py::array_t<int> sample(
         py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-        std::string sampling_method = "") {
+        std::string sampling_method = "topk",
+        const int topk = 1,
+        const float topp = 0.75
+      ) {
         if (available_sampling_methods.find(sampling_method) !=
           available_sampling_methods.end()) {
           tw_._sampling_method = sampling_method;
         }
+        assert(topk >= 0);
+        tw_._topk = topk;
+        assert(topp >= 0.0 && topp <= 1.0);
+        tw_._topp = topp;
 
         auto input_seq_out = input_seq.mutable_unchecked<2>();
         const int* input_seq_data = input_seq_out.data(0, 0);
