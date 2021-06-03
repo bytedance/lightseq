@@ -47,14 +47,11 @@ template <OperationType OpType_>
 size_t GptEncoder<OpType_>::compute_buffer_bytesize() {
   int si = _max_batch_size;
   size_t sz0 = (size_t)_max_batch_dim;
-  std::cout << "sz0" << sz0 << '\n';
   sz0 += 2 * (size_t)_max_batch_dim * (size_t)_tw._n_enc_layer;
-  std::cout << "sz0" << sz0 << '\n';
   long long sz1 = (size_t)_max_batch_dim * 6 +
              (size_t)_max_batch_size * (size_t)_tw._head_num * (size_t)_tw._max_step * (size_t)_tw._max_step;
   long long sz2 = (size_t)_max_batch_dim + (size_t)_max_batch_size * (size_t)_tw._max_step * (size_t)_tw._inner_size;
   long long sz3 = (size_t)_max_batch_size * (size_t)_tw._max_step * (size_t)_tw._src_vocab_size;
-  std::cout << "size: " << sz0 << ' ' << sz1 << ' ' << sz2 << ' ' << sz3 << '\n';
   return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
 }
 
