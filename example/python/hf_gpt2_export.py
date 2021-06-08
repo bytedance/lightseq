@@ -103,7 +103,7 @@ if __name__ == "__main__":
     input_huggingface_gpt_model = ("gpt2")
     head_number = 12
     # in order to get score, we should use `beam_search` inference method
-    generation_method = "beam_search"
+    generation_method = "topk"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
