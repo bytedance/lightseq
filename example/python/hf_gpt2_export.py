@@ -48,6 +48,7 @@ def extract_gpt_weights(
     topp=0.75,
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id=50256,
+    pad_id=50257,
 ):
     gpt = Gpt()
     # load var names
@@ -82,7 +83,7 @@ def extract_gpt_weights(
 
     # fill in conf
     gpt.model_conf.head_num = head_num
-    gpt.model_conf.src_padding_id = 1
+    gpt.model_conf.src_padding_id = pad_id
     gpt.model_conf.sampling_method = generation_method
     gpt.model_conf.topp = topp
     gpt.model_conf.topk = topk
@@ -108,6 +109,7 @@ if __name__ == "__main__":
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id = 50256
+    pad_id = 50257
     extract_gpt_weights(
         output_lightseq_model_name,
         input_huggingface_gpt_model,
@@ -116,4 +118,5 @@ if __name__ == "__main__":
         topk=topk,
         topp=topp,
         eos_id=eos_id,
+        pad_id=pad_id
     )
