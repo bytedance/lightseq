@@ -596,7 +596,6 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
       }
     }
     __syncthreads();
-    assert(s_tid != vocab_size);
   }
 
   /* if new sampled tid is not EOS, set unfinish TRUE */
