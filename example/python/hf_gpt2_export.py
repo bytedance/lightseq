@@ -103,7 +103,7 @@ if __name__ == "__main__":
     output_lightseq_model_name = "lightseq_gpt2.pb"
     input_huggingface_gpt_model = ("gpt2")
     head_number = 12
-    # in order to get score, we should use `beam_search` inference method
+    # generation_method should be "topk" or "topp"
     generation_method = "topk"
     topk = 1
     topp = 0.75
