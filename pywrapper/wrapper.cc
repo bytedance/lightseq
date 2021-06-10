@@ -25,6 +25,10 @@ PYBIND11_MODULE(lightseq, m) {
           .def(py::init<const std::string, const int, const int>(),
                py::arg("weight_path"), py::arg("max_batch_size"), py::arg("max_step"))
           .def(
+               "infer", &lightseq::cuda::Gpt::infer,
+               py::return_value_policy::reference_internal, py::arg("input_seq")
+          )
+          .def(
                "sample", &lightseq::cuda::Gpt::sample,
                py::return_value_policy::reference_internal,
                py::arg("input_seq"),
