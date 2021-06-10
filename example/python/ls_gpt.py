@@ -21,7 +21,7 @@ def ls_gpt2(model, inputs):
     return generated_ids, end_time-start_time
 
 
-def hf_gpt2(model, inputs):
+def hf_gpt2(model, inputs, tokenizer):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
     generated_ids = []
@@ -29,6 +29,7 @@ def hf_gpt2(model, inputs):
         _res = model.generate(
             torch.tensor(sent).long().view(1, -1).to('cuda:0'),
             max_length=50,
+            pad_token_id=tokenizer.eos_token_id
         )
         generated_ids.append(_res)
     torch.cuda.synchronize()
@@ -49,13 +50,13 @@ def ls_generate(model, tokenizer, inputs):
     for sent in ls_res:
         print(sent)
         print("------")
-    print(ls_res_ids)
+    # print(ls_res_ids)
 
 
 def hf_generate(model, tokenizer, inputs):
     print("=========huggingface=========")
     print("huggingface generating...")
-    hf_res_ids, hf_time = hf_gpt2(model, inputs)
+    hf_res_ids, hf_time = hf_gpt2(model, inputs, tokenizer)
     hf_res = [
         tokenizer.decode(ids[0], skip_special_tokens=True)
         for ids in hf_res_ids
@@ -65,7 +66,7 @@ def hf_generate(model, tokenizer, inputs):
     for sent in hf_res:
         print(sent)
         print("------")
-    print(hf_res_ids)
+    # print(hf_res_ids)
 
 
 def warmup(ls_tokenizer, hf_tokenizer, ls_model, hf_model, sentences):
@@ -124,8 +125,8 @@ def main():
         ls_inputs = ls_tokenizer(sentences)["input_ids"]
         hf_inputs = hf_tokenizer(sentences)["input_ids"]
 
-        print(hf_inputs)
-        print(ls_inputs)
+        # print(hf_inputs)
+        # print(ls_inputs)
 
         ls_generate(ls_model, ls_tokenizer, ls_inputs)
         hf_generate(hf_model, hf_tokenizer, hf_inputs)
