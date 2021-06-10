@@ -125,6 +125,10 @@ def main():
         ls_inputs = ls_tokenizer(sentences)["input_ids"]
         hf_inputs = hf_tokenizer(sentences)["input_ids"]
 
+        # Example of using lightseq to get log probability
+        print("log probability for sentences:")
+        for sent in ls_inputs:
+            print(ls_model.infer(torch.tensor(sent).long().view(1, -1)))
         # print(hf_inputs)
         # print(ls_inputs)
 
