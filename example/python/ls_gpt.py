@@ -10,68 +10,49 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 def ls_gpt2(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    generated_ids = []
-    for sent in inputs:
-        _res = model.sample(
-            torch.tensor(sent).long().view(1, -1)
-        )
-        generated_ids.append(_res)
+    generated_ids = model.sample(inputs)
     torch.cuda.synchronize()
     end_time = time.perf_counter()
-    return generated_ids, end_time-start_time
+    return generated_ids, end_time - start_time
 
 
 def hf_gpt2(model, inputs, tokenizer):
+    inputs = inputs.to("cuda:0")
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    generated_ids = []
-    for sent in inputs:
-        _res = model.generate(
-            torch.tensor(sent).long().view(1, -1).to('cuda:0'),
-            max_length=50,
-            pad_token_id=tokenizer.eos_token_id
-        )
-        generated_ids.append(_res)
+    generated_ids = model.generate(
+        inputs, max_length=50, pad_token_id=tokenizer.eos_token_id
+    )
     torch.cuda.synchronize()
     end_time = time.perf_counter()
-    return generated_ids, end_time-start_time
+    return generated_ids, end_time - start_time
 
 
 def ls_generate(model, tokenizer, inputs):
     print("=========lightseq=========")
     print("lightseq generating...")
     ls_res_ids, ls_time = ls_gpt2(model, inputs)
-    ls_res = [
-        tokenizer.decode(ids[0], skip_special_tokens=True)
-        for ids in ls_res_ids
-    ]
+    ls_res = tokenizer.batch_decode(ls_res_ids, skip_special_tokens=True)
     print(f"lightseq time: {ls_time}s")
     print("lightseq results:")
     for sent in ls_res:
         print(sent)
-        print("------")
-    # print(ls_res_ids)
 
 
 def hf_generate(model, tokenizer, inputs):
     print("=========huggingface=========")
     print("huggingface generating...")
     hf_res_ids, hf_time = hf_gpt2(model, inputs, tokenizer)
-    hf_res = [
-        tokenizer.decode(ids[0], skip_special_tokens=True)
-        for ids in hf_res_ids
-    ]
+    hf_res = tokenizer.batch_decode(hf_res_ids, skip_special_tokens=True)
     print(f"huggingface time: {hf_time}s")
     print("huggingface results:")
     for sent in hf_res:
         print(sent)
-        print("------")
-    # print(hf_res_ids)
 
 
 def warmup(ls_tokenizer, hf_tokenizer, ls_model, hf_model, sentences):
-    ls_inputs = ls_tokenizer(sentences)["input_ids"]
-    hf_inputs = hf_tokenizer(sentences)["input_ids"]
+    ls_inputs = ls_tokenizer(sentences, return_tensors="pt", padding=True)["input_ids"]
+    hf_inputs = hf_tokenizer(sentences, return_tensors="pt", padding=True)["input_ids"]
 
     ls_generate(ls_model, ls_tokenizer, ls_inputs)
     hf_generate(hf_model, hf_tokenizer, hf_inputs)
@@ -79,14 +60,14 @@ def warmup(ls_tokenizer, hf_tokenizer, ls_model, hf_model, sentences):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--user_input', action="store_true")
+    parser.add_argument("--user_input", action="store_true")
     args = parser.parse_args()
 
     print("initializing gpt tokenizer...")
 
     ls_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     # lightseq use len(tokenizer) as pad_token in default
-    ls_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    ls_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
     print(f"lightseq tokenizer pad token id: {ls_tokenizer.pad_token_id}")
 
     hf_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -95,21 +76,19 @@ def main():
     print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
-    ls_model = lightseq.Gpt(
-        "lightseq_gpt2.pb",
-        max_batch_size=16,
-        max_step=50
-    )
+    ls_model = lightseq.Gpt("lightseq_gpt2.pb", max_batch_size=16, max_step=50)
 
     print("creating huggingface model...")
     hf_model = GPT2LMHeadModel.from_pretrained("gpt2")
-    hf_model.to('cuda:0')
+    hf_model.to("cuda:0")
 
+    # lightseq gpt perplexity supports batch infer with different lengths,
+    # but sampling doesn't support
     sentences = [
-        "I love that girl, but",
-        "She is so beautiful that I can not help",
-        "Nothing's gonna stop",
-        "Drop everything now. Meet me in the pouring"
+        "My name is GPT",
+        "My name is GPT",
+        "My name is GPT",
+        "My name is GPT",
     ]
 
     print("====================START warmup====================")
@@ -122,15 +101,12 @@ def main():
 
         print("tokenizing the sentences...")
 
-        ls_inputs = ls_tokenizer(sentences)["input_ids"]
-        hf_inputs = hf_tokenizer(sentences)["input_ids"]
-
-        # Example of using lightseq to get log probability
-        print("log probability for sentences:")
-        for sent in ls_inputs:
-            print(ls_model.infer(torch.tensor(sent).long().view(1, -1)))
-        # print(hf_inputs)
-        # print(ls_inputs)
+        ls_inputs = ls_tokenizer(sentences, return_tensors="pt", padding=True)[
+            "input_ids"
+        ]
+        hf_inputs = hf_tokenizer(sentences, return_tensors="pt", padding=True)[
+            "input_ids"
+        ]
 
         ls_generate(ls_model, ls_tokenizer, ls_inputs)
         hf_generate(hf_model, hf_tokenizer, hf_inputs)
