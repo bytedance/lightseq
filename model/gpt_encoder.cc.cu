@@ -44,14 +44,18 @@ Compute GPU memory size needed by gpt encoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-long GptEncoder<OpType_>::compute_buffer_bytesize() {
+size_t GptEncoder<OpType_>::compute_buffer_bytesize() {
   int si = _max_batch_size;
-  int sz0 = _max_batch_dim;
-  sz0 += 2 * _max_batch_dim * _tw._n_enc_layer;
-  long sz1 = _max_batch_dim * 6 +
-             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
-  long sz3 = _max_batch_size * _tw._max_step * _tw._src_vocab_size;
+  size_t sz0 = (size_t)_max_batch_dim;
+  sz0 += 2 * (size_t)_max_batch_dim * (size_t)_tw._n_enc_layer;
+  long long sz1 = (size_t)_max_batch_dim * 6 +
+                  (size_t)_max_batch_size * (size_t)_tw._head_num *
+                      (size_t)_tw._max_step * (size_t)_tw._max_step;
+  long long sz2 = (size_t)_max_batch_dim + (size_t)_max_batch_size *
+                                               (size_t)_tw._max_step *
+                                               (size_t)_tw._inner_size;
+  long long sz3 = (size_t)_max_batch_size * (size_t)_tw._max_step *
+                  (size_t)_tw._src_vocab_size;
   return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
 }
 
@@ -144,6 +148,12 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
       _p_d_src_emb_wei[1], _p_d_token_id, _p_d_query, _p_d_real_seq_len,
       _tw._padding_id, 0);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query, "input embeddings",
+            _batch_token_num * _tw._hidden_size - 5,
+            _batch_token_num * _tw._hidden_size);
+#endif
 
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -249,7 +259,8 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
     print_vec(_p_d_query, "_p_d_query before logits",
               _batch_size * _tw._hidden_size - 10,
               _batch_size * _tw._hidden_size);
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= 20) break;
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
+      break;
 #else
     if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
       break;
@@ -279,12 +290,18 @@ int GptEncoder<OpType_>::sample_one_token() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   /* ---step 2. sample new tokens from logits */
   if (_tw._sampling_method == "topk") {
+#ifdef DEBUG_RESULT
+    std::cout << "sampling using topk\n";
+#endif
     ker_topk_sample_launcher<_DataType>(
         _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
         _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
         _p_d_real_seq_len, _tw._src_vocab_size, _tw._topk, _p_d_unfinished,
         _p_d_curandstate, _tw._eos_id);
   } else {
+#ifdef DEBUG_RESULT
+    std::cout << "sampling using topp\n";
+#endif
     ker_topp_sample_launcher<_DataType>(
         _batch_size, _batch_seq_len, _batch_seq_len, _max_thread_per_block,
         _stream, _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf,
@@ -313,19 +330,26 @@ int GptEncoder<OpType_>::sample_one_token_with_cache() {
       _tw._src_vocab_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_logit, "logits", _batch_size * _tw._src_vocab_size - 5,
+  print_vec(_p_d_logit, "sampling-logits",
+            _batch_size * _tw._src_vocab_size - 5,
             _batch_size * _tw._src_vocab_size);
 #endif
 
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   // /* ---step 2. sample new tokens from logits */
   if (_tw._sampling_method == "topk") {
+#ifdef DEBUG_RESULT
+    std::cout << "sampling using topk\n";
+#endif
     ker_topk_sample_launcher<_DataType>(
         _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
         _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
         _tw._src_vocab_size, _tw._topk, _p_d_unfinished, _p_d_curandstate,
         _tw._eos_id);
   } else {
+#ifdef DEBUG_RESULT
+    std::cout << "sampling using topp\n";
+#endif
     ker_topp_sample_launcher<_DataType>(
         _batch_size, _batch_seq_len, 1, _max_thread_per_block, _stream,
         _p_d_logit, _p_d_sample_id, _p_d_sample_id_buf, _p_d_real_seq_len,
@@ -374,6 +398,9 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
 
 #ifdef DEBUG_RESULT
   if (_layer_id == 0) {
+    print_vec(_p_d_enc_wei[_weight_offset + 2], "qkv_weight_mat",
+              _tw._hidden_size * _tw._hidden_size * 3 - 5,
+              _tw._hidden_size * _tw._hidden_size * 3);
     print_vec(_p_d_qkv_projected, "_p_d_qkv_projected",
               _batch_token_num * _tw._hidden_size * 3 - 5,
               _batch_token_num * _tw._hidden_size * 3);

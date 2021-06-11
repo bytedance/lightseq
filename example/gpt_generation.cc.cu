@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
       std::make_shared<lightseq::cuda::GptEncoder<optype>>(
           max_batch_size,
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
-          reinterpret_cast<float *>(thrust::raw_pointer_cast(d_sample_.data())),
+          reinterpret_cast<float *>(thrust::raw_pointer_cast(d_ppl_.data())),
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_sample_.data())),
           tw_, stream_, cache_stream_, hd_);
   res = encoder_->check();
