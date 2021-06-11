@@ -10,16 +10,19 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 """ 
-For the mapping dictionary: key is the value of the proto parameter, value is a powerful expression, each && split tensor name of the matching path or expression.
+For the mapping dictionary: key is the value of the proto parameter, 
+value is a powerful expression, each && split tensor name of the matching path or expression.
 
-The sub-pattern of the path is separated by spaces, and the expression starts with a expression_. You can operate separately on each tensor and support multiple expressions. Multiple matching paths
+The sub-pattern of the path is separated by spaces, and the expression starts with a expression_. 
+You can operate separately on each tensor and support multiple expressions. Multiple matching paths
 and the expression will finally be concatenated on axis = -1.
 """
 enc_layer_mapping_dict = OrderedDict(
     {
         "multihead_norm_scale": "ln_1 weight",
         "multihead_norm_bias": "ln_1 bias",
-        # GPT2的Conv1D无需额外transpose https://github.com/huggingface/transformers/blob/9ec0f01b6c3aff4636869aee735859fb6f89aa98/src/transformers/modeling_utils.py#L1400
+        # GPT2's Conv1D don't need transpose 
+        # https://github.com/huggingface/transformers/blob/9ec0f01b6c3aff4636869aee735859fb6f89aa98/src/transformers/modeling_utils.py#L1400
         "multihead_project_kernel_qkv": "attn c_attn weight",
         "multihead_project_bias_qkv": "attn c_attn bias",
         "multihead_project_kernel_output": "attn c_proj weight",
