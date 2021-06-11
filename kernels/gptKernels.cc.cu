@@ -115,7 +115,6 @@ template void ker_gpt_embedding_launcher<__half>(
     const __half* token_emb, const __half* pos_emb, const int* token_id,
     __half* output, int* real_seq_len, int padding_id, int pos_offset);
 
-
 /**
 @brief: ker_correlation_softmax_gpt
 query-key correlation softmax for encoder self attention
@@ -520,7 +519,7 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
 
   if (k != 1) {
     /* step2 hold one logit per thread which larger than Kth logit and sample
-    * from them */
+     * from them */
     float topk_exp_sum, topk_exp = CUDA_FLOAT_INF_NEG;
     int topk_tid = vocab_size;
     int test_num = 0;
@@ -582,17 +581,12 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
       s_tid = topk_tid;
     }
     __syncthreads();
-  } 
-  else {
+  } else {
     s_tid = vocab_size;
-    // printf("finding exact top1 (s_tid initialized to %d)\n", s_tid);
     for (int idx = left_logit_idx; idx < right_logit_idx; idx += blockDim.x) {
       float logit = (float)logits[idx];
-      // printf("accessing index %d with logit %f\n", idx, logit);
       if (logit == s_max_logit) {
-        // printf("max logit found at index %d\n", idx);
         s_tid = idx - left_logit_idx + threadIdx.x;
-        // printf("selecting top1 id: %d\n", s_tid);
       }
     }
     __syncthreads();

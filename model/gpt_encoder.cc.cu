@@ -49,9 +49,13 @@ size_t GptEncoder<OpType_>::compute_buffer_bytesize() {
   size_t sz0 = (size_t)_max_batch_dim;
   sz0 += 2 * (size_t)_max_batch_dim * (size_t)_tw._n_enc_layer;
   long long sz1 = (size_t)_max_batch_dim * 6 +
-             (size_t)_max_batch_size * (size_t)_tw._head_num * (size_t)_tw._max_step * (size_t)_tw._max_step;
-  long long sz2 = (size_t)_max_batch_dim + (size_t)_max_batch_size * (size_t)_tw._max_step * (size_t)_tw._inner_size;
-  long long sz3 = (size_t)_max_batch_size * (size_t)_tw._max_step * (size_t)_tw._src_vocab_size;
+                  (size_t)_max_batch_size * (size_t)_tw._head_num *
+                      (size_t)_tw._max_step * (size_t)_tw._max_step;
+  long long sz2 = (size_t)_max_batch_dim + (size_t)_max_batch_size *
+                                               (size_t)_tw._max_step *
+                                               (size_t)_tw._inner_size;
+  long long sz3 = (size_t)_max_batch_size * (size_t)_tw._max_step *
+                  (size_t)_tw._src_vocab_size;
   return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
 }
 
@@ -144,12 +148,12 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
       _p_d_src_emb_wei[1], _p_d_token_id, _p_d_query, _p_d_real_seq_len,
       _tw._padding_id, 0);
-  
-  #ifdef DEBUG_RESULT
-      print_vec(_p_d_query, "input embeddings",
-                _batch_token_num * _tw._hidden_size - 5,
-                _batch_token_num * _tw._hidden_size);
-  #endif
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query, "input embeddings",
+            _batch_token_num * _tw._hidden_size - 5,
+            _batch_token_num * _tw._hidden_size);
+#endif
 
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -255,7 +259,8 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
     print_vec(_p_d_query, "_p_d_query before logits",
               _batch_size * _tw._hidden_size - 10,
               _batch_size * _tw._hidden_size);
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step) break;
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
+      break;
 #else
     if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
       break;
@@ -325,8 +330,8 @@ int GptEncoder<OpType_>::sample_one_token_with_cache() {
       _tw._src_vocab_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_logit, "sampling-logits", 
-  _batch_size * _tw._src_vocab_size - 5,
+  print_vec(_p_d_logit, "sampling-logits",
+            _batch_size * _tw._src_vocab_size - 5,
             _batch_size * _tw._src_vocab_size);
 #endif
 
