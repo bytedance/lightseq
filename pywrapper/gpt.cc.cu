@@ -105,7 +105,7 @@ class Gpt {
       std::runtime_error(std::string(cudaGetErrorString(cuerr)));
     }
   }
-  py::array_t<float> infer(
+  py::array_t<float> ppl(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int* input_seq_data = input_seq_out.data(0, 0);
