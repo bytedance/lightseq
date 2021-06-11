@@ -9,9 +9,12 @@ from transformers import GPT2LMHeadModel
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
-""" key是proto参数的值，value是一个强大的表达式，每个&&分割tensor name的匹配路径或表达式，每个匹配
-路径的子pattern用空格分隔，表达式用expression_开头，可以对每个tensor进行单独操作，支持多个表达式。多个匹配路径
-和表达式最后会concat，axis=-1 """
+""" 
+For the mapping dictionary: key is the value of the proto parameter, value is a powerful expression, each && split tensor name of the matching path or expression.
+
+The sub-pattern of the path is separated by spaces, and the expression starts with a expression_. You can operate separately on each tensor and support multiple expressions. Multiple matching paths
+and the expression will finally be concatenated on axis = -1.
+"""
 enc_layer_mapping_dict = OrderedDict(
     {
         "multihead_norm_scale": "ln_1 weight",
@@ -54,7 +57,6 @@ def extract_gpt_weights(
     # load var names
     encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
     enc_var_name_list = list(encoder_state_dict.keys())
-    # import pdb;pdb.set_trace()
 
     # fill each encoder layer's params
     enc_tensor_names = {}
