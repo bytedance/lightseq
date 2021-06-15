@@ -363,7 +363,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
 
-    # Replace with LightSeq 2.0 encoder layers.
+    # Replace with LightSeq encoder layers.
     inject_ls_enc_layer(model, training_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.

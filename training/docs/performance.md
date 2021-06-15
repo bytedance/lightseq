@@ -7,7 +7,7 @@ The following tables are comparisons of performance between different implementa
 
 **1 GPU**
 
-| batch_tokens | Fairseq | Fairseq+Apex | Fairseq+LightSeq 2.0 | Fairseq+Apex speedup | Fairseq+LightSeq 2.0 speedup |
+| batch_tokens | Fairseq | Fairseq+Apex | Fairseq+LightSeq | Fairseq+Apex speedup | Fairseq+LightSeq speedup |
 |--------------|---------|--------------|----------------------|----------------------|------------------------------|
 | 512          | 3781    | 4677         | 11631                | 1.24                 | 3.08                         |
 | 1024         | 8031    | 10270        | 19305                | 1.28                 | 2.40                         |
@@ -19,7 +19,7 @@ The following tables are comparisons of performance between different implementa
 
 **8 GPUs**
 
-| batch_tokens | Fairseq | Fairseq+Apex | Fairseq+LightSeq 2.0 | Fairseq+Apex speedup | Fairseq+LightSeq 2.0 speedup |
+| batch_tokens | Fairseq | Fairseq+Apex | Fairseq+LightSeq | Fairseq+Apex speedup | Fairseq+LightSeq speedup |
 |--------------|---------|--------------|----------------------|----------------------|------------------------------|
 | 512          | 26005   | 31274        | 61864                | 1.20                 | 2.38                         |
 | 1024         | 58071   | 67710        | 111858               | 1.17                 | 1.93                         |
@@ -33,7 +33,7 @@ The following tables are comparisons of performance between different implementa
 
 **1 GPU**
 
-| batch_tokens | NeurST | NeurST+LightSeq 2.0 | NeurST+LightSeq 2.0 speedup |
+| batch_tokens | NeurST | NeurST+LightSeq | NeurST+LightSeq speedup |
 |--------------|--------|---------------------|-----------------------------|
 | 512          | 4765   | 9989                | 2.10                        |
 | 1024         | 7066   | 14479               | 2.05                        |
@@ -44,7 +44,7 @@ The following tables are comparisons of performance between different implementa
 
 **8 GPUs**
 
-| batch_tokens | NeurST | NeurST+LightSeq 2.0 | NeurST+LightSeq 2.0 speedup |
+| batch_tokens | NeurST | NeurST+LightSeq | NeurST+LightSeq speedup |
 |--------------|--------|---------------------|-----------------------------|
 | 512          | 34761  | 54820               | 1.58                        |
 | 1024         | 59561  | 94021               | 1.58                        |
@@ -61,7 +61,7 @@ The following tables are comparisons of performance between different implementa
 
 **fp32**
 
-| total_counts (m) | PyTorch | TensorFlow | DeepSpeed | LightSeq 2.0 |
+| total_counts (m) | PyTorch | TensorFlow | DeepSpeed | LightSeq |
 |------------------|---------|------------|-----------|--------------|
 | 0.1              | 1.00    | 0.37       | 2.45      | 2.37         |
 | 0.5              | 1.00    | 0.32       | 1.75      | 2.16         |
@@ -75,7 +75,7 @@ The following tables are comparisons of performance between different implementa
 
 **fp16**
 
-| total_counts (m) | PyTorch | TensorFlow | DeepSpeed | LightSeq 2.0 |
+| total_counts (m) | PyTorch | TensorFlow | DeepSpeed | LightSeq |
 |------------------|---------|------------|-----------|--------------|
 | 0.1              | 1.00    | 0.38       | 2.46      | 2.42         |
 | 0.5              | 1.00    | 0.39       | 2.01      | 2.38         |
@@ -91,7 +91,7 @@ The following tables are comparisons of performance between different implementa
 
 **fp32**
 
-| batch_size | seq_len | PyTorch | TensorFlow | DeepSpeed | LightSeq 2.0 |
+| batch_size | seq_len | PyTorch | TensorFlow | DeepSpeed | LightSeq |
 |------------|---------|---------|------------|-----------|--------------|
 | 256        | 32      | 1.00    | 0.22       | 1.16      | 1.20         |
 | 128        | 64      | 1.00    | 0.29       | 1.10      | 1.36         |
@@ -106,7 +106,7 @@ The following tables are comparisons of performance between different implementa
 
 **fp16**
 
-| batch_size | seq_len | PyTorch | TensorFlow | DeepSpeed | LightSeq 2.0 |
+| batch_size | seq_len | PyTorch | TensorFlow | DeepSpeed | LightSeq |
 |------------|---------|---------|------------|-----------|--------------|
 | 256        | 32      | 1.00    | 0.20       | 2.42      | 2.09         |
 | 128        | 64      | 1.00    | 0.23       | 2.56      | 2.74         |

@@ -2,17 +2,14 @@ import math
 
 import torch
 from torch import nn
-
-import deepspeed
-from deepspeed.utils import logger, log_dist
-from fairseq import tasks, utils, distributed_utils
-from fairseq.data import iterators
-from fairseq.logging import metrics
 import torch.distributed as dist
+import deepspeed
+from deepspeed.utils import log_dist
+from fairseq import tasks, distributed_utils
+from fairseq.logging import metrics
 
 from ds_fairseq_data import BatchIterator
 from ds_fairseq_argument import gen_ds_fairseq_arg
-from examples.fairseq.ls_task import LSTranslationTask
 
 
 best_bleu = 0.0
@@ -204,7 +201,7 @@ def set_seed(seed):
 def tmp():
     fs_args, ds_config = gen_ds_fairseq_arg()
     set_seed(fs_args.seed)
-    task = LSTranslationTask.setup_task(fs_args)
+    task = tasks.setup_task(fs_args)
     trainer = DsFairseqTrainer(fs_args, ds_config, task)
     batch_itr = BatchIterator(fs_args, task)
     for epoch in batch_itr.train_epoch():
