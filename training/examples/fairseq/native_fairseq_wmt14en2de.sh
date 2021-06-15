@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -ex
 THIS_DIR=$(dirname $(readlink -f $0))
-cd $THIS_DIR
+cd $THIS_DIR/../../
 
 if [ ! -d "wmt14_en_de" ]; then
     wget http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/wmt_data/databin_wmt14_en_de.tar.gz

@@ -362,7 +362,7 @@ def main():
 
     model.resize_token_embeddings(len(tokenizer))
 
-    # Replace with LightSeq 2.0 encoder layers.
+    # Replace with LightSeq encoder layers.
     args.local_rank = accelerator.local_process_index
     args.fp16 = accelerator.use_fp16
     inject_ls_enc_layer(model, args, config)

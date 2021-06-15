@@ -21,7 +21,9 @@ from tests import fairseq_layers
 from ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 from ops.pytorch.transformer_embedding_layer import LSTransformerEmbeddingLayer
 from ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
-from examples.fairseq.ls_fs_transformer_decoder_layer import LSFSTransformerDecoderLayer
+from examples.fairseq.fs_modules.ls_fs_transformer_decoder_layer import (
+    LSFSTransformerDecoderLayer,
+)
 
 kt = TestDecorator()
 
