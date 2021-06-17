@@ -14,7 +14,9 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-rm -r /tmp/test-ner/
+if [ -d "/tmp/test-ner/" ]; then
+  rm -rf /tmp/test-ner/
+fi
 
 python3 -m torch.distributed.launch \
   --nproc_per_node=8 \

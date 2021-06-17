@@ -14,7 +14,9 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-rm -r /tmp/test-ner/
+if [ -d "/tmp/test-ner/" ]; then
+  rm -rf /tmp/test-ner/
+fi
 
 accelerate launch $THIS_DIR/run_ner_no_trainer.py \
   --model_name_or_path bert-large-uncased \

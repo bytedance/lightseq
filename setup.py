@@ -104,7 +104,7 @@ setup(
         "Operating System :: POSIX :: Linux",
     ],
     ext_modules=[CMakeExtension("lightseq")],
-    install_requires=["ninja", "fairseq"],
+    install_requires=["ninja"],
     python_requires=">=3.6",
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,

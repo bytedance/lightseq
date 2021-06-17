@@ -5,7 +5,7 @@ We modify the token classification [examples](https://github.com/huggingface/tra
 
 First you should install these requirements.
 ```shell
-pip install torch ninja transformers seqeval
+pip install torch ninja transformers seqeval datasets
 ```
 
 Then you can easily fine-tunes BERT on CoNLL-2003 by running the bash script `run_ner.sh`.
