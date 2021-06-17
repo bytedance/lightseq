@@ -14,14 +14,13 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-rm -r /tmp/test-ner/
+if [ -d "/tmp/test-ner/" ]; then
+  rm -rf /tmp/test-ner/
+fi
 
-python3 -m torch.distributed.launch \
-  --nproc_per_node=8 \
-  $THIS_DIR/run_ner.py \
+accelerate launch $THIS_DIR/run_ner_no_trainer.py \
   --model_name_or_path bert-large-uncased \
   --dataset_name conll2003 \
   --output_dir /tmp/test-ner \
-  --do_train \
-  --do_eval \
+  --task_name ner \
   --num_train_epochs 1

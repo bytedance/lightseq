@@ -3,9 +3,7 @@ This repo contains an example for how to use LightSeq to accerate the training o
 
 First you should install these requirements.
 ```shell
-git clone https://github.com/bytedance/lightseq.git
-cd lightseq/training/
-pip install -e .
+pip install lightseq fairseq
 ```
 
 Then you can train a translation task on wmt14 en2de dataset by running the following script:

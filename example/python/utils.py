@@ -70,13 +70,11 @@ def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
 
 def _get_encode_output_mapping_dict(dec_layer_num):
     encode_output_kernel_pattern = [
-        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(
-            ele)
+        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(ele)
         for ele in range(dec_layer_num)
     ]
     encode_output_bias_pattern = [
-        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(
-            ele)
+        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(ele)
         for ele in range(dec_layer_num)
     ]
 
@@ -111,18 +109,15 @@ def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale
             float(max_timescale) / float(min_timescale)
         ) / (tf.cast(num_timescales, tf.float32) - 1)
         inv_timescales = min_timescale * tf.exp(
-            tf.cast(tf.range(num_timescales), tf.float32) * -
-            log_timescale_increment
+            tf.cast(tf.range(num_timescales), tf.float32) * -log_timescale_increment
         )
-        scaled_time = tf.expand_dims(
-            position, 1) * tf.expand_dims(inv_timescales, 0)
-        signal = tf.concat(
-            [tf.math.sin(scaled_time), tf.math.cos(scaled_time)], axis=1)
+        scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(inv_timescales, 0)
+        signal = tf.concat([tf.math.sin(scaled_time), tf.math.cos(scaled_time)], axis=1)
     return signal
 
 
 def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
-    """ use pattern to diff source and target. """
+    """use pattern to diff source and target."""
     target_tn = []
     # lang_embedding = None
     for tn in tensor_names:

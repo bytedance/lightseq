@@ -348,18 +348,18 @@ def extract_transformer_weights(
 if __name__ == "__main__":
     output_lightseq_model_name = "lightseq_bart_base.pb"
     input_huggingface_bart_model = (
-        "facebook/bart-base"  ## Example: you can try "facebook/bart-large" as well
+        "facebook/bart-base"  # Example: you can try "facebook/bart-large" as well
     )
     head_number = 12  # for bart-large, we have 16
-    generation_method = "beam_search"  ## in order to get score, we should use `beam_search` inference method
+    generation_method = "beam_search"  # in order to get score, we should use `beam_search` inference method
     beam_size = 4
-    max_step = 50 # max step for generation, it decides GPU memory occupancy
-    extra_decode_length = 50  ## maximum_generation_length = min(src_length + extra_decode_length, max_step)
+    max_step = 50  # max step for generation, it decides GPU memory occupancy
+    extra_decode_length = 50  # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     length_penalty = 1.0
     extract_transformer_weights(
         output_lightseq_model_name,
         input_huggingface_bart_model,
-        head_num=head_number,  ## layer number
+        head_num=head_number,  # layer number
         generation_method=generation_method,
         beam_size=beam_size,
         max_step=max_step,

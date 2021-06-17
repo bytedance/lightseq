@@ -20,9 +20,9 @@ export PATH=/usr/local/cuda/bin:${PATH}
 CONDA_PATH=/miniconda
 
 # Compile wheels
-for PYBIN in $CONDA_PATH/envs/py*/bin; do
-    "${PYBIN}/pip" install -U build
-    ENABLE_FP32=0 ENABLE_DEBUG=0 "${PYBIN}/python" -m build
+for PYBIN in /usr/local/bin/python3*; do
+    "${PYBIN}" -m pip install -U build
+    ENABLE_FP32=0 ENABLE_DEBUG=0 "${PYBIN}" -m build
 done
 
 # Bundle external shared libraries into the wheels

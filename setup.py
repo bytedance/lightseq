@@ -4,8 +4,9 @@ import sys
 import platform
 import subprocess
 import multiprocessing
+import glob
 
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
@@ -88,10 +89,10 @@ with open("README.md", "r") as fh:
 
 setup(
     name="lightseq",
-    version="1.2.0",
-    author="Xiaohui Wang, Ying Xiong, Yang Wei",
-    author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, \
-weiyang.god@bytedance.com",
+    version="2.0.1",
+    author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
+    author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
+    ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
     description="LightSeq is a high performance inference library "
     "for sequence processing and generation implemented in CUDA",
     long_description=long_description,
@@ -103,7 +104,21 @@ weiyang.god@bytedance.com",
         "Operating System :: POSIX :: Linux",
     ],
     ext_modules=[CMakeExtension("lightseq")],
+    install_requires=["ninja"],
+    python_requires=">=3.6",
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=["docs", "tests"]),
+    package_data={
+        "lightseq.training": [
+            path.replace("lightseq/training/", "")
+            for path in glob.glob("lightseq/training/csrc/**/*", recursive=True)
+        ]
+    },
+    entry_points={
+        "console_scripts": [
+            "lightseq-train = lightseq.training.examples.fairseq"
+            ".lightseq_fairseq_train_cli:ls_cli_main",
+        ],
+    },
 )

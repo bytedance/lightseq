@@ -3,7 +3,7 @@ import argparse
 
 import torch
 import numpy as np
-import lightseq
+import lightseq.inference as lsi
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 
@@ -76,7 +76,7 @@ def main():
     print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
-    ls_model = lightseq.Gpt("lightseq_gpt2.pb", max_batch_size=16, max_step=50)
+    ls_model = lsi.Gpt("lightseq_gpt2.pb", max_batch_size=16, max_step=50)
 
     print("creating huggingface model...")
     hf_model = GPT2LMHeadModel.from_pretrained("gpt2")
