@@ -93,7 +93,13 @@ pip install -e .
 ```
 
 ### TensorFlow
-Comming soon...
+- Tensorflow version = 2.4
+- Python version = 3.7
+- Cuda version = 11.0
+- To install LightSeq training library:
+```shell
+pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorflow/lightseq_tf-2.0.1-cp37-cp37m-linux_x86_64.whl
+```
 
 ## Usage
 
