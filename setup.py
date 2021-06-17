@@ -89,7 +89,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="lightseq",
-    version="1.3.2",
+    version="2.0.1",
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
