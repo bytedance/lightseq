@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 
-from .util import (
+from lightseq.training.tests.util import (
     TestDecorator,
     get_fairseq_enc_params,
     get_fairseq_dec_params,
@@ -17,7 +17,7 @@ from .util import (
     copy_grad_from_paras,
 )
 
-from . import fairseq_layers
+from lightseq.training.tests import fairseq_layers
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
