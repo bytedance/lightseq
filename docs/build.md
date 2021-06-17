@@ -1,11 +1,11 @@
 # Build from source code
 
 ## Requirements
-- cudatoolkit-dev >= 10.1
+- cudatoolkit-dev >= 10.1 < 11
 - protobuf >= 3.13
 - cmake >= 3.18
 
-To install cudatoolkit-dev, you could run `conda install -c conda-forge cudatoolkit-dev` or follow the [official guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile), the runfile installation with `--toolkit` arg is recommended. 
+To install cudatoolkit-dev, you could run `conda install -c conda-forge cudatoolkit-dev` or follow the [official guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile), the runfile installation with `--toolkit` arg is recommended. LightSeq can be run on cuda11, but it is not supported to compile with cuda11, cuda11 has build-in cub, it will conflict with submodule cub.
 
 After installation, check the installation of `nvcc` and static libraries (*.a) in `${CUDA_PATH}/lib64`.
 
