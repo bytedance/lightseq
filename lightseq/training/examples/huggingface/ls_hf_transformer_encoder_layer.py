@@ -1,6 +1,6 @@
 import random
 
-from ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 
 
 class LSHFTransformerEncoderLayer(LSTransformerEncoderLayer):

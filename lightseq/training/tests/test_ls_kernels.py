@@ -3,8 +3,8 @@ import random
 import torch
 from torch.nn import functional
 
-from ops.pytorch.builder import KernelBuilder, AdamBuilder
-from tests.util import TestDecorator, cast_fp32_tensor
+from lightseq.training.ops.pytorch.builder import KernelBuilder, AdamBuilder
+from .util import TestDecorator, cast_fp32_tensor
 
 cuda_module = KernelBuilder().load()
 adam_module = AdamBuilder().load()

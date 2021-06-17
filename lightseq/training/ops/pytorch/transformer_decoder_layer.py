@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from ops.pytorch.builder import TransformerBuilder
-from ops.pytorch.util import copy_para
+from lightseq.training.ops.pytorch.builder import TransformerBuilder
+from lightseq.training.ops.pytorch.util import copy_para
 
 transformer_cuda_module = None
 _all_layer_grads = dict()

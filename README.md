@@ -173,11 +173,11 @@ tar -zxvf transformer_weight.tar.gz
 Finally you can run lightseq in only a few lines!
 
 ```python
-import lightseq
+import lightseq.inference as lsi
 import numpy as np
 
 test_input = np.array([[5001, 2, 36, 5002]])
-transformer = lightseq.Transformer("transformer.pb", 32) # 32 is max batch size, it will decide GPU memory occupancy.
+transformer = lsi.Transformer("transformer.pb", 32) # 32 is max batch size, it will decide GPU memory occupancy.
 result = transformer.infer(test_input)
 ```
 

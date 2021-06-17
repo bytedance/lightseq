@@ -7,7 +7,8 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(lightseq, m) {
+PYBIND11_MODULE(inference, m) {
+  m.attr("__name__") = "lightseq.inference";
   py::class_<lightseq::cuda::TransformerDecoder>(m, "TransformerDecoder")
       .def(py::init<const std::string, const int>())
       .def("infer", &lightseq::cuda::TransformerDecoder::infer);

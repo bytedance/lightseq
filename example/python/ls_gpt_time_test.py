@@ -1,6 +1,6 @@
 import time
 import torch
-import lightseq
+import lightseq.inference as lsi
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 
@@ -30,7 +30,7 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
     # tokenizer.pad_token_id = tokenizer.eos_token_id
     print("creating lightseq model...")
-    ls_model = lightseq.Gpt(
+    ls_model = lsi.Gpt(
         "lightseq_gpt2.pb",
         max_batch_size=128,
         max_step=50,  # max length

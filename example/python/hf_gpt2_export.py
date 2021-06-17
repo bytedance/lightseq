@@ -21,7 +21,7 @@ enc_layer_mapping_dict = OrderedDict(
     {
         "multihead_norm_scale": "ln_1 weight",
         "multihead_norm_bias": "ln_1 bias",
-        # GPT2's Conv1D don't need transpose 
+        # GPT2's Conv1D don't need transpose
         # https://github.com/huggingface/transformers/blob/9ec0f01b6c3aff4636869aee735859fb6f89aa98/src/transformers/modeling_utils.py#L1400
         "multihead_project_kernel_qkv": "attn c_attn weight",
         "multihead_project_bias_qkv": "attn c_attn bias",
@@ -44,6 +44,7 @@ src_emb_mapping_dict = OrderedDict(
         "position_embedding": "wpe",
     }
 )
+
 
 def extract_gpt_weights(
     output_file,
@@ -106,7 +107,7 @@ def extract_gpt_weights(
 
 if __name__ == "__main__":
     output_lightseq_model_name = "lightseq_gpt2.pb"
-    input_huggingface_gpt_model = ("gpt2")
+    input_huggingface_gpt_model = "gpt2"
     head_number = 12
     # generation_method should be "topk" or "topp"
     generation_method = "topk"
@@ -123,5 +124,5 @@ if __name__ == "__main__":
         topk=topk,
         topp=topp,
         eos_id=eos_id,
-        pad_id=pad_id
+        pad_id=pad_id,
     )
