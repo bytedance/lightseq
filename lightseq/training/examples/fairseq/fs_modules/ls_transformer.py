@@ -16,6 +16,7 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransforme
 from .ls_fs_transformer_decoder_layer import LSFSTransformerDecoderLayer
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
+MAX_SEQ_LENGTH = 300
 
 
 @register_model("ls_transformer")
@@ -145,7 +146,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
             max_batch_tokens=args.max_tokens,
-            max_seq_len=256,  # FIXME later
+            max_seq_len=MAX_SEQ_LENGTH,  # FIXME later
             padding_idx=dictionary.pad(),
             dropout=args.dropout,
             fp16=args.fp16,
@@ -187,7 +188,7 @@ class LSTransformerEncoder(FairseqEncoder):
     def build_encoder_layer(self, args):
         config = LSTransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
-            max_seq_len=256,
+            max_seq_len=MAX_SEQ_LENGTH,
             hidden_size=args.encoder_embed_dim,
             intermediate_size=args.encoder_ffn_embed_dim,
             nhead=args.encoder_attention_heads,
@@ -288,7 +289,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
     def build_decoder_layer(self, args):
         config = LSFSTransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
-            max_seq_len=256,
+            max_seq_len=MAX_SEQ_LENGTH,
             hidden_size=args.decoder_embed_dim,
             intermediate_size=args.decoder_ffn_embed_dim,
             nhead=args.decoder_attention_heads,
