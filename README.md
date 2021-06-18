@@ -22,6 +22,9 @@ Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 to as TRTIS in the later discussion). With LightSeq, you can easily deploy efficient model services or develop
 your own model architectures just with a little code modification.
 
+:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now, 
+please check out [here](./lightseq/training/README.md) for details.
+
 ## Features
 
 - Comprehensive sequence modeling support, including Bert, GPT, Transformer and their VAE variants.
