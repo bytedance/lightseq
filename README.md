@@ -1,26 +1,25 @@
-# LightSeq: A High Performance Inference Library for Sequence Processing and Generation
+# LightSeq: A High Performance Library for Sequence Processing and Generation
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
 [中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
 
-LightSeq is a high performance inference library for sequence processing and generation implemented
+LightSeq is a high performance training and inference library for sequence processing and generation implemented
 in CUDA.
-It enables highly efficient computation of modern NLP models such as **BERT**, **GPT2**,
+It enables highly efficient computation of modern NLP models such as **BERT**, **GPT**,
 **Transformer**, etc.
 It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*， *Language
-Modelling*, and other related tasks using these models.
+Modelling*, *Sentiment analysis*, and other related tasks with sequence data.
 
 The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and
-custom kernel functions which are specially fused and optimized for these widely used models. In
-addition to model components, we also provide codes
-manage model weights trained from deepleanring framework and servers as a custom backend for
+custom kernel functions which are specially fused and optimized for Transformer model family. In
+addition to model components, the library also provide easy-to deploy model management and serving backend based on 
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
-to as TRTIS in the later discussion). With LightSeq, you can easily deploy efficient model services or develop
-your own model architectures just with a little code modification.
+to as TRTIS in the later discussion). 
+With LightSeq, one can easily develop modified Transformer architecture with little additional code. 
 
 :tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now, 
 please check out [here](./lightseq/training/README.md) for details.
@@ -31,7 +30,8 @@ please check out [here](./lightseq/training/README.md) for details.
 - Various search methods, such as beam search, diverse beam search, topp/topk sampling.
 - Out-of-the-box rich middlewares for model service based on TRTIS, such as dynamic batch,
   multi-model on single GPU.
-- State of art inference performance compared with Deeplearning framework and other inference
+- Lightening fast training speed for supported models. 
+- Lightening fast inference performance compared with Deeplearning framework and other inference
   libraries.
 
 The following is a support matrix of LightSeq compared with
@@ -42,7 +42,7 @@ The following is a support matrix of LightSeq compared with
 
 ## Performance
 
-Here, we show our experimental results on neural machine translation and text generation.
+Here are the experimental results on neural machine translation and text generation.
 The models of these two tasks are Transformer-base, but use beam search and sampling search methods
 respectively.
 We choose Tensorflow and
@@ -281,19 +281,21 @@ work:
 
 ## Cite Us
 
-Our paper has been accepted by NAACL 2021 (Industry Track).
-If you use LightSeq in your research publication, please cite this paper.
+If you use LightSeq in your research, please cite the following paper.
 
 ```tex
-@article{wang2021lightseq,
-      title={LightSeq: A High Performance Inference Library for Transformers}, 
-      author={Xiaohui Wang and Ying Xiong and Yang Wei and Mingxuan Wang and Lei Li},
-      journal={arXiv preprint arXiv:2010.13887},
-      year={2021}
+@InProceedings{wang2021lightseq,
+  title = "{L}ight{S}eq: A High Performance Inference Library for Transformers",
+    author = "Wang, Xiaohui and Xiong, Ying and Wei, Yang and Wang, Mingxuan and Li, Lei",
+    booktitle = "Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies: Industry Papers (NAACL-HLT)",
+    month = jun,
+    year = "2021",
+    publisher = "Association for Computational Linguistics",
+    pages = "113--120",
 }
 ```
 
 ## Contact
 
-Any questions or suggestions, please feel free to contact us.
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com
+Any questions or suggestions, please feel free to contact us at
+wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lileilab@bytedance.com
