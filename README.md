@@ -2,6 +2,10 @@
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
+
+:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now, 
+please check out [here](./lightseq/training/README.md) for details.
+
 [中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
 
 LightSeq is a high performance training and inference library for sequence processing and generation implemented
@@ -20,9 +24,6 @@ addition to model components, the library also provide easy-to deploy model mana
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
 to as TRTIS in the later discussion). 
 With LightSeq, one can easily develop modified Transformer architecture with little additional code. 
-
-:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now, 
-please check out [here](./lightseq/training/README.md) for details.
 
 ## Features
 
@@ -60,68 +61,25 @@ More results is available [here](./docs/performance.md).
 - Text generation
 ![generation](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/generation.png)
 
-## Code Structure
-
-```shell
-├── CMakeLists.txt # cmake build file
-├── CONTRIBUTING.md 
-├── example
-│   ├── CMakeLists.txt
-│   ├── decoder_example.cc.cu # transformer decoder only example
-│   ├── gpt_generation.cc.cu # GPT generation example
-│   ├── gptlm_example.cc.cu # GPT language model example
-│   ├── transformer_example.cc.cu # Transformer translation example
-│   └── transformer_generate_example.cc.cu # Transformer generation example
-├── kernels
-│   ├── CMakeLists.txt
-│   ├── common.h # common kernel functions 
-│   ├── gptKernels.cc.cu # GPT kernel functions
-│   ├── gptKernels.h
-│   ├── transformerKernels.cc.cu # Transformer kernel functions
-│   └── transformerKernels.h
-├── LICENSE
-├── model
-│   ├── CMakeLists.txt
-│   ├── decoder.cc.cu # Transformer decoder
-│   ├── decoder.h
-│   ├── encoder.cc.cu # Transformer encoder
-│   ├── encoder.h
-│   ├── gpt_encoder.cc.cu # GPT encoder
-│   └── gpt_encoder.h
-├── NOTICE
-├── proto
-│   ├── CMakeLists.txt
-│   ├── gpt.proto # proto file to save GPT model
-│   ├── gpt_weight.cc # GPT weight class
-│   ├── gpt_weight.h
-│   ├── transformer.proto # # proto file to save Transformer model
-│   ├── transformer_weight.cc # Transformer weight class
-│   └── transformer_weight.h
-├── pywrapper
-│   ├── CMakeLists.txt
-│   ├── transformer.cc.cu # python wrapper for Transformer
-│   ├── transformer_decoder.cc.cu # python wrapper for Transformer decoder
-│   └── wrapper.cc # pybind registeration
-├── README.md
-├── server # custom engine for Triton
-│   ├── CMakeLists.txt
-│   ├── custom.h # Triton dependeny
-│   ├── decoder_generate_server.cc.cu
-│   ├── generate_server.cc.cu
-│   ├── gpt_generate_server.cc.cu
-│   ├── gptlm_server.cc.cu
-│   ├── libserver.ldscript # Triton dependeny
-│   ├── model_config_cuda.h # Triton dependeny
-│   ├── model_config.h # Triton dependeny
-│   ├── model_config.proto # Triton dependeny
-│   └── transformer_server.cc.cu 
-└── tools
-    ├── CMakeLists.txt
-    ├── util.cc.cu
-    └── util.h
-```
 
 ## Quick Start
+
+### Fast training from Fairseq
+
+You can experience lightning fast training by running following commands,
+Firstly install these requirements.
+
+```shell
+pip install lightseq fairseq sacremoses
+```
+
+Then you can train a translation task on wmt14 en2de dataset by running the following script
+
+```shell
+sh lightseq/training/examples/fairseq/ls_fairseq_wmt14en2de.sh
+```
+
+To compare lightseq with fairseq, delete the arguments with `ls_`prefix to using the original fairseq implementation
 
 ### Run from HuggingFace bart
 
