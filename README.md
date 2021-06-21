@@ -275,7 +275,7 @@ You can use LightSeq operators directly in your codes to build your own models f
 For example, if you want to use the encoder layers, you first need to generate a config containing all the arguments of the models and training. Then you can initialize the LightSeq encoder layer using the config and integrate it into you models.
 
 ```
-from ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 
 config = LSTransformerEncoderLayer.get_config(
     max_batch_tokens=4096,
