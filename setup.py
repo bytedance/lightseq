@@ -89,7 +89,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="lightseq",
-    version="2.0.1",
+    version="2.0.0",
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
@@ -103,7 +103,7 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
     ],
-    ext_modules=[CMakeExtension("lightseq")],
+    ext_modules=[CMakeExtension("lightseq_inference", optional=True)],
     install_requires=["ninja"],
     python_requires=">=3.6",
     cmdclass=dict(build_ext=CMakeBuild),
