@@ -227,31 +227,6 @@ TenforFlow, PyTorch) to custom model proto defined by LightSeq. Furthermore, you
 source code](./docs/build.md) if you want to modify the model architectures or serve a new model not supported by
 LightSeq currently.
 
-### Building models from scratch
-You can use LightSeq operators directly in your codes to build your own models for training. To simplify the use of individual operators, LightSeq designed a simple and self-contained interface.
-
-For example, if you want to use the encoder layers, you first need to generate a config containing all the arguments of the models and training. Then you can initialize the LightSeq encoder layer using the config and integrate it into you models.
-
-```
-from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
-
-config = LSTransformerEncoderLayer.get_config(
-    max_batch_tokens=4096,
-    max_seq_len=256,
-    hidden_size=1024,
-    intermediate_size=4096,
-    nhead=16,
-    attn_prob_dropout_ratio=0.1,
-    activation_dropout_ratio=0.1,
-    hidden_dropout_ratio=0.1,
-    pre_layer_norm=True,
-    fp16=True,
-    local_rank=0,
-)
-enc_layer = LSTransformerEncoderLayer(config)
-```
-Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `ops/pytorch` and `ops/tensorflow` directory for detail.
-
 ## Limitations and Future Plans
 
 LightSeq does not support CPU inference for now and its compilation relies heavily on TRTIS, we will
