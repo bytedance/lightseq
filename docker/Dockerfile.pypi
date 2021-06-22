@@ -50,14 +50,5 @@ RUN mkdir -p ${CMAKE_PATH} && cd ${CMAKE_PATH} && \
     sh cmake-3.18.2-Linux-x86_64.sh --skip-license && \
     rm cmake-3.18.2-Linux-x86_64.sh && ln -s ${CMAKE_PATH}/bin/cmake /usr/bin/cmake
 
-# install miniconda
-ARG CONDA_PATH=/miniconda
-RUN curl -LO -C - https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p ${CONDA_PATH} && \
-    rm Miniconda3-latest-Linux-x86_64.sh && \
-    ${CONDA_PATH}/bin/conda create -y -n py36 python=3.6 && \
-    ${CONDA_PATH}/bin/conda create -y -n py37 python=3.7 && \
-    ${CONDA_PATH}/bin/conda create -y -n py38 python=3.8
-
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 ENV PATH /usr/local/cuda/bin:${PATH}
