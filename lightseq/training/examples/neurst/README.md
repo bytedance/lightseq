@@ -6,7 +6,7 @@ First you should install these requirements.
 pip install subword-nmt pyyaml sacrebleu sacremoses
 git clone https://github.com/moses-smt/mosesdecoder.git
 ```
-Then clone Neurst and switch to lightseq branch. 
+Then clone Neurst and switch to lightseq branch.
 ```shell
 git clone https://github.com/bytedance/neurst.git
 cd neurst/
@@ -32,4 +32,4 @@ python3 -m neurst.cli.run_exp \
 
 
 LightSeq can achieve about 1.33x speedup using batch size 4096 on 8 V100 GPUs,
-compared with original tensorflow implementation. 
+compared with original tensorflow implementation.

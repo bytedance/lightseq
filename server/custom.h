@@ -149,9 +149,9 @@ typedef struct custom_payload_struct {
 /// gives the maximum size expected for 'content'. Returns the actual
 /// size, in bytes, of 'content'.
 /// \return false if error, true if success.
-typedef bool (*CustomGetNextInputFn_t)(
-    void* input_context, const char* name, const void** content,
-    uint64_t* content_byte_size);
+typedef bool (*CustomGetNextInputFn_t)(void* input_context, const char* name,
+                                       const void** content,
+                                       uint64_t* content_byte_size);
 
 /// Type for the CustomGetOutput callback function.
 ///
@@ -171,9 +171,9 @@ typedef bool (*CustomGetNextInputFn_t)(
 /// should continue to the next output. If non-nullptr, the size of
 /// the buffer will be large enough to hold 'content_byte_size' bytes.
 /// \return false if error, true if success.
-typedef bool (*CustomGetOutputFn_t)(
-    void* output_context, const char* name, size_t shape_dim_cnt,
-    int64_t* shape_dims, uint64_t content_byte_size, void** content);
+typedef bool (*CustomGetOutputFn_t)(void* output_context, const char* name,
+                                    size_t shape_dim_cnt, int64_t* shape_dims,
+                                    uint64_t content_byte_size, void** content);
 
 /// Type for the CustomInitialize function.
 typedef int (*CustomInitializeFn_t)(const CustomInitializeData*, void**);
@@ -185,9 +185,8 @@ typedef int (*CustomFinalizeFn_t)(void*);
 typedef char* (*CustomErrorStringFn_t)(void*, int);
 
 /// Type for the CustomExecute function.
-typedef int (*CustomExecuteFn_t)(
-    void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
-    CustomGetOutputFn_t);
+typedef int (*CustomExecuteFn_t)(void*, uint32_t, CustomPayload*,
+                                 CustomGetNextInputFn_t, CustomGetOutputFn_t);
 
 /// Initialize the custom backend for a given model configuration and
 /// get the associated custom context.
@@ -233,9 +232,9 @@ const char* CustomErrorString(void* custom_context, int errcode);
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomExecute(
-    void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+int CustomExecute(void* custom_context, uint32_t payload_cnt,
+                  CustomPayload* payloads, CustomGetNextInputFn_t input_fn,
+                  CustomGetOutputFn_t output_fn);
 
 #ifdef __cplusplus
 }

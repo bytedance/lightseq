@@ -106,21 +106,20 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   /* ---step2. encoder feedforward--- */
   if (_tw._is_multilingual) {
     ker_multilg_enc_emb_launcher<_DataType>(
-        batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
-        _p_d_src_emb_wei[1], _p_d_src_emb_wei[4],
+        batch_size, batch_seq_len, _tw._hidden_size, _stream,
+        _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_src_emb_wei[4],
         //_p_d_src_emb_wei[1], _p_d_src_emb_wei[1],
-	_p_d_token_id, _p_d_output, _p_d_padding_mask,
-        _tw._padding_id, _max_thread_per_block);
+        _p_d_token_id, _p_d_output, _p_d_padding_mask, _tw._padding_id,
+        _max_thread_per_block);
   } else {
     ker_enc_embedding_launcher<_DataType>(
-        batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
-        _p_d_src_emb_wei[1],
-	_p_d_token_id, _p_d_output, _p_d_padding_mask,
-        _tw._padding_id, _max_thread_per_block);
+        batch_size, batch_seq_len, _tw._hidden_size, _stream,
+        _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_token_id, _p_d_output,
+        _p_d_padding_mask, _tw._padding_id, _max_thread_per_block);
   }
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {         // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {    // token_id
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
       std::cout << "emb out: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
@@ -139,8 +138,8 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {         // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {    // token_id
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,

@@ -88,8 +88,7 @@ int main(int argc, char *argv[]) {
   //     std::vector<int>(buf_bytesize / sizeof(int), 0);
   void *d_buf_;
   // encoder and decoder use the same buffer to save gpu memory useage
-  lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMalloc(&d_buf_, buf_bytesize));
+  lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
   // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);

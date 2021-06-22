@@ -28,12 +28,13 @@
 #include <stdint.h>
 #include "model_config.pb.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia {
+namespace inferenceserver {
 
 /// Get the CUDA stream priority for a given ModelPriority
 /// \param priority The ModelOptimizationPolicy::ModelPriority priority.
 /// \param cuda_stream_priority Returns the CUDA stream priority.
 /// \return The error status.
 int GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority);
-
-}}  // namespace nvidia::inferenceserver
+}  // namespace inferenceserver
+}  // namespace nvidia

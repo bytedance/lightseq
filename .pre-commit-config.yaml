@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.0.1
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: https://gitlab.com/daverona/pre-commit-cpp
+    rev: 0.8.0
+    hooks:
+      - id: clang-format # formatter of C/C++ code based on a style guide: LLVM, Google, Chromium, Mozilla, and WebKit available
+        args: [-style=file]
+
+  - repo: https://github.com/psf/black
+    rev: 21.5b2
+    hooks:
+      - id: black

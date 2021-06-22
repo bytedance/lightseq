@@ -117,8 +117,7 @@ template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele);
 
 template <typename T>
-void print_vec(const T* outv, std::string outn, int start,
-               int end);
+void print_vec(const T* outv, std::string outn, int start, int end);
 
 /* Print run time, for debug */
 void print_time_duration(

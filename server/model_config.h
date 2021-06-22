@@ -29,7 +29,8 @@
 #include <stdint.h>
 #include "model_config.pb.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia {
+namespace inferenceserver {
 
 /// The type for the correlation ID in an inference request. This must
 /// match the protobuf type used in InferRequestHeader.correlation_id.
@@ -39,8 +40,8 @@ using CorrelationID = uint64_t;
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 
 /// The type for the metric_tags map.
-using MetricTagsMap = ::google::protobuf::Map<
-    ::google::protobuf::string, ::google::protobuf::string>;
+using MetricTagsMap = ::google::protobuf::Map<::google::protobuf::string,
+                                              ::google::protobuf::string>;
 
 /// The type from platform name to the backend configuration for that
 /// platform.
@@ -129,8 +130,8 @@ int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(
-    const int batch_size, const DataType& dtype, const DimsList& dims);
+int64_t GetByteSize(const int batch_size, const DataType& dtype,
+                    const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
 /// and shape. A tensor that has empty shape [] and non-zero
@@ -141,9 +142,8 @@ int64_t GetByteSize(
 /// \param dims The shape.
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-int64_t GetByteSize(
-    const int batch_size, const DataType& dtype,
-    const std::vector<int64_t>& dims);
+int64_t GetByteSize(const int batch_size, const DataType& dtype,
+                    const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on ModelInput.
 /// \param mio The ModelInput protobuf.
@@ -196,8 +196,8 @@ bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
 /// \params dims0 The first shape.
 /// \params dims1 The second shape.
 /// \return True if the shapes are equal, false if not equal.
-bool CompareDimsWithWildcard(
-    const DimsList& dims0, const std::vector<int64_t>& dims1);
+bool CompareDimsWithWildcard(const DimsList& dims0,
+                             const std::vector<int64_t>& dims1);
 
 /// Convert a DimsList to string representation.
 /// \param dims The DimsList to be converted.
@@ -210,5 +210,5 @@ std::string DimsListToString(const DimsList& dims);
 /// \return String representation of the vector in pattern
 /// "[d0,d1,...,dn]"
 std::string DimsListToString(const std::vector<int64_t>& dims);
-
-}}  // namespace nvidia::inferenceserver
+}  // namespace inferenceserver
+}  // namespace nvidia

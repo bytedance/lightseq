@@ -1223,7 +1223,7 @@ __global__ void ker_correlation_softmax_encself(T* correlation,
                                                 const int* src_padding_mask) {
   int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
   if (src_padding_mask[blockIdx.x * blockDim.x + blockIdx.y % blockDim.x]) {
-    correlation[idx] = (T) 0.f;
+    correlation[idx] = (T)0.f;
     return;
   }
   int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];

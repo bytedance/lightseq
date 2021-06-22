@@ -3,7 +3,7 @@
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
 
-:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now, 
+:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now,
 please check out [here](./lightseq/training/README.md) for details.
 
 [中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
@@ -19,11 +19,11 @@ The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and
 custom kernel functions which are specially fused and optimized for Transformer model family. In
-addition to model components, the library also provide easy-to deploy model management and serving backend based on 
+addition to model components, the library also provide easy-to deploy model management and serving backend based on
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
-to as TRTIS in the later discussion). 
-With LightSeq, one can easily develop modified Transformer architecture with little additional code. 
+to as TRTIS in the later discussion).
+With LightSeq, one can easily develop modified Transformer architecture with little additional code.
 
 ## Features
 
@@ -31,7 +31,7 @@ With LightSeq, one can easily develop modified Transformer architecture with lit
 - Various search methods, such as beam search, diverse beam search, topp/topk sampling.
 - Out-of-the-box rich middlewares for model service based on TRTIS, such as dynamic batch,
   multi-model on single GPU.
-- Lightening fast training speed for supported models. 
+- Lightening fast training speed for supported models.
 - Lightening fast inference performance compared with Deeplearning framework and other inference
   libraries.
 
@@ -157,7 +157,7 @@ To avoid problems caused by inconsistent environments, you can use the pre-built
 
 ```shell
 docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
-# 
+#
 docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
 /${current}/${path}:/quick_start nvcr.io/nvidia/tensorrtserver:19.05-py3 /bin/bash
 # inside container
