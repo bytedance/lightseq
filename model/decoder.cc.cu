@@ -330,8 +330,8 @@ void Decoder<OpType_>::project_encoder_output() {
       &_type_one, _p_d_trg_emb_wei[4], _AType, kv_dim, _p_d_encoder_output,
       _BType, _tw._hidden_size, &_type_zero, _p_d_encoder_out_buf, _CType,
       kv_dim, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-// _p_d_encoder_out_buf: [batch_size, batch_seq_len, layer_num, 2,
-// hidden_size]
+  // _p_d_encoder_out_buf: [batch_size, batch_seq_len, layer_num, 2,
+  // hidden_size]
 
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
@@ -695,8 +695,8 @@ bool Decoder<OpType_>::sample() {
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
   for (int ii = 0; ii < _batch_size; ii++) {
-    print_vec(_p_d_alive_seq + ii * _tw._max_step, "Batch token ids: ",
-              _cur_step + 2);
+    print_vec(_p_d_alive_seq + ii * _tw._max_step,
+              "Batch token ids: ", _cur_step + 2);
   }
 #endif
 

@@ -323,32 +323,32 @@ void launch_attn_softmax_bw(T *out_grad, const T *soft_inp, int rows,
   dim3 block_dim(WARP_SIZE, warps_per_block);
 
   if (softmax_len <= 32)
-    ker_attn_softmax_bw<T, 1><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 1>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 64)
-    ker_attn_softmax_bw<T, 2><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 2>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 128)
-    ker_attn_softmax_bw<T, 4><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 4>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 256)
-    ker_attn_softmax_bw<T, 8><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 8>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 384)
-    ker_attn_softmax_bw<T, 12><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 12>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 512)
-    ker_attn_softmax_bw<T, 16><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 16>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 768)
-    ker_attn_softmax_bw<T, 24><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 24>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 1024)
-    ker_attn_softmax_bw<T, 32><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 32>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else if (softmax_len <= 2048)
-    ker_attn_softmax_bw<T, 64><<<grid_dim, block_dim, 0, stream>>>(
-        out_grad, soft_inp, softmax_len);
+    ker_attn_softmax_bw<T, 64>
+        <<<grid_dim, block_dim, 0, stream>>>(out_grad, soft_inp, softmax_len);
   else
     throw std::runtime_error(
         std::string(

@@ -48,8 +48,8 @@ void check_gpu_error(T result, char const *const func, const char *const file,
                      int const line) {
   if (result) {
     throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
-                             std::to_string(line) + "): " +
-                             (_cudaGetErrorString(result)) + "\n");
+                             std::to_string(line) +
+                             "): " + (_cudaGetErrorString(result)) + "\n");
   }
 }
 

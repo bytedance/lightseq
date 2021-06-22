@@ -206,9 +206,8 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
 
   // attention context, score * v
   // value: [batch_size, nhead, src_seq_len, head_dim]
-  const T *encdec_v_ptr =
-      encdec_kv_ptr +
-      (_layer_id * 2 + 1) * _batch_size * _src_seq_len * _hidden_size;
+  const T *encdec_v_ptr = encdec_kv_ptr + (_layer_id * 2 + 1) * _batch_size *
+                                              _src_seq_len * _hidden_size;
   _encdec_attn_context.Forward(_batch_heads, buffer, encdec_v_ptr,
                                _encdec_attn_score_ptr, _cublasHandle);
 

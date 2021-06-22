@@ -210,5 +210,5 @@ std::string DimsListToString(const DimsList& dims);
 /// \return String representation of the vector in pattern
 /// "[d0,d1,...,dn]"
 std::string DimsListToString(const std::vector<int64_t>& dims);
-}
-}  // namespace nvidia::inferenceserver
+}  // namespace inferenceserver
+}  // namespace nvidia

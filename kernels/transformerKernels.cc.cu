@@ -173,41 +173,41 @@ void select_beam_rough_topk_launcher(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id) {
   if (beam_size == 1)
-    select_beam_rough_topk<
-        T, 1><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 1>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 2)
-    select_beam_rough_topk<
-        T, 2><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 2>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 4)
-    select_beam_rough_topk<
-        T, 4><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 4>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 8)
-    select_beam_rough_topk<
-        T, 8><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 8>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 16)
-    select_beam_rough_topk<
-        T, 16><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 16>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
   if (beam_size == 32)
-    select_beam_rough_topk<
-        T, 32><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx, can_score,
-        num_beam_can, vocab_size, max_step, length_norm, cur_step,
-        diverse_lambda, end_id);
+    select_beam_rough_topk<T, 32>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
+            can_score, num_beam_can, vocab_size, max_step, length_norm,
+            cur_step, diverse_lambda, end_id);
 }
 
 template void select_beam_rough_topk_launcher<float>(
@@ -315,16 +315,16 @@ template <typename T>
 void ker_bias_relu_launcher(int batch_token_num, int block_dim,
                             cudaStream_t stream, T* input, const T* bias,
                             int feature_dim) {
-  ker_bias_relu<T><<<batch_token_num, block_dim, 0, stream>>>(input, bias,
-                                                              feature_dim);
+  ker_bias_relu<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
 }
 
 template <>
 void ker_bias_relu_launcher<__half>(int batch_token_num, int block_dim,
                                     cudaStream_t stream, __half* input,
                                     const __half* bias, int feature_dim) {
-  ker_bias_relu<__half><<<batch_token_num, block_dim, 0, stream>>>(
-      input, bias, feature_dim / 2);
+  ker_bias_relu<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
 }
 
 template void ker_bias_relu_launcher<float>(int batch_token_num, int block_dim,
@@ -695,10 +695,10 @@ void ker_enc_embedding_launcher(int batch_size, int batch_seq_len,
                                 const int* token_id, T* output,
                                 int* padding_mask, int padding_id,
                                 int max_thread_per_block) {
-  ker_enc_embedding<
-      T><<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, padding_mask, padding_id,
-      hidden_size);
+  ker_enc_embedding<T>
+      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, padding_mask, padding_id,
+          hidden_size);
 }
 
 template <>
@@ -709,10 +709,10 @@ void ker_enc_embedding_launcher<__half>(int batch_size, int batch_seq_len,
                                         const int* token_id, __half* output,
                                         int* padding_mask, int padding_id,
                                         int max_thread_per_block) {
-  ker_enc_embedding<__half><<<dim3(batch_size, batch_seq_len),
-                              max_thread_per_block, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, padding_mask, padding_id,
-      hidden_size / 2);
+  ker_enc_embedding<__half>
+      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
+          token_emb, pos_emb, token_id, output, padding_mask, padding_id,
+          hidden_size / 2);
 }
 
 template void ker_enc_embedding_launcher<float>(
@@ -849,10 +849,10 @@ void ker_arrange_encself_qkv_launcher(int batch_token_num, int hidden_size,
                                       int max_batch_dim, int batch_seq_len,
                                       int dim_per_head, int head_num,
                                       int max_thread_per_block) {
-  ker_arrange_encself_qkv<
-      T><<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
-      ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len, dim_per_head,
-      head_num);
+  ker_arrange_encself_qkv<T>
+      <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len,
+          dim_per_head, head_num);
 }
 
 template <>
@@ -861,10 +861,10 @@ void ker_arrange_encself_qkv_launcher<__half>(
     const __half* ori_qkv, const __half* qkv_bias, __half* new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block) {
-  ker_arrange_encself_qkv<
-      __half><<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
-      ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
-      dim_per_head / 2, head_num);
+  ker_arrange_encself_qkv<__half>
+      <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
+          dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_encself_qkv_launcher<float>(
@@ -971,10 +971,10 @@ void ker_arrange_decself_qkv_launcher(int step_token_num, int hidden_size,
                                       T* new_v, int head_num, int dim_per_head,
                                       int max_step, int step_id,
                                       int max_thread_per_block) {
-  ker_arrange_decself_qkv<
-      T><<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head, max_step,
-      step_id);
+  ker_arrange_decself_qkv<T>
+      <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
+          max_step, step_id);
 }
 
 template <>
@@ -983,10 +983,10 @@ void ker_arrange_decself_qkv_launcher<__half>(
     const __half* ori_qkv, const __half* qkv_bias, __half* new_q, __half* new_k,
     __half* new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block) {
-  ker_arrange_decself_qkv<
-      __half><<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
-      ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-      max_step, step_id);
+  ker_arrange_decself_qkv<__half>
+      <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
+          max_step, step_id);
 }
 
 template void ker_arrange_decself_qkv_launcher<float>(
@@ -1090,10 +1090,10 @@ void ker_arrange_encdec_kv_launcher(int batch_token_num, int dec_layer_num,
                                     T* new_v, int offset_per_layer,
                                     int batch_seq_len, int dim_per_head,
                                     int head_num, int max_thread_per_block) {
-  ker_arrange_encdec_kv<T><<<dim3(batch_token_num, dec_layer_num * 2),
-                             max_thread_per_block, 0, stream>>>(
-      ori_kv, kv_bias, new_k, new_v, offset_per_layer, batch_seq_len,
-      dim_per_head, head_num);
+  ker_arrange_encdec_kv<T>
+      <<<dim3(batch_token_num, dec_layer_num * 2), max_thread_per_block, 0,
+         stream>>>(ori_kv, kv_bias, new_k, new_v, offset_per_layer,
+                   batch_seq_len, dim_per_head, head_num);
 }
 
 template <>
@@ -1102,10 +1102,10 @@ void ker_arrange_encdec_kv_launcher<__half>(
     cudaStream_t stream, const __half* ori_kv, const __half* kv_bias,
     __half* new_k, __half* new_v, int offset_per_layer, int batch_seq_len,
     int dim_per_head, int head_num, int max_thread_per_block) {
-  ker_arrange_encdec_kv<__half><<<dim3(batch_token_num, dec_layer_num * 2),
-                                  max_thread_per_block, 0, stream>>>(
-      ori_kv, kv_bias, new_k, new_v, offset_per_layer / 2, batch_seq_len,
-      dim_per_head / 2, head_num);
+  ker_arrange_encdec_kv<__half>
+      <<<dim3(batch_token_num, dec_layer_num * 2), max_thread_per_block, 0,
+         stream>>>(ori_kv, kv_bias, new_k, new_v, offset_per_layer / 2,
+                   batch_seq_len, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_encdec_kv_launcher<float>(
@@ -1189,9 +1189,9 @@ void ker_arrange_encdec_q_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const __half* ori_q, const __half* q_bias, __half* new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block) {
-  ker_arrange_encdec_q<
-      __half><<<step_token_num, max_thread_per_block, 0, stream>>>(
-      ori_q, q_bias, new_q, beam_size, dim_per_head / 2, head_num);
+  ker_arrange_encdec_q<__half>
+      <<<step_token_num, max_thread_per_block, 0, stream>>>(
+          ori_q, q_bias, new_q, beam_size, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_encdec_q_launcher<float>(
@@ -1248,9 +1248,9 @@ void ker_correlation_softmax_encself_launcher(int batch_size, int batch_seq_len,
                                               int head_num, cudaStream_t stream,
                                               T* correlation,
                                               const int* src_padding_mask) {
-  ker_correlation_softmax_encself<T><<<
-      dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0, stream>>>(
-      correlation, src_padding_mask);
+  ker_correlation_softmax_encself<T>
+      <<<dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0,
+         stream>>>(correlation, src_padding_mask);
 }
 
 template void ker_correlation_softmax_encself_launcher<float>(
@@ -1344,9 +1344,9 @@ template <typename T>
 void ker_correlation_softmax_encdec_launcher(
     int batch_size, int head_num_per_seq, int batch_seq_len,
     cudaStream_t stream, T* correlation, const int* src_padding_mask) {
-  ker_correlation_softmax_encdec<
-      T><<<dim3(batch_size, head_num_per_seq), batch_seq_len, 0, stream>>>(
-      correlation, src_padding_mask);
+  ker_correlation_softmax_encdec<T>
+      <<<dim3(batch_size, head_num_per_seq), batch_seq_len, 0, stream>>>(
+          correlation, src_padding_mask);
 }
 
 template void ker_correlation_softmax_encdec_launcher<float>(
@@ -1417,9 +1417,9 @@ void ker_arrange_atten_output_launcher(int batch_token_num, int hidden_size,
                                        T* new_q, int beam_size,
                                        int dim_per_head, int head_num,
                                        int max_thread_per_block) {
-  ker_arrange_atten_output<
-      T><<<batch_token_num, max_thread_per_block, 0, stream>>>(
-      ori_q, new_q, beam_size, dim_per_head, head_num);
+  ker_arrange_atten_output<T>
+      <<<batch_token_num, max_thread_per_block, 0, stream>>>(
+          ori_q, new_q, beam_size, dim_per_head, head_num);
 }
 
 template <>
@@ -1427,9 +1427,9 @@ void ker_arrange_atten_output_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const __half* ori_q, __half* new_q, int beam_size, int dim_per_head,
     int head_num, int max_thread_per_block) {
-  ker_arrange_atten_output<
-      __half><<<batch_token_num, max_thread_per_block, 0, stream>>>(
-      ori_q, new_q, beam_size, dim_per_head / 2, head_num);
+  ker_arrange_atten_output<__half>
+      <<<batch_token_num, max_thread_per_block, 0, stream>>>(
+          ori_q, new_q, beam_size, dim_per_head / 2, head_num);
 }
 
 template void ker_arrange_atten_output_launcher<float>(
@@ -1670,11 +1670,12 @@ void ker_refresh_cache_launcher<__half>(
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
     bool diverse, int end_id) {
-  ker_refresh_cache<
-      __half><<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
-      num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem, new_self_k_bgeem,
-      new_self_v_bgeem, self_k_bgeem_offset / 2, beam_size, dim_per_head / 2,
-      head_num, vocab_size, cur_step, max_step, diverse, end_id);
+  ker_refresh_cache<__half>
+      <<<dim3(grid_dim_x, grid_dim_y), block_dim / 2, 0, stream>>>(
+          num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem,
+          new_self_k_bgeem, new_self_v_bgeem, self_k_bgeem_offset / 2,
+          beam_size, dim_per_head / 2, head_num, vocab_size, cur_step, max_step,
+          diverse, end_id);
 }
 
 template void ker_refresh_cache_launcher<float>(
@@ -2235,16 +2236,16 @@ template <typename T>
 void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
                             cudaStream_t stream, T* input, const T* bias,
                             int feature_dim) {
-  ker_bias_gelu<T><<<batch_token_num, block_dim, 0, stream>>>(input, bias,
-                                                              feature_dim);
+  ker_bias_gelu<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim);
 }
 
 template <>
 void ker_bias_gelu_launcher<__half>(int batch_token_num, int block_dim,
                                     cudaStream_t stream, __half* input,
                                     const __half* bias, int feature_dim) {
-  ker_bias_gelu<__half><<<batch_token_num, block_dim, 0, stream>>>(
-      input, bias, feature_dim / 2);
+  ker_bias_gelu<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, bias, feature_dim / 2);
 }
 
 template void ker_bias_gelu_launcher<float>(int batch_token_num, int block_dim,

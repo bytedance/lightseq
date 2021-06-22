@@ -96,8 +96,8 @@ void launch_transform_0213<float>(float *output, const float *input,
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 
-  transform_0213<float><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, hidden_dim, head_dim);
+  transform_0213<float>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, hidden_dim, head_dim);
 }
 
 template <>
@@ -110,8 +110,8 @@ void launch_transform_0213<__half>(__half *output, const __half *input,
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 
-  transform_0213<__half><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, hidden_dim, head_dim);
+  transform_0213<__half>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, hidden_dim, head_dim);
 }
 
 /**
@@ -226,8 +226,8 @@ void launch_bias_add_transform_20314<float>(float *output, const float *input,
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
-  bias_add_transform_20314<float><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, bias, dim_3, dim_4);
+  bias_add_transform_20314<float>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, bias, dim_3, dim_4);
 }
 
 template <>
@@ -241,8 +241,8 @@ void launch_bias_add_transform_20314<__half>(__half *output,
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
-  bias_add_transform_20314<__half><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, bias, dim_3, dim_4);
+  bias_add_transform_20314<__half>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, bias, dim_3, dim_4);
 }
 
 /**
@@ -310,8 +310,8 @@ void launch_transform4d_0213<float>(float *output, const float *input,
   dim3 grid_dim(trans_count, nblock_per_trans);
   dim3 block_dim(head_dim, nhead, ntoken_per_block);
 
-  transform4d_0213<float><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, batch_size, seq_len);
+  transform4d_0213<float>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, batch_size, seq_len);
 }
 
 template <>
@@ -328,6 +328,6 @@ void launch_transform4d_0213<__half>(__half *output, const __half *input,
   dim3 grid_dim(trans_count, nblock_per_trans);
   dim3 block_dim(head_dim, nhead, ntoken_per_block);
 
-  transform4d_0213<__half><<<grid_dim, block_dim, 0, stream>>>(
-      output, input, batch_size, seq_len);
+  transform4d_0213<__half>
+      <<<grid_dim, block_dim, 0, stream>>>(output, input, batch_size, seq_len);
 }

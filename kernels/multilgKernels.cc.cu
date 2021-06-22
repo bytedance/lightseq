@@ -105,10 +105,10 @@ void ker_multilg_enc_emb_launcher(int batch_size, int batch_seq_len,
                                   const T* src_lang_emb, const int* token_id,
                                   T* output, int* padding_mask, int padding_id,
                                   int max_thread_per_block) {
-  ker_multilg_enc_emb<
-      T><<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
-      token_emb, pos_emb, src_lang_emb, token_id, output, padding_mask,
-      padding_id, hidden_size);
+  ker_multilg_enc_emb<T>
+      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
+          token_emb, pos_emb, src_lang_emb, token_id, output, padding_mask,
+          padding_id, hidden_size);
 }
 
 template <>
@@ -117,10 +117,10 @@ void ker_multilg_enc_emb_launcher<__half>(
     const __half* token_emb, const __half* pos_emb, const __half* src_lang_emb,
     const int* token_id, __half* output, int* padding_mask, int padding_id,
     int max_thread_per_block) {
-  ker_multilg_enc_emb<__half><<<dim3(batch_size, batch_seq_len),
-                                max_thread_per_block, 0, stream>>>(
-      token_emb, pos_emb, src_lang_emb, token_id, output, padding_mask,
-      padding_id, hidden_size / 2);
+  ker_multilg_enc_emb<__half>
+      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
+          token_emb, pos_emb, src_lang_emb, token_id, output, padding_mask,
+          padding_id, hidden_size / 2);
 }
 
 template void ker_multilg_enc_emb_launcher<float>(
@@ -381,41 +381,47 @@ void select_beam_rough_topk_multilg_launcher(
     int step_token_num, int max_thread_per_block, cudaStream_t stream,
     int beam_size, float diverse_lambda, int end_id, int src_seq_len) {
   if (beam_size == 1)
-    select_beam_rough_topk_multilg<
-        T, 1><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 1>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
   if (beam_size == 2)
-    select_beam_rough_topk_multilg<
-        T, 2><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 2>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
   if (beam_size == 4)
-    select_beam_rough_topk_multilg<
-        T, 4><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 4>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
   if (beam_size == 8)
-    select_beam_rough_topk_multilg<
-        T, 8><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 8>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
   if (beam_size == 16)
-    select_beam_rough_topk_multilg<
-        T, 16><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 16>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
   if (beam_size == 32)
-    select_beam_rough_topk_multilg<
-        T, 32><<<step_token_num, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
-        src_token_id, can_idx, can_score, num_beam_can, vocab_size, max_step,
-        length_norm, cur_step, diverse_lambda, end_id, src_seq_len);
+    select_beam_rough_topk_multilg<T, 32>
+        <<<step_token_num, max_thread_per_block, 0, stream>>>(
+            logits, logit_bias, seq_probs, seq_score, alive_seq, vocab_mask,
+            src_token_id, can_idx, can_score, num_beam_can, vocab_size,
+            max_step, length_norm, cur_step, diverse_lambda, end_id,
+            src_seq_len);
 }
 
 template void select_beam_rough_topk_multilg_launcher<float>(

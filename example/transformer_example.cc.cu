@@ -69,8 +69,9 @@ int main(int argc, char *argv[]) {
   // instantiate decoder
   std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_ =
       std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
-          max_batch_size, reinterpret_cast<int *>(
-                              thrust::raw_pointer_cast(d_padding_mask_.data())),
+          max_batch_size,
+          reinterpret_cast<int *>(
+              thrust::raw_pointer_cast(d_padding_mask_.data())),
           reinterpret_cast<optraits::DataType *>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_output_.data())),
