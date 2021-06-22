@@ -5,11 +5,14 @@ import platform
 import subprocess
 import multiprocessing
 import glob
-
-from setuptools import setup, Extension, find_packages
+import logging
+from setuptools import setup, Extension
 import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
+
+logging.basicConfig()
+logger = logging.getLogger(__file__)
 
 ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
 ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
@@ -87,9 +90,9 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 
-setup(
+setup_kwargs = dict(
     name="lightseq",
-    version="2.0.1",
+    version="2.0.0",
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
@@ -103,7 +106,6 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
     ],
-    ext_modules=[CMakeExtension("lightseq")],
     install_requires=["ninja"],
     python_requires=">=3.6",
     cmdclass=dict(build_ext=CMakeBuild),
@@ -113,7 +115,7 @@ setup(
         "lightseq.training": [
             path.replace("lightseq/training/", "")
             for path in glob.glob("lightseq/training/csrc/**/*", recursive=True)
-        ]
+        ],
     },
     entry_points={
         "console_scripts": [
@@ -122,3 +124,20 @@ setup(
         ],
     },
 )
+ext_modules = [CMakeExtension("inference")]
+
+try:
+    setup(ext_modules=ext_modules, **setup_kwargs)
+except Exception as e:
+    logger.warning(e)
+    logger.warning("The inference extension could not be compiled")
+
+    # Retry to install the module without C extensions :
+    # Remove any previously defined build_ext command class.
+    if "build_ext" in setup_kwargs["cmdclass"]:
+        del setup_kwargs["cmdclass"]["build_ext"]
+
+    # If this new 'setup' call don't fail, the module
+    # will be successfully installed, without the C extension :
+    setup(**setup_kwargs)
+    logger.info("lightseq training installation succeeded.")
