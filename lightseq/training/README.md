@@ -21,7 +21,7 @@ With only a small amount of code, you can enjoy the excellent performance provid
 ## Features
 - **High performance**.
 In WMT14 English to German dataset, compared to [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex),
-LightSeq can provide **1.52** times speedup for transformer big model on NVIDIA Tesla V100 with 4096 batch size.
+LightSeq can provide **1.53** times speedup for transformer big model on NVIDIA Ampere A100 with 4096 batch size.
 - **Comprehensive operators**.
 LightSeq provides comprehensive efficient custom operators for PyTorch and TensorFlow, including embedding, encoder layer, decoder layer, criterion and optimizer. To the best of our knowledge, LightSeq is the first open source project that cover the entire training process for Transformer-based models.
 In contrast, [DeepSpeed](https://github.com/microsoft/DeepSpeed) only provides encoder layer.
@@ -36,20 +36,18 @@ The following is a support matrix of LightSeq compared with
 ![features](docs/images/features.png)
 
 ## Performance
-Here, we show our main experimental results on WMT14 English to German task. We perform data parallel training for Transformer big model on NVIDIA Tesla V100 GPU.
+Detailed experimental results is available [here](./docs/performance.md). Here are the experimental results on WMT14 English to German task.
 
-Detailed results is available [here](./docs/performance.md).
+We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
+[Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
-### PyTorch
-We use Fairseq as the baseline and compare the performance of different implementations.
-- 8 GPUs
-<img src="docs/images/pytorch_8gpu.png"  width="50%" aligned="middle">
+### Speedup for single training step
+<img src="docs/images/single_step.png"  width="60%" aligned="middle">
 
-- 1 GPU
-<img src="docs/images/pytorch_1gpu.png"  width="50%" aligned="middle">
+We compute speedup on different batch size using the WPS (real words per second) metric.
 
-### TensorFlow
-See [NeurST](https://github.com/bytedance/neurst) for more details.
+### End-to-end wall-clock training time
+<img src="docs/images/total_time.png"  width="60%" aligned="middle">
 
 ## Code Structure
 ```shell
