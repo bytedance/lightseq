@@ -2,11 +2,10 @@
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
-
-:tada: :tada: :tada: LightSeq supports fast training for models in the Transformer family now,
-please check out [here](./lightseq/training/README.md) for details.
-
 [中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
+
+:tada: :tada: :tada: **LightSeq supports fast training for models in the Transformer family now,
+please check out [here](./lightseq/training/README.md) for details. [2021/06/18]**
 
 LightSeq is a high performance training and inference library for sequence processing and generation implemented
 in CUDA.
@@ -40,6 +39,10 @@ The following is a support matrix of LightSeq compared with
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
 
 ![support](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/support.png)
+
+## Code Structure
+At present, the code about **training** is in directory `./lightseq/training`, and other directories are all about **inference**.
+The training and inference parts are currently separate, and we will merge them in the near future.
 
 ## Performance
 
