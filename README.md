@@ -40,6 +40,10 @@ The following is a support matrix of LightSeq compared with
 
 ![support](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/support.png)
 
+## Code Structure
+At present, the code about **training** is in directory `./lightseq/training`, and other directories are all about **inference**.
+The training and inference parts are currently separate, and we will merge them in the near future.
+
 ## Performance
 
 Here are the experimental results on neural machine translation and text generation.
