@@ -152,7 +152,7 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
     }
-  } // trg
+  }  // trg
 
   if (_is_multilingual) {
     // fill in language embedding
@@ -166,7 +166,7 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
     } else {
-      if (layer.lang_emb_size() / _hidden_size != 
+      if (layer.lang_emb_size() / _hidden_size !=
           layer.trg_vocab_mask_size() / _trg_vocab_size) {
         return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
       }
@@ -182,10 +182,10 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
 
     std::cout << "Finish loading multi lingual weights from host to device"
               << std::endl;
-  }  
+  }
 
-  std::cout << "Finish loading " << source
-            << "_emb_wei from host to device" << std::endl;
+  std::cout << "Finish loading " << source << "_emb_wei from host to device"
+            << std::endl;
   return "";
 }
 
@@ -446,7 +446,8 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
   get_model_config(transformer, only_decoder);
 
   if (_hidden_size % 4 != 0) {
-    return "hidden_size should be a multiple of 4 to avoid misaligned address in CUDA";
+    return "hidden_size should be a multiple of 4 to avoid misaligned address "
+           "in CUDA";
   }
 
   std::string res;
@@ -466,8 +467,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
   res = parse_dec_wei(transformer);
   if (!res.empty()) return res;
 
-  std::cout << "Finish loading all weight from host to device"
-            << std::endl;
+  std::cout << "Finish loading all weight from host to device" << std::endl;
   // Optional:  Delete all global objects allocated by libprotobuf.
   // google::protobuf::ShutdownProtobufLibrary();
   return "";

@@ -69,8 +69,8 @@ void launch_fuse_transpose_bias_kernel<float>(const float *inp, float *out,
   dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
-  column_sum_reduce<float>
-      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols);
+  column_sum_reduce<float><<<grid_dim, block_dim, 0, stream>>>(inp, out, rows,
+                                                               cols);
 }
 
 template <>
@@ -80,8 +80,8 @@ void launch_fuse_transpose_bias_kernel<__half>(const __half *inp, __half *out,
   dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
-  column_sum_reduce<__half>
-      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols);
+  column_sum_reduce<__half><<<grid_dim, block_dim, 0, stream>>>(inp, out, rows,
+                                                                cols);
 }
 
 /**

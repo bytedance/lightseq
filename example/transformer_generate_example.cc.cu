@@ -69,9 +69,8 @@ int main(int argc, char *argv[]) {
   // instantiate decoder
   std::shared_ptr<lightseq::cuda::Decoder<optype>> decoder_ =
       std::make_shared<lightseq::cuda::Decoder<optype>>(
-          max_batch_size,
-          reinterpret_cast<int *>(
-              thrust::raw_pointer_cast(d_padding_mask_.data())),
+          max_batch_size, reinterpret_cast<int *>(
+                              thrust::raw_pointer_cast(d_padding_mask_.data())),
           reinterpret_cast<optraits::DataType *>(
               thrust::raw_pointer_cast(d_encoder_output_.data())),
           reinterpret_cast<int *>(thrust::raw_pointer_cast(d_output_.data())),
@@ -88,8 +87,7 @@ int main(int argc, char *argv[]) {
   //     std::vector<int>(buf_bytesize / sizeof(int), 0);
   void *d_buf_;
   // encoder and decoder use the same buffer to save gpu memory useage
-  lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMalloc(&d_buf_, buf_bytesize));
+  lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
   // encoder and decoder use the same buffer to save gpu memory useage
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);

@@ -8,7 +8,9 @@ from fairseq.modules import LayerNorm
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from torch import Tensor
 import torch.nn.functional as F
-from lightseq.training.ops.pytorch.transformer_decoder_layer import LSTransformerDecoderLayer
+from lightseq.training.ops.pytorch.transformer_decoder_layer import (
+    LSTransformerDecoderLayer,
+)
 
 
 @with_incremental_state

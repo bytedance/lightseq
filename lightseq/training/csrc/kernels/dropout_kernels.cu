@@ -782,13 +782,13 @@ void launch_ls_dropout_act_bias<ActivationType::kGelu, float>(
     float *out, const float *vals, uint8_t *mask, const float *bias,
     int total_count, int dim, float ratio, cudaStream_t stream) {
   int grid_dim = total_count >> 10;
-  ls_dropout_act_bias_kernel<ActivationType::kGelu>
-      <<<grid_dim + 1, 256, 0, stream>>>(
-          total_count, ratio, out, vals, mask, bias,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::system_clock::now().time_since_epoch())
-              .count(),
-          dim);
+  ls_dropout_act_bias_kernel<
+      ActivationType::kGelu><<<grid_dim + 1, 256, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim);
 }
 
 template <>
@@ -796,13 +796,13 @@ void launch_ls_dropout_act_bias<ActivationType::kGelu, __half>(
     __half *out, const __half *vals, uint8_t *mask, const __half *bias,
     int total_count, int dim, float ratio, cudaStream_t stream) {
   int grid_dim = total_count >> 11;
-  ls_dropout_act_bias_kernel<ActivationType::kGelu>
-      <<<grid_dim + 1, 256, 0, stream>>>(
-          total_count, ratio, out, vals, mask, bias,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::system_clock::now().time_since_epoch())
-              .count(),
-          dim);
+  ls_dropout_act_bias_kernel<
+      ActivationType::kGelu><<<grid_dim + 1, 256, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim);
 }
 
 template <>
@@ -810,13 +810,13 @@ void launch_ls_dropout_act_bias<ActivationType::kRelu, float>(
     float *out, const float *vals, uint8_t *mask, const float *bias,
     int total_count, int dim, float ratio, cudaStream_t stream) {
   int grid_dim = total_count >> 10;
-  ls_dropout_act_bias_kernel<ActivationType::kRelu>
-      <<<grid_dim + 1, 256, 0, stream>>>(
-          total_count, ratio, out, vals, mask, bias,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::system_clock::now().time_since_epoch())
-              .count(),
-          dim);
+  ls_dropout_act_bias_kernel<
+      ActivationType::kRelu><<<grid_dim + 1, 256, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim);
 }
 
 template <>
@@ -824,13 +824,13 @@ void launch_ls_dropout_act_bias<ActivationType::kRelu, __half>(
     __half *out, const __half *vals, uint8_t *mask, const __half *bias,
     int total_count, int dim, float ratio, cudaStream_t stream) {
   int grid_dim = total_count >> 11;
-  ls_dropout_act_bias_kernel<ActivationType::kRelu>
-      <<<grid_dim + 1, 256, 0, stream>>>(
-          total_count, ratio, out, vals, mask, bias,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              std::chrono::system_clock::now().time_since_epoch())
-              .count(),
-          dim);
+  ls_dropout_act_bias_kernel<
+      ActivationType::kRelu><<<grid_dim + 1, 256, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim);
 }
 
 /**

@@ -334,8 +334,8 @@ int Context::Init() {
   decoder_ = std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
-      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_,
-      false, reinterpret_cast<int*>(d_input_));
+      reinterpret_cast<int*>(d_output_), tw_, stream_, hd_, false,
+      reinterpret_cast<int*>(d_input_));
   res = decoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;

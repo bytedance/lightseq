@@ -357,8 +357,8 @@ void launch_d_lookup_scale_pos_dropout<float>(
   dim3 zg_grid_dim((total_nums + MAX_THREADS - 1) / MAX_THREADS);
   dim3 zg_block_dim(MAX_THREADS);
 
-  zero_grads<float>
-      <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
+  zero_grads<float><<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings,
+                                                              total_nums);
 
   int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
   int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;
@@ -383,8 +383,8 @@ void launch_d_lookup_scale_pos_dropout<__half>(
   dim3 zg_grid_dim((total_nums + MAX_THREADS - 1) / MAX_THREADS);
   dim3 zg_block_dim(MAX_THREADS);
 
-  zero_grads<__half>
-      <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
+  zero_grads<__half><<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings,
+                                                               total_nums);
 
   int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
   int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;

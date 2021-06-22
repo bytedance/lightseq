@@ -209,7 +209,7 @@ std::string GptWeight<OpType_>::initializing(std::string proto_path) {
   // Verify that the version of the library that we linked against is
   // compatible with the version of the headers we compiled against.
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-  
+
   std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
   if (!gpt.ParseFromIstream(&raw_input)) {
     return "Parse weights from [" + proto_path + "] failed.";

@@ -10,8 +10,12 @@ from fairseq.models import (
 )
 from fairseq.models.fairseq_encoder import EncoderOut
 from fairseq.modules import LayerNorm
-from lightseq.training.ops.pytorch.transformer_embedding_layer import LSTransformerEmbeddingLayer
-from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from lightseq.training.ops.pytorch.transformer_embedding_layer import (
+    LSTransformerEmbeddingLayer,
+)
+from lightseq.training.ops.pytorch.transformer_encoder_layer import (
+    LSTransformerEncoderLayer,
+)
 
 from .ls_fs_transformer_decoder_layer import LSFSTransformerDecoderLayer
 
