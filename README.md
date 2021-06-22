@@ -55,8 +55,7 @@ was used as the benchmark of Tensorflow.
 More results is available [here](./docs/performance.md).
 
 - Neural machine translation
-![nmt2](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt2.png)
-![nmt1](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt1.png)
+![nmt](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt.png)
 
 - Text generation
 ![generation](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/generation.png)
