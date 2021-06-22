@@ -22,7 +22,7 @@ jobs:
       - name: install pre-commit
         run: |
           pip install pre-commit
-          apt update && apt install clang-format
+          sudo apt-get update && sudo apt-get install clang-format
 
       # Runs a set of commands using the runners shell
       - name: check format
