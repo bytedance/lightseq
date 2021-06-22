@@ -23,6 +23,7 @@ jobs:
         run: |
           pip install pre-commit
           sudo apt-get install -y --no-install-recommends clang-format-7
+          clang-format --version
 
       # Runs a set of commands using the runners shell
       - name: check format
