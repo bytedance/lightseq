@@ -38,8 +38,8 @@ jobs:
       - uses: actions/checkout@v1
       - name: env check
         run: |
-          which python
+          /opt/python/cp38-cp38/bin/python -V
       - name: build wheel
         run: |
-          python -m pip install -U build
-          python -m build
+          /opt/python/cp38-cp38/bin/python -m pip install -U build
+          /opt/python/cp38-cp38/bin/python -m build
