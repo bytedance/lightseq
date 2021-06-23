@@ -43,3 +43,4 @@ jobs:
         run: |
           /opt/python/cp38-cp38/bin/python -m pip install -U build
           /opt/python/cp38-cp38/bin/python -m build
+          /opt/python/cp38-cp38/bin/python setup.py build_ext
