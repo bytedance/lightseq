@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -ex
 THIS_DIR=$(dirname $(readlink -f $0))
-cd $THIS_DIR/../../
+cd $THIS_DIR/../../..
 
 if [ ! -d "wmt14_en_de" ]; then
-    wget http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/wmt_data/databin_wmt14_en_de.tar.gz
-    tar -zxvf databin_wmt14_en_de.tar.gz && rm databin_wmt14_en_de.tar.gz
+    echo "Downloading dataset"
+    wget http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/wmt_data/databin_wmt14_en_de.tar.gz -P /tmp
+    tar -zxvf /tmp/databin_wmt14_en_de.tar.gz && rm /tmp/databin_wmt14_en_de.tar.gz
 fi
 
-fairseq-train ./wmt14_en_de/ \
+fairseq-train /tmp/wmt14_en_de/ \
     --arch transformer_wmt_en_de_big_t2t --share-decoder-input-output-embed \
     --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 \
     --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 \
