@@ -36,6 +36,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+        with: 
+          submodules: 'recursive'
       - name: env check
         run: |
           /opt/python/cp38-cp38/bin/python -V
