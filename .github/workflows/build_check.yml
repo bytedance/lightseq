@@ -45,7 +45,7 @@ jobs:
         run: |
           /opt/python/cp38-cp38/bin/python -m pip install -U build
           /opt/python/cp38-cp38/bin/python -m build
-          
+
   build_inference:
     runs-on: ubuntu-latest
     container: taka23/lightseq:build-linux
