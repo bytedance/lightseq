@@ -35,7 +35,7 @@ jobs:
     container: taka23/lightseq:build-linux
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - name: build wheel
         run: |
           python3 -m pip install -U build
