@@ -1,9 +1,9 @@
 # LightSeq: A High Performance Library for Sequence Processing and Generation
 
-![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
+![logo](./docs/inference/images/logo.png)
 
 **[2021/06/18]** :tada: :tada: :tada: **LightSeq supports fast training for models in the Transformer family now,
-please check out [here](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/README.md) for details.**
+please check out [here](./lightseq/training/README.md) for details.**
 
 ---
 
@@ -26,13 +26,13 @@ With LightSeq, one can easily develop modified Transformer architecture with lit
 The following is a support matrix of LightSeq **training** library compared with
 [DeepSpeed](https://github.com/microsoft/DeepSpeed).
 
-![features](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/images/features.png)
+![features](./docs/training/images/features.png)
 
 The following is a support matrix of LightSeq **inference** library compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
 
-![support](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/support.png)
+![support](./docs/inference/images/support.png)
 
 
 ## Performance
@@ -41,11 +41,11 @@ The following is a support matrix of LightSeq **inference** library compared wit
 Here we present the experimental results on WMT14 English to German translation task based on Transformer-big models. We train Transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
-<img src="https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/images/single_step.png"  width="60%" aligned="middle">
+<img src="./docs/training/images/single_step.png"  width="60%" aligned="middle">
 
 We compute speedup on different batch size using the WPS (real words per second) metric.
 
-More results is available [here](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/performance.md)
+More results is available [here](./docs/training/performance.md)
 
 ### Inference
 Here we present the experimental results on neural machine translation based on Transformer-base models using beam search methods.
@@ -55,9 +55,9 @@ The implementation from
 [tensor2tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py)
 was used as the benchmark of Tensorflow.
 
-![nmt](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt.png)
+<img src="./docs/inference/images/nmt.png"  width="60%" aligned="middle">
 
-More results is available [here](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/performance.md).
+More results is available [here](./docs/inference/performance.md).
 
 
 
