@@ -86,7 +86,7 @@ We compute speedup on different batch size using the WPS (real words per second)
 - To install LightSeq training library:
 ```shell
 git clone https://github.com/bytedance/lightseq.git
-cd lightseq/training/
+cd lightseq
 pip install -e .
 ```
 
@@ -114,7 +114,7 @@ You can also use LightSeq operators directly in your codes to build your own mod
 For example, if you want to use the encoder layers, you first need to generate a config containing all the arguments of the models and training. Then you can initialize the LightSeq encoder layer using the config and integrate it into you models.
 
 ```
-from ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 
 config = LSTransformerEncoderLayer.get_config(
     max_batch_tokens=4096,
@@ -131,7 +131,7 @@ config = LSTransformerEncoderLayer.get_config(
 )
 enc_layer = LSTransformerEncoderLayer(config)
 ```
-Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `ops/pytorch` and `ops/tensorflow` directory for detail.
+Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `lightseq/training/ops/pytorch` and `lightseq/training/ops/tensorflow` directory for detail.
 
 ## Limitations and Future Plans
 * Training with 8 bit integers.
