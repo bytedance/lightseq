@@ -50,9 +50,16 @@ We compute speedup on different batch size using the WPS (real words per second)
 
 ## Requirements and Installation
 ### PyTorch
-- PyTorch version >= 1.5.0
+- PyTorch version with supported cuda
 - Python version >= 3.6
-- To install LightSeq training library:
+To install LightSeq training library,
+
+```shell
+pip install lightseq
+```
+
+or install in develop mode,
+
 ```shell
 git clone https://github.com/bytedance/lightseq.git
 cd lightseq
@@ -70,7 +77,7 @@ pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorfl
 
 ## Usage
 
-### Training libraries users.
+### Quick start for different training libraries
 LightSeq integrate its custom operators into popular training libraries. Users of these libraries can use LightSeq without perception:
 - [Fairseq](./examples/fairseq/README.md)
 - [Hugging Face](./examples/huggingface/README.md)
