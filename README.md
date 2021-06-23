@@ -41,7 +41,7 @@ The following is a support matrix of LightSeq **inference** library compared wit
 Here we present the experimental results on WMT14 English to German translation task based on Transformer-big models. We train Transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
-<img src="./docs/training/images/single_step.png"  width="60%" aligned="middle">
+<img src="./docs/training/images/single_step.png"  width="80%" aligned="middle">
 
 We compute speedup on different batch size using the WPS (real words per second) metric.
 
@@ -55,7 +55,7 @@ The implementation from
 [tensor2tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py)
 was used as the benchmark of Tensorflow.
 
-<img src="./docs/inference/images/nmt.png"  width="60%" aligned="middle">
+<img src="./docs/inference/images/nmt.png"  width="80%" aligned="middle">
 
 More results is available [here](./docs/inference/performance.md).
 

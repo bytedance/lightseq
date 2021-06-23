@@ -1,6 +1,6 @@
 # Efficient Training Library for Transformer-based Models
 
-![logo](../.../docs/inference/images/logo.png)
+![logo](../../docs/inference/images/logo.png)
 
 LightSeq supports fast training for models in the Transformer family now!
 
@@ -40,7 +40,7 @@ We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
 ### Speedup for single training step
-<img src="../../docs/training/images/single_step.png"  width="60%" aligned="middle">
+<img src="../../docs/training/images/single_step.png"  width="80%" aligned="middle">
 
 We compute speedup on different batch size using the WPS (real words per second) metric.
 
