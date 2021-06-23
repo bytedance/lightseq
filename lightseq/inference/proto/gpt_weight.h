@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "gpt.pb.h"
-#include "tools/util.h"
+#include "../tools/util.h"
 
 namespace lightseq {
 namespace cuda {

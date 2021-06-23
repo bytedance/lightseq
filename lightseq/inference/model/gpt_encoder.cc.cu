@@ -1,6 +1,6 @@
-#include "kernels/gptKernels.h"
-#include "kernels/transformerKernels.h"
-#include "model/gpt_encoder.h"
+#include "../kernels/gptKernels.h"
+#include "../kernels/transformerKernels.h"
+#include "gpt_encoder.h"
 
 /**
 @file

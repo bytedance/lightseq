@@ -1,6 +1,6 @@
 #include "encoder.h"
-#include "kernels/transformerKernels.h"
-#include "kernels/multilgKernels.h"
+#include "../kernels/transformerKernels.h"
+#include "../kernels/multilgKernels.h"
 
 /**
 @file

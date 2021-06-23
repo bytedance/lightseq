@@ -2,8 +2,8 @@
 
 #include "3rdparty/cub/cub/cub.cuh"
 #include "decoder.h"
-#include "kernels/transformerKernels.h"
-#include "kernels/multilgKernels.h"
+#include "../kernels/transformerKernels.h"
+#include "../kernels/multilgKernels.h"
 
 /**
 @file

@@ -13,8 +13,8 @@
 #include <iostream>
 #include <string>
 
-#include "proto/transformer_weight.h"
-#include "tools/util.h"
+#include "../proto/transformer_weight.h"
+#include "../tools/util.h"
 
 /**
 @file

@@ -1,9 +1,9 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include "pywrapper/gpt.cc.cu"
-#include "pywrapper/transformer.cc.cu"
-#include "pywrapper/transformer_decoder.cc.cu"
+#include "gpt.cc.cu"
+#include "transformer.cc.cu"
+#include "transformer_decoder.cc.cu"
 
 namespace py = pybind11;
 

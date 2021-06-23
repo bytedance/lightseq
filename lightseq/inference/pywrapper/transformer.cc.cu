@@ -1,10 +1,10 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include "model/decoder.h"
-#include "model/encoder.h"
-#include "proto/transformer_weight.h"
-#include "tools/util.h"
+#include "../model/decoder.h"
+#include "../model/encoder.h"
+#include "../proto/transformer_weight.h"
+#include "../tools/util.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType transformer_optytpe =

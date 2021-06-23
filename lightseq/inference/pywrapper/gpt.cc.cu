@@ -1,9 +1,9 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include "model/gpt_encoder.h"
-#include "proto/gpt_weight.h"
-#include "tools/util.h"
+#include "../model/gpt_encoder.h"
+#include "../proto/gpt_weight.h"
+#include "../tools/util.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType gpt_optype =
