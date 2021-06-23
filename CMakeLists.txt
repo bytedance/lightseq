@@ -47,11 +47,21 @@ if(DEBUG_MODE)
     message(STATUS "Debug computation result")
 endif()
 
+
+# Tell hdf5 that we are manually overriding certain settings
+# set (HDF5_EXTERNALLY_CONFIGURED 1)
+# Avoid duplicating names of installed libraries
+# set (HDF5_EXTERNAL_LIB_PREFIX "lightseq")
+# Export configuration to this export variable
+# set (HDF5_EXPORTED_TARGETS "paraview-targets")
+
+# Add the sub project
 add_subdirectory(kernels)
 add_subdirectory(tools)
 add_subdirectory(proto)
 add_subdirectory(model)
 add_subdirectory(example)
 add_subdirectory(3rdparty/pybind11)
+add_subdirectory(3rdparty/hdf5)
 add_subdirectory(pywrapper)
 add_subdirectory(server)
