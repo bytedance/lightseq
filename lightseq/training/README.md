@@ -14,7 +14,7 @@ In addition, we integrate our custom operators into popular training libraries l
 [NeurST](https://github.com/bytedance/neurst),
 which enables a **1.5X-3X** end-to-end speedup campred to the native version.
 
-With only a small amount of code, you can enjoy the excellent performance provided by LightSeq. Try it now!
+With only a few lines of code, you can enjoy the excellent performance provided by LightSeq. Try it now!
 
 ## Features
 - **High performance**.
