@@ -2,7 +2,7 @@
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
-[中文版本介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)
+[训练模块中文版本介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)
 
 LightSeq supports fast training for models in the Transformer family now!
 
@@ -33,21 +33,21 @@ LightSeq provides complete unit tests and debug tools, which help users develop 
 The following is a support matrix of LightSeq compared with
 [DeepSpeed](https://github.com/microsoft/DeepSpeed).
 
-![features](docs/images/features.png)
+![features](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/images/features.png)
 
 ## Performance
-Detailed experimental results is available [here](./docs/performance.md). Here are the experimental results on WMT14 English to German task.
+Detailed experimental results is available [here](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/performance.md). Here are the experimental results on WMT14 English to German task.
 
 We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
 ### Speedup for single training step
-<img src="docs/images/single_step.png"  width="60%" aligned="middle">
+<img src="https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/images/single_step.png"  width="60%" aligned="middle">
 
 We compute speedup on different batch size using the WPS (real words per second) metric.
 
 ### End-to-end wall-clock training time
-<img src="docs/images/total_time.png"  width="60%" aligned="middle">
+<img src="https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/docs/images/total_time.png"  width="60%" aligned="middle">
 
 ## Code Structure
 ```shell
@@ -138,5 +138,6 @@ Currently, LightSeq supports the separate use of five operations: embedding, enc
 
 
 ## Contact
-Any questions or suggestions, please feel free to contact us.
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, qian.xian@bytedance.com, weiyang.god@bytedance.com
+
+Any questions or suggestions, please feel free to contact us at
+wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lileilab@bytedance.com
