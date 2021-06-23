@@ -15,7 +15,7 @@ The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and
 custom kernel functions which are specially fused and optimized for Transformer model family. In
-addition to model components, the library also provide easy-to deploy model management and serving backend based on
+addition to model components, the library also provide easy-to-deploy model management and serving backend based on
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html)(referred
 to as TRTIS in the later discussion).
