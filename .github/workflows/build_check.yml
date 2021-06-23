@@ -58,4 +58,5 @@ jobs:
         run: |
           /opt/python/cp38-cp38/bin/python -V
       - name: build ext
+        run: |
           /opt/python/cp38-cp38/bin/python setup.py build_ext
