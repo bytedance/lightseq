@@ -218,7 +218,7 @@ work:
 
 If you use LightSeq in your research, please cite the following paper.
 
-```tex
+```
 @InProceedings{wang2021lightseq,
   title = "{L}ight{S}eq: A High Performance Inference Library for Transformers",
     author = "Wang, Xiaohui and Xiong, Ying and Wei, Yang and Wang, Mingxuan and Li, Lei",

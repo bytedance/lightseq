@@ -62,63 +62,47 @@ More results is available [here](https://raw.githubusercontent.com/bytedance/lig
 
 
 ## Quick Start
+### Fast training from Fairseq
 
-### Training python wrapper
-You can use LightSeq operators directly in your codes to build your own models. To simplify the use of individual operators, LightSeq designed a simple and self-contained interface.
-
-For example, if you want to use the encoder layers, you first need to generate a config containing all the arguments of the models and training. Then you can initialize the LightSeq encoder layer using the config and integrate it into you models.
-
-```python
-from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
-
-config = LSTransformerEncoderLayer.get_config(
-    max_batch_tokens=4096,
-    max_seq_len=256,
-    hidden_size=1024,
-    intermediate_size=4096,
-    nhead=16,
-    attn_prob_dropout_ratio=0.1,
-    activation_dropout_ratio=0.1,
-    hidden_dropout_ratio=0.1,
-    pre_layer_norm=True,
-    fp16=True,
-    local_rank=0,
-)
-enc_layer = LSTransformerEncoderLayer(config)
-```
-
-Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `lightseq/training/ops/pytorch` and `lightseq/training/ops/tensorflow` directory for detail.
-
-### Inference python wrapper
-
-We provide python api to call lightseq, all you need is to install `lightseq` with `pip`, and make sure you have GPU driver not older than 418.40.04.
-
-And check these files `lightseq/inference/proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
+You can experience lightning fast training by running following commands,
+Firstly install these requirements.
 
 ```shell
-curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
-tar -zxvf transformer_weight.tar.gz
+pip install lightseq fairseq sacremoses
 ```
 
-Finally you can run lightseq in only a few lines!
+Then you can train a translation task on wmt14 en2de dataset by running the following script
 
-```python
-import lightseq.inference as lsi
-import numpy as np
-
-test_input = np.array([[5001, 2, 36, 5002]])
-transformer = lsi.Transformer("transformer.pb", 32) # 32 is max batch size, it will decide GPU memory occupancy.
-result = transformer.infer(test_input)
+```shell
+sh lightseq/training/examples/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
-Python api doesn't support GPT for now, and we will get it ready as soon as possible.
+To compare lightseq with fairseq, delete the arguments with `ls_`prefix to using the original fairseq implementation
+
+### Fast inference from HuggingFace bart
+
+We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
+
+```shell
+pip install torch tensorflow transformers lightseq
+cd example/python
+```
+
+then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
+
+```shell
+python hf_bart_export.py
+python ls_bart.py
+```
+
+LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 
 ## Cite Us
 
 If you use LightSeq in your research, please cite the following paper.
 
-```tex
+```
 @InProceedings{wang2021lightseq,
   title = "{L}ight{S}eq: A High Performance Inference Library for Transformers",
     author = "Wang, Xiaohui and Xiong, Ying and Wei, Yang and Wang, Mingxuan and Li, Lei",
