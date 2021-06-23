@@ -2,8 +2,8 @@
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
-:tada: :tada: :tada: **LightSeq supports fast training for models in the Transformer family now,
-please check out [here](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/README.md) for details. [2021/06/18]**
+**[2021/06/18]** :tada: :tada: :tada: **LightSeq supports fast training for models in the Transformer family now,
+please check out [here](https://raw.githubusercontent.com/bytedance/lightseq/master/lightseq/training/README.md) for details.**
 
 ---
 
