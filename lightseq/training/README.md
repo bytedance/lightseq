@@ -80,10 +80,10 @@ pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorfl
 
 ### Quick start for different training libraries
 LightSeq integrate its custom operators into popular training libraries. Users of these libraries can use LightSeq without perception:
-- [Fairseq](./examples/fairseq/README.md)
-- [Hugging Face](./examples/huggingface/README.md)
-- [DeepSpeed](./examples/deepspeed/README.md)
-- [NeurST](./examples/neurst/README.md)
+- [Fairseq](../../examples/fairseq/README.md)
+- [Hugging Face](../../examples/huggingface/README.md)
+- [DeepSpeed](../../examples/deepspeed/README.md)
+- [NeurST](../../examples/neurst/README.md)
 
 ### Building models from scratch
 You can also use LightSeq operators directly in your codes to build your own models. To simplify the use of individual operators, LightSeq designed a simple and self-contained interface.
