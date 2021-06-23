@@ -185,6 +185,8 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
                 f"loading transformer.decoder_stack {proto_attr} -> {hdf5_key}")
             f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
 
+    print(f"proto to hdf5 conversion completed.")
+
 
 def extract_transformer_weights(
     output_file,
