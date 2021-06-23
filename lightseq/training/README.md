@@ -52,6 +52,7 @@ We compute speedup on different batch size using the WPS (real words per second)
 ### PyTorch
 - PyTorch version with supported cuda
 - Python version >= 3.6
+
 To install LightSeq training library,
 
 ```shell
