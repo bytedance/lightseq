@@ -104,9 +104,3 @@ Currently, LightSeq supports the separate use of five operations: embedding, enc
 
 ## Limitations and Future Plans
 * Training with 8 bit integers.
-
-
-## Contact
-
-Any questions or suggestions, please feel free to contact us at
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lileilab@bytedance.com
