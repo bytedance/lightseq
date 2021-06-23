@@ -3,10 +3,10 @@ set -ex
 THIS_DIR=$(dirname $(readlink -f $0))
 cd $THIS_DIR/../../..
 
-if [ ! -d "wmt14_en_de" ]; then
+if [ ! -d "/tmp/wmt14_en_de" ]; then
     echo "Downloading dataset"
     wget http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/wmt_data/databin_wmt14_en_de.tar.gz -P /tmp
-    tar -zxvf /tmp/databin_wmt14_en_de.tar.gz && rm /tmp/databin_wmt14_en_de.tar.gz
+    tar -zxvf /tmp/databin_wmt14_en_de.tar.gz -C /tmp && rm /tmp/databin_wmt14_en_de.tar.gz
 fi
 
 fairseq-train /tmp/wmt14_en_de/ \
