@@ -36,7 +36,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
       - name: build wheel
         run: |
           python3 -m pip install -U build
