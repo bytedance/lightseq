@@ -1,6 +1,6 @@
 # Efficient Inference Library for Transformer-based Models
 
-![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
+![logo](../../docs/inference/images/logo.png)
 
 [推理模块中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
 
@@ -34,7 +34,7 @@ The following is a support matrix of LightSeq compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
 
-![support](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/support.png)
+![support](../../docs/inference/images/support.png)
 
 ## Performance
 
@@ -47,13 +47,15 @@ The implementation from
 [tensor2tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py)
 was used as the benchmark of Tensorflow.
 
-More results is available [here](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/performance.md).
+More results is available [here](../../docs/inference/performance.md).
 
 - Neural machine translation
-![nmt](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/nmt.png)
+<img src="../../docs/inference/images/nmt.png"  width="60%" aligned="middle">
+
 
 - Text generation
-![generation](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/generation.png)
+<img src="../../docs/inference/images/generation.png"  width="60%" aligned="middle">
+
 
 
 ## Quick Start
