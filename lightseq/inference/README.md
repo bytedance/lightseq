@@ -60,7 +60,7 @@ More results is available [here](../../docs/inference/performance.md).
 
 ## Quick Start
 
-### Fast inference from HuggingFace bart
+### From HuggingFace bart
 
 We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
 
@@ -99,7 +99,9 @@ Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 
 LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
-### Inference python wrapper
+And there is also a quick start for huggingface GPT in examples.
+
+### Python wrapper
 
 We provide python api to call lightseq, all you need is to install `lightseq` with `pip`, and make sure you have GPU driver not older than 418.40.04.
 
