@@ -47,36 +47,7 @@ We compute speedup on different batch size using the WPS (real words per second)
 ### End-to-end wall-clock training time
 <img src="../../docs/training/images/total_time.png"  width="60%" aligned="middle">
 
-## Code Structure
-```shell
-├── csrc # C source files
-│   ├── kernels # CUDA kernels
-│   ├── ops # CPP wrapper
-│   ├── tensorflow
-│   └── torch # pybind for PyTorch
-├── docs
-├── examples # examples of different codebases
-│   ├── deepspeed
-│   ├── fairseq
-│   ├── huggingface
-│   └── neurst
-├── ops # python wrappers
-│   ├── pytorch
-│   │   ├── builder # kernel builders
-│   │   ├── adam.py
-│   │   ├── cross_entropy_layer.py
-│   │   ├── transformer_decoder_layer.py
-│   │   ├── transformer_embedding_layer.py
-│   │   ├── transformer_encoder_layer.py
-│   │   └── util.py
-│   └── tensorflow
-├── tests # unit test
-│   ├── fairseq_layers.py # fairseq layers
-│   ├── test_ls_kernels.py # test CUDA kernels
-│   ├── test_ls_ops.py # test CUDA kernels
-│   └── util.py # test LightSeq layers
-└── README.md
-```
+
 ## Requirements and Installation
 ### PyTorch
 - PyTorch version >= 1.5.0
