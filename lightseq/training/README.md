@@ -2,8 +2,6 @@
 
 ![logo](https://raw.githubusercontent.com/bytedance/lightseq/master/docs/images/logo.png)
 
-[训练模块中文版本介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)
-
 LightSeq supports fast training for models in the Transformer family now!
 
 We provide highly optimized custom operators for PyTorch and TensorFlow,
