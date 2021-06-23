@@ -203,9 +203,9 @@ client](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 
 ### Serve your own model
 
-In order to serve your own model, you need to [export model](./docs/export_model.md) trained from deeplearning framework(E.g.
+In order to serve your own model, you need to [export model](../../docs/inference/export_model.md) trained from deeplearning framework(E.g.
 TenforFlow, PyTorch) to custom model proto defined by LightSeq. Furthermore, you may need to [build from
-source code](./docs/build.md) if you want to modify the model architectures or serve a new model not supported by
+source code](../../docs/inference/build.md) if you want to modify the model architectures or serve a new model not supported by
 LightSeq currently.
 
 ## Limitations and Future Plans
