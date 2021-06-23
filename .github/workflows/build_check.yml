@@ -36,7 +36,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - name: env check
+        run: |
+          which python
       - name: build wheel
         run: |
-          python3 -m pip install -U build
-          python3 -m build
+          python -m pip install -U build
+          python -m build
