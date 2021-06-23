@@ -8,7 +8,7 @@ LightSeq provides a high performance inference library for sequence processing a
 in CUDA.
 It enables highly efficient computation of modern NLP models such as **BERT**, **GPT**,
 **Transformer**, etc.
-It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*， *Language
+It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*, *Language
 Modelling*, *Sentiment analysis*, and other related tasks with sequence data.
 
 The library is built on top of CUDA official
