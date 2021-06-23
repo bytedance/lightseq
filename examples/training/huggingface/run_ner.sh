@@ -19,7 +19,7 @@ if [ -d "/tmp/test-ner/" ]; then
 fi
 
 python3 -m torch.distributed.launch \
-  --nproc_per_node=8 \
+  --nproc_per_node=1 \
   $THIS_DIR/run_ner.py \
   --model_name_or_path bert-large-uncased \
   --dataset_name conll2003 \

@@ -8,7 +8,7 @@ pip install lightseq fairseq sacremoses
 
 Then you can train a translation task on wmt14 en2de dataset by running the following script:
 ```shell
-sh lightseq/training/examples/fairseq/ls_fairseq_wmt14en2de.sh
+sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 Or you can use LightSeq modules like `--arch ls_transformer_wmt_en_de_big_t2t`,

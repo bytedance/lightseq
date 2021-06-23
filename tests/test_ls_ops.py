@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 
-from lightseq.training.tests.util import (
+from tests.util import (
     TestDecorator,
     get_fairseq_enc_params,
     get_fairseq_dec_params,
@@ -17,7 +17,7 @@ from lightseq.training.tests.util import (
     copy_grad_from_paras,
 )
 
-from lightseq.training.tests import fairseq_layers
+from tests import fairseq_layers
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
@@ -25,7 +25,7 @@ from lightseq.training.ops.pytorch.transformer_embedding_layer import (
     LSTransformerEmbeddingLayer,
 )
 from lightseq.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
-from lightseq.training.examples.fairseq.fs_modules.ls_fs_transformer_decoder_layer import (
+from lightseq.training.fs_modules.ls_fs_transformer_decoder_layer import (
     LSFSTransformerDecoderLayer,
 )
 

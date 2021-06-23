@@ -8,7 +8,7 @@ pip install torch ninja fairseq deepspeed
 
 Then you can train a translation task on wmt14 en2de dataset by running the following script:
 ```shell
-sh lightseq/training/examples/deepspeed/ds_fairseq_wmt14en2de.sh
+sh examples/training/deepspeed/ds_fairseq_wmt14en2de.sh
 ```
 
 This script firstly download the dataset, and then run native Fairseq training script using DeepSpeed launcher without any other parameter modifications.

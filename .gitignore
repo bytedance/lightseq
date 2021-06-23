@@ -142,3 +142,5 @@ test_case/
 build/
 *.pb
 .vscode
+*.bin
+*.idx
