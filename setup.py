@@ -119,7 +119,7 @@ setup_kwargs = dict(
     },
     entry_points={
         "console_scripts": [
-            "lightseq-train = lightseq.training."
+            "lightseq-train = examples.training.fairseq."
             "lightseq_fairseq_train_cli:ls_cli_main",
         ],
     },
