@@ -74,7 +74,7 @@ pip install lightseq fairseq sacremoses
 Then you can train a translation task on wmt14 en2de dataset by running the following script
 
 ```shell
-sh lightseq/training/examples/fairseq/ls_fairseq_wmt14en2de.sh
+sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 To compare lightseq with fairseq, delete the arguments with `ls_`prefix to using the original fairseq implementation
@@ -85,7 +85,7 @@ We provide an end2end bart-base example to see how fast Lightseq is compared to 
 
 ```shell
 pip install torch tensorflow transformers lightseq
-cd example/python
+cd examples/inference/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.

@@ -12,7 +12,7 @@ In addition, we integrate our custom operators into popular training libraries l
 [Fairseq](https://github.com/pytorch/fairseq),
 [Hugging Face](https://github.com/huggingface/transformers),
 [NeurST](https://github.com/bytedance/neurst),
-which enables a **1.5X-3X** end-to-end speedup campred to the native version.
+which enables a **1.5X-3X** end-to-end speedup compared to the native version.
 
 With only a few lines of code, you can enjoy the excellent performance provided by LightSeq. Try it now!
 

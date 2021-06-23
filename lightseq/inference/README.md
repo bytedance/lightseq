@@ -66,7 +66,7 @@ We provide an end2end bart-base example to see how fast Lightseq is compared to 
 
 ```shell
 pip install torch tensorflow transformers lightseq
-cd example/python
+cd examples/inference/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
@@ -103,7 +103,7 @@ LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now
 
 We provide python api to call lightseq, all you need is to install `lightseq` with `pip`, and make sure you have GPU driver not older than 418.40.04.
 
-And check these files `proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
+And check these files `lightseq/inference/proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
 ```shell
 curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
