@@ -143,5 +143,10 @@ void read_batch_tokenids_from_file(std::string, int& batch_size,
                                    int& batch_seq_len,
                                    std::vector<int>& input_ids);
 
+/*
+Utility function for initializing
+*/
+bool endswith(std::string const& full, std::string const& end);
+
 }  // namespace cuda
 }  // namespace lightseq

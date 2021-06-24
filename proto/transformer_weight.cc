@@ -1,5 +1,6 @@
 #include "transformer_weight.h"
 
+#include "H5Cpp.h"
 #include <fstream>
 /**
 @file
@@ -32,7 +33,7 @@ __half TransformerWeight<OperationType::FP16>::float2required(float value) {
 Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::get_model_config(
+void TransformerWeight<OpType_>::proto_get_model_config(
     const Transformer &transformer, bool only_decoder) {
   _hidden_size = transformer.trg_embedding().norm_scale_size();
   _inner_size =
@@ -83,7 +84,7 @@ Compared with the encoder, the decoder has more
   distinguish between encoder and decoder
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::parse_emb_wei(
+std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
     const EmbeddingLayer &layer, std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
@@ -193,7 +194,7 @@ std::string TransformerWeight<OpType_>::parse_emb_wei(
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::parse_enc_wei(
+std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     const Transformer &transformer) {
   std::vector<int> offset;
   std::vector<float> value;
@@ -294,7 +295,7 @@ std::string TransformerWeight<OpType_>::parse_enc_wei(
 Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::parse_dec_wei(
+std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     const Transformer &transformer) {
   std::vector<int> offset;
   std::vector<float> value;
@@ -431,46 +432,49 @@ std::string TransformerWeight<OpType_>::parse_dec_wei(
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::initializing(std::string proto_path,
+std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
                                                      bool only_decoder) {
-  Transformer transformer;
-  // Verify that the version of the library that we linked against is
-  // compatible with the version of the headers we compiled against.
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
+  // If weight is of type pb, parse using proto parser.
+  if (endswith(weight_path, ".pb")) {
+    Transformer transformer;
+    // Verify that the version of the library that we linked against is
+    // compatible with the version of the headers we compiled against.
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
-  if (!transformer.ParseFromIstream(&raw_input)) {
-    return "Parse weights from [" + proto_path + "] failed.";
-  }
+    std::fstream raw_input(weight_path, std::ios::in | std::ios::binary);
+    if (!transformer.ParseFromIstream(&raw_input)) {
+      return "Parse weights from [" + weight_path + "] failed.";
+    }
+    proto_get_model_config(transformer, only_decoder);
 
-  get_model_config(transformer, only_decoder);
+    if (_hidden_size % 4 != 0) {
+      return "hidden_size should be a multiple of 4 to avoid misaligned "
+             "address "
+             "in CUDA";
+    }
 
-  if (_hidden_size % 4 != 0) {
-    return "hidden_size should be a multiple of 4 to avoid misaligned address "
-           "in CUDA";
-  }
+    std::string res;
+    if (!only_decoder) {
+      res = proto_parse_emb_wei(transformer.src_embedding(), "src");
+      if (!res.empty()) return res;
+    }
 
-  std::string res;
-  if (!only_decoder) {
-    res = parse_emb_wei(transformer.src_embedding(), "src");
+    res = proto_parse_emb_wei(transformer.trg_embedding(), "trg");
     if (!res.empty()) return res;
-  }
 
-  res = parse_emb_wei(transformer.trg_embedding(), "trg");
-  if (!res.empty()) return res;
+    if (!only_decoder) {
+      res = proto_parse_enc_wei(transformer);
+      if (!res.empty()) return res;
+    }
 
-  if (!only_decoder) {
-    res = parse_enc_wei(transformer);
+    res = proto_parse_dec_wei(transformer);
     if (!res.empty()) return res;
+
+    std::cout << "Finish loading all weight from host to device" << std::endl;
+    // Optional:  Delete all global objects allocated by libprotobuf.
+    // google::protobuf::ShutdownProtobufLibrary();
+    return "";
   }
-
-  res = parse_dec_wei(transformer);
-  if (!res.empty()) return res;
-
-  std::cout << "Finish loading all weight from host to device" << std::endl;
-  // Optional:  Delete all global objects allocated by libprotobuf.
-  // google::protobuf::ShutdownProtobufLibrary();
-  return "";
 }
 
 template class TransformerWeight<OperationType::FP16>;

@@ -28,11 +28,14 @@ class TransformerWeight {
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
-  void get_model_config(const Transformer &transformer,
-                        bool only_decoder = false);
-  std::string parse_emb_wei(const EmbeddingLayer &layer, std::string source);
-  std::string parse_enc_wei(const Transformer &transformer);
-  std::string parse_dec_wei(const Transformer &transformer);
+
+  // parsing function for protobuffer
+  void proto_get_model_config(const Transformer &transformer,
+                              bool only_decoder = false);
+  std::string proto_parse_emb_wei(const EmbeddingLayer &layer,
+                                  std::string source);
+  std::string proto_parse_enc_wei(const Transformer &transformer);
+  std::string proto_parse_dec_wei(const Transformer &transformer);
 
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
