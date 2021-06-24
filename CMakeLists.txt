@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(LightSeq LANGUAGES CXX CUDA)
+project(LightSeq LANGUAGES C CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 10.1 REQUIRED)
@@ -13,7 +13,6 @@ set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
 # setting compiler flags
-
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -Xcompiler -Wall")
@@ -47,14 +46,6 @@ if(DEBUG_MODE)
     message(STATUS "Debug computation result")
 endif()
 
-
-# Tell hdf5 that we are manually overriding certain settings
-# set (HDF5_EXTERNALLY_CONFIGURED 1)
-# Avoid duplicating names of installed libraries
-# set (HDF5_EXTERNAL_LIB_PREFIX "lightseq")
-# Export configuration to this export variable
-# set (HDF5_EXPORTED_TARGETS "paraview-targets")
-
 # Add the sub project
 add_subdirectory(kernels)
 add_subdirectory(tools)
@@ -62,6 +53,5 @@ add_subdirectory(proto)
 add_subdirectory(model)
 add_subdirectory(example)
 add_subdirectory(3rdparty/pybind11)
-add_subdirectory(3rdparty/hdf5)
 add_subdirectory(pywrapper)
 add_subdirectory(server)
