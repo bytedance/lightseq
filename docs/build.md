@@ -26,6 +26,17 @@ $ make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 ```
 `make install` and `ldconfig` may need to run with `sudo`. If you are encountered with any problem, check [this](https://github.com/protocolbuffers/protobuf/blob/master/src/README.md)
 
+HDF5 also need to be installed.
+```shell
+$ curl -O -L -C - https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz
+$ tar -xzvf hdf5-1_12_0.tar.gz
+$ cd hdf5-hdf5-1_12_0
+$ ./configure --prefix=/usr/local/hdf5 --enable-cxx
+$ make
+$ make check-install
+$ cd ..
+```
+
 ## Build
 
 To build all targets.
