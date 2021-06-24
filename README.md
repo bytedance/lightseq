@@ -24,13 +24,13 @@ Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 With LightSeq, one can easily develop modified Transformer architecture with little additional code.
 
 ## Features
-### [Training](./lightseq/training/README.md)
+### [Training](./lightseq/training)
 The following is a support matrix of LightSeq **training** library compared with
 [DeepSpeed](https://github.com/microsoft/DeepSpeed).
 
 ![features](./docs/training/images/features.png)
 
-### [Inference](./lightseq/inference/README.md)
+### [Inference](./lightseq/inference)
 The following is a support matrix of LightSeq **inference** library compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
