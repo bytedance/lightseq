@@ -24,13 +24,13 @@ Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 With LightSeq, one can easily develop modified Transformer architecture with little additional code.
 
 ## Features
-### [Training](./lightseq/training)
+### [<u>Training</u>](./lightseq/training)
 The following is a support matrix of LightSeq **training** library compared with
 [DeepSpeed](https://github.com/microsoft/DeepSpeed).
 
 ![features](./docs/training/images/features.png)
 
-### [Inference](./lightseq/inference)
+### [<u>Inference</u>](./lightseq/inference)
 The following is a support matrix of LightSeq **inference** library compared with
 [TurboTransformers](https://github.com/Tencent/TurboTransformers) and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer).
@@ -40,7 +40,7 @@ The following is a support matrix of LightSeq **inference** library compared wit
 
 ## Performance
 
-### [Training](./lightseq/training)
+### [<u>Training</u>](./lightseq/training)
 Here we present the experimental results on WMT14 English to German translation task based on Transformer-big models. We train Transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
@@ -50,7 +50,7 @@ We compute speedup on different batch size using the WPS (real words per second)
 
 More results is available [here](./docs/training/performance.md)
 
-### [Inference](./lightseq/inference)
+### [<u>Inference</u>](./lightseq/inference)
 Here we present the experimental results on neural machine translation based on Transformer-base models using beam search methods.
 We choose Tensorflow and
 [FasterTransformer](https://github.com/NVIDIA/DeepLearningExamples/tree/master/FasterTransformer) as a comparison.
@@ -80,7 +80,7 @@ Then you can train a translation task on wmt14 en2de dataset by running the foll
 sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
-To compare lightseq with fairseq, delete the arguments with `ls_`prefix to using the original fairseq implementation
+To compare lightseq with fairseq, delete the arguments with `ls_` prefix to using the original fairseq implementation
 
 More usage is available [here](./lightseq/training/README.md).
 
