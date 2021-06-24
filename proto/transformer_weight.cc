@@ -9,7 +9,7 @@ Currently, fp16 and fp32 versions are provided.
 Weights in proto file will always be in fp32. For fp16, the weights
   will be casted from fp32 into fp16
 */
-
+using namespace H5;
 namespace lightseq {
 namespace cuda {
 /**
@@ -436,6 +436,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
                                                      bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
+    std::cout << "Parsing protobuf: " + weight_path + "\n";
     Transformer transformer;
     // Verify that the version of the library that we linked against is
     // compatible with the version of the headers we compiled against.
@@ -474,6 +475,28 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     // Optional:  Delete all global objects allocated by libprotobuf.
     // google::protobuf::ShutdownProtobufLibrary();
     return "";
+  } else if (endswith(weight_path, ".hdf5")) {
+    std::cout << "Parsing hdf5: " + weight_path + "\n";
+    H5File file(weight_path, H5F_ACC_RDONLY);
+    DataSet dataset = file.openDataSet("model_conf/beam_size");
+    H5T_class_t type_class = dataset.getTypeClass();
+    std::cout << "dataset type: " << type_class << "\n";
+
+    DataSpace dataspace = dataset.getSpace();
+    int rank = dataspace.getSimpleExtentNdims();
+
+    hsize_t dims_out[rank];
+    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
+    std::cout << "rank: " << rank << ", ndims: " << ndims << ", dimensions: ";
+    for (int i = 0; i < ndims; ++i) {
+      std::cout << (unsigned long)(dims_out[i]) << " ";
+    }
+    std::cout << '\n';
+
+    return "Debugging abort";
+  } else {
+    return "Unsupported weight extention for [" + weight_path +
+           "]; Supported extensions: .pb, .hdf5\n";
   }
 }
 
