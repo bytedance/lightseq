@@ -119,8 +119,8 @@ setup_kwargs = dict(
     },
     entry_points={
         "console_scripts": [
-            "lightseq-train = lightseq.training.examples.fairseq"
-            ".lightseq_fairseq_train_cli:ls_cli_main",
+            "lightseq-train = examples.training.fairseq."
+            "lightseq_fairseq_train_cli:ls_cli_main",
         ],
     },
 )
@@ -131,11 +131,6 @@ try:
 except Exception as e:
     logger.warning(e)
     logger.warning("The inference extension could not be compiled")
-
-    # Retry to install the module without C extensions :
-    # Remove any previously defined build_ext command class.
-    if "build_ext" in setup_kwargs["cmdclass"]:
-        del setup_kwargs["cmdclass"]["build_ext"]
 
     # If this new 'setup' call don't fail, the module
     # will be successfully installed, without the C extension :
