@@ -130,30 +130,33 @@ real_seq_len: [batch_size]
 */
 template <typename T>
 __global__ void ker_correlation_softmax_gpt(T* correlation,
-                                            const int* real_seq_len) {
-  int query_token_pos = blockIdx.y % blockDim.x;
+                                            const int* real_seq_len,
+                                            const int batch_seq_len) {
+  int query_token_pos = blockIdx.y % batch_seq_len;
   if (query_token_pos >= real_seq_len[blockIdx.x]) {
     return;
   }
+
   int mask = 0;  // can see the token when mask=0
-  if (threadIdx.x > query_token_pos) {
+  if (threadIdx.x > query_token_pos || threadIdx.x >= batch_seq_len) {
     mask = 1;  // Can only see the token on the left side of it
   }
 
-  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
-  float val = (float)correlation[idx];
+  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
+  float val = threadIdx.x < batch_seq_len ? (float)correlation[idx]
+                                          : CUDA_FLOAT_INF_NEG;
   float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
   __shared__ float smax;
   if (threadIdx.x == 0) smax = max_val;
   __syncthreads();
 
-  val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
+  val = mask ? 0.f : expf(val - smax);
   float rsum = blockReduceSum<float>(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
 
-  correlation[idx] = (T)(val / (ssum + epsilon));
+  if (threadIdx.x < batch_seq_len) correlation[idx] = (T)(val / ssum);
 }
 
 template <typename T>
@@ -161,9 +164,15 @@ void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,
                                           int head_num, cudaStream_t stream,
                                           T* correlation,
                                           const int* real_seq_len) {
+  int block_dim = batch_seq_len;
+  if (batch_seq_len < 1024) {
+    block_dim = (batch_seq_len + 31) >> 5;
+    block_dim *= 32;
+  }
+
   ker_correlation_softmax_gpt<T>
-      <<<dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0,
-         stream>>>(correlation, real_seq_len);
+      <<<dim3(batch_size, head_num * batch_seq_len), block_dim, 0, stream>>>(
+          correlation, real_seq_len, batch_seq_len);
 }
 
 template void ker_correlation_softmax_gpt_launcher<float>(
