@@ -1,6 +1,6 @@
 #include "transformer_weight.h"
 
-#include "H5Cpp.h"
+#include "hdf5.h"
 #include <fstream>
 /**
 @file
@@ -9,7 +9,6 @@ Currently, fp16 and fp32 versions are provided.
 Weights in proto file will always be in fp32. For fp16, the weights
   will be casted from fp32 into fp16
 */
-using namespace H5;
 namespace lightseq {
 namespace cuda {
 /**
@@ -436,7 +435,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
                                                      bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
-    std::cout << "Parsing protobuf: " + weight_path + "\n";
+    std::cout << "Parsing protobuf: " << weight_path << std::endl;
     Transformer transformer;
     // Verify that the version of the library that we linked against is
     // compatible with the version of the headers we compiled against.
@@ -476,22 +475,61 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     // google::protobuf::ShutdownProtobufLibrary();
     return "";
   } else if (endswith(weight_path, ".hdf5")) {
-    std::cout << "Parsing hdf5: " + weight_path + "\n";
-    H5File file(weight_path, H5F_ACC_RDONLY);
-    DataSet dataset = file.openDataSet("model_conf/beam_size");
-    H5T_class_t type_class = dataset.getTypeClass();
-    std::cout << "dataset type: " << type_class << "\n";
+    std::cout << "Parsing hdf5: " << weight_path << std::endl;
 
-    DataSpace dataspace = dataset.getSpace();
-    int rank = dataspace.getSimpleExtentNdims();
+    hid_t file = H5Fopen(weight_path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // hid_t dataset = H5Dopen2(file, "model_conf/beam_size", H5P_DEFAULT);
+    hid_t dataset =
+        H5Dopen2(file, "decoder_stack/0/encdec_norm_bias", H5P_DEFAULT);
 
-    hsize_t dims_out[rank];
-    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
-    std::cout << "rank: " << rank << ", ndims: " << ndims << ", dimensions: ";
-    for (int i = 0; i < ndims; ++i) {
-      std::cout << (unsigned long)(dims_out[i]) << " ";
+    hid_t datatype = H5Dget_type(dataset); /* datatype handle */
+    H5T_class_t t_class = H5Tget_class(datatype);
+    H5Tclose(datatype);
+    if (t_class == H5T_INTEGER) {
+      std::cout << "Data set has INTEGER type" << std::endl;
+    } else if (t_class == H5T_FLOAT) {
+      std::cout << "Data set has FLOAT type" << std::endl;
     }
-    std::cout << '\n';
+    H5T_order_t order = H5Tget_order(datatype);
+    if (order == H5T_ORDER_LE) std::cout << "Little endian order" << std::endl;
+
+    size_t data_size = H5Tget_size(datatype);
+    std::cout << "Data size is " << (int)data_size << std::endl;
+
+    hsize_t dims_out[3];
+    hid_t dataspace = H5Dget_space(dataset); /* dataspace handle */
+    int rank = H5Sget_simple_extent_ndims(dataspace);
+
+    int status_n = H5Sget_simple_extent_dims(dataspace, dims_out, NULL);
+    printf("rank %d, dimensions %lu x %lu x %lu \n", rank,
+           (unsigned long)(dims_out[0]), (unsigned long)(dims_out[1]),
+           (unsigned long)(dims_out[2]));
+
+    size_t vec_size = 1;
+    for (int i = 0; i < rank; ++i) {
+      vec_size *= dims_out[i];
+    }
+    std::cout << "vector size: " << vec_size << std::endl;
+    float data_out[vec_size];
+
+    /*
+     * Read data from hyperslab in the file into the hyperslab in
+     * memory and display.
+     */
+    herr_t status;
+    status = H5Dread(dataset, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                     data_out);
+
+    if (status) {
+      return "H5 Dataset read error";
+    }
+    std::cout << "sizeof(float) " << sizeof(float) << '\n';
+    for (int i = 0; i < vec_size; i++) std::cout << data_out[i] << ' ';
+    std::cout << "\n";
+
+    // close file
+    H5Dclose(dataset);
+    H5Fclose(file);
 
     return "Debugging abort";
   } else {
