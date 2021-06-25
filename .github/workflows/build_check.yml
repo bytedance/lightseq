@@ -29,7 +29,7 @@ jobs:
       - name: check format
         run: |
           pre-commit run -a --show-diff-on-failure
-          
+
   build_wheel:
     runs-on: ubuntu-latest
     container: taka23/lightseq:build-linux
