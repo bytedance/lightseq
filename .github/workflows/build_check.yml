@@ -45,18 +45,3 @@ jobs:
         run: |
           /opt/python/cp38-cp38/bin/python -m pip install -U build
           /opt/python/cp38-cp38/bin/python -m build
-
-  build_inference:
-    runs-on: ubuntu-latest
-    container: taka23/lightseq:build-linux
-
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: 'recursive'
-      - name: env check
-        run: |
-          /opt/python/cp38-cp38/bin/python -V
-      - name: build ext
-        run: |
-          /opt/python/cp38-cp38/bin/python setup.py build_ext

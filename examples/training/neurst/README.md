@@ -1,4 +1,4 @@
-# LightSeq for Neurst
+# LightSeq for NeurST
 This repo contains an example for how to use LightSeq to accerate the training of translation task.
 
 First you should install these requirements.
@@ -6,7 +6,7 @@ First you should install these requirements.
 pip install subword-nmt pyyaml sacrebleu sacremoses
 git clone https://github.com/moses-smt/mosesdecoder.git
 ```
-Then clone Neurst and switch to lightseq branch.
+Then clone NeurST and switch to lightseq branch.
 ```shell
 git clone https://github.com/bytedance/neurst.git
 cd neurst/
