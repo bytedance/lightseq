@@ -5,6 +5,10 @@ name: build
 on:
   pull_request:
     branches: [master]
+  push:
+    paths-ignore:
+    - 'docs/**'
+    branches: [master]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
