@@ -912,7 +912,7 @@ __global__ void ker_arrange_decself_qkv(const T* ori_qkv, const T* qkv_bias,
     T val = ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i] +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
-        blockIdx.x;  // obvious, seq_id = batch_id * beam_size + beam_id
+        blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
       // for query
       new_q[seq_id * hidden_size + i] = val;
@@ -943,7 +943,7 @@ __global__ void ker_arrange_decself_qkv<__half>(
     half2 val = __hadd2(
         p_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i],
         __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
-    // obvious,seq_id = batch_id * beam_size + beam_id
+    // obvious，seq_id = batch_id * beam_size + beam_id
     int seq_id = blockIdx.x;
     if (blockIdx.y == 0) {
       // for query
@@ -1211,7 +1211,7 @@ query-key correlation softmax for encoder self attention
 @thread
 gridDim.x = batch_size
 gridDim.y = head_num * batch_seq_len
-blockDim.x = batch_seq_len
+blockDim.x = first multiple of WARP_SIZE greater than batch_seq_len
 
 @param
 correlation: [batch_size, head_num, batch_seq_len, batch_seq_len]
@@ -1220,27 +1220,33 @@ src_padding_mask: [batch_size, batch_seq_len],
 */
 template <typename T>
 __global__ void ker_correlation_softmax_encself(T* correlation,
-                                                const int* src_padding_mask) {
-  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
-  if (src_padding_mask[blockIdx.x * blockDim.x + blockIdx.y % blockDim.x]) {
+                                                const int* src_padding_mask,
+                                                int batch_seq_len) {
+  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
+  if (threadIdx.x < batch_seq_len &&
+      src_padding_mask[blockIdx.x * batch_seq_len +
+                       blockIdx.y % batch_seq_len]) {
     correlation[idx] = (T)0.f;
     return;
   }
-  int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];
-  float val = (float)correlation[idx];
+  int mask = threadIdx.x < batch_seq_len
+                 ? src_padding_mask[blockIdx.x * batch_seq_len + threadIdx.x]
+                 : 1;
+  float val = threadIdx.x < batch_seq_len ? (float)correlation[idx]
+                                          : CUDA_FLOAT_INF_NEG;
 
   float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
   __shared__ float smax;
   if (threadIdx.x == 0) smax = max_val;
   __syncthreads();
 
-  val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
+  val = mask ? 0.f : expf(val - smax);
   float rsum = blockReduceSum<float>(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
 
-  correlation[idx] = (T)(val / (ssum + epsilon));
+  if (threadIdx.x < batch_seq_len) correlation[idx] = (T)(val / ssum);
 }
 
 template <typename T>
@@ -1248,9 +1254,15 @@ void ker_correlation_softmax_encself_launcher(int batch_size, int batch_seq_len,
                                               int head_num, cudaStream_t stream,
                                               T* correlation,
                                               const int* src_padding_mask) {
+  int block_dim = batch_seq_len;
+  if (batch_seq_len < 1024) {
+    block_dim = (batch_seq_len + 31) >> 5;
+    block_dim *= 32;
+  }
+
   ker_correlation_softmax_encself<T>
-      <<<dim3(batch_size, head_num * batch_seq_len), batch_seq_len, 0,
-         stream>>>(correlation, src_padding_mask);
+      <<<dim3(batch_size, head_num * batch_seq_len), block_dim, 0, stream>>>(
+          correlation, src_padding_mask, batch_seq_len);
 }
 
 template void ker_correlation_softmax_encself_launcher<float>(
@@ -1267,36 +1279,43 @@ query-key correlation softmax for decoder self attention
 
 @thread
 gridDim.x = batch_size * beam_size * head_num
-blockDim.x = cur_step + 1
+blockDim.x = first multiple of WARP_SIZE greater than cur_step + 1
 
 @param
 correlation: [batch_size, beam_size, head_num, cur_step + 1]
 */
 template <typename T>
-__global__ void ker_correlation_softmax_decself(T* correlation) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  float val = (float)correlation[idx];
+__global__ void ker_correlation_softmax_decself(T* correlation, int step_num) {
+  int idx = blockIdx.x * step_num + threadIdx.x;
+  float val =
+      threadIdx.x < step_num ? (float)correlation[idx] : CUDA_FLOAT_INF_NEG;
 
   float max_val = blockReduceMax(val);
   __shared__ float smax;
   if (threadIdx.x == 0) smax = max_val;
   __syncthreads();
 
-  val = expf(fmaxf(logit_thresh_min, val - smax));
+  val = threadIdx.x < step_num ? expf(val - smax) : 0;
+
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
 
-  correlation[idx] = (T)(val / ssum);
+  if (threadIdx.x < step_num) correlation[idx] = (T)(val / ssum);
 }
 
 template <typename T>
 void ker_correlation_softmax_decself_launcher(int batch_head_num, int step_num,
                                               cudaStream_t stream,
                                               T* correlation) {
-  ker_correlation_softmax_decself<<<batch_head_num, step_num, 0, stream>>>(
-      correlation);
+  int block_dim = step_num;
+  if (step_num < 1024) {
+    block_dim = (step_num + 31) >> 5;
+    block_dim *= 32;
+  }
+  ker_correlation_softmax_decself<<<batch_head_num, block_dim, 0, stream>>>(
+      correlation, step_num);
 }
 
 template void ker_correlation_softmax_decself_launcher<float>(
@@ -1312,7 +1331,7 @@ query-key correlation softmax for encoder-decoder attention
 @thread
 gridDim.x = batch_size
 gridDim.y = head_num * beam_size
-blockDim.x = batch_seq_len
+blockDim.x = first multiple of WARP_SIZE greater than batch_seq_len
 
 @param
 correlation: [batch_size, head_num, beam_size, batch_seq_len]
@@ -1321,32 +1340,41 @@ src_padding_mask: [batch_size, batch_seq_len]
 */
 template <typename T>
 __global__ void ker_correlation_softmax_encdec(T* correlation,
-                                               const int* src_padding_mask) {
-  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
-  int mask = src_padding_mask[blockIdx.x * blockDim.x + threadIdx.x];
-  float val = (float)correlation[idx];
+                                               const int* src_padding_mask,
+                                               int batch_seq_len) {
+  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
+  int mask = threadIdx.x < batch_seq_len
+                 ? src_padding_mask[blockIdx.x * batch_seq_len + threadIdx.x]
+                 : 1;
+  float val = threadIdx.x < batch_seq_len ? (float)correlation[idx]
+                                          : CUDA_FLOAT_INF_NEG;
 
   float max_val = blockReduceMax(mask ? CUDA_FLOAT_INF_NEG : val);
   __shared__ float smax;
   if (threadIdx.x == 0) smax = max_val;
   __syncthreads();
 
-  val = mask ? 0.f : expf(fmaxf(logit_thresh_min, val - smax));
+  val = mask ? 0.f : expf(val - smax);
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0) ssum = rsum;
   __syncthreads();
 
-  correlation[idx] = (T)(val / (ssum + epsilon));
+  if (threadIdx.x < batch_seq_len) correlation[idx] = (T)(val / ssum);
 }
 
 template <typename T>
 void ker_correlation_softmax_encdec_launcher(
     int batch_size, int head_num_per_seq, int batch_seq_len,
     cudaStream_t stream, T* correlation, const int* src_padding_mask) {
+  int block_dim = batch_seq_len;
+  if (batch_seq_len < 1024) {
+    block_dim = (batch_seq_len + 31) >> 5;
+    block_dim *= 32;
+  }
   ker_correlation_softmax_encdec<T>
-      <<<dim3(batch_size, head_num_per_seq), batch_seq_len, 0, stream>>>(
-          correlation, src_padding_mask);
+      <<<dim3(batch_size, head_num_per_seq), block_dim, 0, stream>>>(
+          correlation, src_padding_mask, batch_seq_len);
 }
 
 template void ker_correlation_softmax_encdec_launcher<float>(
