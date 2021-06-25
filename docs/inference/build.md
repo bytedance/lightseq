@@ -31,9 +31,9 @@ HDF5 also need to be installed.
 $ curl -O -L -C - https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz
 $ tar -xzvf hdf5-1_12_0.tar.gz
 $ cd hdf5-hdf5-1_12_0
-$ ./configure --prefix=/usr/local/hdf5 --enable-cxx
+$ ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
 $ make
-$ make check-install
+$ make install
 $ cd ..
 ```
 
