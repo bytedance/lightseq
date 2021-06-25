@@ -170,8 +170,7 @@ void read_batch_tokenids_from_file(std::string file_name, int& batch_size,
 
 bool endswith(std::string const& full, std::string const& end) {
   if (full.length() >= end.length()) {
-    return (0 ==
-            full.compare(full.length() - full.length(), end.length(), end));
+    return (0 == full.compare(full.length() - end.length(), end.length(), end));
   }
   return false;
 }
