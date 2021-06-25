@@ -92,7 +92,7 @@ with open("README.md", "r") as fh:
 
 setup_kwargs = dict(
     name="lightseq",
-    version="2.0.0",
+    version="2.0.2",
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
