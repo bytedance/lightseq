@@ -520,7 +520,7 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
     _sampling_method = "beam_search";
   }
 
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_FLOAT,
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_INT,
                            &_topk);
   std::cout << "_topk " << _topk << std::endl;
 
