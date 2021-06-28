@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include <cublas_v2.h>
 #include <cuda.h>
@@ -13,6 +14,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
+#include "hdf5.h"
 
 /**
 @file
@@ -147,6 +149,43 @@ void read_batch_tokenids_from_file(std::string, int& batch_size,
 Utility function for initializing
 */
 bool endswith(std::string const& full, std::string const& end);
+
+/*
+Helper function of HDF5.
+
+Return the 1D size of given hdf5 dataset if dataset is already open.
+*/
+int get_hdf5_dataset_size(hid_t dataset);
+
+/*
+Helper function of HDF5.
+
+Return the 1D size of given hdf5 dataset in the given file.
+*/
+int get_hdf5_dataset_size(hid_t hdf5_file, std::string& dataset_name);
+
+/*
+Helper function of HDF5.
+
+Read the data of specified type `output_type` into `output_buf`.
+
+returns: the size of output data
+*/
+int read_hdf5_dataset_data(
+    hid_t hdf5_file, std::string& dataset_name, hid_t output_type,
+    void* output_buf,
+    std::function<bool(int)> size_predicate = [](int x) -> bool {
+      return (x < 0);
+    },
+    std::string extra_msg = "");
+
+/*
+Helper function of HDF5.
+
+Read a scalar of specified type `output_type` into `output_buf`.
+*/
+void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string& dataset_name,
+                              hid_t output_type, void* output_buf);
 
 }  // namespace cuda
 }  // namespace lightseq
