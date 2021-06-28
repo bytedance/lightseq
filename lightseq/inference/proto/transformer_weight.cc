@@ -509,13 +509,12 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   std::cout << "_diverse_lambda " << _diverse_lambda << std::endl;
 
   char _sampling_method_buf[128];  // get 128 character for sampling method
-  read_hdf5_dataset_data(
-      hdf5_file, "model_conf/sampling_method", H5T_C_S1, _sampling_method_buf,
-      [](int size) { return size > 128; },
+  int _sampling_method_strlen = read_hdf5_dataset_data(
+      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_SCHAR,
+      _sampling_method_buf, [](int size) { return size > 128; },
       "Expect model_conf/sampling_method to have less than 128 characters.");
-  _sampling_method.assign(_sampling_method_buf);
+  _sampling_method.assign(_sampling_method_buf, _sampling_method_strlen);
   std::cout << "_sampling_method " << _sampling_method << std::endl;
-  // TODO: potential check here for memory issue
 
   if (_sampling_method == "") {
     _sampling_method = "beam_search";
@@ -541,8 +540,13 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
                            &_use_gelu);
   std::cout << "_use_gelu " << _use_gelu << std::endl;
 
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
-                           H5T_NATIVE_HBOOL, &_is_multilingual);
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
+                             H5T_NATIVE_HBOOL, &_is_multilingual);
+  } catch (HDF5DatasetNotFoundError &e) {
+    // if this attribute is not found, default initialize it to false
+    _is_multilingual = false;
+  }
   std::cout << "_is_multilingual " << _is_multilingual << std::endl;
 }
 

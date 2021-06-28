@@ -198,6 +198,12 @@ int get_hdf5_dataset_size(hid_t dataset) {
 }
 
 int get_hdf5_dataset_size(hid_t hdf5_file, std::string dataset_name) {
+  // check if dataset exists or not
+  if (!H5Lexists(hdf5_file, dataset_name.c_str(), H5P_DEFAULT)) {
+    throw HDF5DatasetNotFoundError(
+        (dataset_name + " Not Found in HDF5 File").c_str());
+  }
+
   // parse dataset size
   hid_t ds = H5Dopen2(hdf5_file, dataset_name.c_str(), H5P_DEFAULT);
   if (ds < 0) {
@@ -215,6 +221,12 @@ int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
                            hid_t output_type, void* output_buf,
                            std::function<bool(int)> size_predicate,
                            std::string extra_msg) {
+  // check if dataset exists or not
+  if (!H5Lexists(hdf5_file, dataset_name.c_str(), H5P_DEFAULT)) {
+    throw HDF5DatasetNotFoundError(
+        (dataset_name + " Not Found in HDF5 File").c_str());
+  }
+
   hid_t ds = H5Dopen2(hdf5_file, dataset_name.c_str(), H5P_DEFAULT);
   if (ds < 0) {
     throw std::runtime_error("Failed to open HDF5 dataset: " + dataset_name);
@@ -237,9 +249,9 @@ int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
   return ds_size;
 }
 
-void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
-                              hid_t output_type, void* output_buf) {
-  read_hdf5_dataset_data(
+int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
+                             hid_t output_type, void* output_buf) {
+  return read_hdf5_dataset_data(
       hdf5_file, dataset_name, output_type, output_buf,
       [](int size) { return size != 1; }, "Expect scalar with shape of 1.");
 }

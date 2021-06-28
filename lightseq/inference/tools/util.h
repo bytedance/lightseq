@@ -169,7 +169,7 @@ Helper function of HDF5.
 
 Read the data of specified type `output_type` into `output_buf`.
 
-returns: the size of output data
+return: the size of output data.
 */
 int read_hdf5_dataset_data(
     hid_t hdf5_file, std::string dataset_name, hid_t output_type,
@@ -183,9 +183,16 @@ int read_hdf5_dataset_data(
 Helper function of HDF5.
 
 Read a scalar of specified type `output_type` into `output_buf`.
+
+return: the size of output data.
 */
-void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
-                              hid_t output_type, void* output_buf);
+int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
+                             hid_t output_type, void* output_buf);
+
+class HDF5DatasetNotFoundError : public std::runtime_error {
+ public:
+  HDF5DatasetNotFoundError(const char* what) : runtime_error(what) {}
+};
 
 }  // namespace cuda
 }  // namespace lightseq
