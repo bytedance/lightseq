@@ -83,6 +83,7 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "length_penalty",
         "src_padding_id",
         "trg_start_id",
+        "diverse_lambda",
         "sampling_method",
         "topp",
         "topk",
@@ -90,6 +91,7 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "is_post_ln",
         "no_scale_embedding",
         "use_gelu",
+        "is_multilingual"
     ]
 
     EMBEDDING_KEYS = [
