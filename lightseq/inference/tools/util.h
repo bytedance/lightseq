@@ -162,7 +162,7 @@ Helper function of HDF5.
 
 Return the 1D size of given hdf5 dataset in the given file.
 */
-int get_hdf5_dataset_size(hid_t hdf5_file, std::string& dataset_name);
+int get_hdf5_dataset_size(hid_t hdf5_file, std::string dataset_name);
 
 /*
 Helper function of HDF5.
@@ -172,7 +172,7 @@ Read the data of specified type `output_type` into `output_buf`.
 returns: the size of output data
 */
 int read_hdf5_dataset_data(
-    hid_t hdf5_file, std::string& dataset_name, hid_t output_type,
+    hid_t hdf5_file, std::string dataset_name, hid_t output_type,
     void* output_buf,
     std::function<bool(int)> size_predicate = [](int x) -> bool {
       return (x < 0);
@@ -184,7 +184,7 @@ Helper function of HDF5.
 
 Read a scalar of specified type `output_type` into `output_buf`.
 */
-void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string& dataset_name,
+void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
                               hid_t output_type, void* output_buf);
 
 }  // namespace cuda

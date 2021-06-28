@@ -38,12 +38,10 @@ class TransformerWeight {
   std::string proto_parse_dec_wei(const Transformer &transformer);
 
   // parsing function for hdf5
-  // void proto_get_model_config(const Transformer &transformer,
-  //                             bool only_decoder = false);
-  // std::string proto_parse_emb_wei(const EmbeddingLayer &layer,
-  //                                 std::string source);
-  // std::string proto_parse_enc_wei(const Transformer &transformer);
-  // std::string proto_parse_dec_wei(const Transformer &transformer);
+  void hdf5_get_model_config(hid_t hdf5_file, bool only_decoder = false);
+  std::string hdf5_parse_emb_wei(hid_t hdf5_file, std::string source);
+  std::string hdf5_parse_enc_wei(hid_t hdf5_file);
+  std::string hdf5_parse_dec_wei(hid_t hdf5_file);
 
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4

@@ -197,9 +197,9 @@ int get_hdf5_dataset_size(hid_t dataset) {
   return vec_size;
 }
 
-int get_hdf5_dataset_size(hid_t hdf5_file, std::string& dataset_name) {
+int get_hdf5_dataset_size(hid_t hdf5_file, std::string dataset_name) {
   // parse dataset size
-  hid_t ds = H5Dopen2(hdf5_file, dataset_name, H5P_DEFAULT);
+  hid_t ds = H5Dopen2(hdf5_file, dataset_name.c_str(), H5P_DEFAULT);
   if (ds < 0) {
     throw std::runtime_error("Failed to open HDF5 dataset: " + dataset_name);
   }
@@ -208,17 +208,14 @@ int get_hdf5_dataset_size(hid_t hdf5_file, std::string& dataset_name) {
     throw std::runtime_error("HDF5 parsing error: " + dataset_name);
   }
   H5Dclose(ds);
-  return ds_size
+  return ds_size;
 }
 
-int read_hdf5_dataset_data(
-    hid_t hdf5_file, std::string& dataset_name, hid_t output_type,
-    void* output_buf,
-    std::function<bool(int)> size_predicate = [](int x) -> bool {
-      return (x < 0);
-    },
-    std::string extra_msg = "") {
-  hid_t ds = H5Dopen2(hdf5_file, dataset_name, H5P_DEFAULT);
+int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
+                           hid_t output_type, void* output_buf,
+                           std::function<bool(int)> size_predicate,
+                           std::string extra_msg) {
+  hid_t ds = H5Dopen2(hdf5_file, dataset_name.c_str(), H5P_DEFAULT);
   if (ds < 0) {
     throw std::runtime_error("Failed to open HDF5 dataset: " + dataset_name);
   }
@@ -226,7 +223,8 @@ int read_hdf5_dataset_data(
 
   // sanity (custom) check for size with extra message.
   if (size_predicate(ds_size)) {
-    throw std::runtime_error("Invalid shape " + ds_size + ". " + extra_msg);
+    throw std::runtime_error("Invalid shape " + std::to_string(ds_size) + ". " +
+                             extra_msg);
   }
 
   herr_t status =
@@ -239,11 +237,11 @@ int read_hdf5_dataset_data(
   return ds_size;
 }
 
-void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string& dataset_name,
+void read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
                               hid_t output_type, void* output_buf) {
   read_hdf5_dataset_data(
       hdf5_file, dataset_name, output_type, output_buf,
-      [](int size) { return size != 1 }, "Expect scalar with shape of 1.");
+      [](int size) { return size != 1; }, "Expect scalar with shape of 1.");
 }
 
 }  // namespace cuda
