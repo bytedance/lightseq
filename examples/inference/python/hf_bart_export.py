@@ -167,6 +167,12 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
             f.create_dataset(hdf5_key, data=attrgetter(
                 proto_attr)(transformer))
 
+    # save number of layers metadata
+    f.create_dataset("model_conf/n_encoder_stack",
+                     data=len(transformer.encoder_stack))
+    f.create_dataset("model_conf/n_decoder_stack",
+                     data=len(transformer.decoder_stack))
+
     # load encoder_stack
     for layer_id, layer in enumerate(transformer.encoder_stack):
         for key in ENCODER_LAYER_KEYS:
