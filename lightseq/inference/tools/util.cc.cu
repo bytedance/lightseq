@@ -219,6 +219,9 @@ int read_hdf5_dataset_data(
     },
     std::string extra_msg = "") {
   hid_t ds = H5Dopen2(hdf5_file, dataset_name, H5P_DEFAULT);
+  if (ds < 0) {
+    throw std::runtime_error("Failed to open HDF5 dataset: " + dataset_name);
+  }
   int ds_size = get_hdf5_dataset_size(ds);
 
   // sanity (custom) check for size with extra message.
