@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 import tensorflow as tf
 import h5py
+import numpy as np
 from operator import attrgetter
 from utils import fill_layer, _gather_token_embedding, _get_encode_output_mapping_dict
 from transformer_pb2 import Transformer
@@ -166,8 +167,13 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
                 continue
 
             print(f"loading transformer {proto_attr} -> {hdf5_key}")
-            f.create_dataset(hdf5_key, data=attrgetter(
-                proto_attr)(transformer))
+            _data = attrgetter(proto_attr)(transformer)
+            if type(_data) is str:
+                print(
+                    f"find type str, explicitly convert string to ascii encoded array.")
+                # explict convert to array of char (int8) to avoid issues on string reading in C
+                _data = np.array([ord(c) for c in _data]).astype(np.int8)
+            f.create_dataset(hdf5_key, data=_data)
 
     # save number of layers metadata
     f.create_dataset("model_conf/n_encoder_stack",
@@ -482,8 +488,15 @@ def extract_transformer_weights(
         f.close()
 
         f = h5py.File(output_file, 'r')
-        list(map(lambda x: print(f"{x[0]}:", x[1]
-             [()]), f["model_conf"].items()))
+
+        def _print_pair(key, value):
+            if key == "sampling_method":
+                value = "".join(map(chr, value[()]))
+            else:
+                value = value[()]
+            print(f"{key}: {value}")
+
+        list(map(lambda x: _print_pair(*x), f["model_conf"].items()))
         f.close()
 
 
