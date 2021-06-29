@@ -510,7 +510,7 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
 
   char _sampling_method_buf[128];  // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
-      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_SCHAR,
+      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
       _sampling_method_buf, [](int size) { return size > 128; },
       "Expect model_conf/sampling_method to have less than 128 characters.");
   _sampling_method.assign(_sampling_method_buf, _sampling_method_strlen);
@@ -697,92 +697,113 @@ Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
 std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+  size_t value_size =
+      (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
+       _hidden_size * _hidden_size + _hidden_size * 3 +
+       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
+       _hidden_size) *
+      _n_enc_layer;
   std::vector<int> offset;
-  std::vector<float> value;
+  std::vector<float> value(value_size);
+
   int idx = 0;
+  for (int layer_id = 0; layer_id < _n_enc_layer; ++i) {
+    std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
-  for (auto enc_layer : transformer.encoder_stack()) {
     offset.push_back(idx);
-    if (enc_layer.multihead_norm_scale_size() != _hidden_size)
-      return "Wrong multihead_norm_scale_size !";
-    for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_norm_bias_size() != _hidden_size)
-      return "Wrong multihead_norm_bias_size !";
-    for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_kernel_qkv_size() !=
-        _hidden_size * _hidden_size * 3)
-      return "Wrong multihead_project_kernel_qkv_size !";
-    for (float ele : enc_layer.multihead_project_kernel_qkv())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size * 3; },
+        "Wrong multihead_project_kernel_qkv_size !");
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_bias_qkv_size() != _hidden_size * 3)
-      return "Wrong multihead_project_bias_qkv_size !";
-    for (float ele : enc_layer.multihead_project_bias_qkv())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * 3; },
+        "Wrong multihead_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_kernel_output_size() !=
-        _hidden_size * _hidden_size)
-      return "Wrong multihead_project_kernel_output_size !";
-    for (float ele : enc_layer.multihead_project_kernel_output())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size; },
+        "Wrong multihead_project_kernel_output_size !");
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_bias_output_size() != _hidden_size)
-      return "Wrong multihead_project_bias_output_size !";
-    for (float ele : enc_layer.multihead_project_bias_output())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_norm_scale_size() != _hidden_size)
-      return "Wrong ffn_norm_scale_size !";
-    for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_norm_bias_size() != _hidden_size)
-      return "Wrong ffn_norm_bias_size !";
-    for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
-      return "Wrong ffn_first_kernel_size !";
-    for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_first_kernel_size !");
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_bias_size() != _inner_size)
-      return "Wrong ffn_first_bias_size !";
-    for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _inner_size; },
+        "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
-      return "Wrong ffn_second_kernel_size !";
-    for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_second_kernel_size !");
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_second_bias_size() != _hidden_size)
-      return "Wrong ffn_second_bias_size !";
-    for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
 
   }  // for
 
   std::vector<_DataType> raw_value;
+  raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
