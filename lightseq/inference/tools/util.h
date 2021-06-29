@@ -184,7 +184,7 @@ Helper function of HDF5.
 Read the data of specified type `output_type` into a vector<T>,
 and the vector will be returned.
 */
-
+// TODO: merge these two _float _int function together to improve readability
 std::vector<float> read_hdf5_dataset_data_float(
     hid_t hdf5_file, std::string dataset_name, hid_t output_type,
     std::function<bool(int)> size_predicate = [](int x) -> bool {
