@@ -493,6 +493,9 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/diverse_lambda",
                            H5T_NATIVE_FLOAT, &_diverse_lambda);
 
+  // special handling for string reading
+  // string were converted to numpy array of np.int8 in python
+  // hence needed to be read as an char array here
   char _sampling_method_buf[128];  // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
       hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
