@@ -27,10 +27,17 @@ class GptWeight {
  private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
+
   _DataType float2required(float value);
-  void get_model_config(const Gpt &gpt);
-  std::string parse_emb_wei(const GptEmbeddingLayer &layer);
-  std::string parse_enc_wei(const Gpt &gpt);
+
+  void proto_get_model_config(const Gpt &gpt);
+  std::string proto_parse_emb_wei(const GptEmbeddingLayer &layer);
+  std::string proto_parse_enc_wei(const Gpt &gpt);
+
+  // parsing function for hdf5
+  void hdf5_get_model_config(hid_t hdf5_file);
+  std::string hdf5_parse_emb_wei(hid_t hdf5_file);
+  std::string hdf5_parse_enc_wei(hid_t hdf5_file);
 
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4

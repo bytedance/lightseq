@@ -34,7 +34,7 @@ __half GptWeight<OperationType::FP16>::float2required(float value) {
 Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
-void GptWeight<OpType_>::get_model_config(const Gpt &gpt) {
+void GptWeight<OpType_>::proto_get_model_config(const Gpt &gpt) {
   _hidden_size = gpt.src_embedding().norm_scale_size();
   _inner_size = gpt.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step = gpt.src_embedding().position_embedding_size() / _hidden_size;
@@ -62,7 +62,8 @@ void GptWeight<OpType_>::get_model_config(const Gpt &gpt) {
 Load the weights of embedding layer into GPU memory.
 */
 template <OperationType OpType_>
-std::string GptWeight<OpType_>::parse_emb_wei(const GptEmbeddingLayer &layer) {
+std::string GptWeight<OpType_>::proto_parse_emb_wei(
+    const GptEmbeddingLayer &layer) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -104,7 +105,7 @@ std::string GptWeight<OpType_>::parse_emb_wei(const GptEmbeddingLayer &layer) {
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string GptWeight<OpType_>::parse_enc_wei(const Gpt &gpt) {
+std::string GptWeight<OpType_>::proto_parse_enc_wei(const Gpt &gpt) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -205,29 +206,52 @@ Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
 std::string GptWeight<OpType_>::initializing(std::string proto_path) {
-  Gpt gpt;
-  // Verify that the version of the library that we linked against is
-  // compatible with the version of the headers we compiled against.
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
+  // If weight is of type pb, parse using proto parser.
+  if (endswith(weight_path, ".pb")) {
+    std::cout << "Parsing protobuf: " << weight_path << std::endl;
+    Gpt gpt;
+    // Verify that the version of the library that we linked against is
+    // compatible with the version of the headers we compiled against.
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
-  if (!gpt.ParseFromIstream(&raw_input)) {
-    return "Parse weights from [" + proto_path + "] failed.";
+    std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
+    if (!gpt.ParseFromIstream(&raw_input)) {
+      return "Parse weights from [" + proto_path + "] failed.";
+    }
+
+    proto_get_model_config(gpt);
+
+    std::string res = proto_parse_emb_wei(gpt.src_embedding());
+    if (!res.empty()) return res;
+
+    res = proto_parse_enc_wei(gpt);
+    if (!res.empty()) return res;
+
+    std::cout << "finish initializing all weight from host to device"
+              << std::endl;
+    // Optional:  Delete all global objects allocated by libprotobuf.
+    // google::protobuf::ShutdownProtobufLibrary();
+    return "";
+  } else if (endswith(weight_path, ".hdf5")) {
+    std::cout << "Parsing hdf5: " << weight_path << std::endl;
+
+    hid_t hdf5_file = H5Fopen(weight_path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (hdf5_file < 0) {
+      return "Unable to read HDF5 file from " + weight_path;
+    }
+    hdf5_get_model_config(hdf5_file);
+
+    // hdf5_parse_* would throw std::runtime_error on error
+    hdf5_parse_emb_wei(hdf5_file);
+    hdf5_parse_enc_wei(hdf5_file);
+    H5Fclose(hdf5_file);
+
+    std::cout << "Finish loading all weight from host to device" << std::endl;
+    return "";
+  } else {
+    return "Unsupported weight extention for [" + weight_path +
+           "]; Supported extensions: .pb, .hdf5\n";
   }
-
-  get_model_config(gpt);
-
-  std::string res = parse_emb_wei(gpt.src_embedding());
-  if (!res.empty()) return res;
-
-  res = parse_enc_wei(gpt);
-  if (!res.empty()) return res;
-
-  std::cout << "finish initializing all weight from host to device"
-            << std::endl;
-  // Optional:  Delete all global objects allocated by libprotobuf.
-  // google::protobuf::ShutdownProtobufLibrary();
-  return "";
 }
 
 template class GptWeight<OperationType::FP16>;
