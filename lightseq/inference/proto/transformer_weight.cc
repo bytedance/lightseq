@@ -654,7 +654,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   if (_is_multilingual) {
     // fill in language embedding
 
-    std::vector<float> raw_value_float = read_hdf5_dataset_data<float>(
+    std::vector<float> raw_value_float = read_hdf5_dataset_data_float(
         hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
     std::vector<_DataType> raw_value;
     for (float e : raw_value_float) raw_value.push_back(float2required(e));
@@ -676,7 +676,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
       // fill in target vocab mask
-      std::vector<int> h_mask = read_hdf5_dataset_data<int>(
+      std::vector<int> h_mask = read_hdf5_dataset_data_int(
           hdf5_file, dataset_prefix + "/trg_vocab_mask", H5T_NATIVE_INT);
 
       _d_trg_vocab_mask = h_mask;
@@ -980,6 +980,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     std::cout << "Parsing hdf5: " << weight_path << std::endl;
 
     hid_t hdf5_file = H5Fopen(weight_path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    // TODO: add error check
     hdf5_get_model_config(hdf5_file, only_decoder);
     hdf5_parse_emb_wei(hdf5_file, "src");
     hdf5_parse_emb_wei(hdf5_file, "trg");
