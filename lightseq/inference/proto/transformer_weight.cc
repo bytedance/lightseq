@@ -551,6 +551,8 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
   std::vector<int> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of embedding weight." << std::endl;
   int idx = 0;
 
   offset.push_back(idx);
@@ -683,6 +685,8 @@ std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of encoder weight." << std::endl;
 
   int idx = 0;
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
@@ -806,6 +810,8 @@ std::string TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
       _n_dec_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of decoder weight." << std::endl;
   int idx = 0;
 
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
