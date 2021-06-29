@@ -1046,8 +1046,9 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     hdf5_parse_enc_wei(hdf5_file);
     hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
+
     std::cout << "Finish loading all weight from host to device" << std::endl;
-    return "Debugging abort";
+    return "";
   } else {
     return "Unsupported weight extention for [" + weight_path +
            "]; Supported extensions: .pb, .hdf5\n";
