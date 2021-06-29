@@ -579,7 +579,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [](int size) { return size != vocab_size * _hidden_size; },
+      [=](int size) { return size != vocab_size * _hidden_size; },
       "Wrong token_embedding_size !");
   idx += vocab_size * _hidden_size;
 
@@ -587,21 +587,21 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [](int size) { return size != _max_step * _hidden_size; },
+      [=](int size) { return size != _max_step * _hidden_size; },
       "Wrong position_embedding_size !");
   idx += _max_step * _hidden_size;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [](int size) { return size != _hidden_size; },
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
       "Wrong norm_scale_size !");
   idx += _hidden_size;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
-      value.data() + idx, [](int size) { return size != _hidden_size; },
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
       "Wrong norm_bias_size !");
   idx += _hidden_size;
 
@@ -620,7 +620,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/encode_output_project_kernel_kv",
         H5T_NATIVE_FLOAT, value.data() + idx,
-        [](int size) {
+        [=](int size) {
           return size != _hidden_size * _hidden_size * 2 * _n_dec_layer;
         },
         "Wrong encode_output_project_kernel_kv_size !");
@@ -630,14 +630,14 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/encode_output_project_bias_kv",
         H5T_NATIVE_FLOAT, value.data() + idx,
-        [](int size) { return size != _hidden_size * 2 * _n_dec_layer; },
+        [=](int size) { return size != _hidden_size * 2 * _n_dec_layer; },
         "Wrong encode_output_project_bias_kv_size !");
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/shared_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [](int size) { return size != vocab_size; },
+        value.data() + idx, [=](int size) { return size != vocab_size; },
         "Wrong shared_bias_size !");
     idx += vocab_size;
 
@@ -981,6 +981,8 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
 
     hid_t hdf5_file = H5Fopen(weight_path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     hdf5_get_model_config(hdf5_file, only_decoder);
+    hdf5_parse_emb_wei(hdf5_file, "src");
+    hdf5_parse_emb_wei(hdf5_file, "trg");
     H5Fclose(hdf5_file);
 
     return "Debugging abort";
