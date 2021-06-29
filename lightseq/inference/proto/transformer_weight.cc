@@ -707,7 +707,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   std::vector<float> value(value_size);
 
   int idx = 0;
-  for (int layer_id = 0; layer_id < _n_enc_layer; ++i) {
+  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
