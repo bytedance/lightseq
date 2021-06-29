@@ -249,6 +249,40 @@ int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
   return ds_size;
 }
 
+template <typename T>
+std::vector<T> read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
+                                      hid_t output_type,
+                                      std::function<bool(int)> size_predicate,
+                                      std::string extra_msg) {
+  // check if dataset exists or not
+  if (!H5Lexists(hdf5_file, dataset_name.c_str(), H5P_DEFAULT)) {
+    throw HDF5DatasetNotFoundError(
+        (dataset_name + " Not Found in HDF5 File").c_str());
+  }
+
+  hid_t ds = H5Dopen2(hdf5_file, dataset_name.c_str(), H5P_DEFAULT);
+  if (ds < 0) {
+    throw std::runtime_error("Failed to open HDF5 dataset: " + dataset_name);
+  }
+  int ds_size = get_hdf5_dataset_size(ds);
+
+  // sanity (custom) check for size with extra message.
+  if (size_predicate(ds_size)) {
+    throw std::runtime_error("Invalid shape " + std::to_string(ds_size) + ". " +
+                             extra_msg);
+  }
+
+  std::vector<T> output_vec(ds_size);
+  herr_t status = H5Dread(ds, output_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                          output_vec.data());
+
+  if (status < 0) {
+    throw std::runtime_error("Failed to read HDF5 dataset: " + dataset_name);
+  }
+  H5Dclose(ds);
+  return output_vec;  // return with copy elision
+}
+
 int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
                              hid_t output_type, void* output_buf) {
   return read_hdf5_dataset_data(
