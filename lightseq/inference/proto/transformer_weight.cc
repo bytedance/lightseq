@@ -827,7 +827,7 @@ std::string TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
        _hidden_size) *
       _n_dec_layer;
   std::vector<int> offset;
-  std::vector<float> value;
+  std::vector<float> value(value_size);
   int idx = 0;
 
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
