@@ -606,8 +606,9 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   idx += _hidden_size;
 
   if (source == "src") {
-    std::for_each(value.begin(), value.end(), float2required);
-    std::vector<_DataType> &raw_value = value;
+    std::vector<_DataType> raw_value;
+    raw_value.reserve(value.size());
+    for (float e : value) raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
     for (int e : offset)
       _p_d_src_emb_wei.push_back(
@@ -640,8 +641,9 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
         "Wrong shared_bias_size !");
     idx += vocab_size;
 
-    std::for_each(value.begin(), value.end(), float2required);
-    std::vector<_DataType> &raw_value = value;
+    std::vector<_DataType> raw_value;
+    raw_value.reserve(value.size());
+    for (float e : value) raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
@@ -652,9 +654,10 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   if (_is_multilingual) {
     // fill in language embedding
 
-    std::vector<_DataType> raw_value = read_hdf5_dataset_data<_DataType>(
+    std::vector<float> raw_value_float = read_hdf5_dataset_data<float>(
         hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
-    std::for_each(raw_value.begin(), raw_value.end(), float2required);
+    std::vector<_DataType> raw_value;
+    for (float e : raw_value_float) raw_value.push_back(float2required(e));
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
