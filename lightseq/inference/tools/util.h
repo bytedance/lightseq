@@ -184,8 +184,15 @@ Helper function of HDF5.
 Read the data of specified type `output_type` into a vector<T>,
 and the vector will be returned.
 */
-template <typename T>
-std::vector<T> read_hdf5_dataset_data(
+
+std::vector<float> read_hdf5_dataset_data_float(
+    hid_t hdf5_file, std::string dataset_name, hid_t output_type,
+    std::function<bool(int)> size_predicate = [](int x) -> bool {
+      return (x < 0);
+    },
+    std::string extra_msg = "");
+
+std::vector<int> read_hdf5_dataset_data_int(
     hid_t hdf5_file, std::string dataset_name, hid_t output_type,
     std::function<bool(int)> size_predicate = [](int x) -> bool {
       return (x < 0);
