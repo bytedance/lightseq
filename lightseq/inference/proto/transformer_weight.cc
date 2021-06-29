@@ -536,8 +536,8 @@ Compared with the encoder, the decoder has more
   distinguish between encoder and decoder
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                           std::string source) {
+void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
+                                                    std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::string dataset_prefix =
@@ -669,14 +669,13 @@ std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
   std::cout << "Finish loading " << source << "_emb_wei from host to device"
             << std::endl;
-  return "";
 }
 
 /**
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -792,14 +791,13 @@ std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
-  return "";
 }
 
 /**
 Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
+void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -961,7 +959,6 @@ std::string TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
   for (int e : offset)
     _p_d_dec_wei.push_back(thrust::raw_pointer_cast(_d_dec_wei.data()) + e);
   std::cout << "Finish loading dec_wei from host to device" << std::endl;
-  return "";
 }
 
 /**
