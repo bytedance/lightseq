@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 
-def check_rule(tensor_name, rule):
+def _check_rule(tensor_name, rule):
     if "Adam" in tensor_name or "adam" in tensor_name:
         return False
     assert isinstance(rule, str) and rule
@@ -22,59 +22,75 @@ def check_rule(tensor_name, rule):
     return True
 
 
-def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
+def _apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
+    expression = [
+        ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
+    ]
+
+    ckpt_rule = [
+        ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
+    ]
+
+    assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
+        len(ckpt_rule) == 0 and len(expression) > 0
+    )
+
+    if len(expression) < 2:
+        expression = "" if not expression else expression[0].split("_")[1]
+    else:
+        expression = [exp.split("_")[1] for exp in expression]
+
+    target_tn = []
+    for cr in ckpt_rule:
+        tmp = []
+        for tn in tensor_names:
+            if _check_rule(tn, cr):
+                tmp.append(tn)
+        if len(tmp) != 1:
+            print(tmp, cr)
+        assert len(tmp) == 1
+        target_tn.extend(tmp)
+    target_tensor = [state_dict[name] for name in target_tn]
+    tt = {}
+    if target_tensor:
+        exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
+    else:
+        if not isinstance(expression, list):
+            expression = [expression]
+        exec("tt['save'] = [%s]" % ",".join(expression))
+
+    target_tensor = np.concatenate(tt["save"], axis=-1)
+    print(
+        "%s -> %s, shape: %s, convert finished."
+        % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
+    )
+    return target_tensor
+
+
+def fill_proto_layer(tensor_names, state_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
-        expression = [
-            ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
-        ]
-
-        ckpt_rule = [
-            ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
-        ]
-
-        assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
-            len(ckpt_rule) == 0 and len(expression) > 0
-        )
-
-        if len(expression) < 2:
-            expression = "" if not expression else expression[0].split("_")[1]
-        else:
-            expression = [exp.split("_")[1] for exp in expression]
-
-        target_tn = []
-        for cr in ckpt_rule:
-            tmp = []
-            for tn in tensor_names:
-                if check_rule(tn, cr):
-                    tmp.append(tn)
-            if len(tmp) != 1:
-                print(tmp, cr)
-            assert len(tmp) == 1
-            target_tn.extend(tmp)
-        target_tensor = [stete_dict[name] for name in target_tn]
-        tt = {}
-        if target_tensor:
-            exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
-        else:
-            if not isinstance(expression, list):
-                expression = [expression]
-            exec("tt['save'] = [%s]" % ",".join(expression))
-
-        target_tensor = np.concatenate(tt["save"], axis=-1)
-        print(
-            "%s -> %s, shape: %s, convert finished."
-            % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
-        )
+        target_tensor = _apply_rule(
+            proto_name, ckpt_rule, tensor_names, state_dict)
         exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
+
+
+def fill_hdf5_layer(tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict):
+    for proto_name, ckpt_rule in mapping_dict.items():
+        target_tensor = _apply_rule(
+            proto_name, ckpt_rule, tensor_names, state_dict)
+        hdf5_file.create_dataset(
+            hdf5_dataset_prefix + proto_name, data=target_tensor.flatten().tolist())
 
 
 def _get_encode_output_mapping_dict(dec_layer_num):
     encode_output_kernel_pattern = [
-        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(ele)
+        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(
+            ele)
         for ele in range(dec_layer_num)
     ]
     encode_output_bias_pattern = [
-        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(ele)
+        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(
+            ele)
         for ele in range(dec_layer_num)
     ]
 
@@ -84,36 +100,6 @@ def _get_encode_output_mapping_dict(dec_layer_num):
         ),
         "encode_output_project_bias_kv": "&&".join(encode_output_bias_pattern),
     }
-
-
-def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
-    """Return positional encoding.
-
-    Calculates the position encoding as a mix of sine and cosine functions with
-    geometrically increasing wavelengths.
-    Defined and formulized in Attention is All You Need, section 3.5.
-
-    Args:
-      length: Sequence length.
-      hidden_size: Size of the
-      min_timescale: Minimum scale that will be applied at each position
-      max_timescale: Maximum scale that will be applied at each position
-
-    Returns:
-      Tensor with shape [length, hidden_size]
-    """
-    with tf.device("/cpu:0"):
-        position = tf.cast(tf.range(length), tf.float32)
-        num_timescales = hidden_size // 2
-        log_timescale_increment = math.log(
-            float(max_timescale) / float(min_timescale)
-        ) / (tf.cast(num_timescales, tf.float32) - 1)
-        inv_timescales = min_timescale * tf.exp(
-            tf.cast(tf.range(num_timescales), tf.float32) * -log_timescale_increment
-        )
-        scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(inv_timescales, 0)
-        signal = tf.concat([tf.math.sin(scaled_time), tf.math.cos(scaled_time)], axis=1)
-    return signal
 
 
 def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
