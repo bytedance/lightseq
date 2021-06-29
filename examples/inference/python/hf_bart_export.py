@@ -5,7 +5,7 @@ import tensorflow as tf
 import h5py
 import numpy as np
 from operator import attrgetter
-from utils import fill_layer, _gather_token_embedding, _get_encode_output_mapping_dict
+from utils import fill_proto_layer, _gather_token_embedding, _get_encode_output_mapping_dict
 from transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
@@ -249,7 +249,7 @@ def extract_transformer_weights(
             enc_tensor_names.setdefault(layer_id, []).append(name)
 
         for layer_id in sorted(enc_tensor_names.keys()):
-            fill_layer(
+            fill_proto_layer(
                 enc_tensor_names[layer_id],
                 encoder_state_dict,
                 transformer.encoder_stack.add(),
@@ -266,7 +266,7 @@ def extract_transformer_weights(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_layer(
+        fill_proto_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
             transformer.decoder_stack.add(),
@@ -275,7 +275,7 @@ def extract_transformer_weights(
 
     # fill src_embedding
     if not only_decoder:
-        fill_layer(
+        fill_proto_layer(
             enc_var_name_list,
             encoder_state_dict,
             transformer.src_embedding,
@@ -310,7 +310,7 @@ def extract_transformer_weights(
     encode_output_mapping_dict = _get_encode_output_mapping_dict(
         len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_layer(
+    fill_proto_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,
