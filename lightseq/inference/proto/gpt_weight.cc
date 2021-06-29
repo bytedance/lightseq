@@ -270,6 +270,63 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 }
 
 /**
+Load the weights of embedding layer into GPU memory.
+*/
+template <OperationType OpType_>
+void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
+                                                    std::string source) {
+  std::string dataset_prefix = "src_embedding";
+  size_t value_size = _src_vocab_size * _hidden_size +
+                      _max_step * _hidden_size + _hidden_size * 2;
+
+  std::vector<int> offset;
+  std::vector<float> value(value_size);  // preallocate vector for performance
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of embedding weight." << std::endl;
+  int idx = 0;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [=](int size) { return size != _src_vocab_size * _hidden_size; },
+      "Wrong token_embedding_size !");
+  idx += _src_vocab_size * _hidden_size;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [=](int size) { return size != _max_step * _hidden_size; },
+      "Wrong position_embedding_size !");
+  idx += _max_step * _hidden_size;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
+  idx += _hidden_size;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_bias_size !");
+  idx += _hidden_size;
+
+  std::vector<_DataType> raw_value;
+  raw_value.reserve(value.size());
+  for (float e : value) raw_value.push_back(float2required(e));
+  _d_src_emb_wei = raw_value;
+  for (int e : offset)
+    _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
+                               e);
+
+  std::cout << "finish initializing emb_wei from host to device" << std::endl;
+}
+
+/**
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
