@@ -126,7 +126,7 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
-    output_lightseq_model_name = "lightseq_gpt2"
+    output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
     head_number = 12  # 36 for "gpt2-large"
     # generation_method should be "topk" or "topp"
