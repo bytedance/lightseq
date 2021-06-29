@@ -980,7 +980,9 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     std::cout << "Parsing hdf5: " << weight_path << std::endl;
 
     hid_t hdf5_file = H5Fopen(weight_path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-    // TODO: add error check
+    if (hdf5_file < 0) {
+      return "Unable to read HDF5 file from " + weight_path;
+    }
     hdf5_get_model_config(hdf5_file, only_decoder);
     hdf5_parse_emb_wei(hdf5_file, "src");
     hdf5_parse_emb_wei(hdf5_file, "trg");
