@@ -560,108 +560,132 @@ Compared with the encoder, the decoder has more
 template <OperationType OpType_>
 std::string TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
                                                            std::string source) {
-  // int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
+  int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
-  // std::vector<int> offset;
-  // std::vector<float> value;
-  // int idx = 0;
+  std::string dataset_prefix =
+      (source == "src") ? "src_embedding" : "trg_embedding";
+  size_t value_size =
+      vocab_size * _hidden_size + _max_step * _hidden_size + 2 * _hidden_size;
+  if (source != "src") {
+    value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
+                  _hidden_size * 2 * _n_dec_layer + vocab_size;
+  }
 
-  // offset.push_back(idx);
-  // if (layer.token_embedding_size() != vocab_size * _hidden_size)
-  //   return "Wrong token_embedding_size !";
-  // for (float ele : layer.token_embedding()) value.push_back(ele);
-  // idx += vocab_size * _hidden_size;
+  std::vector<int> offset;
+  std::vector<float> value(value_size);  // preallocate vector for performance
+  int idx = 0;
 
-  // offset.push_back(idx);
-  // if (layer.position_embedding_size() != _max_step * _hidden_size)
-  //   return "Wrong position_embedding_size !";
-  // for (float ele : layer.position_embedding()) value.push_back(ele);
-  // idx += _max_step * _hidden_size;
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [](int size) { return size != vocab_size * _hidden_size; },
+      "Wrong token_embedding_size !");
+  idx += vocab_size * _hidden_size;
 
-  // offset.push_back(idx);
-  // if (layer.norm_scale_size() != _hidden_size) return "Wrong norm_scale_size
-  // !"; for (float ele : layer.norm_scale()) value.push_back(ele); idx +=
-  // _hidden_size;
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
+      value.data() + idx,
+      [](int size) { return size != _max_step * _hidden_size; },
+      "Wrong position_embedding_size !");
+  idx += _max_step * _hidden_size;
 
-  // offset.push_back(idx);
-  // if (layer.norm_bias_size() != _hidden_size) return "Wrong norm_bias_size
-  // !"; for (float ele : layer.norm_bias()) value.push_back(ele); idx +=
-  // _hidden_size;
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
+  idx += _hidden_size;
 
-  // if (source == "src") {
-  //   std::vector<_DataType> raw_value;
-  //   for (float e : value) raw_value.push_back(float2required(e));
-  //   _d_src_emb_wei = raw_value;
-  //   for (int e : offset)
-  //     _p_d_src_emb_wei.push_back(
-  //         thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
-  // } else {
-  //   // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [](int size) { return size != _hidden_size; },
+      "Wrong norm_bias_size !");
+  idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (layer.encode_output_project_kernel_kv_size() !=
-  //       _hidden_size * _hidden_size * 2 * _n_dec_layer)
-  //     return "Wrong encode_output_project_kernel_kv_size !";
-  //   for (float ele : layer.encode_output_project_kernel_kv())
-  //     value.push_back(ele);
-  //   idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
+  if (source == "src") {
+    std::for_each(value.begin(), value.end(), float2required);
+    std::vector<_DataType> &raw_value = value;
+    _d_src_emb_wei = raw_value;
+    for (int e : offset)
+      _p_d_src_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+  } else {
+    // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
-  //   offset.push_back(idx);
-  //   if (layer.encode_output_project_bias_kv_size() !=
-  //       _hidden_size * 2 * _n_dec_layer)
-  //     return "Wrong encode_output_project_bias_kv_size !";
-  //   for (float ele : layer.encode_output_project_bias_kv())
-  //     value.push_back(ele);
-  //   idx += _hidden_size * 2 * _n_dec_layer;
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encode_output_project_kernel_kv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [](int size) {
+          return size != _hidden_size * _hidden_size * 2 * _n_dec_layer;
+        },
+        "Wrong encode_output_project_kernel_kv_size !");
+    idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
-  //   offset.push_back(idx);
-  //   if (layer.shared_bias_size() != vocab_size)
-  //     return "Wrong shared_bias_size !";
-  //   for (float ele : layer.shared_bias()) value.push_back(ele);
-  //   idx += vocab_size;
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encode_output_project_bias_kv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [](int size) { return size != _hidden_size * 2 * _n_dec_layer; },
+        "Wrong encode_output_project_bias_kv_size !");
+    idx += _hidden_size * 2 * _n_dec_layer;
 
-  //   std::vector<_DataType> raw_value;
-  //   for (float e : value) raw_value.push_back(float2required(e));
-  //   _d_trg_emb_wei = raw_value;
-  //   for (int e : offset) {
-  //     _p_d_trg_emb_wei.push_back(
-  //         thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
-  //   }
-  // }  // trg
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/shared_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [](int size) { return size != vocab_size; },
+        "Wrong shared_bias_size !");
+    idx += vocab_size;
 
-  // if (_is_multilingual) {
-  //   // fill in language embedding
-  //   std::vector<_DataType> raw_value;
-  //   for (float e : layer.lang_emb()) {
-  //     raw_value.push_back(float2required(e));
-  //   }
+    std::for_each(value.begin(), value.end(), float2required);
+    std::vector<_DataType> &raw_value = value;
+    _d_trg_emb_wei = raw_value;
+    for (int e : offset) {
+      _p_d_trg_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
+    }
+  }  // trg
 
-  //   if (source == "src") {
-  //     _d_src_lang_emb = raw_value;
-  //     _p_d_src_emb_wei.push_back(
-  //         thrust::raw_pointer_cast(_d_src_lang_emb.data()));
-  //   } else {
-  //     if (layer.lang_emb_size() / _hidden_size !=
-  //         layer.trg_vocab_mask_size() / _trg_vocab_size) {
-  //       return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
-  //     }
-  //     _d_trg_lang_emb = raw_value;
-  //     _p_d_trg_emb_wei.push_back(
-  //         thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
-  //     // fill in target vocab mask
-  //     std::vector<int> h_mask;
-  //     for (int ele : layer.trg_vocab_mask()) h_mask.push_back(ele);
-  //     _d_trg_vocab_mask = h_mask;
-  //     _p_d_trg_vocab_mask =
-  //     thrust::raw_pointer_cast(_d_trg_vocab_mask.data());
-  //   }
+  if (_is_multilingual) {
+    // fill in language embedding
 
-  //   std::cout << "Finish loading multi lingual weights from host to device"
-  //             << std::endl;
-  // }
+    std::vector<_DataType> raw_value = read_hdf5_dataset_data<_DataType>(
+        hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
+    std::for_each(raw_value.begin(), raw_value.end(), float2required);
 
-  // std::cout << "Finish loading " << source << "_emb_wei from host to device"
-  //           << std::endl;
+    if (source == "src") {
+      _d_src_lang_emb = raw_value;
+      _p_d_src_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+    } else {
+      size_t lang_emb_size = raw_value.size();
+      size_t trg_vocab_mask_size =
+          get_hdf5_dataset_size(hdf5_file, dataset_prefix + "trg_vocab_mask");
+      if (lang_emb_size / _hidden_size !=
+          trg_vocab_mask_size / _trg_vocab_size) {
+        return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
+      }
+
+      _d_trg_lang_emb = raw_value;
+      _p_d_trg_emb_wei.push_back(
+          thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+      // fill in target vocab mask
+      std::vector<int> h_mask = read_hdf5_dataset_data<int>(
+          hdf5_file, dataset_prefix + "/trg_vocab_mask", H5T_NATIVE_INT);
+
+      _d_trg_vocab_mask = h_mask;
+      _p_d_trg_vocab_mask = thrust::raw_pointer_cast(_d_trg_vocab_mask.data());
+    }
+
+    std::cout << "Finish loading multi lingual weights from host to device"
+              << std::endl;
+  }
+
+  std::cout << "Finish loading " << source << "_emb_wei from host to device"
+            << std::endl;
   return "";
 }
 
