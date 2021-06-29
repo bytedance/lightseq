@@ -818,128 +818,159 @@ Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
 std::string TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
+  size_t value_size =
+      (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
+       _hidden_size * _hidden_size + _hidden_size * 3 +
+       _hidden_size * _hidden_size + _hidden_size +
+       _hidden_size * _hidden_size + _hidden_size * 3 +
+       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
+       _hidden_size) *
+      _n_dec_layer;
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
 
-  for (auto dec_layer : transformer.decoder_stack()) {
+  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
+    std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
+
     offset.push_back(idx);
-    if (dec_layer.self_norm_scale_size() != _hidden_size)
-      return "Wrong self_norm_scale size !";
-    for (float ele : dec_layer.self_norm_scale()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong self_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.self_norm_bias_size() != _hidden_size)
-      return "Wrong self_norm_bias_size !";
-    for (float ele : dec_layer.self_norm_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong self_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_kernel_qkv_size() !=
-        _hidden_size * _hidden_size * 3)
-      return "Wrong self_project_kernel_qkv size !";
-    for (float ele : dec_layer.self_project_kernel_qkv()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_kernel_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size * 3; },
+        "Wrong self_project_kernel_qkv_size !");
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_bias_qkv_size() != _hidden_size * 3)
-      return "Wrong self_project_bias_qkv size !";
-    for (float ele : dec_layer.self_project_bias_qkv()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_bias_qkv", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size * 3; },
+        "Wrong self_project_bias_qkv_size !");
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_kernel_output_size() !=
-        _hidden_size * _hidden_size)
-      return "Wrong self_project_kernel_output size !";
-    for (float ele : dec_layer.self_project_kernel_output())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_kernel_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size; },
+        "Wrong self_project_kernel_output_size !");
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_bias_output_size() != _hidden_size)
-      return "Wrong self_project_bias_output size !";
-    for (float ele : dec_layer.self_project_bias_output()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/self_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong self_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_norm_scale_size() != _hidden_size)
-      return "Wrong encdec_norm_scale size !";
-    for (float ele : dec_layer.encdec_norm_scale()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_norm_bias_size() != _hidden_size)
-      return "Wrong encdec_norm_bias_size !";
-    for (float ele : dec_layer.encdec_norm_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
-      return "Wrong encdec_project_kernel_q size !";
-    for (float ele : dec_layer.encdec_project_kernel_q()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_kernel_q",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size; },
+        "Wrong encdec_project_kernel_q_size !");
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_bias_q_size() != _hidden_size)
-      return "Wrong encdec_project_bias_q size !";
-    for (float ele : dec_layer.encdec_project_bias_q()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_bias_q", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_project_bias_q_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_kernel_output_size() !=
-        _hidden_size * _hidden_size)
-      return "Wrong encdec_project_kernel_output size !";
-    for (float ele : dec_layer.encdec_project_kernel_output())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_kernel_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size; },
+        "Wrong encdec_project_kernel_output_size !");
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_bias_output_size() != _hidden_size)
-      return "Wrong encdec_project_bias_output size !";
-    for (float ele : dec_layer.encdec_project_bias_output())
-      value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/encdec_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong encdec_project_bias_output_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_norm_scale_size() != _hidden_size)
-      return "Wrong ffn_norm_scale_size !";
-    for (float ele : dec_layer.ffn_norm_scale()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_norm_bias_size() != _hidden_size)
-      return "Wrong ffn_norm_bias_size !";
-    for (float ele : dec_layer.ffn_norm_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
-      return "Wrong ffn_first_kernel_size !";
-    for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_first_kernel_size !");
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_first_bias_size() != _inner_size)
-      return "Wrong ffn_first_bias_size !";
-    for (float ele : dec_layer.ffn_first_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _inner_size; },
+        "Wrong ffn_first_bias_size !");
     idx += _inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
-      return "Wrong ffn_second_kernel_size !";
-    for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_second_kernel_size !");
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_second_bias_size() != _hidden_size)
-      return "Wrong ffn_second_bias_size !";
-    for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
 
   }  // for
 
   std::vector<_DataType> raw_value;
+  raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
@@ -1013,7 +1044,7 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
     hdf5_parse_emb_wei(hdf5_file, "src");
     hdf5_parse_emb_wei(hdf5_file, "trg");
     hdf5_parse_enc_wei(hdf5_file);
-    // hdf5_parse_dec_wei(hdf5_file);
+    hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
     std::cout << "Finish loading all weight from host to device" << std::endl;
     return "Debugging abort";
