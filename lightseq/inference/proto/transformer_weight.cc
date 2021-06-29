@@ -434,43 +434,35 @@ template <OperationType OpType_>
 void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
                                                        bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
-  std::cout << "hidden_size " << _hidden_size << std::endl;
 
   _inner_size =
       get_hdf5_dataset_size(hdf5_file, "decoder_stack/0/ffn_first_kernel") /
       _hidden_size;
-  std::cout << "inner_size " << _inner_size << std::endl;
 
   _max_step =
       get_hdf5_dataset_size(hdf5_file, "trg_embedding/position_embedding") /
       _hidden_size;
-  std::cout << "max_step " << _max_step << std::endl;
 
   if (!only_decoder) {
     _src_vocab_size =
         get_hdf5_dataset_size(hdf5_file, "src_embedding/token_embedding") /
         _hidden_size;
-    std::cout << "_src_vocab_size " << _src_vocab_size << std::endl;
   }
 
   _trg_vocab_size =
       get_hdf5_dataset_size(hdf5_file, "trg_embedding/token_embedding") /
       _hidden_size;
-  std::cout << "_trg_vocab_size " << _trg_vocab_size << std::endl;
 
   if (!only_decoder) {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/n_encoder_stack",
                              H5T_NATIVE_INT, &_n_enc_layer);
-    std::cout << "n_enc_layer " << _n_enc_layer << std::endl;
   }
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/n_decoder_stack",
                            H5T_NATIVE_INT, &_n_dec_layer);
-  std::cout << "n_dec_layer " << _n_dec_layer << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/head_num", H5T_NATIVE_INT,
                            &_head_num);
-  std::cout << "head_num " << _head_num << std::endl;
 
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
@@ -478,27 +470,21 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
                            &_beam_size);
-  std::cout << "_beam_size " << _beam_size << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
                            H5T_NATIVE_INT, &_extra_decode_length);
-  std::cout << "_extra_decode_length " << _extra_decode_length << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/length_penalty",
                            H5T_NATIVE_FLOAT, &_length_penalty);
-  std::cout << "_length_penalty " << _length_penalty << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
                            H5T_NATIVE_INT, &_padding_id);
-  std::cout << "_padding_id " << _padding_id << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/trg_start_id", H5T_NATIVE_INT,
                            &_start_id);
-  std::cout << "_start_id " << _start_id << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/trg_end_id", H5T_NATIVE_INT,
                            &_end_id);
-  std::cout << "_end_id " << _end_id << std::endl;
 
   if (_end_id == 0) {
     _end_id = _trg_vocab_size - 1;
@@ -506,7 +492,6 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/diverse_lambda",
                            H5T_NATIVE_FLOAT, &_diverse_lambda);
-  std::cout << "_diverse_lambda " << _diverse_lambda << std::endl;
 
   char _sampling_method_buf[128];  // get 128 character for sampling method
   int _sampling_method_strlen = read_hdf5_dataset_data(
@@ -514,7 +499,6 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
       _sampling_method_buf, [](int size) { return size > 128; },
       "Expect model_conf/sampling_method to have less than 128 characters.");
   _sampling_method.assign(_sampling_method_buf, _sampling_method_strlen);
-  std::cout << "_sampling_method " << _sampling_method << std::endl;
 
   if (_sampling_method == "") {
     _sampling_method = "beam_search";
@@ -522,23 +506,18 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_INT,
                            &_topk);
-  std::cout << "_topk " << _topk << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/topp", H5T_NATIVE_FLOAT,
                            &_topp);
-  std::cout << "_topp " << _topp << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_post_ln", H5T_NATIVE_HBOOL,
                            &_is_post_ln);
-  std::cout << "_is_post_ln " << _is_post_ln << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/no_scale_embedding",
                            H5T_NATIVE_HBOOL, &_no_scale_embedding);
-  std::cout << "_no_scale_embedding " << _no_scale_embedding << std::endl;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/use_gelu", H5T_NATIVE_HBOOL,
                            &_use_gelu);
-  std::cout << "_use_gelu " << _use_gelu << std::endl;
 
   try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
@@ -547,7 +526,6 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
     // if this attribute is not found, default initialize it to false
     _is_multilingual = false;
   }
-  std::cout << "_is_multilingual " << _is_multilingual << std::endl;
 }
 
 /**
