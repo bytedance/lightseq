@@ -36,8 +36,8 @@ class GptWeight {
 
   // parsing function for hdf5
   void hdf5_get_model_config(hid_t hdf5_file);
-  std::string hdf5_parse_emb_wei(hid_t hdf5_file);
-  std::string hdf5_parse_enc_wei(hid_t hdf5_file);
+  void hdf5_parse_emb_wei(hid_t hdf5_file);
+  void hdf5_parse_enc_wei(hid_t hdf5_file);
 
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4

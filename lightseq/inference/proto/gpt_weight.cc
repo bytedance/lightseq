@@ -202,6 +202,74 @@ std::string GptWeight<OpType_>::proto_parse_enc_wei(const Gpt &gpt) {
 }
 
 /**
+Read model config stored in custom hdf5 file.
+*/
+template <OperationType OpType_>
+void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
+  _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
+
+  _inner_size =
+      get_hdf5_dataset_size(hdf5_file, "encoder_stack/0/ffn_first_kernel") /
+      _hidden_size;
+
+  _max_step =
+      get_hdf5_dataset_size(hdf5_file, "src_embedding/position_embedding") /
+      _hidden_size;
+
+  _src_vocab_size =
+      get_hdf5_dataset_size(hdf5_file, "src_embedding/token_embedding") /
+      _hidden_size;
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/n_encoder_stack",
+                           H5T_NATIVE_INT, &_n_enc_layer);
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/head_num", H5T_NATIVE_INT,
+                           &_head_num);
+
+  _dim_per_head = _hidden_size / _head_num;
+
+  _weight_per_enc_layer = 12;
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
+                           H5T_NATIVE_INT, &_padding_id);
+
+  // special handling for string reading
+  // string were converted to numpy array of np.int8 in python
+  // hence needed to be read as an char array here
+  char _sampling_method_buf[128];  // get 128 character for sampling method
+  int _sampling_method_strlen = read_hdf5_dataset_data(
+      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
+      _sampling_method_buf, [](int size) { return size > 128; },
+      "Expect model_conf/sampling_method to have less than 128 characters.");
+  _sampling_method_read =
+      std::string(_sampling_method_buf, _sampling_method_strlen);
+  if (_sampling_method_read != "") {
+    _sampling_method = _sampling_method_read;
+  }
+
+  int _topk_read;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_INT,
+                           &_topk_read);
+  if (_topk_read != 0) {
+    _topk = _topk_read;
+  }
+
+  float _topp_read;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/topp", H5T_NATIVE_FLOAT,
+                           &_topp_read);
+  if (_topp_read != 0.0) {
+    _topp = _topp_read;
+  }
+
+  int _eos_id_read;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/eos_id", H5T_NATIVE_INT,
+                           &_eos_id_read);
+  if (_eos_id_read != 0) {
+    _eos_id = _eos_id_read;
+  }
+}
+
+/**
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
