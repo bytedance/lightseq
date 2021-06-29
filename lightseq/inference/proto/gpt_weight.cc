@@ -327,6 +327,127 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 }
 
 /**
+Load the weights of encoder into GPU memory.
+*/
+template <OperationType OpType_>
+void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+  size_t value_size =
+      (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
+           _hidden_size * _hidden_size + _hidden_size * 3 +
+           _hidden_size * _inner_size;
+       + _inner_size + _hidden_size * _inner_size + _hidden_size) *
+      _n_enc_layer;
+  std::vector<int> offset;
+  std::vector<float> value(value_size);
+  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+            << " MB of encoder weight." << std::endl;
+
+  int idx = 0;
+  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
+    std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_scale_size !");
+    idx += _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_norm_bias_size !");
+    idx += _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size * 3; },
+        "Wrong multihead_project_kernel_qkv_size !");
+    idx += _hidden_size * _hidden_size * 3;
+
+    offset.push_back(idx);
+
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * 3; },
+        "Wrong multihead_project_bias_qkv_size !");
+    idx += _hidden_size * 3;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size * _hidden_size; },
+        "Wrong multihead_project_kernel_output_size !");
+    idx += _hidden_size * _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/multihead_project_bias_output",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) { return size != _hidden_size; },
+        "Wrong multihead_project_bias_output_size !");
+    idx += _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_scale_size !");
+    idx += _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_norm_bias_size !");
+    idx += _hidden_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_first_kernel_size !");
+    idx += _hidden_size * _inner_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _inner_size; },
+        "Wrong ffn_first_bias_size !");
+    idx += _inner_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_second_kernel_size !");
+    idx += _hidden_size * _inner_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
+        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        "Wrong ffn_second_bias_size !");
+    idx += _hidden_size;
+  }  // for
+
+  std::vector<_DataType> raw_value;
+  for (float e : value) raw_value.push_back(float2required(e));
+  _d_enc_wei = raw_value;
+
+  for (int e : offset)
+    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  std::cout << "finish initializing enc_wei from host to device" << std::endl;
+}
+
+/**
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
