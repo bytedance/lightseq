@@ -3,6 +3,7 @@
 # This builder is adapted from Microsoft DeepSpeed
 
 import torch
+import pathlib
 from .builder import CUDAOpBuilder
 
 
@@ -29,7 +30,11 @@ class KernelBuilder(CUDAOpBuilder):
         ]
 
     def include_paths(self):
-        return ["csrc/kernels/includes", "csrc/ops/includes"]
+        return [
+            "csrc/kernels/includes",
+            "csrc/ops/includes",
+            str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),
+        ]
 
     def nvcc_args(self):
         args = [
