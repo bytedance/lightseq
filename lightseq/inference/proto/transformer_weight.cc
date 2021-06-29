@@ -1005,10 +1005,18 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
       return "Unable to read HDF5 file from " + weight_path;
     }
     hdf5_get_model_config(hdf5_file, only_decoder);
+    if (_hidden_size % 4 != 0) {
+      return "hidden_size should be a multiple of 4 to avoid misaligned "
+             "address "
+             "in CUDA";
+    }
+    // hdf5_parse_* would throw std::runtime_error on error
     hdf5_parse_emb_wei(hdf5_file, "src");
     hdf5_parse_emb_wei(hdf5_file, "trg");
+    hdf5_parse_enc_wei(hdf5_file);
+    // hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
-
+    std::cout << "Finish loading all weight from host to device" << std::endl;
     return "Debugging abort";
   } else {
     return "Unsupported weight extention for [" + weight_path +
