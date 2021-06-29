@@ -205,7 +205,7 @@ std::string GptWeight<OpType_>::proto_parse_enc_wei(const Gpt &gpt) {
 Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
+void GptWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
 
   _inner_size =
@@ -241,7 +241,7 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
       hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
       _sampling_method_buf, [](int size) { return size > 128; },
       "Expect model_conf/sampling_method to have less than 128 characters.");
-  _sampling_method_read =
+  std::string _sampling_method_read =
       std::string(_sampling_method_buf, _sampling_method_strlen);
   if (_sampling_method_read != "") {
     _sampling_method = _sampling_method_read;
@@ -273,8 +273,7 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 Load the weights of embedding layer into GPU memory.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                    std::string source) {
+void GptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
   size_t value_size = _src_vocab_size * _hidden_size +
                       _max_step * _hidden_size + _hidden_size * 2;
@@ -330,12 +329,12 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+void GptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
-           _hidden_size * _hidden_size + _hidden_size * 3 +
-           _hidden_size * _inner_size;
-       + _inner_size + _hidden_size * _inner_size + _hidden_size) *
+       _hidden_size * _hidden_size + _hidden_size * 3 +
+       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
+       _hidden_size) *
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
@@ -451,7 +450,7 @@ void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
-std::string GptWeight<OpType_>::initializing(std::string proto_path) {
+std::string GptWeight<OpType_>::initializing(std::string weight_path) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
@@ -460,9 +459,9 @@ std::string GptWeight<OpType_>::initializing(std::string proto_path) {
     // compatible with the version of the headers we compiled against.
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
+    std::fstream raw_input(weight_path, std::ios::in | std::ios::binary);
     if (!gpt.ParseFromIstream(&raw_input)) {
-      return "Parse weights from [" + proto_path + "] failed.";
+      return "Parse weights from [" + weight_path + "] failed.";
     }
 
     proto_get_model_config(gpt);

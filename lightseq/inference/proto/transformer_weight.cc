@@ -652,7 +652,8 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
           get_hdf5_dataset_size(hdf5_file, dataset_prefix + "trg_vocab_mask");
       if (lang_emb_size / _hidden_size !=
           trg_vocab_mask_size / _trg_vocab_size) {
-        return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
+        throw std::runtime_error(
+            "Wrong trg_lang_emb_size or trg_vocab_mask_size !");
       }
 
       _d_trg_lang_emb = raw_value;

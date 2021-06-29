@@ -48,7 +48,7 @@ class GptWeight {
   thrust::device_vector<_DataType> _d_enc_wei;
 
  public:
-  std::string initializing(std::string proto_path);
+  std::string initializing(std::string weight_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
     // {token_emb, pos_emb, norm_scale, norm_bias}
