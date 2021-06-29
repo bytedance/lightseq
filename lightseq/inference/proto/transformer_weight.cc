@@ -697,98 +697,98 @@ Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
 std::string TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
-  // std::vector<int> offset;
-  // std::vector<float> value;
-  // int idx = 0;
+  std::vector<int> offset;
+  std::vector<float> value;
+  int idx = 0;
 
-  // for (auto enc_layer : transformer.encoder_stack()) {
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_norm_scale_size() != _hidden_size)
-  //     return "Wrong multihead_norm_scale_size !";
-  //   for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
-  //   idx += _hidden_size;
+  for (auto enc_layer : transformer.encoder_stack()) {
+    offset.push_back(idx);
+    if (enc_layer.multihead_norm_scale_size() != _hidden_size)
+      return "Wrong multihead_norm_scale_size !";
+    for (float ele : enc_layer.multihead_norm_scale()) value.push_back(ele);
+    idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_norm_bias_size() != _hidden_size)
-  //     return "Wrong multihead_norm_bias_size !";
-  //   for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
-  //   idx += _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.multihead_norm_bias_size() != _hidden_size)
+      return "Wrong multihead_norm_bias_size !";
+    for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
+    idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_project_kernel_qkv_size() !=
-  //       _hidden_size * _hidden_size * 3)
-  //     return "Wrong multihead_project_kernel_qkv_size !";
-  //   for (float ele : enc_layer.multihead_project_kernel_qkv())
-  //     value.push_back(ele);
-  //   idx += _hidden_size * _hidden_size * 3;
+    offset.push_back(idx);
+    if (enc_layer.multihead_project_kernel_qkv_size() !=
+        _hidden_size * _hidden_size * 3)
+      return "Wrong multihead_project_kernel_qkv_size !";
+    for (float ele : enc_layer.multihead_project_kernel_qkv())
+      value.push_back(ele);
+    idx += _hidden_size * _hidden_size * 3;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_project_bias_qkv_size() != _hidden_size * 3)
-  //     return "Wrong multihead_project_bias_qkv_size !";
-  //   for (float ele : enc_layer.multihead_project_bias_qkv())
-  //     value.push_back(ele);
-  //   idx += _hidden_size * 3;
+    offset.push_back(idx);
+    if (enc_layer.multihead_project_bias_qkv_size() != _hidden_size * 3)
+      return "Wrong multihead_project_bias_qkv_size !";
+    for (float ele : enc_layer.multihead_project_bias_qkv())
+      value.push_back(ele);
+    idx += _hidden_size * 3;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_project_kernel_output_size() !=
-  //       _hidden_size * _hidden_size)
-  //     return "Wrong multihead_project_kernel_output_size !";
-  //   for (float ele : enc_layer.multihead_project_kernel_output())
-  //     value.push_back(ele);
-  //   idx += _hidden_size * _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.multihead_project_kernel_output_size() !=
+        _hidden_size * _hidden_size)
+      return "Wrong multihead_project_kernel_output_size !";
+    for (float ele : enc_layer.multihead_project_kernel_output())
+      value.push_back(ele);
+    idx += _hidden_size * _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.multihead_project_bias_output_size() != _hidden_size)
-  //     return "Wrong multihead_project_bias_output_size !";
-  //   for (float ele : enc_layer.multihead_project_bias_output())
-  //     value.push_back(ele);
-  //   idx += _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.multihead_project_bias_output_size() != _hidden_size)
+      return "Wrong multihead_project_bias_output_size !";
+    for (float ele : enc_layer.multihead_project_bias_output())
+      value.push_back(ele);
+    idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_norm_scale_size() != _hidden_size)
-  //     return "Wrong ffn_norm_scale_size !";
-  //   for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
-  //   idx += _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_norm_scale_size() != _hidden_size)
+      return "Wrong ffn_norm_scale_size !";
+    for (float ele : enc_layer.ffn_norm_scale()) value.push_back(ele);
+    idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_norm_bias_size() != _hidden_size)
-  //     return "Wrong ffn_norm_bias_size !";
-  //   for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
-  //   idx += _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_norm_bias_size() != _hidden_size)
+      return "Wrong ffn_norm_bias_size !";
+    for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
+    idx += _hidden_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
-  //     return "Wrong ffn_first_kernel_size !";
-  //   for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
-  //   idx += _hidden_size * _inner_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+      return "Wrong ffn_first_kernel_size !";
+    for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
+    idx += _hidden_size * _inner_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_first_bias_size() != _inner_size)
-  //     return "Wrong ffn_first_bias_size !";
-  //   for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
-  //   idx += _inner_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_first_bias_size() != _inner_size)
+      return "Wrong ffn_first_bias_size !";
+    for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
+    idx += _inner_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
-  //     return "Wrong ffn_second_kernel_size !";
-  //   for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
-  //   idx += _hidden_size * _inner_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+      return "Wrong ffn_second_kernel_size !";
+    for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
+    idx += _hidden_size * _inner_size;
 
-  //   offset.push_back(idx);
-  //   if (enc_layer.ffn_second_bias_size() != _hidden_size)
-  //     return "Wrong ffn_second_bias_size !";
-  //   for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
-  //   idx += _hidden_size;
+    offset.push_back(idx);
+    if (enc_layer.ffn_second_bias_size() != _hidden_size)
+      return "Wrong ffn_second_bias_size !";
+    for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
+    idx += _hidden_size;
 
-  // }  // for
+  }  // for
 
-  // std::vector<_DataType> raw_value;
-  // for (float e : value) raw_value.push_back(float2required(e));
-  // _d_enc_wei = raw_value;
+  std::vector<_DataType> raw_value;
+  for (float e : value) raw_value.push_back(float2required(e));
+  _d_enc_wei = raw_value;
 
-  // for (int e : offset)
-  //   _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
-  // std::cout << "Finish loading enc_wei from host to device" << std::endl;
+  for (int e : offset)
+    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  std::cout << "Finish loading enc_wei from host to device" << std::endl;
   return "";
 }
 
