@@ -36,6 +36,7 @@ $ make
 $ make install
 $ cd ..
 ```
+If cmake fails with "Could NOT find HDF5", try update `PATH` via `export PATH="$PATH:/usr/local/hdf5"`.
 
 ## Build
 
