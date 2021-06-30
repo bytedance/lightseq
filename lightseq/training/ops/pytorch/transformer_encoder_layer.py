@@ -240,9 +240,7 @@ class LSTransformerEncoderLayer(nn.Module):
         self.__assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
         if dim % 256 != 0:
-            raise ValueError(
-                f"Hidden dim {dim} is not an integer multiple of 256."
-            )
+            raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
         if hidden_states.dtype != self.para.dtype:
             raise TypeError(
                 f"Inputs type {hidden_states.dtype} is not equal to parameters type {self.para.dtype}."
