@@ -362,9 +362,7 @@ class LSTransformerDecoderLayer(nn.Module):
             self.config.training = False
         bs, sl, dim = decoder_states.size()
         if dim % 256 != 0:
-            raise ValueError(
-                f"Hidden dim {dim} is not an integer multiple of 256."
-            )
+            raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
         if decoder_states.dtype != self.para.dtype:
             raise TypeError(
                 f"Inputs type {decoder_states.dtype} is not equal to parameters type {self.para.dtype}."
