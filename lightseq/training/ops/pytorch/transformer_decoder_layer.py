@@ -360,6 +360,10 @@ class LSTransformerDecoderLayer(nn.Module):
             cache["dec_self_k"] = new_k
             cache["dec_self_v"] = new_v
             self.config.training = False
+        if decoder_states.dtype != self.para.dtype:
+            raise TypeError(
+                f"Inputs type {decoder_states.dtype} is not equal to parameters type {self.para.dtype}."
+            )
         bs, sl = decoder_states.size()[:2]
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(

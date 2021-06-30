@@ -238,6 +238,10 @@ class LSTransformerEncoderLayer(nn.Module):
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
         self.__assign_layer_weight_grad()
+        if hidden_states.dtype != self.para.dtype:
+            raise TypeError(
+                f"Inputs type {hidden_states.dtype} is not equal to parameters type {self.para.dtype}."
+            )
         bs, sl = hidden_states.size()[:2]
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
