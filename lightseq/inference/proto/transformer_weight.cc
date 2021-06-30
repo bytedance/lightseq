@@ -50,6 +50,11 @@ void TransformerWeight<OpType_>::get_model_config(
   }
   _n_dec_layer = transformer.decoder_stack_size();
   _head_num = transformer.model_conf().head_num();
+  if (_hidden_size % _head_num != 0) {
+    throw std::runtime_error("Wrong head_num: hidden_size " +
+                             std::to_string(_hidden_size) + " % head_num " +
+                             std::to_string(_head_num) + " != 0.");
+  }
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
   _weight_per_dec_layer = 18;

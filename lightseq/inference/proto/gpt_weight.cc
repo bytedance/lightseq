@@ -41,6 +41,11 @@ void GptWeight<OpType_>::get_model_config(const Gpt &gpt) {
   _src_vocab_size = gpt.src_embedding().token_embedding_size() / _hidden_size;
   _n_enc_layer = gpt.encoder_stack_size();
   _head_num = gpt.model_conf().head_num();
+  if (_hidden_size % _head_num != 0) {
+    throw std::runtime_error("Wrong head_num: hidden_size " +
+                             std::to_string(_hidden_size) + " % head_num " +
+                             std::to_string(_head_num) + " != 0.");
+  }
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
   _padding_id = gpt.model_conf().src_padding_id();
