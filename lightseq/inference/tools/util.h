@@ -170,11 +170,13 @@ Helper function of HDF5.
 Read the data of specified type `output_type` into `output_buf`.
 return: the size of output data.
 */
-int read_hdf5_dataset_data(hid_t hdf5_file, std::string dataset_name,
-                           hid_t output_type, void* output_buf,
-                           std::function<bool(int)> size_predicate =
-                               [](int x) -> bool { return (x < 0); },
-                           std::string extra_msg = "");
+int read_hdf5_dataset_data(
+    hid_t hdf5_file, std::string dataset_name, hid_t output_type,
+    void* output_buf,
+    std::function<bool(int)> size_predicate = [](int x) -> bool {
+      return (x < 0);
+    },
+    std::string extra_msg = "");
 
 /*
 Helper function of HDF5.
