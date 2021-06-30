@@ -398,6 +398,11 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
 
 #ifdef DEBUG_RESULT
   if (_layer_id == 0) {
+    std::cout << "hidden_size: " << _tw._hidden_size << std::endl;
+    std::cout << "_batch_token_num: " << _batch_token_num << std::endl;
+    std::cout << "_dim_per_head: " << _tw._dim_per_head << std::endl;
+    std::cout << "_head_num: " << _tw._head_num << std::endl;
+
     print_vec(_p_d_enc_wei[_weight_offset + 2], "qkv_weight_mat",
               _tw._hidden_size * _tw._hidden_size * 3 - 5,
               _tw._hidden_size * _tw._hidden_size * 3);
@@ -406,7 +411,6 @@ void GptEncoder<OpType_>::self_attention(bool cache) {
               _batch_token_num * _tw._hidden_size * 3);
   }
 #endif
-
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,

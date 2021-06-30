@@ -3,6 +3,7 @@
 # This file is adapted from Microsoft DeepSpeed
 
 import torch
+import pathlib
 from .builder import CUDAOpBuilder
 
 
@@ -35,7 +36,11 @@ class TransformerBuilder(CUDAOpBuilder):
         ]
 
     def include_paths(self):
-        return ["csrc/kernels/includes", "csrc/ops/includes"]
+        return [
+            "csrc/kernels/includes",
+            "csrc/ops/includes",
+            str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),
+        ]
 
     def nvcc_args(self):
         args = [
@@ -45,6 +50,7 @@ class TransformerBuilder(CUDAOpBuilder):
             "-U__CUDA_NO_HALF_OPERATORS__",
             "-U__CUDA_NO_HALF_CONVERSIONS__",
             "-U__CUDA_NO_HALF2_OPERATORS__",
+            "-DTHRUST_IGNORE_CUB_VERSION_CHECK",
         ]
 
         return args + self.compute_capability_args()
