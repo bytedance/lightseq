@@ -66,8 +66,7 @@ def main():
     print("creating lightseq model...")
     ls_model = lsi.Transformer("lightseq_bart_base.hdf5", 128)
     print("creating huggingface model...")
-    hf_model = BartForConditionalGeneration.from_pretrained(
-        "facebook/bart-base")
+    hf_model = BartForConditionalGeneration.from_pretrained("facebook/bart-base")
     hf_model.to("cuda:0")
 
     sentences = [

@@ -57,15 +57,14 @@ def extract_gpt_weights(
     pad_id=50257,
 ):
     # load var names
-    encoder_state_dict = GPT2LMHeadModel.from_pretrained(
-        model_dir).state_dict()
+    encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
     enc_var_name_list = list(encoder_state_dict.keys())
 
     # initialize output file
     output_file += ".hdf5"
     print("Saving model to hdf5...")
     print("Writing to {0}".format(output_file))
-    hdf5_file = h5py.File(output_file, 'w')
+    hdf5_file = h5py.File(output_file, "w")
 
     # fill each encoder layer's params
     enc_tensor_names = {}
@@ -83,7 +82,7 @@ def extract_gpt_weights(
             encoder_state_dict,
             hdf5_file,
             f"encoder_stack/{layer_id}/",
-            enc_layer_mapping_dict
+            enc_layer_mapping_dict,
         )
 
     # fill src_embedding
@@ -92,29 +91,28 @@ def extract_gpt_weights(
         encoder_state_dict,
         hdf5_file,
         "src_embedding/",
-        src_emb_mapping_dict
+        src_emb_mapping_dict,
     )
 
     # save number of layers metadata
-    hdf5_file.create_dataset("model_conf/n_encoder_stack",
-                             data=len(enc_tensor_names), dtype='i4')
+    hdf5_file.create_dataset(
+        "model_conf/n_encoder_stack", data=len(enc_tensor_names), dtype="i4"
+    )
     # fill in model_conf
-    hdf5_file.create_dataset("model_conf/head_num",
-                             data=head_num, dtype='i4')
-    hdf5_file.create_dataset("model_conf/src_padding_id",
-                             data=pad_id, dtype='i4')
-    hdf5_file.create_dataset("model_conf/sampling_method",
-                             data=np.array([ord(c) for c in generation_method]).astype(np.int8), dtype='i1')
-    hdf5_file.create_dataset("model_conf/topp",
-                             data=topp, dtype='f4')
-    hdf5_file.create_dataset("model_conf/topk",
-                             data=topk, dtype='i4')
-    hdf5_file.create_dataset("model_conf/eos_id",
-                             data=eos_id, dtype='i4')
+    hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
+    hdf5_file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/sampling_method",
+        data=np.array([ord(c) for c in generation_method]).astype(np.int8),
+        dtype="i1",
+    )
+    hdf5_file.create_dataset("model_conf/topp", data=topp, dtype="f4")
+    hdf5_file.create_dataset("model_conf/topk", data=topk, dtype="i4")
+    hdf5_file.create_dataset("model_conf/eos_id", data=eos_id, dtype="i4")
 
     hdf5_file.close()
     # read-in again to double check
-    hdf5_file = h5py.File(output_file, 'r')
+    hdf5_file = h5py.File(output_file, "r")
 
     def _print_pair(key, value):
         if key == "sampling_method":
@@ -122,6 +120,7 @@ def extract_gpt_weights(
         else:
             value = value[()]
         print(f"{key}: {value}")
+
     list(map(lambda x: _print_pair(*x), hdf5_file["model_conf"].items()))
 
 

@@ -51,10 +51,8 @@ def hf_generate(model, tokenizer, inputs):
 
 
 def warmup(ls_tokenizer, hf_tokenizer, ls_model, hf_model, sentences):
-    ls_inputs = ls_tokenizer(sentences, return_tensors="pt", padding=True)[
-        "input_ids"]
-    hf_inputs = hf_tokenizer(sentences, return_tensors="pt", padding=True)[
-        "input_ids"]
+    ls_inputs = ls_tokenizer(sentences, return_tensors="pt", padding=True)["input_ids"]
+    hf_inputs = hf_tokenizer(sentences, return_tensors="pt", padding=True)["input_ids"]
 
     ls_generate(ls_model, ls_tokenizer, ls_inputs)
     hf_generate(hf_model, hf_tokenizer, hf_inputs)
@@ -78,8 +76,7 @@ def main():
     print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
-    ls_model = lsi.Gpt("lightseq_gpt2_base.hdf5",
-                       max_batch_size=16, max_step=50)
+    ls_model = lsi.Gpt("lightseq_gpt2_base.hdf5", max_batch_size=16, max_step=50)
 
     print("creating huggingface model...")
     hf_model = GPT2LMHeadModel.from_pretrained("gpt2")

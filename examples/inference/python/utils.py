@@ -23,9 +23,7 @@ def _check_rule(tensor_name, rule):
 
 
 def _apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
-    expression = [
-        ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
-    ]
+    expression = [ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")]
 
     ckpt_rule = [
         ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
@@ -69,28 +67,27 @@ def _apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
 
 def fill_proto_layer(tensor_names, state_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
-        target_tensor = _apply_rule(
-            proto_name, ckpt_rule, tensor_names, state_dict)
+        target_tensor = _apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
 
-def fill_hdf5_layer(tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict):
+def fill_hdf5_layer(
+    tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict
+):
     for proto_name, ckpt_rule in mapping_dict.items():
-        target_tensor = _apply_rule(
-            proto_name, ckpt_rule, tensor_names, state_dict)
+        target_tensor = _apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         hdf5_file.create_dataset(
-            hdf5_dataset_prefix + proto_name, data=target_tensor.flatten().tolist())
+            hdf5_dataset_prefix + proto_name, data=target_tensor.flatten().tolist()
+        )
 
 
 def _get_encode_output_mapping_dict(dec_layer_num):
     encode_output_kernel_pattern = [
-        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(
-            ele)
+        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(ele)
         for ele in range(dec_layer_num)
     ]
     encode_output_bias_pattern = [
-        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(
-            ele)
+        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(ele)
         for ele in range(dec_layer_num)
     ]
 
