@@ -360,7 +360,13 @@ class LSTransformerDecoderLayer(nn.Module):
             cache["dec_self_k"] = new_k
             cache["dec_self_v"] = new_v
             self.config.training = False
-        bs, sl = decoder_states.size()[:2]
+        bs, sl, dim = decoder_states.size()
+        if dim % 256 != 0:
+            raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
+        if decoder_states.dtype != self.para.dtype:
+            raise TypeError(
+                f"Inputs type {decoder_states.dtype} is not equal to parameters type {self.para.dtype}."
+            )
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
