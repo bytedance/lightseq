@@ -55,5 +55,5 @@ $ pip wheel $PROJECT_DIR --no-deps -w $PROJECT_DIR/output/
 
 To install python lightseq in development models
 ```shell
-$ ENABLE_FP32=1 ENABLE_DEBUG=1 pip3 install -e $PROJECT_DIR
+$ PATH=/usr/local/hdf5/:$PATH CUDACXX=/usr/local/cuda/bin/nvcc ENABLE_FP32=1 ENABLE_DEBUG=1 pip3 install -e $PROJECT_DIR
 ```
