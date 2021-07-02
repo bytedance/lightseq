@@ -19,7 +19,6 @@ _all_layer_grads = dict()
 class LSTransformerEncoderFunc(Function):
     @staticmethod
     @custom_fwd(cast_inputs=torch.half)
-    @amp.float_function
     def forward(
         ctx,
         input,
@@ -33,6 +32,11 @@ class LSTransformerEncoderFunc(Function):
             if config.fp16
             else cuda_module.transformer_encoder_layer_fw_fp32
         )
+        if config.fp16:
+            input = input.to(torch.half)
+            input_mask = input_mask.to(torch.half)
+        print("input dtype", input.dtype)
+        print("input_mask dtype", input_mask.dtype)
 
         (output,) = forward_func(
             config.layer_id, input, input_mask, config.training, config.pre_layer_norm
@@ -45,7 +49,6 @@ class LSTransformerEncoderFunc(Function):
 
     @staticmethod
     @custom_bwd
-    @amp.float_function
     def backward(ctx, grad_output):
         cuda_module = transformer_cuda_module
         backward_func = (
@@ -57,9 +60,15 @@ class LSTransformerEncoderFunc(Function):
         assert ctx.config.training
 
         output, input, input_mask = ctx.saved_tensors
-        # print("grad_output dtype", grad_output.dtype)
-        # print("output dtype", output.dtype)
-        # print("input dtype", input.dtype)
+        if ctx.config.fp16:
+            grad_output = grad_output.to(torch.half)
+            output = output.to(torch.half)
+            input = input.to(torch.half)
+            input_mask = input_mask.to(torch.half)
+        print("grad_output dtype", grad_output.dtype)
+        print("output dtype", output.dtype)
+        print("input dtype", input.dtype)
+        print("input_mask dtype", input_mask.dtype)
         (grad_input,) = backward_func(
             ctx.config.layer_id, grad_output, output, input, input_mask
         )
@@ -242,13 +251,15 @@ class LSTransformerEncoderLayer(nn.Module):
             return
         cuda_module = transformer_cuda_module
         if self.config.fp16:
-            param = self.para.clone()
-            param.to(torch.half)
+            param = self.para.to(torch.half)
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             param = self.para
             func = cuda_module.assign_layer_weight_grad_fp32
         grad = torch.empty_like(param)
+        print("grad dtype", grad.dtype)
+        print("param dtype", param.dtype)
+        print("self.para dtype", self.para.dtype)
         func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
