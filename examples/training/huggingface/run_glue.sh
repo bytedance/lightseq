@@ -14,19 +14,27 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-if [ -d "/tmp/test-ner/" ]; then
-  rm -rf /tmp/test-ner/
-fi
+export TASK_NAME=mrpc
 
-python3 -m torch.distributed.launch \
-  --nproc_per_node=1 \
-  $THIS_DIR/run_ner.py \
-  --model_name_or_path bert-large-uncased \
-  --per_device_train_batch_size 32 \
-  --dataset_name conll2003 \
-  --output_dir /tmp/test-ner \
+# v100 fp32 40 samples/sec, 0.87 acc
+# v100 fp32 lightseq 47 samples/sec, 0.68 acc
+# v100 torch amp 84 samples/sec, 0.86 acc
+# v100 torch amp lightseq 194 samples/sec, 0.51 acc
+# v100 apex amp 84 samples/sec, 0.86 acc
+
+
+python3 $THIS_DIR/run_glue.py \
+  --model_name_or_path bert-large-cased \
+  --task_name $TASK_NAME \
   --do_train \
   --do_eval \
-  --num_train_epochs 1 \
-  --with_lightseq false \
+  --max_seq_length 128 \
+  --per_device_train_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --output_dir /tmp/$TASK_NAME/ \
+  --overwrite_output_dir \
+  --with_lightseq true \
   --fp16 \
+  --fp16_full_eval \
+  --fp16_backend apex \

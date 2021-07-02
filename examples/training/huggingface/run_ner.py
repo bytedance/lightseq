@@ -93,6 +93,12 @@ class ModelArguments:
             "with private models)."
         },
     )
+    with_lightseq: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to use lightseq TransformerEncoder"
+        },
+    )
 
 
 @dataclass
@@ -364,7 +370,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    inject_ls_enc_layer(model, training_args, config)
+    if model_args.with_lightseq:
+        inject_ls_enc_layer(model, training_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):

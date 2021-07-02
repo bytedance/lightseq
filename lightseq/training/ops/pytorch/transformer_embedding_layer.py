@@ -4,8 +4,13 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.autograd import Function
+from torch.cuda.amp import custom_fwd, custom_bwd
+
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
+
+
+
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -13,6 +18,7 @@ _all_layer_grads = dict()
 
 class LSTransformerEmbeddingFunc(Function):
     @staticmethod
+    @custom_fwd(cast_inputs=torch.half)
     def forward(ctx, config, input, embeddings, step):
         cuda_module = transformer_cuda_module
         forward_func = (
@@ -29,6 +35,7 @@ class LSTransformerEmbeddingFunc(Function):
         return output
 
     @staticmethod
+    @custom_bwd
     def backward(ctx, grad_output):
         cuda_module = transformer_cuda_module
         backward_func = (
@@ -95,6 +102,14 @@ class LSTransformerEmbeddingLayer(nn.Module):
         if transformer_cuda_module is None:
             transformer_cuda_module = TransformerBuilder().load()
 
+        try:
+            from apex import amp
+            amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp32')
+            amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp16')
+        except:
+            pass
+
+
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
         create_layer_func = (
@@ -149,13 +164,15 @@ class LSTransformerEmbeddingLayer(nn.Module):
     def __assign_layer_weight_grad(self):
         if self.config.layer_id in _all_layer_grads:
             return
-        grad = torch.empty_like(self.embeddings.data)
         cuda_module = transformer_cuda_module
         if self.config.fp16:
+            param = self.embeddings.to(torch.half, copy=True)
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
+            param = self.embeddings
             func = cuda_module.assign_layer_weight_grad_fp32
-        func(self.embeddings, grad, "TransformerEmbeddingLayer", self.config.layer_id)
+        grad = torch.empty_like(param)
+        func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
     def forward(self, input, step=0, **kwargs):
@@ -177,5 +194,7 @@ class LSTransformerEmbeddingLayer(nn.Module):
             raise ValueError(
                 f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
             )
+        if self.config.fp16:
+            input = input.to(torch.half, copy=True)
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
         return x

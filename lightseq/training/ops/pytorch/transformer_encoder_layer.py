@@ -4,16 +4,22 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.autograd import Function
+from torch.cuda.amp import custom_fwd, custom_bwd
+
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import copy_para
+from apex import amp
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
 
 
+
 class LSTransformerEncoderFunc(Function):
     @staticmethod
+    @custom_fwd(cast_inputs=torch.half)
+    @amp.float_function
     def forward(
         ctx,
         input,
@@ -38,6 +44,8 @@ class LSTransformerEncoderFunc(Function):
         return output
 
     @staticmethod
+    @custom_bwd
+    @amp.float_function
     def backward(ctx, grad_output):
         cuda_module = transformer_cuda_module
         backward_func = (
@@ -49,6 +57,9 @@ class LSTransformerEncoderFunc(Function):
         assert ctx.config.training
 
         output, input, input_mask = ctx.saved_tensors
+        # print("grad_output dtype", grad_output.dtype)
+        # print("output dtype", output.dtype)
+        # print("input dtype", input.dtype)
         (grad_input,) = backward_func(
             ctx.config.layer_id, grad_output, output, input, input_mask
         )
@@ -57,6 +68,7 @@ class LSTransformerEncoderFunc(Function):
 
         # This appears to be an effective way to release context memory
         ctx.config = None
+        print(grad_input.isnan().sum() / grad_input.numel())
 
         return (grad_input, None, grad, None)
 
@@ -93,6 +105,13 @@ class LSTransformerEncoderLayer(nn.Module):
         global transformer_cuda_module
         if transformer_cuda_module is None:
             transformer_cuda_module = TransformerBuilder().load()
+
+        # try:
+        #     from apex import amp
+        #     amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp16')
+        #     amp.register_half_function(transformer_cuda_module, 'transformer_encoder_layer_bw_fp16')
+        # except:
+        #     pass
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -221,13 +240,16 @@ class LSTransformerEncoderLayer(nn.Module):
     def __assign_layer_weight_grad(self):
         if self.config.layer_id in _all_layer_grads:
             return
-        grad = torch.empty_like(self.para.data)
         cuda_module = transformer_cuda_module
         if self.config.fp16:
+            param = self.para.clone()
+            param.to(torch.half)
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
+            param = self.para
             func = cuda_module.assign_layer_weight_grad_fp32
-        func(self.para, grad, "TransformerEncoderLayer", self.config.layer_id)
+        grad = torch.empty_like(param)
+        func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
     def forward(self, hidden_states, encoder_padding_mask, **kwargs):
@@ -241,10 +263,10 @@ class LSTransformerEncoderLayer(nn.Module):
         bs, sl, dim = hidden_states.size()
         if dim % 256 != 0:
             raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
-        if hidden_states.dtype != self.para.dtype:
-            raise TypeError(
-                f"Inputs type {hidden_states.dtype} is not equal to parameters type {self.para.dtype}."
-            )
+
+        # if self.config.fp16:
+        #     hidden_states = hidden_states.clone().half()
+
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
@@ -259,4 +281,7 @@ class LSTransformerEncoderLayer(nn.Module):
             self.para,
             self.config,
         )
+        # if self.para.dtype == torch.float32:
+        #     output = output.clone().float()
+
         return output
