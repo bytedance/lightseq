@@ -496,11 +496,11 @@ def extract_transformer_weights(
 
 if __name__ == "__main__":
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_bart_base"
+    output_lightseq_model_name = "lightseq_bart_base"  # you can rename it to "lightseq_bart_large" for large model
     input_huggingface_bart_model = (
         "facebook/bart-base"  # Example: you can try "facebook/bart-large" as well
     )
-    head_number = 12  # for bart-large, we have 16
+    head_number = 12  # change this to 16 for "bart-large" model
     # in order to get score, we should use `beam_search` inference method
     generation_method = "beam_search"
     beam_size = 4
