@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.autograd import Function
-from torch.cuda.amp import custom_fwd, custom_bwd
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
@@ -16,7 +15,6 @@ _all_layer_grads = dict()
 
 class LSTransformerEncoderFunc(Function):
     @staticmethod
-    @custom_fwd(cast_inputs=torch.half)
     def forward(
         ctx,
         input,
@@ -44,7 +42,6 @@ class LSTransformerEncoderFunc(Function):
         return output
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, grad_output):
         cuda_module = transformer_cuda_module
         backward_func = (
