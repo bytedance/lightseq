@@ -1,3 +1,4 @@
+# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +20,7 @@ export TASK_NAME=mrpc
 # v100 fp32 40 samples/sec, 0.87 acc
 # v100 fp32 lightseq 47 samples/sec, 0.68 acc
 # v100 torch amp 84 samples/sec, 0.86 acc
-# v100 torch amp lightseq 194 samples/sec, 0.51 acc
+# v100 torch amp lightseq 163 samples/sec, 0.68 acc
 # v100 apex amp 84 samples/sec, 0.86 acc
 
 

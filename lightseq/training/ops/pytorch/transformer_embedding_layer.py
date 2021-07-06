@@ -10,8 +10,6 @@ from torch.cuda.amp import custom_fwd, custom_bwd
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 
 
-
-
 transformer_cuda_module = None
 _all_layer_grads = dict()
 
@@ -101,14 +99,6 @@ class LSTransformerEmbeddingLayer(nn.Module):
         global transformer_cuda_module
         if transformer_cuda_module is None:
             transformer_cuda_module = TransformerBuilder().load()
-
-        try:
-            from apex import amp
-            amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp32')
-            amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp16')
-        except:
-            pass
-
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module

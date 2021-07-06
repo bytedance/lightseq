@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
+# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -95,9 +96,7 @@ class ModelArguments:
     )
     with_lightseq: bool = field(
         default=True,
-        metadata={
-            "help": "Whether to use lightseq TransformerEncoder"
-        },
+        metadata={"help": "Whether to use lightseq TransformerEncoder"},
     )
 
 

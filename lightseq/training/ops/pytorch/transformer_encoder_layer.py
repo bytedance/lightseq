@@ -9,11 +9,9 @@ from torch.cuda.amp import custom_fwd, custom_bwd
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import copy_para
-from apex import amp
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
-
 
 
 class LSTransformerEncoderFunc(Function):
@@ -35,8 +33,6 @@ class LSTransformerEncoderFunc(Function):
         if config.fp16:
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
-        print("input dtype", input.dtype)
-        print("input_mask dtype", input_mask.dtype)
 
         (output,) = forward_func(
             config.layer_id, input, input_mask, config.training, config.pre_layer_norm
@@ -65,10 +61,6 @@ class LSTransformerEncoderFunc(Function):
             output = output.to(torch.half)
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
-        print("grad_output dtype", grad_output.dtype)
-        print("output dtype", output.dtype)
-        print("input dtype", input.dtype)
-        print("input_mask dtype", input_mask.dtype)
         (grad_input,) = backward_func(
             ctx.config.layer_id, grad_output, output, input, input_mask
         )
@@ -77,7 +69,6 @@ class LSTransformerEncoderFunc(Function):
 
         # This appears to be an effective way to release context memory
         ctx.config = None
-        print(grad_input.isnan().sum() / grad_input.numel())
 
         return (grad_input, None, grad, None)
 
@@ -114,13 +105,6 @@ class LSTransformerEncoderLayer(nn.Module):
         global transformer_cuda_module
         if transformer_cuda_module is None:
             transformer_cuda_module = TransformerBuilder().load()
-
-        # try:
-        #     from apex import amp
-        #     amp.register_half_function(transformer_cuda_module, 'transformer_embedding_layer_fw_fp16')
-        #     amp.register_half_function(transformer_cuda_module, 'transformer_encoder_layer_bw_fp16')
-        # except:
-        #     pass
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -247,19 +231,20 @@ class LSTransformerEncoderLayer(nn.Module):
         nn.init.zeros_(self._get_weights(11))
 
     def __assign_layer_weight_grad(self):
+        if self.config.fp16 and not hasattr(self, "para_16"):
+            self.register_buffer(
+                "para_16", torch.tensor(self.para.data, dtype=torch.half)
+            )
+
+        param = self.para_16 if self.config.fp16 else self.para
         if self.config.layer_id in _all_layer_grads:
             return
         cuda_module = transformer_cuda_module
         if self.config.fp16:
-            param = self.para.to(torch.half)
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
-            param = self.para
             func = cuda_module.assign_layer_weight_grad_fp32
         grad = torch.empty_like(param)
-        print("grad dtype", grad.dtype)
-        print("param dtype", param.dtype)
-        print("self.para dtype", self.para.dtype)
         func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
@@ -270,13 +255,12 @@ class LSTransformerEncoderLayer(nn.Module):
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
+        if self.config.fp16:
+            self.para_16 = self.para.to(torch.half)
         self.__assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
         if dim % 256 != 0:
             raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
-
-        # if self.config.fp16:
-        #     hidden_states = hidden_states.clone().half()
 
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
@@ -292,7 +276,5 @@ class LSTransformerEncoderLayer(nn.Module):
             self.para,
             self.config,
         )
-        # if self.para.dtype == torch.float32:
-        #     output = output.clone().float()
 
         return output
