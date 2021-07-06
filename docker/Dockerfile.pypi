@@ -55,7 +55,8 @@ RUN curl -O -L -C - \
     https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz && \
     tar xf hdf5-1_12_0.tar.gz && \
     rm hdf5-1_12_0.tar.gz && \
-    cd hdf5-hdf5-1_12_0 && ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
+    cd hdf5-hdf5-1_12_0 && \
+    ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
     make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
 
 

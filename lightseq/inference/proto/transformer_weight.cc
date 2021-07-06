@@ -1,6 +1,5 @@
 #include "transformer_weight.h"
 
-#include "hdf5.h"
 #include <fstream>
 /**
 @file
