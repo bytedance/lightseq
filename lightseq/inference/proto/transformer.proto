@@ -115,8 +115,6 @@ message ModelConf {
   // Whether it is a multilingual model.
   // If it is set to true, lang_emb and trg_vocab_mask should be non-empty.
   bool is_multilingual = 15;
-  // If it is set to true, norm_scale and norm_bias in EmbeddingLayer should be empty
-  bool is_fsmt = 16;
 }
 
 message Transformer {
