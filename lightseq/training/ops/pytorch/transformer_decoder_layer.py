@@ -345,15 +345,15 @@ class LSTransformerDecoderLayer(nn.Module):
                 step = 0
             if self.config.layer_id == 0 and step == 0:
                 shape = (
-                    self.nlayer * 2,
+                    self.config.nlayer * 2,
                     encoder_out.shape[0],
                     encoder_out.shape[1] * self.config.hidden_size,
                 )
                 encdec_kv = torch.zeros(shape).type_as(decoder_states).contiguous()
                 cache["encdec_kv"] = encdec_kv
                 cache_list.append(encdec_kv)
-            head_dim = int(self.config.hidden_size / self.config.heads)
-            shape = (batch_beams, self.config.heads, step + 1, head_dim)
+            head_dim = int(self.config.hidden_size / self.config.nhead)
+            shape = (batch_beams, self.config.nhead, step + 1, head_dim)
             new_k = torch.zeros(shape).type_as(decoder_states).contiguous()
             new_v = torch.zeros(shape).type_as(decoder_states).contiguous()
             cache_list = [new_k, new_v] + cache_list
