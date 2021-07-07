@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.autograd import Function
-from torch.cuda.amp import custom_fwd, custom_bwd
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
@@ -16,7 +15,6 @@ _all_layer_grads = dict()
 
 class LSTransformerEmbeddingFunc(Function):
     @staticmethod
-    @custom_fwd(cast_inputs=torch.half)
     def forward(ctx, config, input, embeddings, step):
         cuda_module = transformer_cuda_module
         forward_func = (
@@ -24,6 +22,9 @@ class LSTransformerEmbeddingFunc(Function):
             if config.fp16
             else cuda_module.transformer_embedding_layer_fw_fp32
         )
+
+        if config.fp16:
+            input = input.to(torch.half)
 
         (output,) = forward_func(config.layer_id, input, step, config.training)
 
@@ -33,7 +34,6 @@ class LSTransformerEmbeddingFunc(Function):
         return output
 
     @staticmethod
-    @custom_bwd
     def backward(ctx, grad_output):
         cuda_module = transformer_cuda_module
         backward_func = (
@@ -44,6 +44,10 @@ class LSTransformerEmbeddingFunc(Function):
         assert ctx.config.training
 
         (input,) = ctx.saved_tensors
+
+        if ctx.config.fp16:
+            grad_output = grad_output.to(torch.half)
+            input = input.to(torch.half)
         backward_func(ctx.config.layer_id, grad_output, input)
 
         grad = _all_layer_grads[ctx.config.layer_id]
@@ -152,14 +156,20 @@ class LSTransformerEmbeddingLayer(nn.Module):
         return emb
 
     def __assign_layer_weight_grad(self):
+        if self.config.fp16 and not hasattr(self, "para_16"):
+            self.register_buffer(
+                "para_16", torch.tensor(self.para.data, dtype=torch.half)
+            )
+
+        param = self.para_16 if self.config.fp16 else self.para
+
         if self.config.layer_id in _all_layer_grads:
             return
+
         cuda_module = transformer_cuda_module
         if self.config.fp16:
-            param = self.embeddings.to(torch.half, copy=True)
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
-            param = self.embeddings
             func = cuda_module.assign_layer_weight_grad_fp32
         grad = torch.empty_like(param)
         func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
@@ -169,6 +179,8 @@ class LSTransformerEmbeddingLayer(nn.Module):
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
 
+        if self.config.fp16:
+            self.para_16 = self.para.to(torch.half)
         self.__assign_layer_weight_grad()
         input = input.to(torch.int)
         bs, sl = input.size()
