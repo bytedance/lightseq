@@ -265,26 +265,13 @@ def extract_fsmt_weights(
     # fill src_embedding
     transformer.src_embedding.position_embedding[:] = (
         encoder_state_dict["model.encoder.embed_positions.weight"]
-        .numpy()[:max_step, :]
+        .numpy()[2 : max_step + 2, :]
         .reshape([-1])
         .tolist()
     )
     print(
         "model.encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
             encoder_state_dict["model.encoder.embed_positions.weight"].numpy().shape
-        )
-    )
-
-    transformer.src_embedding.token_embedding[:] = (
-        encoder_state_dict["model.encoder.embed_tokens.weight"]
-        .numpy()
-        .reshape([-1])
-        .tolist()
-    )
-
-    print(
-        "model.encoder.embed_tokens.weight -> src_embedding.token_embedding, shape: {}, conversion finished!".format(
-            encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
         )
     )
 
@@ -297,6 +284,23 @@ def extract_fsmt_weights(
     print(f"setting src_embedding.norm_scale to all 1")
     print(f"setting src_embedding.norm_bias to all 0")
 
+    transformer.src_embedding.token_embedding[:] = (
+        # scale embedding
+        (
+            encoder_state_dict["model.encoder.embed_tokens.weight"]
+            * (encoder_hidden_size ** 0.5)
+        )
+        .numpy()
+        .reshape([-1])
+        .tolist()
+    )
+
+    print(
+        "model.encoder.embed_tokens.weight -> src_embedding.token_embedding, shape: {}, conversion finished!".format(
+            encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
+        )
+    )
+
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     fill_proto_layer(
@@ -308,7 +312,7 @@ def extract_fsmt_weights(
 
     transformer.trg_embedding.position_embedding[:] = (
         decoder_state_dict["model.decoder.embed_positions.weight"]
-        .numpy()[:max_step, :]
+        .numpy()[2 : max_step + 2, :]
         .reshape([-1])
         .tolist()
     )
@@ -318,8 +322,23 @@ def extract_fsmt_weights(
         )
     )
 
+    decoder_vocab_size, decoder_hidden_size = (
+        decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
+    )
+    # FSMT does not have embedding layernorm - add hack to make it work.
+    transformer.trg_embedding.norm_scale[:] = [1 for _ in range(decoder_hidden_size)]
+    transformer.trg_embedding.norm_bias[:] = [0 for _ in range(decoder_hidden_size)]
+    transformer.trg_embedding.shared_bias[:] = [0 for _ in range(decoder_vocab_size)]
+    print(f"setting trg_embedding.norm_scale to all 1")
+    print(f"setting trg_embedding.norm_bias to all 0")
+    print(f"setting trg_embedding.shared_bias to all 0")
+
     transformer.trg_embedding.token_embedding[:] = (
-        decoder_state_dict["model.decoder.embed_tokens.weight"]
+        # scale embedding
+        (
+            decoder_state_dict["model.decoder.embed_tokens.weight"]
+            * (decoder_hidden_size ** 0.5)
+        )
         .numpy()
         .reshape([-1])
         .tolist()
@@ -330,17 +349,6 @@ def extract_fsmt_weights(
             decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
         )
     )
-
-    vocab_size, decoder_hidden_size = (
-        decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
-    )
-    # FSMT does not have embedding layernorm - add hack to make it work.
-    transformer.trg_embedding.norm_scale[:] = [1 for _ in range(decoder_hidden_size)]
-    transformer.trg_embedding.norm_bias[:] = [0 for _ in range(decoder_hidden_size)]
-    transformer.trg_embedding.shared_bias[:] = [0 for _ in range(vocab_size)]
-    print(f"setting trg_embedding.norm_scale to all 1")
-    print(f"setting trg_embedding.norm_bias to all 0")
-    print(f"setting trg_embedding.shared_bias to all 0")
 
     # change encoder layer norm scale&bias position
     tmp_scale, tmp_bias = (
@@ -465,7 +473,9 @@ def extract_fsmt_weights(
     transformer.model_conf.topp = topp
     transformer.model_conf.diverse_lambda = 0
     transformer.model_conf.is_post_ln = True
-    transformer.model_conf.no_scale_embedding = True
+    transformer.model_conf.no_scale_embedding = (
+        False  # scale_embedding is true for fsmt
+    )
     transformer.model_conf.use_gelu = True
 
     if save_proto:
