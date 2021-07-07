@@ -461,7 +461,8 @@ void Decoder<OpType_>::self_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-      _max_thread_per_block, _tw._is_post_ln);
+      _max_thread_per_block, _tw._is_post_ln,
+      /* do_layernorm */ (_tw._has_layernorm_embedding || _weight_offset != 0));
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);

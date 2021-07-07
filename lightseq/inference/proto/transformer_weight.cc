@@ -82,6 +82,11 @@ void TransformerWeight<OpType_>::proto_get_model_config(
   _use_gelu = transformer.model_conf().use_gelu();
   _is_multilingual = transformer.model_conf().is_multilingual();
   _has_layernorm_embedding = transformer.model_conf().has_layernorm_embedding();
+
+  if (!_is_post_ln && _has_layernorm_embedding) {
+    throw std::runtime_error(
+        "Use layernorm embedding with pre-layernorm is not supported.");
+  }
 }
 
 /**
@@ -551,6 +556,11 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   } catch (HDF5DatasetNotFoundError &e) {
     // default initialize it to true
     _has_layernorm_embedding = true;
+  }
+
+  if (!_is_post_ln && _has_layernorm_embedding) {
+    throw std::runtime_error(
+        "Use layernorm embedding with pre-layernorm is not supported.");
   }
 }
 

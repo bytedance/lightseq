@@ -160,7 +160,21 @@ void Encoder<OpType_>::self_attention() {
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
-      _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
+      _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln,
+      /* do_layernorm */ (_tw._has_layernorm_embedding || _weight_offset != 0));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_enc_wei[_weight_offset], "self attn ln norm_scale", 5);
+  print_vec(_p_d_enc_wei[_weight_offset + 1], "self attn ln norm_bias", 5);
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "self attn ln (raw query): token-" << j << std::endl;
+      print_vec(
+          _p_d_q + i * _batch_seq_len * _tw._hidden_size + j * _tw._hidden_size,
+          "self attn ln (raw query)", 5);
+    }
+  }
+#endif
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
@@ -211,6 +225,17 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 4], _AType,
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "self attn out: token-" << j << std::endl;
+      print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "self attn out", 10);
+    }
+  }
+#endif
   return;
 }
 
