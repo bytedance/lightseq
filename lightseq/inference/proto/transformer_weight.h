@@ -118,6 +118,7 @@ class TransformerWeight {
   bool _no_scale_embedding;
   bool _use_gelu;
   bool _is_multilingual;
+  bool _has_layernorm_embedding;
   const int *_p_d_trg_vocab_mask;
 
   void print_model_config() {
@@ -138,6 +139,8 @@ class TransformerWeight {
     std::cout << "end_id: " << _end_id << std::endl;
     std::cout << "padding_id: " << _padding_id << std::endl;
     std::cout << "is_multilingual: " << _is_multilingual << std::endl;
+    std::cout << "has_layernorm_embedding: " << _has_layernorm_embedding
+              << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;

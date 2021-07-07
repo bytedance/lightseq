@@ -96,6 +96,7 @@ def save_fsmt_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "no_scale_embedding",
         "use_gelu",
         "is_multilingual",
+        "has_layernorm_embedding"
     ]
 
     EMBEDDING_KEYS = [
@@ -347,7 +348,10 @@ def extract_fsmt_weights(
 
     print(
         "model.decoder.embed_tokens.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
-            decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().transpose().shape
+            decoder_state_dict["model.decoder.embed_tokens.weight"]
+            .numpy()
+            .transpose()
+            .shape
         )
     )
 
@@ -478,6 +482,8 @@ def extract_fsmt_weights(
         False  # scale_embedding is true for fsmt
     )
     transformer.model_conf.use_gelu = False
+    # FSMT does NOT has layernorm for embedding
+    transformer.model_conf.has_layernorm_embedding = False
 
     if save_proto:
         output_file += ".pb"

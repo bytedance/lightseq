@@ -115,6 +115,8 @@ message ModelConf {
   // Whether it is a multilingual model.
   // If it is set to true, lang_emb and trg_vocab_mask should be non-empty.
   bool is_multilingual = 15;
+  // Whether the model contains layernorm for embedding, default to true
+  bool has_layernorm_embedding = 16;
 }
 
 message Transformer {

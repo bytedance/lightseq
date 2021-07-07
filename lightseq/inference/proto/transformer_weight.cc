@@ -81,6 +81,7 @@ void TransformerWeight<OpType_>::proto_get_model_config(
   _no_scale_embedding = transformer.model_conf().no_scale_embedding();
   _use_gelu = transformer.model_conf().use_gelu();
   _is_multilingual = transformer.model_conf().is_multilingual();
+  _has_layernorm_embedding = transformer.model_conf().has_layernorm_embedding();
 }
 
 /**
@@ -540,8 +541,16 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
                              H5T_NATIVE_HBOOL, &_is_multilingual);
   } catch (HDF5DatasetNotFoundError &e) {
-    // if this attribute is not found, default initialize it to false
+    // default initialize it to false
     _is_multilingual = false;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/has_layernorm_embedding",
+                             H5T_NATIVE_HBOOL, &_has_layernorm_embedding);
+  } catch (HDF5DatasetNotFoundError &e) {
+    // default initialize it to true
+    _has_layernorm_embedding = true;
   }
 }
 
