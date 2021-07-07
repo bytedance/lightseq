@@ -475,41 +475,50 @@ residual_bias: [hidden_size]
 template <typename T>
 __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
                                       const T* bias, const T* residual_bias,
-                                      const int hidden_size, bool is_post_ln) {
+                                      const int hidden_size, bool is_post_ln,
+                                      bool do_layernorm) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
-  float val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    val += input[i];
-  }
 
-  // step 0. compute mean
-  __shared__ float s_mean;
-  float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
-  __syncthreads();
+  if (do_layernorm) {
+    float val = 0.0;
+    for (uint i = start; i < end; i += blockDim.x) {
+      val += input[i];
+    }
 
-  // step 1. compute variance
-  val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    float tmp = input[i] - s_mean;
-    val += tmp * tmp;
-  }
-  __shared__ float s_var;
-  reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0)
-    s_var = rsqrtf(reduce_res / float(hidden_size) + epsilon);
-  __syncthreads();
+    // step 0. compute mean
+    __shared__ float s_mean;
+    float reduce_res = blockReduceSum<float>(val);
+    if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
+    __syncthreads();
 
-  // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
-    val = input[i] - s_mean;
-    output[i] = val * s_var * __ldg(&scale[i - block_start]) +
-                __ldg(&bias[i - block_start]);
-    if (is_post_ln) {
-      input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
-    } else {
+    // step 1. compute variance
+    val = 0.0;
+    for (uint i = start; i < end; i += blockDim.x) {
+      float tmp = input[i] - s_mean;
+      val += tmp * tmp;
+    }
+    __shared__ float s_var;
+    reduce_res = blockReduceSum(val);
+    if (threadIdx.x == 0)
+      s_var = rsqrtf(reduce_res / float(hidden_size) + epsilon);
+    __syncthreads();
+    // step 2. layer norm
+    for (uint i = start; i < end; i += blockDim.x) {
+      val = input[i] - s_mean;
+      output[i] = val * s_var * __ldg(&scale[i - block_start]) +
+                  __ldg(&bias[i - block_start]);
+      if (is_post_ln) {
+        input[i] = output[i] + __ldg(&residual_bias[i - block_start]);
+      } else {
+        input[i] += __ldg(&residual_bias[i - block_start]);
+      }
+    }
+  } else {
+    // only copying input and adding bias if not do_layernorm
+    for (uint i = start; i < end; i += blockDim.x) {
+      output[i] = input[i];
       input[i] += __ldg(&residual_bias[i - block_start]);
     }
   }
@@ -518,7 +527,8 @@ __global__ void ker_norm_layer_resual(T* input, T* output, const T* scale,
 template <>
 __global__ void ker_norm_layer_resual<__half>(
     __half* input, __half* output, const __half* scale, const __half* bias,
-    const __half* residual_bias, const int half_hidden_size, bool is_post_ln) {
+    const __half* residual_bias, const int half_hidden_size, bool is_post_ln,
+    bool do_layernorm) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -529,47 +539,61 @@ __global__ void ker_norm_layer_resual<__half>(
   const half2* presidual_bias = (const half2*)residual_bias;
   float mean_dim = float(half_hidden_size) * 2.f;
 
-  float val = 0.0;
-  // step 0. compute mean
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 local_f2 = safe_half2_to_float2(pinput[i]);
-    val += local_f2.x + local_f2.y;
-  }
-  __shared__ float s_mean;
-  float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
-  __syncthreads();
-
-  // step 1. compute variance
-  val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 local_f2 = safe_half2_to_float2(pinput[i]);
-    float tmpx = local_f2.x - s_mean;
-    float tmpy = local_f2.y - s_mean;
-    val += tmpx * tmpx + tmpy * tmpy;
-  }
-  __shared__ float s_var;
-  reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
-  __syncthreads();
-
-  // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
-    float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
-    float2 local_f2 = safe_half2_to_float2(pinput[i]);
-    local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
-    local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
-    poutput[i] = __float22half2_rn(local_f2);
-    if (!is_post_ln) {
-      local_f2 = safe_half2_to_float2(pinput[i]);
+  if (do_layernorm) {
+    float val = 0.0;
+    // step 0. compute mean
+    for (uint i = start; i < end; i += blockDim.x) {
+      float2 local_f2 = safe_half2_to_float2(pinput[i]);
+      val += local_f2.x + local_f2.y;
     }
-    float2 residual_bias_val =
-        __half22float2(__ldg(&presidual_bias[i - block_start]));
-    float2 new_input_f2;
-    new_input_f2.x = local_f2.x + residual_bias_val.x;
-    new_input_f2.y = local_f2.y + residual_bias_val.y;
-    pinput[i] = __float22half2_rn(new_input_f2);
+    __shared__ float s_mean;
+    float reduce_res = blockReduceSum<float>(val);
+    if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
+    __syncthreads();
+
+    // step 1. compute variance
+    val = 0.0;
+    for (uint i = start; i < end; i += blockDim.x) {
+      float2 local_f2 = safe_half2_to_float2(pinput[i]);
+      float tmpx = local_f2.x - s_mean;
+      float tmpy = local_f2.y - s_mean;
+      val += tmpx * tmpx + tmpy * tmpy;
+    }
+    __shared__ float s_var;
+    reduce_res = blockReduceSum(val);
+    if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
+    __syncthreads();
+
+    // step 2. layer norm
+    for (uint i = start; i < end; i += blockDim.x) {
+      float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
+      float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
+      float2 local_f2 = safe_half2_to_float2(pinput[i]);
+      local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
+      local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
+      poutput[i] = __float22half2_rn(local_f2);
+      if (!is_post_ln) {
+        local_f2 = safe_half2_to_float2(pinput[i]);
+      }
+      float2 residual_bias_val =
+          __half22float2(__ldg(&presidual_bias[i - block_start]));
+      float2 new_input_f2;
+      new_input_f2.x = local_f2.x + residual_bias_val.x;
+      new_input_f2.y = local_f2.y + residual_bias_val.y;
+      pinput[i] = __float22half2_rn(new_input_f2);
+    }
+  } else {
+    // only copying input and adding bias if not do_layernorm
+    for (uint i = start; i < end; i += blockDim.x) {
+      float2 local_f2 = safe_half2_to_float2(pinput[i]);
+      poutput[i] = __float22half2_rn(local_f2);
+      float2 residual_bias_val =
+          __half22float2(__ldg(&presidual_bias[i - block_start]));
+      float2 new_input_f2;
+      new_input_f2.x = local_f2.x + residual_bias_val.x;
+      new_input_f2.y = local_f2.y + residual_bias_val.y;
+      pinput[i] = __float22half2_rn(new_input_f2);
+    }
   }
 }
 
@@ -579,34 +603,34 @@ void ker_norm_layer_resual_launcher(int token_num, int hidden_size,
                                     const T* scale, const T* bias,
                                     const T* residual_bias,
                                     const int max_thread_per_block,
-                                    bool is_post_ln) {
+                                    bool is_post_ln, bool do_layernorm) {
   ker_norm_layer_resual<T><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size, is_post_ln);
+      input, output, scale, bias, residual_bias, hidden_size, is_post_ln,
+      do_layernorm);
 }
 
 template <>
-void ker_norm_layer_resual_launcher<__half>(int token_num, int hidden_size,
-                                            cudaStream_t stream, __half* input,
-                                            __half* output, const __half* scale,
-                                            const __half* bias,
-                                            const __half* residual_bias,
-                                            const int max_thread_per_block,
-                                            bool is_post_ln) {
+void ker_norm_layer_resual_launcher<__half>(
+    int token_num, int hidden_size, cudaStream_t stream, __half* input,
+    __half* output, const __half* scale, const __half* bias,
+    const __half* residual_bias, const int max_thread_per_block,
+    bool is_post_ln, bool do_layernorm) {
   ker_norm_layer_resual<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, scale, bias, residual_bias, hidden_size / 2, is_post_ln);
+      input, output, scale, bias, residual_bias, hidden_size / 2, is_post_ln,
+      do_layernorm);
 }
 
 template void ker_norm_layer_resual_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float* input,
     float* output, const float* scale, const float* bias,
-    const float* residual_bias, const int max_thread_per_block,
-    bool is_post_ln);
+    const float* residual_bias, const int max_thread_per_block, bool is_post_ln,
+    bool do_layernorm);
 
 template void ker_norm_layer_resual_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half* input,
     __half* output, const __half* scale, const __half* bias,
     const __half* residual_bias, const int max_thread_per_block,
-    bool is_post_ln);
+    bool is_post_ln, bool do_layernorm);
 
 /**
 @brief: ker_enc_embedding
