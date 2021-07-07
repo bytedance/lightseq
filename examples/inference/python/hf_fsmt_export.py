@@ -7,7 +7,6 @@ import numpy as np
 from operator import attrgetter
 from utils import (
     fill_proto_layer,
-    _gather_token_embedding,
     _get_encode_output_mapping_dict,
 )
 from transformer_pb2 import Transformer
@@ -205,7 +204,6 @@ def extract_fsmt_weights(
     model_dir,
     head_num,
     generation_method,
-    max_step,
     extra_decode_length=50,
     beam_size=4,
     length_penalty: float = 0,
@@ -272,9 +270,7 @@ def extract_fsmt_weights(
     )
     print(
         "model.encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
-            encoder_state_dict["model.encoder.embed_positions.weight"]
-            .numpy()
-            .shape
+            encoder_state_dict["model.encoder.embed_positions.weight"].numpy().shape
         )
     )
 
@@ -287,18 +283,18 @@ def extract_fsmt_weights(
 
     print(
         "model.encoder.embed_tokens.weight -> src_embedding.token_embedding, shape: {}, conversion finished!".format(
-            encoder_state_dict["model.encoder.embed_tokens.weight"]
-            .numpy()
-            .shape
+            encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
         )
     )
 
-    _, encoder_hidden_size = encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
+    _, encoder_hidden_size = (
+        encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
+    )
     # FSMT does not have embedding layernorm - add hack to make it work.
     transformer.src_embedding.norm_scale[:] = [1 for _ in range(encoder_hidden_size)]
     transformer.src_embedding.norm_bias[:] = [0 for _ in range(encoder_hidden_size)]
-    print(f"setting trg_embedding.norm_scale to all 1")
-    print(f"setting trg_embedding.norm_bias to all 0")
+    print(f"setting src_embedding.norm_scale to all 1")
+    print(f"setting src_embedding.norm_bias to all 0")
 
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
@@ -309,18 +305,15 @@ def extract_fsmt_weights(
         encode_output_mapping_dict,
     )
 
-
     transformer.trg_embedding.position_embedding[:] = (
         decoder_state_dict["model.decoder.embed_positions.weight"]
-        .numpy()[:max_step, :]
+        .numpy()
         .reshape([-1])
         .tolist()
     )
     print(
         "model.decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
-            decoder_state_dict["model.decoder.embed_positions.weight"]
-            .numpy()[:max_step, :]
-            .shape
+            decoder_state_dict["model.decoder.embed_positions.weight"].numpy().shape
         )
     )
 
@@ -333,19 +326,20 @@ def extract_fsmt_weights(
 
     print(
         "model.decoder.embed_tokens.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
-            decoder_state_dict["model.decoder.embed_tokens.weight"]
-            .numpy()
-            .shape
+            decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
         )
     )
-    
-    _, decoder_hidden_size = decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
+
+    vocab_size, decoder_hidden_size = (
+        decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
+    )
     # FSMT does not have embedding layernorm - add hack to make it work.
     transformer.trg_embedding.norm_scale[:] = [1 for _ in range(decoder_hidden_size)]
     transformer.trg_embedding.norm_bias[:] = [0 for _ in range(decoder_hidden_size)]
+    transformer.trg_embedding.shared_bias[:] = [0 for _ in range(vocab_size)]
     print(f"setting trg_embedding.norm_scale to all 1")
     print(f"setting trg_embedding.norm_bias to all 0")
-
+    print(f"setting trg_embedding.shared_bias to all 0")
 
     # change encoder layer norm scale&bias position
     tmp_scale, tmp_bias = (
@@ -508,14 +502,11 @@ def extract_fsmt_weights(
 if __name__ == "__main__":
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
     output_lightseq_model_name = "lightseq_fsmt_wmt19ende"
-    input_huggingface_fsmt_model = (
-        "facebook/wmt19-en-de" 
-    )
+    input_huggingface_fsmt_model = "facebook/wmt19-en-de"
     head_number = 16
     # in order to get score, we should use `beam_search` inference method
     generation_method = "beam_search"
-    beam_size = 5
-    max_step = 50  # max step for generation, it decides GPU memory occupancy
+    beam_size = 8  # default of 5 which is not supported by lightseq
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50
     length_penalty = 1.0
@@ -525,7 +516,6 @@ if __name__ == "__main__":
         head_num=head_number,  # layer number
         generation_method=generation_method,
         beam_size=beam_size,
-        max_step=max_step,
         extra_decode_length=extra_decode_length,
         length_penalty=length_penalty,
         save_proto=False,
