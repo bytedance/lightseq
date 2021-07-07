@@ -340,13 +340,14 @@ def extract_fsmt_weights(
             * (decoder_hidden_size ** 0.5)
         )
         .numpy()
+        .transpose()
         .reshape([-1])
         .tolist()
     )
 
     print(
         "model.decoder.embed_tokens.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
-            decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
+            decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().transpose().shape
         )
     )
 
