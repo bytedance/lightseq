@@ -206,6 +206,7 @@ def extract_fsmt_weights(
     generation_method,
     extra_decode_length=50,
     beam_size=4,
+    max_step=50,
     length_penalty: float = 0,
     topk=1,
     topp=0.75,
@@ -264,7 +265,7 @@ def extract_fsmt_weights(
     # fill src_embedding
     transformer.src_embedding.position_embedding[:] = (
         encoder_state_dict["model.encoder.embed_positions.weight"]
-        .numpy()
+        .numpy()[:max_step, :]
         .reshape([-1])
         .tolist()
     )
@@ -307,7 +308,7 @@ def extract_fsmt_weights(
 
     transformer.trg_embedding.position_embedding[:] = (
         decoder_state_dict["model.decoder.embed_positions.weight"]
-        .numpy()
+        .numpy()[:max_step, :]
         .reshape([-1])
         .tolist()
     )
@@ -506,7 +507,8 @@ if __name__ == "__main__":
     head_number = 16
     # in order to get score, we should use `beam_search` inference method
     generation_method = "beam_search"
-    beam_size = 8  # default of 5 which is not supported by lightseq
+    beam_size = 4  # default of 5 which is not supported by lightseq
+    max_step = 50
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50
     length_penalty = 1.0
@@ -516,6 +518,7 @@ if __name__ == "__main__":
         head_num=head_number,  # layer number
         generation_method=generation_method,
         beam_size=beam_size,
+        max_step=max_step,
         extra_decode_length=extra_decode_length,
         length_penalty=length_penalty,
         save_proto=False,
