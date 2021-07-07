@@ -92,7 +92,8 @@ class TransformerWeight {
   }
 
   int _hidden_size;
-  int _inner_size;
+  int _encoder_inner_size;
+  int _decoder_inner_size;
   int _max_step;
   int _src_vocab_size;
   int _trg_vocab_size;
@@ -124,7 +125,8 @@ class TransformerWeight {
     std::cout << "encoder layers: " << _n_enc_layer << std::endl;
     std::cout << "decoder layers: " << _n_dec_layer << std::endl;
     std::cout << "hidden size: " << _hidden_size << std::endl;
-    std::cout << "inner size: " << _inner_size << std::endl;
+    std::cout << "encoder inner size: " << _encoder_inner_size << std::endl;
+    std::cout << "decoder inner size: " << _decoder_inner_size << std::endl;
     std::cout << "head number: " << _head_num << std::endl;
     std::cout << "dim per head: " << _dim_per_head << std::endl;
     std::cout << "src vocab size: " << _src_vocab_size << std::endl;

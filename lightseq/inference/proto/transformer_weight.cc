@@ -34,7 +34,11 @@ template <OperationType OpType_>
 void TransformerWeight<OpType_>::proto_get_model_config(
     const Transformer &transformer, bool only_decoder) {
   _hidden_size = transformer.trg_embedding().norm_scale_size();
-  _inner_size =
+  if (!only_decoder) {
+    _encoder_inner_size =
+        transformer.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+  }
+  _decoder_inner_size =
       transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step =
       transformer.trg_embedding().position_embedding_size() / _hidden_size;
@@ -259,22 +263,23 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _encoder_inner_size)
       return "Wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _encoder_inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_bias_size() != _inner_size)
+    if (enc_layer.ffn_first_bias_size() != _encoder_inner_size)
       return "Wrong ffn_first_bias_size !";
     for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
-    idx += _inner_size;
+    idx += _encoder_inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_second_kernel_size() !=
+        _hidden_size * _encoder_inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _encoder_inner_size;
 
     offset.push_back(idx);
     if (enc_layer.ffn_second_bias_size() != _hidden_size)
@@ -396,22 +401,23 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+    if (dec_layer.ffn_first_kernel_size() != _hidden_size * _decoder_inner_size)
       return "Wrong ffn_first_kernel_size !";
     for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _decoder_inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_first_bias_size() != _inner_size)
+    if (dec_layer.ffn_first_bias_size() != _decoder_inner_size)
       return "Wrong ffn_first_bias_size !";
     for (float ele : dec_layer.ffn_first_bias()) value.push_back(ele);
-    idx += _inner_size;
+    idx += _decoder_inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+    if (dec_layer.ffn_second_kernel_size() !=
+        _hidden_size * _decoder_inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _decoder_inner_size;
 
     offset.push_back(idx);
     if (dec_layer.ffn_second_bias_size() != _hidden_size)
@@ -438,8 +444,12 @@ template <OperationType OpType_>
 void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
                                                        bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
-
-  _inner_size =
+  if (!only_decoder) {
+    _encoder_inner_size =
+        get_hdf5_dataset_size(hdf5_file, "encoder_stack/0/ffn_first_kernel") /
+        _hidden_size;
+  }
+  _decoder_inner_size =
       get_hdf5_dataset_size(hdf5_file, "decoder_stack/0/ffn_first_kernel") /
       _hidden_size;
 
@@ -687,8 +697,8 @@ void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
-       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
-       _hidden_size) *
+       _hidden_size * _encoder_inner_size + _encoder_inner_size +
+       _hidden_size * _encoder_inner_size + _hidden_size) *
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
@@ -763,24 +773,25 @@ void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
         value.data() + idx,
-        [=](int size) { return size != _hidden_size * _inner_size; },
+        [=](int size) { return size != _hidden_size * _encoder_inner_size; },
         "Wrong ffn_first_kernel_size !");
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _encoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
+        value.data() + idx,
+        [=](int size) { return size != _encoder_inner_size; },
         "Wrong ffn_first_bias_size !");
-    idx += _inner_size;
+    idx += _encoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
         value.data() + idx,
-        [=](int size) { return size != _hidden_size * _inner_size; },
+        [=](int size) { return size != _hidden_size * _encoder_inner_size; },
         "Wrong ffn_second_kernel_size !");
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _encoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
@@ -811,8 +822,8 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
        _hidden_size * _hidden_size + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size +
        _hidden_size * _hidden_size + _hidden_size * 3 +
-       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
-       _hidden_size) *
+       _hidden_size * _decoder_inner_size + _decoder_inner_size +
+       _hidden_size * _decoder_inner_size + _hidden_size) *
       _n_dec_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
@@ -931,24 +942,25 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
         value.data() + idx,
-        [=](int size) { return size != _hidden_size * _inner_size; },
+        [=](int size) { return size != _hidden_size * _decoder_inner_size; },
         "Wrong ffn_first_kernel_size !");
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _decoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
+        value.data() + idx,
+        [=](int size) { return size != _decoder_inner_size; },
         "Wrong ffn_first_bias_size !");
-    idx += _inner_size;
+    idx += _decoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
         value.data() + idx,
-        [=](int size) { return size != _hidden_size * _inner_size; },
+        [=](int size) { return size != _hidden_size * _decoder_inner_size; },
         "Wrong ffn_second_kernel_size !");
-    idx += _hidden_size * _inner_size;
+    idx += _hidden_size * _decoder_inner_size;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
@@ -1030,9 +1042,13 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
              "in CUDA";
     }
     // hdf5_parse_* would throw std::runtime_error on error
-    hdf5_parse_emb_wei(hdf5_file, "src");
+    if (!only_decoder) {
+      hdf5_parse_emb_wei(hdf5_file, "src");
+    }
     hdf5_parse_emb_wei(hdf5_file, "trg");
-    hdf5_parse_enc_wei(hdf5_file);
+    if (!only_decoder) {
+      hdf5_parse_enc_wei(hdf5_file);
+    }
     hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
 

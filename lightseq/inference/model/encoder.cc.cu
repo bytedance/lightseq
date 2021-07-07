@@ -39,7 +39,8 @@ template <OperationType OpType_>
 long Encoder<OpType_>::compute_buffer_bytesize() {
   long sz1 = _max_batch_dim * 6 +
              _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
+  long sz2 = _max_batch_dim +
+             _max_batch_size * _tw._max_step * _tw._encoder_inner_size;
   return max(sz1, sz2) * sizeof(_DataType);
 }
 
@@ -70,7 +71,7 @@ std::string Encoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
-  if (_tw._inner_size & 1) {
+  if (_tw._encoder_inner_size & 1) {
     return "violate inner_size % 2 = 0";
   }
   if (_tw._dim_per_head & 1) {
@@ -224,28 +225,28 @@ void Encoder<OpType_>::ffn_add_norm() {
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._encoder_inner_size, _batch_token_num,
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 8], _AType,
-      _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
-      _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
+      _tw._encoder_inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
+      _p_d_ffn_buf2, _CType, _tw._encoder_inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
   if (_tw._use_gelu) {
     ker_bias_gelu_launcher<_DataType>(
         _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
+        _p_d_enc_wei[_weight_offset + 9], _tw._encoder_inner_size);
   } else {
     ker_bias_relu_launcher<_DataType>(
         _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
+        _p_d_enc_wei[_weight_offset + 9], _tw._encoder_inner_size);
   }
 
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
-      _tw._inner_size, &_fone, _p_d_enc_wei[_weight_offset + 10], _AType,
-      _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
-      _p_d_output, _CType, _tw._hidden_size, _computeType,
+      _tw._encoder_inner_size, &_fone, _p_d_enc_wei[_weight_offset + 10],
+      _AType, _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._encoder_inner_size,
+      &_fone, _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   return;
 }
