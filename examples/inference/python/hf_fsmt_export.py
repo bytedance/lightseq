@@ -96,7 +96,7 @@ def save_fsmt_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "no_scale_embedding",
         "use_gelu",
         "is_multilingual",
-        "has_layernorm_embedding"
+        "has_layernorm_embedding",
     ]
 
     EMBEDDING_KEYS = [
