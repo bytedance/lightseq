@@ -212,7 +212,6 @@ def extract_fsmt_weights(
     topk=1,
     topp=0.75,
     lang="en",
-    only_decoder=True,
     save_proto=False,
 ):
     transformer = Transformer()
@@ -226,32 +225,26 @@ def extract_fsmt_weights(
             encoder_state_dict[k] = reloaded[k]
         if k.startswith("model.decoder."):
             decoder_state_dict[k] = reloaded[k]
-        if k == "model.shared.weight":
-            encoder_state_dict[k] = reloaded[k]
-            decoder_state_dict[k] = reloaded[k]
-        if k == "final_logits_bias":
-            decoder_state_dict[k] = reloaded[k]
 
     dec_var_name_list = list(decoder_state_dict.keys())
     enc_var_name_list = list(encoder_state_dict.keys())
 
     # fill each encoder layer's params
-    if not only_decoder:
-        enc_tensor_names = {}
-        for name in enc_var_name_list:
-            name_split = name.split(".")
-            if len(name_split) <= 3 or not name_split[3].isdigit():
-                continue
-            layer_id = int(name_split[3])
-            enc_tensor_names.setdefault(layer_id, []).append(name)
+    enc_tensor_names = {}
+    for name in enc_var_name_list:
+        name_split = name.split(".")
+        if len(name_split) <= 3 or not name_split[3].isdigit():
+            continue
+        layer_id = int(name_split[3])
+        enc_tensor_names.setdefault(layer_id, []).append(name)
 
-        for layer_id in sorted(enc_tensor_names.keys()):
-            fill_proto_layer(
-                enc_tensor_names[layer_id],
-                encoder_state_dict,
-                transformer.encoder_stack.add(),
-                enc_layer_mapping_dict,
-            )
+    for layer_id in sorted(enc_tensor_names.keys()):
+        fill_proto_layer(
+            enc_tensor_names[layer_id],
+            encoder_state_dict,
+            transformer.encoder_stack.add(),
+            enc_layer_mapping_dict,
+        )
 
     # fill each decoder layer's params
     dec_tensor_names = {}
@@ -271,48 +264,58 @@ def extract_fsmt_weights(
         )
 
     # fill src_embedding
-    if not only_decoder:
-        fill_proto_layer(
-            enc_var_name_list,
-            encoder_state_dict,
-            transformer.src_embedding,
-            src_emb_mapping_dict,
-        )
-        
-        transformer.src_embedding.position_embedding[:] = (
+    transformer.src_embedding.position_embedding[:] = (
+        encoder_state_dict["model.encoder.embed_positions.weight"]
+        .numpy()
+        .reshape([-1])
+        .tolist()
+    )
+    print(
+        "model.encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
             encoder_state_dict["model.encoder.embed_positions.weight"]
             .numpy()
-            .reshape([-1])
-            .tolist()
+            .shape
         )
-        print(
-            "model.encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
-                encoder_state_dict["model.encoder.embed_positions.weight"]
-                .numpy()
-                .shape
-            )
+    )
+
+    transformer.src_embedding.token_embedding[:] = (
+        encoder_state_dict["model.encoder.embed_tokens.weight"]
+        .numpy()
+        .reshape([-1])
+        .tolist()
+    )
+
+    print(
+        "model.encoder.embed_tokens.weight -> src_embedding.token_embedding, shape: {}, conversion finished!".format(
+            encoder_state_dict["model.encoder.embed_tokens.weight"]
+            .numpy()
+            .shape
         )
-        src_tb = _gather_token_embedding(
-            enc_var_name_list, encoder_state_dict, "shared"
-        )
-        transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
+    )
+
+    _, encoder_hidden_size = encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
+    # FSMT does not have embedding layernorm - add hack to make it work.
+    transformer.src_embedding.norm_scale[:] = [1 for _ in range(encoder_hidden_size)]
+    transformer.src_embedding.norm_bias[:] = [0 for _ in range(encoder_hidden_size)]
+    print(f"setting trg_embedding.norm_scale to all 1")
+    print(f"setting trg_embedding.norm_bias to all 0")
 
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
-    trg_emb_mapping_dict.update(encode_output_mapping_dict)
     fill_proto_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,
-        trg_emb_mapping_dict,
+        encode_output_mapping_dict,
     )
-    pos_emb_list = (
+
+
+    transformer.trg_embedding.position_embedding[:] = (
         decoder_state_dict["model.decoder.embed_positions.weight"]
-        .numpy()[2 : 2 + max_step, :]
+        .numpy()[:max_step, :]
         .reshape([-1])
         .tolist()
     )
-    transformer.trg_embedding.position_embedding[:] = pos_emb_list
     print(
         "model.decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
             decoder_state_dict["model.decoder.embed_positions.weight"]
@@ -320,16 +323,29 @@ def extract_fsmt_weights(
             .shape
         )
     )
-    # assert lang in LANG2ID
-    trg_tb = _gather_token_embedding(
-        dec_var_name_list, decoder_state_dict, "shared", lang=lang
+
+    transformer.trg_embedding.token_embedding[:] = (
+        decoder_state_dict["model.decoder.embed_tokens.weight"]
+        .numpy()
+        .reshape([-1])
+        .tolist()
     )
-    transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
+
     print(
-        "token_embedding.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
-            trg_tb.transpose().shape
+        "model.decoder.embed_tokens.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
+            decoder_state_dict["model.decoder.embed_tokens.weight"]
+            .numpy()
+            .shape
         )
     )
+    
+    _, decoder_hidden_size = decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
+    # FSMT does not have embedding layernorm - add hack to make it work.
+    transformer.trg_embedding.norm_scale[:] = [1 for _ in range(decoder_hidden_size)]
+    transformer.trg_embedding.norm_bias[:] = [0 for _ in range(decoder_hidden_size)]
+    print(f"setting trg_embedding.norm_scale to all 1")
+    print(f"setting trg_embedding.norm_bias to all 0")
+
 
     # change encoder layer norm scale&bias position
     tmp_scale, tmp_bias = (
@@ -456,7 +472,6 @@ def extract_fsmt_weights(
     transformer.model_conf.is_post_ln = True
     transformer.model_conf.no_scale_embedding = True
     transformer.model_conf.use_gelu = True
-    transformer.model_conf.is_fsmt = True
 
     if save_proto:
         output_file += ".pb"
@@ -512,7 +527,6 @@ if __name__ == "__main__":
         beam_size=beam_size,
         max_step=max_step,
         extra_decode_length=extra_decode_length,
-        only_decoder=False,
         length_penalty=length_penalty,
         save_proto=False,
     )
