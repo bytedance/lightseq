@@ -476,7 +476,7 @@ def extract_fsmt_weights(
     transformer.model_conf.no_scale_embedding = (
         False  # scale_embedding is true for fsmt
     )
-    transformer.model_conf.use_gelu = True
+    transformer.model_conf.use_gelu = False
 
     if save_proto:
         output_file += ".pb"
