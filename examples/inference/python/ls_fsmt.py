@@ -18,7 +18,7 @@ def ls_fsmt(model, inputs):
 def hf_fsmt(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    generated_ids = model.generate(inputs.to("cuda:0"), max_length=50, num_beams=8)
+    generated_ids = model.generate(inputs.to("cuda:0"), max_length=50, num_beams=4)
     torch.cuda.synchronize()
     end_time = time.perf_counter()
     return generated_ids, end_time - start_time
@@ -64,7 +64,7 @@ def main():
     tokenizer = FSMTTokenizer.from_pretrained("facebook/wmt19-en-de")
 
     print("creating lightseq model...")
-    ls_model = lsi.Transformer("lightseq_fsmt_wmt19ende.hdf5", 256)
+    ls_model = lsi.Transformer("lightseq_fsmt_wmt19ende.hdf5", 50)
     print("creating huggingface model...")
     hf_model = FSMTForConditionalGeneration.from_pretrained("facebook/wmt19-en-de")
     hf_model.to("cuda:0")
