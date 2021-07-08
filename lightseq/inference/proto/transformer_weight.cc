@@ -1030,9 +1030,13 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
              "in CUDA";
     }
     // hdf5_parse_* would throw std::runtime_error on error
-    hdf5_parse_emb_wei(hdf5_file, "src");
+    if (!only_decoder) {
+      hdf5_parse_emb_wei(hdf5_file, "src");
+    }
     hdf5_parse_emb_wei(hdf5_file, "trg");
-    hdf5_parse_enc_wei(hdf5_file);
+    if (!only_decoder) {
+      hdf5_parse_enc_wei(hdf5_file);
+    }
     hdf5_parse_dec_wei(hdf5_file);
     H5Fclose(hdf5_file);
 
