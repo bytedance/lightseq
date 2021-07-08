@@ -15,10 +15,12 @@ from transformers import (
 src_lang = "de"
 tgt_lang = "en"
 raw_datasets = load_dataset("wmt19", "de-en")
-mname = "facebook/wmt19-de-en"
+hf_modelname = "facebook/wmt19-de-en"
+ls_modelfile = "lightseq_fsmt_wmt19deen.hdf5"  # "lightseq_fsmt_wmt19deen.pb"
+
 print(f"loading translation: {src_lang} -> {tgt_lang}")
 
-tokenizer = FSMTTokenizer.from_pretrained(mname)
+tokenizer = FSMTTokenizer.from_pretrained(hf_modelname)
 
 # load dataset: en -> de translation
 eval_dataset = raw_datasets["validation"]
@@ -59,9 +61,8 @@ hf_metric = load_metric("sacrebleu")
 
 
 def run_ls():
-    ls_model = lsi.Transformer(
-        "lightseq_fsmt_wmt19deen.hdf5", 16
-    )  # 2nd argument is max_batch_size
+    print(f"loading lightseq model: {ls_modelfile}")
+    ls_model = lsi.Transformer(ls_modelfile, 16)  # 2nd argument is max_batch_size
     for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
         with torch.no_grad():
             input_ids = batch["input_ids"]
@@ -84,7 +85,8 @@ def run_ls():
 
 def run_hf():
     # load models
-    hf_model = FSMTForConditionalGeneration.from_pretrained(mname).cuda()
+    print(f"loading huggingface model: {hf_modelname}")
+    hf_model = FSMTForConditionalGeneration.from_pretrained(hf_modelname).cuda()
 
     for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
         with torch.no_grad():
