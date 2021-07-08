@@ -36,6 +36,6 @@ python3 $THIS_DIR/run_glue.py \
   --output_dir /tmp/$TASK_NAME/ \
   --overwrite_output_dir \
   --with_lightseq true \
-  --fp16 \
-  --fp16_full_eval \
-  --fp16_backend apex \
+  # --fp16 \
+  # --fp16_full_eval \
+  # --fp16_backend apex \
