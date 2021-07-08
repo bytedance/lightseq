@@ -1,6 +1,5 @@
 import torch
 import lightseq.inference as lsi
-import threading
 
 from datasets import load_dataset, load_metric
 from torch.utils.data.dataloader import DataLoader
