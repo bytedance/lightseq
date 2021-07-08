@@ -519,12 +519,15 @@ def extract_fsmt_weights(
 
 if __name__ == "__main__":
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_fsmt_wmt19ende"
-    input_huggingface_fsmt_model = "facebook/wmt19-en-de"
+    output_lightseq_model_name = "lightseq_fsmt_wmt19deen"
+    input_huggingface_fsmt_model = "facebook/wmt19-de-en"
+    print(
+        f"exporting model {input_huggingface_fsmt_model} to {output_lightseq_model_name}"
+    )
     head_number = 16
     # in order to get score, we should use `beam_search` inference method
     generation_method = "beam_search"
-    beam_size = 32  # default of 5 which is not supported by lightseq
+    beam_size = 4
     max_step = 256
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 256
