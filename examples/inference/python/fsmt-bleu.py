@@ -28,13 +28,6 @@ def preprocess_function(examples):
     with tokenizer.as_target_tokenizer():
         labels = tokenizer(targets, padding=True, pad_to_multiple_of=8)
     
-    # calculate length in dataset, determine max_step to be approx >= 200
-    # print(model_inputs['input_ids'])
-    # print(f"en max len: {max(list(map(len, model_inputs['input_ids'])))}")
-
-    # print(labels['input_ids'])
-    # print(f"de max len: {max(list(map(len, labels['input_ids'])))}")
-    
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
 
