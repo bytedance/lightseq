@@ -107,7 +107,8 @@ class Transformer {
 
     long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
                                  decoder_->compute_buffer_bytesize());
-    std::cout << "transformer buf_bytesize: " << buf_bytesize << std::endl;
+    std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
+              << "MB GPU buffer for transformer" << std::endl;
 
     void *d_buf_;
     // encoder and decoder use the same buffer to save gpu memory useage
