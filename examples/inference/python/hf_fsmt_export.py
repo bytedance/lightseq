@@ -524,10 +524,10 @@ if __name__ == "__main__":
     head_number = 16
     # in order to get score, we should use `beam_search` inference method
     generation_method = "beam_search"
-    beam_size = 4  # default of 5 which is not supported by lightseq
-    max_step = 50
+    beam_size = 64  # default of 5 which is not supported by lightseq
+    max_step = 128
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
-    extra_decode_length = 50
+    extra_decode_length = 128
     length_penalty = 1.0
     extract_fsmt_weights(
         output_lightseq_model_name,

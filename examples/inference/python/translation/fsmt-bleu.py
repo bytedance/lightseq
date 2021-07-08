@@ -45,11 +45,11 @@ eval_dataset = eval_dataset.map(
 )
 data_collator = DataCollatorForSeq2Seq(
     tokenizer,
-    model=model,
+    model=None,
     label_pad_token_id=tokenizer.pad_token_id,
     pad_to_multiple_of=8,
 )
-eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=1)
+eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=128)
 
 # initialize metric
 ls_metric = load_metric("sacrebleu")
@@ -67,18 +67,17 @@ for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
             input_ids.cuda(),
             # attention_mask=batch["attention_mask"],
             max_length=128,
-            num_beams=4,
+            num_beams=64,
         )
         hf_decoded_preds = tokenizer.batch_decode(hf_generated_tokens, skip_special_tokens=True)
         hf_decoded_preds = [pred.strip() for pred in hf_decoded_preds]
         hf_metric.add_batch(predictions=hf_decoded_preds, references=decoded_labels)
 
         # lightseq generation
-        ls_generated_tokens = ls_model.generate(
+        ls_generated_tokens = ls_model.infer(
             input_ids,
-            # attention_mask=batch["attention_mask"],
-            max_length=128,
         )
+        ls_generated_tokens = [ids[0] for ids in ls_generated_tokens[0]]
         ls_decoded_preds = tokenizer.batch_decode(ls_generated_tokens, skip_special_tokens=True)
         ls_decoded_preds = [pred.strip() for pred in ls_decoded_preds]
         ls_metric.add_batch(predictions=ls_decoded_preds, references=decoded_labels)
