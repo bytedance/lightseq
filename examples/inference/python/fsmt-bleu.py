@@ -1,6 +1,7 @@
 
 import torch
 import lightseq.inference as lsi
+import threading
 
 from datasets import load_dataset, load_metric
 from torch.utils.data.dataloader import DataLoader
@@ -44,14 +45,14 @@ data_collator = DataCollatorForSeq2Seq(
     label_pad_token_id=tokenizer.pad_token_id,
     pad_to_multiple_of=8,
 )
-eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=32)
+eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=16)
 
 # initialize metric
 ls_metric = load_metric("sacrebleu")
 hf_metric = load_metric("sacrebleu")
 
 def run_ls():
-    ls_model = lsi.Transformer("lightseq_fsmt_wmt19ende.hdf5", 32) # 2nd argument is max_batch_size
+    ls_model = lsi.Transformer("lightseq_fsmt_wmt19ende.hdf5", 16) # 2nd argument is max_batch_size
     for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
         with torch.no_grad():
             input_ids = batch["input_ids"]
@@ -87,7 +88,7 @@ def run_hf():
                 input_ids.cuda(),
                 # attention_mask=batch["attention_mask"],
                 max_length=256,
-                num_beams=8,
+                num_beams=32,
             )
             hf_decoded_preds = tokenizer.batch_decode(hf_generated_tokens, skip_special_tokens=True)
             hf_decoded_preds = [pred.strip() for pred in hf_decoded_preds]
@@ -99,10 +100,10 @@ hf_out = open("translation-hf.txt", "w")
 ls_out = open("translation-ls.txt", "w")
 ref_out = open("translation-reference.txt", "w")
 
-print(f"running huggingface translation...")
-run_hf()
 print(f"running lightseq translation...")
 run_ls()
+print(f"running huggingface translation...")
+run_hf()
 
 ls_eval_metric = ls_metric.compute()
 hf_eval_metric = hf_metric.compute()
