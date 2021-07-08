@@ -138,18 +138,20 @@ struct _isinf<__half> {
 
 template <typename T>
 void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
-                   std::string file, int line) {
+                   std::string file, int line, cudaStream_t stream) {
   // check_nan_inf = 0 for checking nan
   // check_nan_inf = 1 for checking inf
   bool res = false;
   std::string msg = file + "(" + std::to_string(line) + "): ";
   if (check_nan_inf) {
     msg += "nan.";
-    res = thrust::transform_reduce(data_ptr, data_ptr + dsize, _isnan<T>(), 0,
+    res = thrust::transform_reduce(thrust::cuda::par.on(stream), data_ptr,
+                                   data_ptr + dsize, _isnan<T>(), false,
                                    thrust::logical_or<bool>());
   } else {
     msg += "inf.";
-    res = thrust::transform_reduce(data_ptr, data_ptr + dsize, _isinf<T>(), 0,
+    res = thrust::transform_reduce(thrust::cuda::par.on(stream), data_ptr,
+                                   data_ptr + dsize, _isinf<T>(), false,
                                    thrust::logical_or<bool>());
   }
   if (res) {
@@ -160,8 +162,8 @@ void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
 
 template void check_nan_inf<float>(const float *data_ptr, int dsize,
                                    bool check_nan_inf, std::string file,
-                                   int line);
+                                   int line, cudaStream_t stream);
 
 template void check_nan_inf<__half>(const __half *data_ptr, int dsize,
                                     bool check_nan_inf, std::string file,
-                                    int line);
+                                    int line, cudaStream_t stream);
