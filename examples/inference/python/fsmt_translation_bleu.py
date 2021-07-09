@@ -14,8 +14,8 @@ from transformers import (
 src_lang = "de"
 tgt_lang = "en"
 raw_datasets = load_dataset("wmt19", "de-en")
-hf_modelname = "facebook/wmt19-de-en"
-ls_modelfile = "lightseq_fsmt_wmt19deen.hdf5"  # "lightseq_fsmt_wmt19deen.pb"
+hf_modelname = f"facebook/wmt19-{src_lang}-{tgt_lang}"
+ls_modelfile = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
 
 print(f"loading translation: {src_lang} -> {tgt_lang}")
 
@@ -99,7 +99,6 @@ def run_hf():
             # huggingface generation
             hf_generated_tokens = hf_model.generate(
                 input_ids.cuda(),
-                # attention_mask=batch["attention_mask"],
                 max_length=256,
                 num_beams=4,
             )
