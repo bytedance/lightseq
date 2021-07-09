@@ -503,28 +503,26 @@ def extract_fsmt_weights(
 
 
 if __name__ == "__main__":
+    src_lang = "de"
+    tgt_lang = "en"
+
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_fsmt_wmt19deen" # or "lightseq_fsmt_wmt19ende" for en->de
-    input_huggingface_fsmt_model = "facebook/wmt19-de-en" # or "facebook/wmt19-en-de" for en->de
+    output_lightseq_model_name = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}"
+    input_huggingface_fsmt_model = f"facebook/wmt19-{src_lang}-{tgt_lang}"
     print(
         f"exporting model {input_huggingface_fsmt_model} to {output_lightseq_model_name}"
     )
-    head_number = 16
-    # in order to get score, we should use `beam_search` inference method
-    generation_method = "beam_search"
-    beam_size = 4
-    max_step = 256
-    # maximum_generation_length = min(src_length + extra_decode_length, max_step)
-    extra_decode_length = 256
-    length_penalty = 1.0
+
     extract_fsmt_weights(
         output_lightseq_model_name,
         input_huggingface_fsmt_model,
-        head_num=head_number,  # layer number
-        generation_method=generation_method,
-        beam_size=beam_size,
-        max_step=max_step,
-        extra_decode_length=extra_decode_length,
-        length_penalty=length_penalty,
+        head_num=16,
+        # in order to get score, we should use `beam_search` inference method
+        generation_method="beam_search",
+        beam_size=4,
+        max_step=256,
+        # maximum_generation_length = min(src_length + extra_decode_length, max_step)
+        extra_decode_length=256,
+        length_penalty=1.0,
         save_proto=False,
     )
