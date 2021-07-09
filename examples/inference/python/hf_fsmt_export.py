@@ -61,6 +61,7 @@ dec_layer_mapping_dict = OrderedDict(
     }
 )
 
+
 def save_fsmt_proto_to_hdf5(transformer: Transformer, f: h5py.File):
     """Convert fsmt protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
