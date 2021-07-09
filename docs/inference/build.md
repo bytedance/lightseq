@@ -26,6 +26,18 @@ $ make -j && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
 ```
 `make install` and `ldconfig` may need to run with `sudo`. If you are encountered with any problem, check [this](https://github.com/protocolbuffers/protobuf/blob/master/src/README.md)
 
+HDF5 also need to be installed.
+```shell
+$ curl -O -L -C - https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz
+$ tar -xzvf hdf5-1_12_0.tar.gz
+$ cd hdf5-hdf5-1_12_0
+$ ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
+$ make
+$ make install
+$ cd ..
+```
+If cmake fails with "Could NOT find HDF5", try update `PATH` via `export PATH="$PATH:/usr/local/hdf5"`.
+
 ## Build
 
 To build all targets.
@@ -43,5 +55,5 @@ $ pip wheel $PROJECT_DIR --no-deps -w $PROJECT_DIR/output/
 
 To install python lightseq in development models
 ```shell
-$ ENABLE_FP32=1 ENABLE_DEBUG=1 pip3 install -e $PROJECT_DIR
+$ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=1 ENABLE_DEBUG=1 pip3 install -e $PROJECT_DIR
 ```

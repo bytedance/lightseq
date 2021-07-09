@@ -61,11 +61,14 @@ def main():
     args = parser.parse_args()
 
     print("initializing bart tokenizer...")
+    # change to "facebook/bart-large" for large model
     tokenizer = BartTokenizer.from_pretrained("facebook/bart-base")
 
     print("creating lightseq model...")
-    ls_model = lsi.Transformer("lightseq_bart_base.pb", 128)
+    # change to "lightseq_bart_large.hdf5" for large model
+    ls_model = lsi.Transformer("lightseq_bart_base.hdf5", 128)
     print("creating huggingface model...")
+    # change to "facebook/bart-large" for large model
     hf_model = BartForConditionalGeneration.from_pretrained("facebook/bart-base")
     hf_model.to("cuda:0")
 

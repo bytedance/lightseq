@@ -1,11 +1,15 @@
 import os
-import math
 from collections import OrderedDict
 
-import numpy as np
-import torch
 import tensorflow as tf
-from utils import fill_layer, _gather_token_embedding, _get_encode_output_mapping_dict
+import h5py
+import numpy as np
+from operator import attrgetter
+from utils import (
+    fill_proto_layer,
+    _gather_token_embedding,
+    _get_encode_output_mapping_dict,
+)
 from transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
@@ -74,6 +78,128 @@ trg_emb_mapping_dict = OrderedDict(
 )
 
 
+def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
+    """Convert bart protobuf to hdf5 format to support larger weight."""
+    MODEL_CONF_KEYS = [
+        # model_conf
+        "head_num",
+        "beam_size",
+        "extra_decode_length",
+        "length_penalty",
+        "src_padding_id",
+        "trg_start_id",
+        "diverse_lambda",
+        "sampling_method",
+        "topp",
+        "topk",
+        "trg_end_id",
+        "is_post_ln",
+        "no_scale_embedding",
+        "use_gelu",
+        "is_multilingual",
+    ]
+
+    EMBEDDING_KEYS = [
+        # src_embedding
+        # trg_embedding
+        "token_embedding",
+        "position_embedding",
+        "norm_scale",
+        "norm_bias",
+        "encode_output_project_kernel_kv",
+        "encode_output_project_bias_kv",
+        "shared_bias",
+        "lang_emb",
+        "trg_vocab_mask",
+    ]
+
+    ENCODER_LAYER_KEYS = [
+        # encoder_stack/{i}
+        "multihead_norm_scale",
+        "multihead_norm_bias",
+        "multihead_project_kernel_qkv",
+        "multihead_project_bias_qkv",
+        "multihead_project_kernel_output",
+        "multihead_project_bias_output",
+        "ffn_norm_scale",
+        "ffn_norm_bias",
+        "ffn_first_kernel",
+        "ffn_first_bias",
+        "ffn_second_kernel",
+        "ffn_second_bias",
+    ]
+
+    DECODER_LAYER_KEYS = [
+        # decoder_stack/{i}
+        "self_norm_scale",
+        "self_norm_bias",
+        "self_project_kernel_qkv",
+        "self_project_bias_qkv",
+        "self_project_kernel_output",
+        "self_project_bias_output",
+        "encdec_norm_scale",
+        "encdec_norm_bias",
+        "encdec_project_kernel_q",
+        "encdec_project_bias_q",
+        "encdec_project_kernel_output",
+        "encdec_project_bias_output",
+        "ffn_norm_scale",
+        "ffn_norm_bias",
+        "ffn_first_kernel",
+        "ffn_first_bias",
+        "ffn_second_kernel",
+        "ffn_second_bias",
+    ]
+    base_attr_to_keys = {
+        "src_embedding": EMBEDDING_KEYS,
+        "trg_embedding": EMBEDDING_KEYS,
+        "model_conf": MODEL_CONF_KEYS,
+    }
+
+    print(f"start converting protobuf to hdf5 format.")
+    # load src_embedding, trg_embedding, model_conf
+    for base_attr, keys in base_attr_to_keys.items():
+        for key in keys:
+            hdf5_key = f"{base_attr}/{key}"
+            proto_attr = f"{base_attr}.{key}"
+
+            if key not in dir(attrgetter(base_attr)(transformer)):
+                print(f"key {key} not found in {base_attr}, skipping")
+                continue
+
+            print(f"loading transformer {proto_attr} -> {hdf5_key}")
+            _data = attrgetter(proto_attr)(transformer)
+            if type(_data) is str:
+                print(
+                    f"find type str, explicitly convert string to ascii encoded array."
+                )
+                # explict convert to array of char (int8) to avoid issues on string reading in C
+                _data = np.array([ord(c) for c in _data]).astype(np.int8)
+            f.create_dataset(hdf5_key, data=_data)
+
+    # save number of layers metadata
+    f.create_dataset("model_conf/n_encoder_stack", data=len(transformer.encoder_stack))
+    f.create_dataset("model_conf/n_decoder_stack", data=len(transformer.decoder_stack))
+
+    # load encoder_stack
+    for layer_id, layer in enumerate(transformer.encoder_stack):
+        for key in ENCODER_LAYER_KEYS:
+            hdf5_key = f"encoder_stack/{layer_id}/{key}"
+            proto_attr = key
+            print(f"loading transformer.encoder_stack {proto_attr} -> {hdf5_key}")
+            f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
+
+    # load decoder_stack
+    for layer_id, layer in enumerate(transformer.decoder_stack):
+        for key in DECODER_LAYER_KEYS:
+            hdf5_key = f"decoder_stack/{layer_id}/{key}"
+            proto_attr = key
+            print(f"loading transformer.decoder_stack {proto_attr} -> {hdf5_key}")
+            f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
+
+    print(f"proto to hdf5 conversion completed.")
+
+
 def extract_transformer_weights(
     output_file,
     model_dir,
@@ -87,6 +213,7 @@ def extract_transformer_weights(
     topp=0.75,
     lang="en",
     only_decoder=True,
+    save_proto=False,
 ):
     transformer = Transformer()
     # load var names
@@ -119,7 +246,7 @@ def extract_transformer_weights(
             enc_tensor_names.setdefault(layer_id, []).append(name)
 
         for layer_id in sorted(enc_tensor_names.keys()):
-            fill_layer(
+            fill_proto_layer(
                 enc_tensor_names[layer_id],
                 encoder_state_dict,
                 transformer.encoder_stack.add(),
@@ -136,7 +263,7 @@ def extract_transformer_weights(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_layer(
+        fill_proto_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
             transformer.decoder_stack.add(),
@@ -145,7 +272,7 @@ def extract_transformer_weights(
 
     # fill src_embedding
     if not only_decoder:
-        fill_layer(
+        fill_proto_layer(
             enc_var_name_list,
             encoder_state_dict,
             transformer.src_embedding,
@@ -178,7 +305,7 @@ def extract_transformer_weights(
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_layer(
+    fill_proto_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,
@@ -335,26 +462,51 @@ def extract_transformer_weights(
     transformer.model_conf.no_scale_embedding = True
     transformer.model_conf.use_gelu = True
 
-    print("Wrting to {0}".format(output_file))
-    with tf.io.gfile.GFile(output_file, "wb") as fout:
-        fout.write(transformer.SerializeToString())
+    if save_proto:
+        output_file += ".pb"
+        print("Saving model to protobuf...")
+        print("Writing to {0}".format(output_file))
+        with tf.io.gfile.GFile(output_file, "wb") as fout:
+            fout.write(transformer.SerializeToString())
 
-    transformer = Transformer()
-    with tf.io.gfile.GFile(output_file, "rb") as fin:
-        transformer.ParseFromString(fin.read())
-    print(transformer.model_conf)
+        transformer = Transformer()
+        with tf.io.gfile.GFile(output_file, "rb") as fin:
+            transformer.ParseFromString(fin.read())
+        print(transformer.model_conf)
+    else:
+        output_file += ".hdf5"
+        print("Saving model to hdf5...")
+        print("Writing to {0}".format(output_file))
+        f = h5py.File(output_file, "w")
+        save_bart_proto_to_hdf5(transformer, f)
+        f.close()
+
+        f = h5py.File(output_file, "r")
+
+        def _print_pair(key, value):
+            if key == "sampling_method":
+                value = "".join(map(chr, value[()]))
+            else:
+                value = value[()]
+            print(f"{key}: {value}")
+
+        list(map(lambda x: _print_pair(*x), f["model_conf"].items()))
+        f.close()
 
 
 if __name__ == "__main__":
-    output_lightseq_model_name = "lightseq_bart_base.pb"
+    # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
+    output_lightseq_model_name = "lightseq_bart_base"  # you can rename it to "lightseq_bart_large" for large model
     input_huggingface_bart_model = (
         "facebook/bart-base"  # Example: you can try "facebook/bart-large" as well
     )
-    head_number = 12  # for bart-large, we have 16
-    generation_method = "beam_search"  # in order to get score, we should use `beam_search` inference method
+    head_number = 12  # change this to 16 for "bart-large" model
+    # in order to get score, we should use `beam_search` inference method
+    generation_method = "beam_search"
     beam_size = 4
     max_step = 50  # max step for generation, it decides GPU memory occupancy
-    extra_decode_length = 50  # maximum_generation_length = min(src_length + extra_decode_length, max_step)
+    # maximum_generation_length = min(src_length + extra_decode_length, max_step)
+    extra_decode_length = 50
     length_penalty = 1.0
     extract_transformer_weights(
         output_lightseq_model_name,
@@ -366,4 +518,5 @@ if __name__ == "__main__":
         extra_decode_length=extra_decode_length,
         only_decoder=False,
         length_penalty=length_penalty,
+        save_proto=False,
     )

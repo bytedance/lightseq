@@ -144,3 +144,4 @@ build/
 .vscode
 *.bin
 *.idx
+*.hdf5

@@ -1,10 +1,9 @@
 import os
+import h5py
+import numpy as np
 from collections import OrderedDict
-
-import tensorflow as tf
-from gpt_pb2 import Gpt
-from utils import fill_layer
 from transformers import GPT2LMHeadModel
+from utils import fill_hdf5_layer
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -57,10 +56,15 @@ def extract_gpt_weights(
     eos_id=50256,
     pad_id=50257,
 ):
-    gpt = Gpt()
     # load var names
     encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
     enc_var_name_list = list(encoder_state_dict.keys())
+
+    # initialize output file
+    output_file += ".hdf5"
+    print("Saving model to hdf5...")
+    print("Writing to {0}".format(output_file))
+    hdf5_file = h5py.File(output_file, "w")
 
     # fill each encoder layer's params
     enc_tensor_names = {}
@@ -71,44 +75,59 @@ def extract_gpt_weights(
         layer_id = int(name_split[2])
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
+    # fill encoder_stack
     for layer_id in sorted(enc_tensor_names.keys()):
-        fill_layer(
+        fill_hdf5_layer(
             enc_tensor_names[layer_id],
             encoder_state_dict,
-            gpt.encoder_stack.add(),
+            hdf5_file,
+            f"encoder_stack/{layer_id}/",
             enc_layer_mapping_dict,
         )
 
     # fill src_embedding
-    fill_layer(
+    fill_hdf5_layer(
         enc_var_name_list,
         encoder_state_dict,
-        gpt.src_embedding,
+        hdf5_file,
+        "src_embedding/",
         src_emb_mapping_dict,
     )
 
-    # fill in conf
-    gpt.model_conf.head_num = head_num
-    gpt.model_conf.src_padding_id = pad_id
-    gpt.model_conf.sampling_method = generation_method
-    gpt.model_conf.topp = topp
-    gpt.model_conf.topk = topk
-    gpt.model_conf.eos_id = eos_id
+    # save number of layers metadata
+    hdf5_file.create_dataset(
+        "model_conf/n_encoder_stack", data=len(enc_tensor_names), dtype="i4"
+    )
+    # fill in model_conf
+    hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
+    hdf5_file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/sampling_method",
+        data=np.array([ord(c) for c in generation_method]).astype(np.int8),
+        dtype="i1",
+    )
+    hdf5_file.create_dataset("model_conf/topp", data=topp, dtype="f4")
+    hdf5_file.create_dataset("model_conf/topk", data=topk, dtype="i4")
+    hdf5_file.create_dataset("model_conf/eos_id", data=eos_id, dtype="i4")
 
-    print("Wrting to {0}".format(output_file))
-    with tf.io.gfile.GFile(output_file, "wb") as fout:
-        fout.write(gpt.SerializeToString())
+    hdf5_file.close()
+    # read-in again to double check
+    hdf5_file = h5py.File(output_file, "r")
 
-    gpt = Gpt()
-    with tf.io.gfile.GFile(output_file, "rb") as fin:
-        gpt.ParseFromString(fin.read())
-    print(gpt.model_conf)
+    def _print_pair(key, value):
+        if key == "sampling_method":
+            value = "".join(map(chr, value[()]))
+        else:
+            value = value[()]
+        print(f"{key}: {value}")
+
+    list(map(lambda x: _print_pair(*x), hdf5_file["model_conf"].items()))
 
 
 if __name__ == "__main__":
-    output_lightseq_model_name = "lightseq_gpt2.pb"
-    input_huggingface_gpt_model = "gpt2"
-    head_number = 12
+    output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
+    input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
+    head_number = 12  # 20 for "gpt2-large"
     # generation_method should be "topk" or "topp"
     generation_method = "topk"
     topk = 1

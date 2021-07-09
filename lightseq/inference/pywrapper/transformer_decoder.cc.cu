@@ -95,7 +95,8 @@ class TransformerDecoder {
     }
 
     long buf_bytesize = decoder_->compute_buffer_bytesize();
-    std::cout << "decoder buf_bytesize: " << buf_bytesize << std::endl;
+    std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
+              << "MB GPU buffer for transformer decoder" << std::endl;
 
     void *d_buf_;
     // encoder and decoder use the same buffer to save gpu memory useage
