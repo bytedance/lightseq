@@ -20,10 +20,11 @@ def _export_model_weight(src_lang, tgt_lang):
         f"exporting model {input_huggingface_fsmt_model} to {output_lightseq_model_name}"
     )
 
-    # hacky way to import hs_fsmt_export without break 
-    # `import lightseq.inference` from installed package 
+    # hacky way to import hs_fsmt_export without break
+    # `import lightseq.inference` from installed package
     import sys
     import pathlib
+
     project_root_path = pathlib.Path(__file__).parent.parent.parent
     target_folder = project_root_path / "examples" / "inference" / "python"
     sys.path.insert(0, str(target_folder))
@@ -159,14 +160,19 @@ def _calculate_bleu(
     }
     return results
 
+
 BLEU_DIFF_THRESHOLD = 0.3
+
 
 def _check_result(results: dict, src_lang, tgt_lang):
     assert results["src_lang"] == src_lang
     assert results["tgt_lang"] == tgt_lang
     bleu_diff = results["huggingface bleu"] - results["lightseq bleu"]
-    print(f"bleu_diff for {src_lang} compared to huggingface -> {tgt_lang}: {bleu_diff}")
+    print(
+        f"bleu_diff for {src_lang} compared to huggingface -> {tgt_lang}: {bleu_diff}"
+    )
     assert bleu_diff <= BLEU_DIFF_THRESHOLD
+
 
 def test_en_de_bleu():
     src_lang, tgt_lang = ("en", "de")
