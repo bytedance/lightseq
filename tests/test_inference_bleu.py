@@ -1,6 +1,6 @@
+import os
 import torch
 import lightseq.inference as lsi
-
 from datasets import load_dataset, load_metric
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
@@ -10,8 +10,7 @@ from transformers import (
     DataCollatorForSeq2Seq,
 )
 
-
-def get_wmt19_eval_dataloader(tokenizer, name="de-en"):
+def _get_wmt19_eval_dataloader(tokenizer, src_lang, tgt_lang, name="de-en"):
     raw_datasets = load_dataset("wmt19", name)
     # load dataset: en -> de translation
     eval_dataset = raw_datasets["validation"]
@@ -46,7 +45,7 @@ def get_wmt19_eval_dataloader(tokenizer, name="de-en"):
     return eval_dataloader
 
 
-def calculate_bleu(
+def _calculate_bleu(
     eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
 ):
     print(f"calculating bleu for translation: {src_lang} -> {tgt_lang}")
@@ -57,6 +56,9 @@ def calculate_bleu(
     hf_model = FSMTForConditionalGeneration.from_pretrained(hf_modelname).cuda()
 
     ls_modelfile = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
+    if not os.path.exists(ls_modelfile):
+        print(f"model weight {ls_modelfile} not found. Please prepare the model weight to {os.getcwd()}")
+        assert False, f"model weight {ls_modelfile} not found. Please prepare the model weight to {os.getcwd()}"
     print(f"loading lightseq model: {ls_modelfile}")
     ls_model = lsi.Transformer(ls_modelfile, 16)  # 2nd argument is max_batch_size
 
@@ -123,13 +125,32 @@ def calculate_bleu(
     }
     return results
 
+BLEU_DIFF_THRESHOLD = 0.3
 
-# en->de, de->en pairs are available
-src_lang, tgt_lang = ("en", "de")  # ("de", "en")
-tokenizer = FSMTTokenizer.from_pretrained(f"facebook/wmt19-{src_lang}-{tgt_lang}")
+def _check_result(results: dict, src_lang, tgt_lang):
+    assert results["src_lang"] == src_lang
+    assert results["tgt_lang"] == tgt_lang
+    bleu_diff = results["huggingface bleu"] - results["lightseq bleu"]
+    print(f"bleu_diff for {src_lang} compared to huggingface -> {tgt_lang}: {bleu_diff}")
+    assert bleu_diff <= BLEU_DIFF_THRESHOLD
 
-eval_dataloader = get_wmt19_eval_dataloader(tokenizer, "de-en")
-results = calculate_bleu(
-    eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
-)
-print(results)
+def test_en_de_bleu():
+    src_lang, tgt_lang = ("en", "de")
+    tokenizer = FSMTTokenizer.from_pretrained(f"facebook/wmt19-{src_lang}-{tgt_lang}")
+    eval_dataloader = _get_wmt19_eval_dataloader(tokenizer, src_lang, tgt_lang, "de-en")
+
+    results = _calculate_bleu(
+        eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
+    )
+    _check_result(results, src_lang, tgt_lang)
+
+
+def test_de_en_bleu():
+    src_lang, tgt_lang = ("de", "en")
+    tokenizer = FSMTTokenizer.from_pretrained(f"facebook/wmt19-{src_lang}-{tgt_lang}")
+    eval_dataloader = _get_wmt19_eval_dataloader(tokenizer, src_lang, tgt_lang, "de-en")
+
+    results = _calculate_bleu(
+        eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
+    )
+    _check_result(results, src_lang, tgt_lang)
