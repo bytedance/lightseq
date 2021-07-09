@@ -11,81 +11,64 @@ from transformers import (
 )
 
 
-src_lang = "de"
-tgt_lang = "en"
-raw_datasets = load_dataset("wmt19", "de-en")
-hf_modelname = f"facebook/wmt19-{src_lang}-{tgt_lang}"
-ls_modelfile = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
+def get_wmt19_eval_dataloader(tokenizer, name="de-en"):
+    raw_datasets = load_dataset("wmt19", name)
+    # load dataset: en -> de translation
+    eval_dataset = raw_datasets["validation"]
+    column_names = eval_dataset.column_names
 
-print(f"loading translation: {src_lang} -> {tgt_lang}")
+    def preprocess_function(examples):
+        inputs = [ex[src_lang] for ex in examples["translation"]]
+        targets = [ex[tgt_lang] for ex in examples["translation"]]
+        inputs = [inp for inp in inputs]
+        model_inputs = tokenizer(inputs, padding=True, pad_to_multiple_of=8)
+        # Setup the tokenizer for targets
+        with tokenizer.as_target_tokenizer():
+            labels = tokenizer(targets, padding=True, pad_to_multiple_of=8)
 
-tokenizer = FSMTTokenizer.from_pretrained(hf_modelname)
+        model_inputs["labels"] = labels["input_ids"]
+        return model_inputs
 
-# load dataset: en -> de translation
-eval_dataset = raw_datasets["validation"]
-column_names = eval_dataset.column_names
-
-
-def preprocess_function(examples):
-    inputs = [ex[src_lang] for ex in examples["translation"]]
-    targets = [ex[tgt_lang] for ex in examples["translation"]]
-    inputs = [inp for inp in inputs]
-    model_inputs = tokenizer(inputs, padding=True, pad_to_multiple_of=8)
-    # Setup the tokenizer for targets
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(targets, padding=True, pad_to_multiple_of=8)
-
-    model_inputs["labels"] = labels["input_ids"]
-    return model_inputs
-
-
-eval_dataset = eval_dataset.map(
-    preprocess_function,
-    batched=True,
-    remove_columns=column_names,
-    load_from_cache_file=True,
-    desc="Running tokenizer on dataset",
-)
-data_collator = DataCollatorForSeq2Seq(
-    tokenizer,
-    model=None,
-    label_pad_token_id=tokenizer.pad_token_id,
-    pad_to_multiple_of=8,
-)
-eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=16)
-
-# initialize metric
-ls_metric = load_metric("sacrebleu")
-hf_metric = load_metric("sacrebleu")
+    eval_dataset = eval_dataset.map(
+        preprocess_function,
+        batched=True,
+        remove_columns=column_names,
+        load_from_cache_file=True,
+        desc="Running tokenizer on dataset",
+    )
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer,
+        model=None,
+        label_pad_token_id=tokenizer.pad_token_id,
+        pad_to_multiple_of=8,
+    )
+    eval_dataloader = DataLoader(eval_dataset, collate_fn=data_collator, batch_size=16)
+    return eval_dataloader
 
 
-def run_ls():
-    print(f"loading lightseq model: {ls_modelfile}")
-    ls_model = lsi.Transformer(ls_modelfile, 16)  # 2nd argument is max_batch_size
-    for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
-        with torch.no_grad():
-            input_ids = batch["input_ids"]
-            labels = batch["labels"]
-            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-            decoded_labels = [[label.strip()] for label in decoded_labels]
+def calculate_bleu(
+    eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
+):
+    print(f"calculating bleu for translation: {src_lang} -> {tgt_lang}")
 
-            # lightseq generation
-            ls_generated_tokens = ls_model.infer(
-                input_ids,
-            )
-            ls_generated_tokens = [ids[0] for ids in ls_generated_tokens[0]]
-            ls_decoded_preds = tokenizer.batch_decode(
-                ls_generated_tokens, skip_special_tokens=True
-            )
-            ls_decoded_preds = [pred.strip() for pred in ls_decoded_preds]
-            ls_out.write("\n".join(ls_decoded_preds))
-            ls_metric.add_batch(predictions=ls_decoded_preds, references=decoded_labels)
-
-
-def run_hf():
-    # load models
+    # load model
+    hf_modelname = f"facebook/wmt19-{src_lang}-{tgt_lang}"
     print(f"loading huggingface model: {hf_modelname}")
     hf_model = FSMTForConditionalGeneration.from_pretrained(hf_modelname).cuda()
+
+    ls_modelfile = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
+    print(f"loading lightseq model: {ls_modelfile}")
+    ls_model = lsi.Transformer(ls_modelfile, 16)  # 2nd argument is max_batch_size
+
+    # initialize metric
+    ls_metric = load_metric("sacrebleu")
+    hf_metric = load_metric("sacrebleu")
+
+    # initialize output file
+    if output_to_file:
+        hf_out = open("translation-hf.txt", "w")
+        ls_out = open("translation-ls.txt", "w")
+        ref_out = open("translation-reference.txt", "w")
 
     for step, batch in tqdm(enumerate(eval_dataloader), total=len(eval_dataloader)):
         with torch.no_grad():
@@ -93,7 +76,8 @@ def run_hf():
             labels = batch["labels"]
             decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
             # save reference output here
-            ref_out.write("\n".join([label.strip() for label in decoded_labels]))
+            if output_to_file:
+                ref_out.write("\n".join([label.strip() for label in decoded_labels]))
             decoded_labels = [[label.strip()] for label in decoded_labels]
 
             # huggingface generation
@@ -106,28 +90,46 @@ def run_hf():
                 hf_generated_tokens, skip_special_tokens=True
             )
             hf_decoded_preds = [pred.strip() for pred in hf_decoded_preds]
-            hf_out.write("\n".join(hf_decoded_preds))
+            if output_to_file:
+                hf_out.write("\n".join(hf_decoded_preds))
             hf_metric.add_batch(predictions=hf_decoded_preds, references=decoded_labels)
 
+            # lightseq generation
+            ls_generated_tokens = ls_model.infer(
+                input_ids,
+            )
+            ls_generated_tokens = [ids[0] for ids in ls_generated_tokens[0]]
+            ls_decoded_preds = tokenizer.batch_decode(
+                ls_generated_tokens, skip_special_tokens=True
+            )
+            ls_decoded_preds = [pred.strip() for pred in ls_decoded_preds]
+            if output_to_file:
+                ls_out.write("\n".join(ls_decoded_preds))
+            ls_metric.add_batch(predictions=ls_decoded_preds, references=decoded_labels)
 
-hf_out = open("translation-hf.txt", "w")
-ls_out = open("translation-ls.txt", "w")
-ref_out = open("translation-reference.txt", "w")
+    if output_to_file:
+        hf_out.close()
+        ls_out.close()
+        ref_out.close()
 
-print(f"running lightseq translation...")
-run_ls()
-print(f"running huggingface translation...")
-run_hf()
-
-ls_eval_metric = ls_metric.compute()
-hf_eval_metric = hf_metric.compute()
-print(
-    {
+    # calculate bleu
+    ls_eval_metric = ls_metric.compute()
+    hf_eval_metric = hf_metric.compute()
+    results = {
+        "src_lang": src_lang,
+        "tgt_lang": tgt_lang,
         "lightseq bleu": ls_eval_metric["score"],
         "huggingface bleu": hf_eval_metric["score"],
     }
-)
+    return results
 
-hf_out.close()
-ls_out.close()
-ref_out.close()
+
+src_lang = "de"
+tgt_lang = "en"
+tokenizer = FSMTTokenizer.from_pretrained(f"facebook/wmt19-{src_lang}-{tgt_lang}")
+
+eval_dataloader = get_wmt19_eval_dataloader(tokenizer, "de-en")
+results = calculate_bleu(
+    eval_dataloader, tokenizer, src_lang, tgt_lang, output_to_file=False
+)
+print(results)
