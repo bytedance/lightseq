@@ -17,13 +17,6 @@ THIS_DIR=$(dirname $(readlink -f $0))
 
 export TASK_NAME=mrpc
 
-# v100 fp32 40 samples/sec, 0.87 acc
-# v100 fp32 lightseq 47 samples/sec, 0.68 acc
-# v100 torch amp 84 samples/sec, 0.86 acc
-# v100 torch amp lightseq 163 samples/sec, 0.68 acc
-# v100 apex amp 84 samples/sec, 0.86 acc
-
-
 python3 $THIS_DIR/run_glue.py \
   --model_name_or_path bert-large-cased \
   --task_name $TASK_NAME \

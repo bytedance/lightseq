@@ -50,5 +50,15 @@ RUN mkdir -p ${CMAKE_PATH} && cd ${CMAKE_PATH} && \
     sh cmake-3.18.2-Linux-x86_64.sh --skip-license && \
     rm cmake-3.18.2-Linux-x86_64.sh && ln -s ${CMAKE_PATH}/bin/cmake /usr/bin/cmake
 
+# install HDF5
+RUN curl -O -L -C - \
+    https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz && \
+    tar xf hdf5-1_12_0.tar.gz && \
+    rm hdf5-1_12_0.tar.gz && \
+    cd hdf5-hdf5-1_12_0 && \
+    ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
+    make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
+
+
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
-ENV PATH /usr/local/cuda/bin:${PATH}
+ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:${PATH}

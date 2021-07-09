@@ -92,7 +92,8 @@ class Gpt {
     }
 
     size_t buf_bytesize = encoder_->compute_buffer_bytesize();
-    std::cout << "gpt2 buf_bytesize: " << buf_bytesize << std::endl;
+    std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
+              << "MB GPU buffer for GPT2" << std::endl;
 
     void* d_buf_;
     // encoder and decoder use the same buffer to save gpu memory useage
