@@ -277,4 +277,4 @@ class LSTransformerEncoderLayer(nn.Module):
             self.config,
         )
 
-        return output
+        return output.to(self.para)

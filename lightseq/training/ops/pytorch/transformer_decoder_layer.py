@@ -410,4 +410,4 @@ class LSTransformerDecoderLayer(nn.Module):
             self.config,
             cache_list,
         )
-        return output
+        return output.to(self.para)

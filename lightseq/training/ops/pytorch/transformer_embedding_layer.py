@@ -197,4 +197,4 @@ class LSTransformerEmbeddingLayer(nn.Module):
                 f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
             )
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
-        return x
+        return x.to(self.embeddings)
