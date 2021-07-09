@@ -22,16 +22,14 @@ def _export_model_weight(src_lang, tgt_lang):
 
     # hacky way to import hs_fsmt_export without break 
     # `import lightseq.inference` from installed package 
-    import importlib.util
+    import sys
     import pathlib
     project_root_path = pathlib.Path(__file__).parent.parent.parent
-    target_path = project_root_path / "examples" / "inference" / "python" / "hf_fsmt_export.py"
+    target_folder = project_root_path / "examples" / "inference" / "python"
+    sys.path.insert(0, str(target_folder))
+    from hf_fsmt_export import extract_fsmt_weights
 
-    spec = importlib.util.spec_from_file_location("hf_fsmt_export", str(target_path))
-    hf_fsmt_export = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(hf_fsmt_export)
-
-    hf_fsmt_export.extract_fsmt_weights(
+    extract_fsmt_weights(
         output_lightseq_model_name,
         input_huggingface_fsmt_model,
         head_num=16,
