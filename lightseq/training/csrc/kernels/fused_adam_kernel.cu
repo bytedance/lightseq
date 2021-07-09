@@ -185,6 +185,7 @@ void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
     using namespace at;
     const int block_dim = 1024;
     int grid_dim = ((total_size + block_dim - 1) / block_dim) >> 2;
+    if (grid_dim == 0) grid_dim = 1;
     const dim3 blocks(grid_dim);
     DISPATCH_DOUBLE_AND_FLOAT(
         g.scalar_type(), 0, "adam_cuda_kernel",
