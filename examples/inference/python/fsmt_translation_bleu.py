@@ -125,7 +125,7 @@ def calculate_bleu(
 
 
 # en->de, de->en pairs are available
-src_lang, tgt_lang = ("en", "de") # ("en", "de") ("de", "en")
+src_lang, tgt_lang = ("en", "de")  # ("de", "en")
 tokenizer = FSMTTokenizer.from_pretrained(f"facebook/wmt19-{src_lang}-{tgt_lang}")
 
 eval_dataloader = get_wmt19_eval_dataloader(tokenizer, "de-en")

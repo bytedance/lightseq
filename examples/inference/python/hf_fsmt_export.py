@@ -504,7 +504,7 @@ def extract_fsmt_weights(
 
 if __name__ == "__main__":
     # en->de, de->en pairs are available
-    src_lang, tgt_lang = ("en", "de") # ("de", "en")
+    src_lang, tgt_lang = ("en", "de")  # ("de", "en")
 
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
     output_lightseq_model_name = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}"
