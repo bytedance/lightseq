@@ -1,5 +1,6 @@
 import os
 import torch
+import sys
 import lightseq.inference as lsi
 from datasets import load_dataset, load_metric
 from torch.utils.data.dataloader import DataLoader
@@ -9,6 +10,41 @@ from transformers import (
     FSMTTokenizer,
     DataCollatorForSeq2Seq,
 )
+
+
+def _export_model_weight(src_lang, tgt_lang):
+    # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
+    output_lightseq_model_name = f"/tmp/lightseq_fsmt_wmt19{src_lang}{tgt_lang}"
+    input_huggingface_fsmt_model = f"facebook/wmt19-{src_lang}-{tgt_lang}"
+    print(
+        f"exporting model {input_huggingface_fsmt_model} to {output_lightseq_model_name}"
+    )
+
+    # hacky way to import hs_fsmt_export without break 
+    # `import lightseq.inference` from installed package 
+    import importlib.util
+    import pathlib
+    project_root_path = pathlib.Path(__file__).parent.parent.parent
+    target_path = project_root_path / "examples" / "inference" / "python" / "hf_fsmt_export.py"
+
+    spec = importlib.util.spec_from_file_location("hf_fsmt_export", str(target_path))
+    hf_fsmt_export = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hf_fsmt_export)
+
+    hf_fsmt_export.extract_fsmt_weights(
+        output_lightseq_model_name,
+        input_huggingface_fsmt_model,
+        head_num=16,
+        # in order to get score, we should use `beam_search` inference method
+        generation_method="beam_search",
+        beam_size=4,
+        max_step=256,
+        # maximum_generation_length = min(src_length + extra_decode_length, max_step)
+        extra_decode_length=256,
+        length_penalty=1.0,
+        save_proto=False,
+    )
+
 
 def _get_wmt19_eval_dataloader(tokenizer, src_lang, tgt_lang, name="de-en"):
     raw_datasets = load_dataset("wmt19", name)
@@ -55,10 +91,10 @@ def _calculate_bleu(
     print(f"loading huggingface model: {hf_modelname}")
     hf_model = FSMTForConditionalGeneration.from_pretrained(hf_modelname).cuda()
 
-    ls_modelfile = f"lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
+    ls_modelfile = f"/tmp/lightseq_fsmt_wmt19{src_lang}{tgt_lang}.hdf5"
     if not os.path.exists(ls_modelfile):
-        print(f"model weight {ls_modelfile} not found. Please prepare the model weight to {os.getcwd()}")
-        assert False, f"model weight {ls_modelfile} not found. Please prepare the model weight to {os.getcwd()}"
+        print(f"model weight {ls_modelfile} not found. exporting model weight...")
+        _export_model_weight(src_lang, tgt_lang)
     print(f"loading lightseq model: {ls_modelfile}")
     ls_model = lsi.Transformer(ls_modelfile, 16)  # 2nd argument is max_batch_size
 
