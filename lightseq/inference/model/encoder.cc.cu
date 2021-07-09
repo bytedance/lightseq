@@ -72,7 +72,7 @@ std::string Encoder<OpType_>::check() {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
   if (_tw._encoder_inner_size & 1) {
-    return "violate inner_size % 2 = 0";
+    return "violate encoder_inner_size % 2 = 0";
   }
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
