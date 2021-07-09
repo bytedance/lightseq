@@ -228,12 +228,11 @@ class LSTransformerEncoderLayer(nn.Module):
         nn.init.zeros_(self._get_weights(11))
 
     def __assign_layer_weight_grad(self):
-        if self.config.fp16 and not hasattr(self, "para_16"):
-            self.register_buffer(
-                "para_16", torch.tensor(self.para.data, dtype=torch.half)
-            )
-
-        param = self.para_16 if self.config.fp16 else self.para
+        param = (
+            self.para_16
+            if self.config.fp16 and self.para.dtype != torch.half
+            else self.para
+        )
         if self.config.layer_id in _all_layer_grads:
             return
         cuda_module = transformer_cuda_module
@@ -252,8 +251,12 @@ class LSTransformerEncoderLayer(nn.Module):
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
-        if self.config.fp16:
-            self.para_16 = self.para.to(torch.half)
+        if self.config.fp16 and self.para.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.para.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.para.clone().detach().half())
+
         self.__assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
         if dim % 256 != 0:
@@ -274,4 +277,4 @@ class LSTransformerEncoderLayer(nn.Module):
             self.config,
         )
 
-        return output
+        return output.to(self.para)

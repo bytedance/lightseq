@@ -23,9 +23,6 @@ class LSTransformerEmbeddingFunc(Function):
             else cuda_module.transformer_embedding_layer_fw_fp32
         )
 
-        if config.fp16:
-            input = input.to(torch.half)
-
         (output,) = forward_func(config.layer_id, input, step, config.training)
 
         if config.is_grad_enabled and config.training:
@@ -47,7 +44,7 @@ class LSTransformerEmbeddingFunc(Function):
 
         if ctx.config.fp16:
             grad_output = grad_output.to(torch.half)
-            input = input.to(torch.half)
+
         backward_func(ctx.config.layer_id, grad_output, input)
 
         grad = _all_layer_grads[ctx.config.layer_id]
@@ -156,12 +153,11 @@ class LSTransformerEmbeddingLayer(nn.Module):
         return emb
 
     def __assign_layer_weight_grad(self):
-        if self.config.fp16 and not hasattr(self, "para_16"):
-            self.register_buffer(
-                "para_16", torch.tensor(self.para.data, dtype=torch.half)
-            )
-
-        param = self.para_16 if self.config.fp16 else self.para
+        param = (
+            self.para_16
+            if self.config.fp16 and self.embeddings.dtype != torch.half
+            else self.embeddings
+        )
 
         if self.config.layer_id in _all_layer_grads:
             return
@@ -179,8 +175,12 @@ class LSTransformerEmbeddingLayer(nn.Module):
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
 
-        if self.config.fp16:
-            self.para_16 = self.para.to(torch.half)
+        if self.config.fp16 and self.embeddings.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.embeddings.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.embeddings.clone().detach().half())
+
         self.__assign_layer_weight_grad()
         input = input.to(torch.int)
         bs, sl = input.size()
@@ -196,7 +196,5 @@ class LSTransformerEmbeddingLayer(nn.Module):
             raise ValueError(
                 f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
             )
-        if self.config.fp16:
-            input = input.to(torch.half, copy=True)
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
-        return x
+        return x.to(self.embeddings)

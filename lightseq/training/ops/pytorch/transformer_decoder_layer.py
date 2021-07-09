@@ -35,7 +35,7 @@ class LSTransformerDecoderFunc(Function):
             decoder_states = decoder_states.to(torch.half)
             encoder_out = encoder_out.to(torch.half)
             encoder_padding_mask = encoder_padding_mask.to(torch.half)
-            cache = [c.to(torch.half) for c in cache]
+            # cache = [c.to(torch.half) for c in cache]
 
         (output,) = forward_func(
             config.layer_id,
@@ -290,11 +290,11 @@ class LSTransformerDecoderLayer(nn.Module):
             nn.init.uniform_(self._get_weights(19), -bound, bound)
 
     def __assign_layer_weight_grad(self):
-        if self.config.fp16 and not hasattr(self, "para_16"):
-            self.register_buffer(
-                "para_16", torch.tensor(self.para.data, dtype=torch.half)
-            )
-        param = self.para_16 if self.config.fp16 else self.para
+        param = (
+            self.para_16
+            if self.config.fp16 and self.para.dtype != torch.half
+            else self.para
+        )
 
         if self.config.layer_id in _all_layer_grads:
             return
@@ -352,8 +352,12 @@ class LSTransformerDecoderLayer(nn.Module):
             (encoder_padding_mask * -1e8).type_as(decoder_states).contiguous()
         )
 
-        if self.config.fp16:
-            self.para_16 = self.para.to(torch.half)
+        if self.config.fp16 and self.para.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.para.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.para.clone().detach().half())
+
         self.__assign_layer_weight_grad()
         cache_list = []
         if cache is not None:
@@ -406,4 +410,4 @@ class LSTransformerDecoderLayer(nn.Module):
             self.config,
             cache_list,
         )
-        return output
+        return output.to(self.para)
