@@ -504,8 +504,8 @@ def extract_fsmt_weights(
 
 if __name__ == "__main__":
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_fsmt_wmt19deen"
-    input_huggingface_fsmt_model = "facebook/wmt19-de-en"
+    output_lightseq_model_name = "lightseq_fsmt_wmt19deen" # or "lightseq_fsmt_wmt19ende" for en->de
+    input_huggingface_fsmt_model = "facebook/wmt19-de-en" # or "facebook/wmt19-en-de" for en->de
     print(
         f"exporting model {input_huggingface_fsmt_model} to {output_lightseq_model_name}"
     )
