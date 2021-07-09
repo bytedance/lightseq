@@ -61,22 +61,6 @@ dec_layer_mapping_dict = OrderedDict(
     }
 )
 
-# src_emb_mapping_dict = OrderedDict(
-#     {
-#         "norm_scale": "layernorm_embedding weight",
-#         "norm_bias": "layernorm_embedding bias",
-#     }
-# )
-
-# trg_emb_mapping_dict = OrderedDict(
-#     {
-#         "norm_scale": "layernorm_embedding weight",
-#         "norm_bias": "layernorm_embedding bias",
-#         "shared_bias": "final_logits_bias",
-#     }
-# )
-
-
 def save_fsmt_proto_to_hdf5(transformer: Transformer, f: h5py.File):
     """Convert fsmt protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
@@ -279,11 +263,11 @@ def extract_fsmt_weights(
     _, encoder_hidden_size = (
         encoder_state_dict["model.encoder.embed_tokens.weight"].numpy().shape
     )
-    # FSMT does not have embedding layernorm - add hack to make it work.
-    transformer.src_embedding.norm_scale[:] = [1 for _ in range(encoder_hidden_size)]
+    # FSMT does not have embedding layernorm - these are just placeholders for weights
+    transformer.src_embedding.norm_scale[:] = [0 for _ in range(encoder_hidden_size)]
     transformer.src_embedding.norm_bias[:] = [0 for _ in range(encoder_hidden_size)]
-    print(f"setting src_embedding.norm_scale to all 1")
-    print(f"setting src_embedding.norm_bias to all 0")
+    print(f"setting src_embedding.norm_scale to dummy value")
+    print(f"setting src_embedding.norm_bias to dummy value")
 
     transformer.src_embedding.token_embedding[:] = (
         # scale embedding
@@ -326,13 +310,13 @@ def extract_fsmt_weights(
     decoder_vocab_size, decoder_hidden_size = (
         decoder_state_dict["model.decoder.embed_tokens.weight"].numpy().shape
     )
-    # FSMT does not have embedding layernorm - add hack to make it work.
-    transformer.trg_embedding.norm_scale[:] = [1 for _ in range(decoder_hidden_size)]
+    # FSMT does not have embedding layernorm - these are just placeholders for weights
+    transformer.trg_embedding.norm_scale[:] = [0 for _ in range(decoder_hidden_size)]
     transformer.trg_embedding.norm_bias[:] = [0 for _ in range(decoder_hidden_size)]
     transformer.trg_embedding.shared_bias[:] = [0 for _ in range(decoder_vocab_size)]
-    print(f"setting trg_embedding.norm_scale to all 1")
-    print(f"setting trg_embedding.norm_bias to all 0")
-    print(f"setting trg_embedding.shared_bias to all 0")
+    print(f"setting trg_embedding.norm_scale to dummy value")
+    print(f"setting trg_embedding.norm_bias to dummy value")
+    print(f"setting trg_embedding.shared_bias to dummy value")
 
     transformer.trg_embedding.token_embedding[:] = (
         # scale embedding
