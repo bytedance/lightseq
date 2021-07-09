@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
+# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -92,6 +93,10 @@ class ModelArguments:
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
             "with private models)."
         },
+    )
+    with_lightseq: bool = field(
+        default=True,
+        metadata={"help": "Whether to use lightseq TransformerEncoder"},
     )
 
 
@@ -364,7 +369,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    inject_ls_enc_layer(model, training_args, config)
+    if model_args.with_lightseq:
+        inject_ls_enc_layer(model, training_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):

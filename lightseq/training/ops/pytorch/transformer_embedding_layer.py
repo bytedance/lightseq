@@ -5,7 +5,9 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
+
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
+
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -39,6 +41,10 @@ class LSTransformerEmbeddingFunc(Function):
         assert ctx.config.training
 
         (input,) = ctx.saved_tensors
+
+        if ctx.config.fp16:
+            grad_output = grad_output.to(torch.half)
+
         backward_func(ctx.config.layer_id, grad_output, input)
 
         grad = _all_layer_grads[ctx.config.layer_id]
@@ -147,20 +153,33 @@ class LSTransformerEmbeddingLayer(nn.Module):
         return emb
 
     def __assign_layer_weight_grad(self):
+        param = (
+            self.para_16
+            if self.config.fp16 and self.embeddings.dtype != torch.half
+            else self.embeddings
+        )
+
         if self.config.layer_id in _all_layer_grads:
             return
-        grad = torch.empty_like(self.embeddings.data)
+
         cuda_module = transformer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             func = cuda_module.assign_layer_weight_grad_fp32
-        func(self.embeddings, grad, "TransformerEmbeddingLayer", self.config.layer_id)
+        grad = torch.empty_like(param)
+        func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
     def forward(self, input, step=0, **kwargs):
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
+
+        if self.config.fp16 and self.embeddings.dtype != torch.half:
+            if hasattr(self, "para_16"):
+                self.para_16.copy_(self.embeddings.to(torch.half))
+            else:
+                self.register_buffer("para_16", self.embeddings.clone().detach().half())
 
         self.__assign_layer_weight_grad()
         input = input.to(torch.int)
@@ -178,4 +197,4 @@ class LSTransformerEmbeddingLayer(nn.Module):
                 f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
             )
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
-        return x
+        return x.to(self.embeddings)
