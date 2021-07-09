@@ -117,4 +117,4 @@ class LSCrossEntropyLayer(nn.Module):
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
             )
         x = LSCrossEntropyFunc.apply(self.config, inputs, targets, **kwargs)
-        return x
+        return x.to(inputs)
