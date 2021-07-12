@@ -33,8 +33,7 @@ class Gpt {
   std::set<std::string> available_sampling_methods = {"topk", "topp"};
 
  public:
-  Gpt(const std::string weight_path, const int max_batch_size,
-      const int max_step = 50)
+  Gpt(const std::string weight_path, const int max_batch_size)
       : stream_(nullptr), hd_(nullptr), encoder_(nullptr) {
     /* ---step1. init environment--- */
     _max_batch_size = max_batch_size;
@@ -67,8 +66,6 @@ class Gpt {
     if (!res.empty()) {
       throw std::runtime_error(res);
     }
-    // set max_step before buffer init
-    tw_._max_step = max_step;
 
     /*
       step3. instantiate gpt encoder, init the gpu memory buffer.

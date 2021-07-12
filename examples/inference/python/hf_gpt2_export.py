@@ -40,7 +40,8 @@ src_emb_mapping_dict = OrderedDict(
         "norm_scale": "ln_f weight",
         "norm_bias": "ln_f bias",
         "token_embedding": "wte",
-        "position_embedding": "wpe",
+        # manually process position_embedding to customize for max_step
+        # "position_embedding": "wpe",
     }
 )
 
@@ -55,6 +56,7 @@ def extract_gpt_weights(
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id=50256,
     pad_id=50257,
+    max_step=50,
 ):
     # load var names
     encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
@@ -85,13 +87,29 @@ def extract_gpt_weights(
             enc_layer_mapping_dict,
         )
 
-    # fill src_embedding
+    # fill src_embedding - except for position embedding
     fill_hdf5_layer(
         enc_var_name_list,
         encoder_state_dict,
         hdf5_file,
         "src_embedding/",
         src_emb_mapping_dict,
+    )
+
+    # special handling for position embedding
+    position_emb = encoder_state_dict["transformer.wpe.weight"]
+    _max_allowed_step, _hidden_size = position_emb.shape
+    if max_step > _max_allowed_step:
+        print(f"max_step {max_step} exceed max allowed step, abort.")
+        return
+    # truncate position embedding for max_step
+    position_emb = position_emb[:max_step, :]
+    print(
+        f"processed position_embedding with max_step constriant, shape: {position_emb.shape}"
+    )
+    position_emb = position_emb.flatten().tolist()
+    hdf5_file.create_dataset(
+        "src_embedding/position_embedding", data=position_emb, dtype="f4"
     )
 
     # save number of layers metadata
@@ -135,6 +153,7 @@ if __name__ == "__main__":
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id = 50256
     pad_id = 50257
+    max_step = 50
     extract_gpt_weights(
         output_lightseq_model_name,
         input_huggingface_gpt_model,
@@ -144,4 +163,5 @@ if __name__ == "__main__":
         topp=topp,
         eos_id=eos_id,
         pad_id=pad_id,
+        max_step=max_step,
     )

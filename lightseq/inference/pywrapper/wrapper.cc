@@ -23,9 +23,8 @@ PYBIND11_MODULE(inference, m) {
            py::arg("diverse_lambda") = -1.0f);
 
   py::class_<lightseq::cuda::Gpt>(m, "Gpt")
-      .def(py::init<const std::string, const int, const int>(),
-           py::arg("weight_path"), py::arg("max_batch_size"),
-           py::arg("max_step"))
+      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+           py::arg("max_batch_size"))
       .def("ppl", &lightseq::cuda::Gpt::ppl,
            py::return_value_policy::reference_internal, py::arg("input_seq"))
       .def("sample", &lightseq::cuda::Gpt::sample,
