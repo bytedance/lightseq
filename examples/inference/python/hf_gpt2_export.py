@@ -56,7 +56,7 @@ def extract_gpt_weights(
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id=50256,
     pad_id=50257,
-    max_step=50
+    max_step=50,
 ):
     # load var names
     encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
@@ -104,9 +104,13 @@ def extract_gpt_weights(
         return
     # truncate position embedding for max_step
     position_emb = position_emb[:max_step, :]
-    print(f"processed position_embedding with max_step constriant, shape: {position_emb.shape}")
+    print(
+        f"processed position_embedding with max_step constriant, shape: {position_emb.shape}"
+    )
     position_emb = position_emb.flatten().tolist()
-    hdf5_file.create_dataset("src_embedding/position_embedding", data=position_emb, dtype="f4")
+    hdf5_file.create_dataset(
+        "src_embedding/position_embedding", data=position_emb, dtype="f4"
+    )
 
     # save number of layers metadata
     hdf5_file.create_dataset(
@@ -159,5 +163,5 @@ if __name__ == "__main__":
         topp=topp,
         eos_id=eos_id,
         pad_id=pad_id,
-        max_step=max_step
+        max_step=max_step,
     )
