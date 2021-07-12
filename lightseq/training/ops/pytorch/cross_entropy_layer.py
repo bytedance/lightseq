@@ -19,6 +19,10 @@ class LSCrossEntropyFunc(Function):
             else cuda_module.cross_entropy_layer_fw_fp32
         )
 
+        targets = targets.to(torch.int32)
+        if config.fp16:
+            inputs = inputs.to(torch.half)
+
         (reduced_loss, nll_loss) = forward_func(config.layer_id, inputs, targets)
 
         if config.is_grad_enabled and config.training:
@@ -38,6 +42,12 @@ class LSCrossEntropyFunc(Function):
         assert ctx.config.training
 
         (inputs, targets) = ctx.saved_tensors
+
+        targets = targets.to(torch.int32)
+        grad_loss = grad_loss.to(torch.float32)
+        if ctx.config.fp16:
+            inputs = inputs.to(torch.half)
+
         (grad_inputs,) = backward_func(ctx.config.layer_id, grad_loss, inputs, targets)
 
         return (None, grad_inputs, None)
@@ -106,5 +116,7 @@ class LSCrossEntropyLayer(nn.Module):
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
             )
-        x = LSCrossEntropyFunc.apply(self.config, inputs, targets, **kwargs)
-        return x
+        loss, nll_loss = LSCrossEntropyFunc.apply(
+            self.config, inputs, targets, **kwargs
+        )
+        return loss.to(inputs), nll_loss.to(inputs)

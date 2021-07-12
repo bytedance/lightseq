@@ -7,6 +7,11 @@ namespace cg = cooperative_groups;
 const float LN_EPSILON = 1e-8f;
 #define TILE_DIM 32
 
+template <typename T>
+__forceinline__ __device__ T add_eps(T x) {
+  return fabsf(x) > LN_EPSILON ? x : (x < 0 ? -LN_EPSILON : LN_EPSILON);
+}
+
 /**
 @brief: ker_layer_norm
 Standard layer normalization.
@@ -198,7 +203,7 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
       // inp_or_out is output
       val = (float)inp_or_out[offset];
       dbetta += dout;
-      dgamma += ((val - vbetta) / vgamma * dout);
+      dgamma += ((val - vbetta) / add_eps(vgamma) * dout);
       offset += y_stride;
     }
   } else {
@@ -288,10 +293,10 @@ __global__ void ker_ln_bw_dinp(T *inp_grad, const T *out_grad,
   if (means == nullptr) {
     // inp_or_out is output, xhat = (output - betta) / gamma
     float4 vbetta = ((const float4 *)betta)[threadIdx.x];
-    xhat.x = (xhat.x - vbetta.x) / vgamma.x;
-    xhat.y = (xhat.y - vbetta.y) / vgamma.y;
-    xhat.z = (xhat.z - vbetta.z) / vgamma.z;
-    xhat.w = (xhat.w - vbetta.w) / vgamma.w;
+    xhat.x = (xhat.x - vbetta.x) / add_eps(vgamma.x);
+    xhat.y = (xhat.y - vbetta.y) / add_eps(vgamma.y);
+    xhat.z = (xhat.z - vbetta.z) / add_eps(vgamma.z);
+    xhat.w = (xhat.w - vbetta.w) / add_eps(vgamma.w);
   } else {
     // inp_or_out is input, xhat = (input - mean) * rsqrtf(var)
     float fmean = (float)means[blockIdx.x];
@@ -377,8 +382,8 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
       float2 vout = __half22float2(tmp_h2[i]);
       float2 vgamma = __half22float2(gamma_h2[i]);
       float2 vbetta = __half22float2(betta_h2[i]);
-      xhat[i].x = (vout.x - vbetta.x) / vgamma.x;
-      xhat[i].y = (vout.y - vbetta.y) / vgamma.y;
+      xhat[i].x = (vout.x - vbetta.x) / add_eps(vgamma.x);
+      xhat[i].y = (vout.y - vbetta.y) / add_eps(vgamma.y);
       sum_dxhat_xhat += xhat[i].x * dxhat[i].x + xhat[i].y * dxhat[i].y;
     }
   } else {

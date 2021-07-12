@@ -17,7 +17,7 @@ class LSHFTransformerEncoderLayer(LSTransformerEncoderLayer):
 
 def gen_bert_config(training_args, config):
     bert_config = LSTransformerEncoderLayer.get_config(
-        max_batch_tokens=2048,
+        max_batch_tokens=4096,
         max_seq_len=config.max_position_embeddings,
         hidden_size=config.hidden_size,
         intermediate_size=config.intermediate_size,

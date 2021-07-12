@@ -1,3 +1,4 @@
+# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,19 +15,21 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-if [ -d "/tmp/test-ner/" ]; then
-  rm -rf /tmp/test-ner/
-fi
+export TASK_NAME=mrpc
 
-python3 -m torch.distributed.launch \
-  --nproc_per_node=1 \
-  $THIS_DIR/run_ner.py \
-  --model_name_or_path bert-large-uncased \
-  --per_device_train_batch_size 16 \
-  --dataset_name conll2003 \
-  --output_dir /tmp/test-ner \
+python3 $THIS_DIR/run_glue.py \
+  --model_name_or_path bert-large-cased \
+  --task_name $TASK_NAME \
   --do_train \
   --do_eval \
-  --num_train_epochs 1 \
+  --max_seq_length 128 \
+  --per_device_train_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --output_dir /tmp/$TASK_NAME/ \
+  --overwrite_output_dir \
   --with_lightseq true \
   --fp16 \
+  # --fp16_full_eval \
+  # --fp16_backend apex \
+  # --fp16_opt_level O2
