@@ -721,6 +721,8 @@ def test_cross_entropy_layer_forward():
         x, base_nll_loss = label_smoothed_nll_loss(
             x, targets, ce_config_fp16.epsilon, ignore_index=ce_config_fp16.padding_idx
         )
+        x = x.to(inputs)
+        base_nll_loss = base_nll_loss.to(inputs)
         return [
             x.contiguous().detach(),
             base_nll_loss.contiguous().detach(),
