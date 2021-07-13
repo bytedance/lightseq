@@ -25,7 +25,7 @@ python3 $THIS_DIR/run_glue.py \
   --max_seq_length 128 \
   --per_device_train_batch_size 32 \
   --learning_rate 2e-5 \
-  --num_train_epochs 3 \
+  --num_train_epochs 2 \
   --output_dir /tmp/$TASK_NAME/ \
   --overwrite_output_dir \
   --with_lightseq true \

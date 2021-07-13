@@ -430,7 +430,7 @@ def generate_enc_layer():
     hidden_dropout_ratio = 0.0
     attn_dropout_ratio = 0.0
     activation_dropout_ratio = 0.0
-    pre_layer_norm = True
+    pre_layer_norm = False
     layer = TransformerEncoderLayer(
         hidden_size,
         intermediate_size,
@@ -439,7 +439,7 @@ def generate_enc_layer():
         attn_dropout_ratio,
         activation_dropout_ratio,
         pre_layer_norm,
-        activation_fn="relu",
+        activation_fn="gelu",
     )
     layer.to(torch.device("cuda:0"), dtype=torch.half)
     return layer
@@ -462,7 +462,7 @@ def generate_dec_layer():
         attn_dropout=attn_dropout_ratio,
         activation_dropout=activation_dropout_ratio,
         normalize_before=pre_layer_norm,
-        activation_fn="relu",
+        activation_fn="gelu",
     )
 
     layer.to(torch.device("cuda:0"), dtype=torch.half)

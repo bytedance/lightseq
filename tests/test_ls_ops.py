@@ -46,9 +46,10 @@ def generate_enc_layer(initial_weights=None, initial_biases=None):
         attn_prob_dropout_ratio=0.0,
         activation_dropout_ratio=0.0,
         hidden_dropout_ratio=0.0,
-        pre_layer_norm=True,
+        pre_layer_norm=False,
         fp16=True,
         local_rank=0,
+        activation_fn="gelu",
     )
     layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
     layer.to(torch.device("cuda:0"), dtype=torch.half)
@@ -90,6 +91,7 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         fp16=True,
         local_rank=0,
         nlayer=num_layers,
+        activation_fn="gelu",
     )
     layer = LSFSTransformerDecoderLayer(
         config,
@@ -695,7 +697,7 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
 def test_cross_entropy_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
-    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    print(f"(batch_size, seq_len, vocab_size): ({batch_size}, {seq_len}, {vocab_size})")
 
     inputs = kt.rand((batch_size, seq_len, vocab_size))
     targets = kt.randint(
@@ -721,6 +723,8 @@ def test_cross_entropy_layer_forward():
         x, base_nll_loss = label_smoothed_nll_loss(
             x, targets, ce_config_fp16.epsilon, ignore_index=ce_config_fp16.padding_idx
         )
+        x = x.to(inputs)
+        base_nll_loss = base_nll_loss.to(inputs)
         return [
             x.contiguous().detach(),
             base_nll_loss.contiguous().detach(),
@@ -733,7 +737,7 @@ def test_cross_entropy_layer_forward():
 def test_cross_entropy_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
-    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    print(f"(batch_size, seq_len, vocab_size): ({batch_size}, {seq_len}, {vocab_size})")
 
     base_inputs = kt.rand((batch_size, seq_len, vocab_size)).requires_grad_()
     cus_inputs = base_inputs.clone().detach().requires_grad_()

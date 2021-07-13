@@ -25,9 +25,10 @@ def gen_bert_config(training_args, config):
         attn_prob_dropout_ratio=config.attention_probs_dropout_prob,
         activation_dropout_ratio=0.1,
         hidden_dropout_ratio=config.hidden_dropout_prob,
-        pre_layer_norm=True,
+        pre_layer_norm=False,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,
+        activation_fn="gelu",
     )
     return bert_config
 

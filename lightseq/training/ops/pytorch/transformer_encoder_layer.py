@@ -122,6 +122,7 @@ class LSTransformerEncoderLayer(nn.Module):
             self.config.activation_dropout_ratio,
             self.config.hidden_dropout_ratio,
             self.config.pre_layer_norm,
+            self.config.activation_fn,
         )
 
         hs = self.config.hidden_size
@@ -187,6 +188,7 @@ class LSTransformerEncoderLayer(nn.Module):
             pre_layer_norm: bool  # pre layer norm or post
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+            activation_fn: str  # relu or gelu
 
         return Config(**kwargs)
 

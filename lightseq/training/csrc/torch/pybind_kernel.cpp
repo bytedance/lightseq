@@ -174,6 +174,30 @@ void torch_launch_concat3_dim1(const torch::Tensor &inp1,
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
+template <ActivationType actType, typename T>
+void torch_launch_ls_dropout_act_bias(torch::Tensor &output,
+                                      torch::Tensor &mask,
+                                      const torch::Tensor &input,
+                                      const torch::Tensor &bias, int total_seq,
+                                      int hidden_dim, float ratio) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_ls_dropout_act_bias<actType, T>(
+      rptr<T>(output), rptr<T>(input), rptr<uint8_t>(mask), rptr<T>(bias),
+      total_seq * hidden_dim, hidden_dim, ratio, stream);
+}
+
+template <ActivationType actType, typename T>
+void torch_launch_ls_dropout_act_bias_bwd(
+    torch::Tensor &in_grad, torch::Tensor &bias_grad, torch::Tensor &mask,
+    const torch::Tensor &input, const torch::Tensor &bias,
+    const torch::Tensor &out_grad, int total_seq, int hidden_dim, float ratio) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_ls_dropout_act_bias_bwd<actType, T>(
+      rptr<T>(in_grad), rptr<T>(bias_grad), rptr<T>(input), rptr<T>(bias),
+      rptr<T>(out_grad), rptr<uint8_t>(mask), total_seq, hidden_dim, ratio,
+      stream);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -216,5 +240,29 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_concat3_dim1_fp32", &torch_launch_concat3_dim1<float>,
         "Test kernel wrapper");
   m.def("torch_launch_concat3_dim1_fp16", &torch_launch_concat3_dim1<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_relu_bias_fp32",
+        &torch_launch_ls_dropout_act_bias<ActivationType::kRelu, float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_relu_bias_fp16",
+        &torch_launch_ls_dropout_act_bias<ActivationType::kRelu, __half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_gelu_bias_fp32",
+        &torch_launch_ls_dropout_act_bias<ActivationType::kGelu, float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_gelu_bias_fp16",
+        &torch_launch_ls_dropout_act_bias<ActivationType::kGelu, __half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_relu_bias_bwd_fp32",
+        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_relu_bias_bwd_fp16",
+        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, __half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp32",
+        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp16",
+        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
         "Test kernel wrapper");
 }

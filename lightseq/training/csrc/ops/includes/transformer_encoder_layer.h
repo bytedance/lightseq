@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
@@ -20,7 +21,8 @@ class TransformerEncoderLayer {
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_dropout_ratio,
                           float hidden_output_dropout_ratio,
-                          float layer_norm_eps, bool pre_or_postLayerNorm);
+                          float layer_norm_eps, bool pre_or_postLayerNorm,
+                          std::string activation_fn);
 
   virtual ~TransformerEncoderLayer();
 
@@ -171,6 +173,7 @@ class TransformerEncoderLayer {
   const size_t _max_batch_tokens;
   const size_t _max_seq_len;
   const bool _pre_or_postLayerNorm;
+  const std::string _activation_fn;
   // dynamic parameter between batch
   size_t _batch_size;
   size_t _seq_len;
