@@ -230,7 +230,7 @@ class LSTransformerDecoderLayer(nn.Module):
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
             nlayer: int  # number of layers
-            activation_fn: str  # relu or gelu
+            activation_fn: str = "relu"  # relu or gelu
 
         return Config(**kwargs)
 

@@ -64,4 +64,4 @@ def inject_ls_enc_layer(model, training_args, config):
         init_ws, init_bs = get_hf_bert_enc_layer_params(model.bert.encoder.layer[i])
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_config, init_ws, init_bs
-        )
+        ).cuda()

@@ -25,11 +25,12 @@ python3 $THIS_DIR/run_glue.py \
   --max_seq_length 128 \
   --per_device_train_batch_size 32 \
   --learning_rate 2e-5 \
-  --num_train_epochs 2 \
+  --num_train_epochs 3 \
   --output_dir /tmp/$TASK_NAME/ \
   --overwrite_output_dir \
   --with_lightseq true \
-  --fp16 \
+  --logging_steps 20 \
+  # --fp16 \
   # --fp16_full_eval \
   # --fp16_backend apex \
   # --fp16_opt_level O2

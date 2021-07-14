@@ -23,7 +23,8 @@ import random
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
-
+import copy
+import torch
 import numpy as np
 from datasets import load_dataset, load_metric
 
@@ -410,7 +411,19 @@ def main():
 
     # Replace with LightSeq encoder layers.
     if model_args.with_lightseq:
+        ls_model = copy.deepcopy(model).cuda()
+        # inject_ls_enc_layer(model, training_args, config)
+        inject_ls_enc_layer(ls_model, training_args, config)
+        test_input = torch.tensor([[1,2,3,4]]).cuda()
+        model.cuda()
+        test_emb = model.bert.embeddings(test_input)
+        mask = torch.tensor([[0,0,0,0]]).float().cuda()
+        assert(torch.allclose(model.bert.embeddings(test_input), ls_model.bert.embeddings(test_input)))
+        print((model.bert.encoder.layer[0](test_emb, mask))[0])
+        print(ls_model.bert.encoder.layer[0](test_emb, mask))[0]
+        assert(torch.allclose(model(test_input), ls_model(test_input)))
         inject_ls_enc_layer(model, training_args, config)
+
 
     # Preprocessing the datasets
     if data_args.task_name is not None:
