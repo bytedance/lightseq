@@ -48,7 +48,7 @@ class TestDecorator(object):
 
     @property
     def hidden_dim(self):
-        hs = random.choice([512, 1024, 2048])
+        hs = random.choice([512, 768, 1024, 1536])
         assert hs % (self.nhead * 8) == 0
         return hs
 

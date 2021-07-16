@@ -200,6 +200,7 @@ custom_cross_entropy_layer_fp16 = generate_cross_entropy_layer(ce_config_fp16)
 custom_cross_entropy_layer_fp32.train()
 custom_cross_entropy_layer_fp16.train()
 
+
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
