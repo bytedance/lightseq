@@ -15,7 +15,7 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-export TASK_NAME=mrpc
+export TASK_NAME=stsb
 
 python3 $THIS_DIR/run_glue.py \
   --model_name_or_path bert-large-cased \
@@ -29,8 +29,9 @@ python3 $THIS_DIR/run_glue.py \
   --output_dir /tmp/$TASK_NAME/ \
   --overwrite_output_dir \
   --with_lightseq true \
-  --logging_steps 20 \
-  # --fp16 \
+  --logging_steps 10 \
+  --fp16 \
+  --seed 1234 \
   # --fp16_full_eval \
   # --fp16_backend apex \
   # --fp16_opt_level O2

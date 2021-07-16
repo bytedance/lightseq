@@ -96,9 +96,8 @@ void torch_launch_fused_add2(torch::Tensor &out, const torch::Tensor &inp1,
 }
 
 template <typename T>
-void torch_launch_fuse_transpose_bias_kernel(const torch::Tensor &inp,
-                                             torch::Tensor &out, int rows,
-                                             int cols) {
+void torch_launch_ffn_bias_bwd(const torch::Tensor &inp, torch::Tensor &out,
+                               int rows, int cols) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_fuse_transpose_bias_kernel(rptr<T>(inp), rptr<T>(out), rows, cols,
                                     stream);
@@ -215,10 +214,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Test kernel wrapper");
   m.def("torch_launch_fused_add2_fp16", &torch_launch_fused_add2<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_fuse_transpose_bias_kernel_fp32",
-        &torch_launch_fuse_transpose_bias_kernel<float>, "Test kernel wrapper");
-  m.def("torch_launch_fuse_transpose_bias_kernel_fp16",
-        &torch_launch_fuse_transpose_bias_kernel<__half>,
+  m.def("torch_launch_ffn_bias_bwd_fp32", &torch_launch_ffn_bias_bwd<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ffn_bias_bwd_fp16", &torch_launch_ffn_bias_bwd<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_fp32", &torch_launch_attn_softmax<float>,
         "Test kernel wrapper");

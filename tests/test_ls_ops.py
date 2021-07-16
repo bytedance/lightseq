@@ -31,7 +31,7 @@ from examples.training.fairseq.fs_modules.ls_fs_transformer_decoder_layer import
 
 kt = TestDecorator()
 
-num_layers = 12
+num_layers = 24
 
 ###################### encoding layer ######################
 
@@ -77,66 +77,66 @@ for _ in range(num_layers):
 ###################### decoding layer ######################
 
 
-def generate_dec_layer(initial_weights=None, initial_biases=None):
-    config = LSFSTransformerDecoderLayer.get_config(
-        max_batch_tokens=max_batch_tokens,
-        max_seq_len=max_seq_len,
-        hidden_size=1024,
-        intermediate_size=4096,
-        nhead=16,
-        attn_prob_dropout_ratio=0.0,
-        activation_dropout_ratio=0.0,
-        hidden_dropout_ratio=0.0,
-        pre_layer_norm=False,
-        fp16=True,
-        local_rank=0,
-        nlayer=num_layers,
-        activation_fn="gelu",
-    )
-    layer = LSFSTransformerDecoderLayer(
-        config,
-        initial_weights,
-        initial_biases,
-    )
-    layer.to(torch.device("cuda:0"), dtype=torch.half)
-    return layer
+# def generate_dec_layer(initial_weights=None, initial_biases=None):
+#     config = LSFSTransformerDecoderLayer.get_config(
+#         max_batch_tokens=max_batch_tokens,
+#         max_seq_len=max_seq_len,
+#         hidden_size=1024,
+#         intermediate_size=4096,
+#         nhead=16,
+#         attn_prob_dropout_ratio=0.0,
+#         activation_dropout_ratio=0.0,
+#         hidden_dropout_ratio=0.0,
+#         pre_layer_norm=False,
+#         fp16=True,
+#         local_rank=0,
+#         nlayer=num_layers,
+#         activation_fn="gelu",
+#     )
+#     layer = LSFSTransformerDecoderLayer(
+#         config,
+#         initial_weights,
+#         initial_biases,
+#     )
+#     layer.to(torch.device("cuda:0"), dtype=torch.half)
+#     return layer
 
 
-custom_dec_layer_list = []
-fairseq_dec_layer_list = []
-_initial_dec_weights_list = []
-_initial_dec_biases_list = []
-_initial_encdec_attn_kvw_list = []
-_initial_encdec_attn_kvb_list = []
+# custom_dec_layer_list = []
+# fairseq_dec_layer_list = []
+# _initial_dec_weights_list = []
+# _initial_dec_biases_list = []
+# _initial_encdec_attn_kvw_list = []
+# _initial_encdec_attn_kvb_list = []
 
-for _ in range(num_layers):
-    fairseq_dec_layer = fairseq_layers.generate_dec_layer()
-    fairseq_dec_layer.train()
-    initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
-    fairseq_dec_layer_list.append(fairseq_dec_layer)
-    _initial_dec_weights_list.append(initial_dec_weights)
-    _initial_dec_biases_list.append(initial_dec_biases)
-    _initial_encdec_attn_kvw_list.append(initial_dec_weights[6])
-    _initial_encdec_attn_kvw_list.append(initial_dec_weights[7])
-    _initial_encdec_attn_kvb_list.append(initial_dec_biases[6])
-    _initial_encdec_attn_kvb_list.append(initial_dec_biases[7])
+# for _ in range(num_layers):
+#     fairseq_dec_layer = fairseq_layers.generate_dec_layer()
+#     fairseq_dec_layer.train()
+#     initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
+#     fairseq_dec_layer_list.append(fairseq_dec_layer)
+#     _initial_dec_weights_list.append(initial_dec_weights)
+#     _initial_dec_biases_list.append(initial_dec_biases)
+#     _initial_encdec_attn_kvw_list.append(initial_dec_weights[6])
+#     _initial_encdec_attn_kvw_list.append(initial_dec_weights[7])
+#     _initial_encdec_attn_kvb_list.append(initial_dec_biases[6])
+#     _initial_encdec_attn_kvb_list.append(initial_dec_biases[7])
 
-_initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
-_initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
-for i in range(num_layers):
-    _initial_dec_weights_list[i].pop(7)
-    _initial_dec_weights_list[i].pop(6)
-    if i == 0:
-        _initial_dec_weights_list[i].append(_initial_encdec_attn_kvw)
-    _initial_dec_biases_list[i].pop(7)
-    _initial_dec_biases_list[i].pop(6)
-    if i == 0:
-        _initial_dec_biases_list[i].append(_initial_encdec_attn_kvb)
-    custom_dec_layer = generate_dec_layer(
-        _initial_dec_weights_list[i], _initial_dec_biases_list[i]
-    )
-    custom_dec_layer.train()
-    custom_dec_layer_list.append(custom_dec_layer)
+# _initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
+# _initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
+# for i in range(num_layers):
+#     _initial_dec_weights_list[i].pop(7)
+#     _initial_dec_weights_list[i].pop(6)
+#     if i == 0:
+#         _initial_dec_weights_list[i].append(_initial_encdec_attn_kvw)
+#     _initial_dec_biases_list[i].pop(7)
+#     _initial_dec_biases_list[i].pop(6)
+#     if i == 0:
+#         _initial_dec_biases_list[i].append(_initial_encdec_attn_kvb)
+#     custom_dec_layer = generate_dec_layer(
+#         _initial_dec_weights_list[i], _initial_dec_biases_list[i]
+#     )
+#     custom_dec_layer.train()
+#     custom_dec_layer_list.append(custom_dec_layer)
 
 ###################### embedding layer ######################
 
@@ -218,9 +218,14 @@ def test_encoder_layer_forward():
         ]
 
     def baseline():
-        res = hidden_states.transpose(0, 1).contiguous().clone()
+        x = hidden_states * (
+            1 - self_attn_padding_mask.unsqueeze(-1).type_as(hidden_states)
+        )
+        res = x.transpose(0, 1).contiguous().clone()
         for i in range(num_layers):
-            res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
+            res = fairseq_enc_layer_list[i](
+                res, self_attn_padding_mask=self_attn_padding_mask
+            )[0]
         return [
             res.transpose(0, 1).contiguous().detach(),
         ]
@@ -783,8 +788,8 @@ if __name__ == "__main__":
         [
             "test_encoder_layer_forward",
             "test_encoder_layer_backward",
-            "test_decoder_layer_forward",
-            "test_decoder_layer_backward",
+            # "test_decoder_layer_forward",
+            # "test_decoder_layer_backward",
             # "test_decoder_layer_forward_inference",
             # "test_embedding_layer_forward",
             # "test_embedding_layer_backward",

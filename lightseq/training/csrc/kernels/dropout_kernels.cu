@@ -872,7 +872,7 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
     for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
       float val = out_grad[idx];
       float in = input[idx];
-      float b = bias[idx % hidden_size ];
+      float b = bias[idx % hidden_size];
       val = activation_bwd_kernel<act_type, float>(
           val * scale * static_cast<float>(mask[idx]), in + b);
       local_sum += val;

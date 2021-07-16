@@ -63,11 +63,11 @@ class LSTransformerEncoderFunc(Function):
         )
 
         grad = _all_layer_grads[ctx.config.layer_id]
-        
-        print("layer id:", ctx.config.layer_id)
-        print("grad_output zero:",(grad_output==0).sum() / grad_output.numel())
-        print("grad_input zero:",(grad_input==0).sum() / grad_input.numel())
-        print("grad zero:",(grad == 0).sum() / grad.numel())
+
+        # print("layer id:", ctx.config.layer_id)
+        # print("grad_output zero:",(grad_output==0).sum() / grad_output.numel())
+        # print("grad_input zero:",(grad_input==0).sum() / grad_input.numel())
+        # print("grad zero:",(grad == 0).sum() / grad.numel())
 
         # This appears to be an effective way to release context memory
         ctx.config = None

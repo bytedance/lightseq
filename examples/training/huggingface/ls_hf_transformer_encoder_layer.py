@@ -22,9 +22,12 @@ def gen_bert_config(training_args, config):
         hidden_size=config.hidden_size,
         intermediate_size=config.intermediate_size,
         nhead=config.num_attention_heads,
-        attn_prob_dropout_ratio=config.attention_probs_dropout_prob,
-        activation_dropout_ratio=0.1,
-        hidden_dropout_ratio=config.hidden_dropout_prob,
+        # attn_prob_dropout_ratio=config.attention_probs_dropout_prob,
+        # activation_dropout_ratio=config.hidden_dropout_prob,
+        # hidden_dropout_ratio=config.hidden_dropout_prob,
+        attn_prob_dropout_ratio=0,
+        activation_dropout_ratio=0,
+        hidden_dropout_ratio=0,
         pre_layer_norm=False,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,
@@ -45,15 +48,15 @@ def get_hf_bert_enc_layer_params(layer):
     init_bs.append(layer.attention.self.value.bias.detach().clone())
     init_ws.append(layer.attention.output.dense.weight.detach().clone())
     init_bs.append(layer.attention.output.dense.bias.detach().clone())
-    init_ws.append(layer.output.LayerNorm.weight.detach().clone())
-    init_bs.append(layer.output.LayerNorm.bias.detach().clone())
+    init_ws.append(layer.attention.output.LayerNorm.weight.detach().clone())
+    init_bs.append(layer.attention.output.LayerNorm.bias.detach().clone())
 
     init_ws.append(layer.intermediate.dense.weight.detach().clone())
     init_bs.append(layer.intermediate.dense.bias.detach().clone())
     init_ws.append(layer.output.dense.weight.detach().clone())
     init_bs.append(layer.output.dense.bias.detach().clone())
-    init_ws.append(layer.attention.output.LayerNorm.weight.detach().clone())
-    init_bs.append(layer.attention.output.LayerNorm.bias.detach().clone())
+    init_ws.append(layer.output.LayerNorm.weight.detach().clone())
+    init_bs.append(layer.output.LayerNorm.bias.detach().clone())
 
     return init_ws, init_bs
 

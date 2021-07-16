@@ -397,7 +397,7 @@ def test_launch_ln_bw():
 
 
 @kt.case()
-def test_launch_fuse_transpose_bias_kernel():
+def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
     coef = random.randint(1, 4)
@@ -407,9 +407,9 @@ def test_launch_fuse_transpose_bias_kernel():
     custom_res = kt.rand((coef * hidden_dim))
 
     if kt.dtype == torch.float:
-        func = cuda_module.torch_launch_fuse_transpose_bias_kernel_fp32
+        func = cuda_module.torch_launch_ffn_bias_bwd_fp32
     else:
-        func = cuda_module.torch_launch_fuse_transpose_bias_kernel_fp16
+        func = cuda_module.torch_launch_ffn_bias_bwd_fp16
 
     # [batch_size*seq_len, coef*hidden_dim] ->
     # [batch_size*seq_len, coef*hidden_dim]
@@ -721,17 +721,17 @@ def test_launch_dropout_gelu_bias_bwd():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_fuse_transpose_bias_kernel",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
+        # "test_launch_transform_0213",
+        # "test_launch_bias_add_transform_20314",
+        # "test_launch_transform4d_0213",
+        # "test_launch_fused_add2",
+        # "test_launch_ffn_bias_bwd",
+        # "test_launch_attn_softmax",
+        # "test_launch_attn_softmax_bw",
+        # "test_launch_layer_norm",
+        # "test_launch_ln_bw",
+        # "test_launch_concat3_dim1",
+        # "test_adam",
         "test_launch_dropout_gelu_bias",
         "test_launch_dropout_relu_bias",
         "test_launch_dropout_relu_bias_bwd",
