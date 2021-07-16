@@ -452,7 +452,7 @@ def generate_dec_layer():
     hidden_dropout_ratio = 0.0
     attn_dropout_ratio = 0.0
     activation_dropout_ratio = 0.0
-    pre_layer_norm = True
+    pre_layer_norm = False
     layer = TransformerDecoderLayer(
         embed_dim=hidden_size,
         ffn_embed_dim=intermediate_size,

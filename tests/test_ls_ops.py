@@ -31,7 +31,7 @@ from examples.training.fairseq.fs_modules.ls_fs_transformer_decoder_layer import
 
 kt = TestDecorator()
 
-num_layers = 1
+num_layers = 12
 
 ###################### encoding layer ######################
 
@@ -87,7 +87,7 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         attn_prob_dropout_ratio=0.0,
         activation_dropout_ratio=0.0,
         hidden_dropout_ratio=0.0,
-        pre_layer_norm=True,
+        pre_layer_norm=False,
         fp16=True,
         local_rank=0,
         nlayer=num_layers,
@@ -199,46 +199,6 @@ custom_cross_entropy_layer_fp32 = generate_cross_entropy_layer(ce_config_fp32)
 custom_cross_entropy_layer_fp16 = generate_cross_entropy_layer(ce_config_fp16)
 custom_cross_entropy_layer_fp32.train()
 custom_cross_entropy_layer_fp16.train()
-
-###################### bert encoder layer ######################
-
-def generate_enc_layer(initial_weights=None, initial_biases=None):
-    config = LSTransformerEncoderLayer.get_config(
-        max_batch_tokens=max_batch_tokens,
-        max_seq_len=max_seq_len,
-        hidden_size=1024,
-        intermediate_size=4096,
-        nhead=16,
-        attn_prob_dropout_ratio=0.0,
-        activation_dropout_ratio=0.0,
-        hidden_dropout_ratio=0.0,
-        pre_layer_norm=False,
-        fp16=True,
-        local_rank=0,
-        activation_fn="gelu",
-    )
-    layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
-    layer.to(torch.device("cuda:0"), dtype=torch.half)
-    return layer
-
-
-custom_enc_layer_list = []
-fairseq_enc_layer_list = []
-
-
-def gen_enc_layer_pair():
-    fairseq_enc_layer = fairseq_layers.generate_enc_layer()
-    fairseq_enc_layer.train()
-    initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
-    custom_enc_layer = generate_enc_layer(initial_enc_weights, initial_enc_biases)
-    custom_enc_layer.train()
-    return fairseq_enc_layer, custom_enc_layer
-
-
-for _ in range(num_layers):
-    fairseq_enc_layer, custom_enc_layer = gen_enc_layer_pair()
-    custom_enc_layer_list.append(custom_enc_layer)
-    fairseq_enc_layer_list.append(fairseq_enc_layer)
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_encoder_layer_forward():
@@ -815,32 +775,6 @@ def test_cross_entropy_layer_backward():
 
     return custom, baseline
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
-def test_encoder_layer_forward():
-    batch_size, seq_len = kt.bs_sl()
-    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
-
-    hidden_states = kt.rand((batch_size, seq_len, 1024))
-    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
-
-    def custom():
-        res = hidden_states.clone()
-        for i in range(num_layers):
-            res = custom_enc_layer_list[i](res, self_attn_padding_mask)
-        return [
-            res.contiguous().detach(),
-        ]
-
-    def baseline():
-        res = hidden_states.transpose(0, 1).contiguous().clone()
-        for i in range(num_layers):
-            res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
-        return [
-            res.transpose(0, 1).contiguous().detach(),
-        ]
-
-    return custom, baseline
-
 
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
@@ -850,10 +784,10 @@ if __name__ == "__main__":
             "test_encoder_layer_backward",
             "test_decoder_layer_forward",
             "test_decoder_layer_backward",
-            "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_cross_entropy_layer_forward",
-            "test_cross_entropy_layer_backward",
+            # "test_decoder_layer_forward_inference",
+            # "test_embedding_layer_forward",
+            # "test_embedding_layer_backward",
+            # "test_cross_entropy_layer_forward",
+            # "test_cross_entropy_layer_backward",
         ]
     )
