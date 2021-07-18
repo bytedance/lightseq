@@ -12,6 +12,7 @@ from lightseq.training.ops.pytorch.util import copy_para
 transformer_cuda_module = None
 _all_layer_grads = dict()
 
+
 def base_architecture(args):
     args.setdefault("hidden_size", 512)
     args.setdefault("intermediate_size", 2048)
@@ -21,6 +22,7 @@ def base_architecture(args):
     args.setdefault("hidden_dropout_ratio", 0.1)
     args.setdefault("pre_layer_norm", True)
 
+
 def transformer_big(args):
     args.setdefault("hidden_size", 1024)
     args.setdefault("intermediate_size", 4096)
@@ -29,8 +31,10 @@ def transformer_big(args):
     args.setdefault("activation_dropout_ratio", 0.1)
     base_architecture(args)
 
+
 def transformer_base(args):
     base_architecture(args)
+
 
 def bert_base(args):
     args.setdefault("hidden_size", 768)
@@ -41,9 +45,11 @@ def bert_base(args):
     args.setdefault("pre_layer_norm", False)
     base_architecture(args)
 
+
 def bert_big(args):
     args.setdefault("pre_layer_norm", False)
     transformer_big(args)
+
 
 MODEL_ARCH = {
     "transformer-base": transformer_base,
