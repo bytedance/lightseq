@@ -7,7 +7,7 @@ from torch.autograd import Function
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import copy_para
+from lightseq.training.ops.pytorch.util import copy_para, MODEL_ARCH
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -187,6 +187,12 @@ class LSTransformerEncoderLayer(nn.Module):
             pre_layer_norm: bool  # pre layer norm or post
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+
+        if "model" in kwargs:
+            if kwargs["model"] not in MODEL_ARCH:
+                raise ValueError("{} architecture is not supported.")
+            MODEL_ARCH[kwargs["model"]](kwargs)
+            del kwargs["model"]
 
         return Config(**kwargs)
 
