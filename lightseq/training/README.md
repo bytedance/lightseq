@@ -93,7 +93,7 @@ You can also use LightSeq operators directly in your codes to build your own mod
 For example, if you want to use the encoder layers, you first need to generate a config containing all the arguments of the models and training. Then you can initialize the LightSeq encoder layer using the config and integrate it into you models.
 
 ```
-from lightseq.training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from lightseq.training import LSTransformerEncoderLayer
 
 config = LSTransformerEncoderLayer.get_config(
     max_batch_tokens=4096,
@@ -110,6 +110,22 @@ config = LSTransformerEncoderLayer.get_config(
 )
 enc_layer = LSTransformerEncoderLayer(config)
 ```
+
+Or you can use the default config by specifying the model architecture.
+```
+from lightseq.training import LSTransformerEncoderLayer
+
+config = LSTransformerEncoderLayer.get_config(
+    model="transformer-big",
+    max_batch_tokens=4096,
+    max_seq_len=256,
+    fp16=True,
+    local_rank=0,
+)
+enc_layer = LSTransformerEncoderLayer(config)
+```
+
+
 Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `lightseq/training/ops/pytorch` and `lightseq/training/ops/tensorflow` directory for detail.
 
 ## Limitations and Future Plans
