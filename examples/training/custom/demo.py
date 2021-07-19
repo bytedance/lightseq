@@ -5,13 +5,27 @@ from lightseq.training import LSTransformer, LSCrossEntropyLayer, LSAdam
 vocab_size, padding_idx = 1000, 0
 batch_size, src_seq_len, trg_seq_len = 6, 10, 15
 
+
 def create_data():
-    src_tokens = torch.randint(padding_idx, vocab_size, (batch_size, src_seq_len), dtype=torch.long, device=torch.device("cuda:0"))
-    trg_tokens = torch.randint(padding_idx, vocab_size, (batch_size, trg_seq_len), dtype=torch.long, device=torch.device("cuda:0"))
+    src_tokens = torch.randint(
+        padding_idx,
+        vocab_size,
+        (batch_size, src_seq_len),
+        dtype=torch.long,
+        device=torch.device("cuda:0"),
+    )
+    trg_tokens = torch.randint(
+        padding_idx,
+        vocab_size,
+        (batch_size, trg_seq_len),
+        dtype=torch.long,
+        device=torch.device("cuda:0"),
+    )
     target = trg_tokens.clone()[:, 1:]
     eos = torch.zeros((batch_size, 1), dtype=torch.long, device=torch.device("cuda:0"))
     target = torch.cat([target, eos], dim=-1)
     return src_tokens, trg_tokens, target
+
 
 def create_model():
     transformer_config = LSTransformer.get_config(
@@ -23,11 +37,12 @@ def create_model():
         num_encoder_layer=6,
         num_decoder_layer=6,
         fp16=True,
-        local_rank=0
+        local_rank=0,
     )
     model = LSTransformer(transformer_config)
     model.to(dtype=torch.half, device=torch.device("cuda:0"))
     return model
+
 
 def create_criterion():
     ce_config = LSCrossEntropyLayer.get_config(
@@ -35,11 +50,12 @@ def create_criterion():
         padding_idx=padding_idx,
         epsilon=0.0,
         fp16=True,
-        local_rank=0
+        local_rank=0,
     )
     loss_fn = LSCrossEntropyLayer(ce_config)
     loss_fn.to(dtype=torch.half, device=torch.device("cuda:0"))
     return loss_fn
+
 
 if __name__ == "__main__":
     src_tokens, trg_tokens, target = create_data()
