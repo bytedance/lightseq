@@ -3,7 +3,11 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 
-from lightseq.training import LSTransformerEmbeddingLayer, LSTransformerEncoderLayer, LSTransformerDecoderLayer
+from lightseq.training import (
+    LSTransformerEmbeddingLayer,
+    LSTransformerEncoderLayer,
+    LSTransformerDecoderLayer,
+)
 from lightseq.training.ops.pytorch.util import MODEL_ARCH
 
 
@@ -181,12 +185,8 @@ class LSTransformerDecoder(nn.Module):
         x = self.embed_tokens(trg_tokens, step)
         return x
 
-    def forward(
-        self, trg_tokens, encoder_out, encoder_padding_mask, cache=None
-    ):
-        x = self.forward_embedding(
-            trg_tokens, cache
-        )
+    def forward(self, trg_tokens, encoder_out, encoder_padding_mask, cache=None):
+        x = self.forward_embedding(trg_tokens, cache)
 
         for layer in self.layers:
             x = layer(
