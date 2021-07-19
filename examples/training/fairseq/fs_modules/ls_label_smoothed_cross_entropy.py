@@ -64,7 +64,6 @@ class LSLabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         target = model.get_targets(sample, net_output)
         target = target.to(torch.int32)
         loss, nll_loss = self.ls_cross_entropy(net_output[0], target)
-        loss, nll_loss = loss.float(), nll_loss.float()
         sample_size = (
             sample["target"].size(0) if self.sentence_avg else sample["ntokens"]
         )
