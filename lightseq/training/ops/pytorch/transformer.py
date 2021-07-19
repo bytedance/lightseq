@@ -36,6 +36,7 @@ class LSTransformer(nn.Module):
             activation_dropout_ratio: float  # ffn activation dropout ratio
             hidden_dropout_ratio: float  # dropout ration before residual
             pre_layer_norm: bool  # pre layer norm or post
+            activation_fn: str  # relu or gelu
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
 
@@ -107,6 +108,7 @@ class LSTransformerEncoder(nn.Module):
             activation_dropout_ratio=config.activation_dropout_ratio,
             hidden_dropout_ratio=config.hidden_dropout_ratio,
             pre_layer_norm=config.pre_layer_norm,
+            activation_fn=config.activation_fn,
             fp16=config.fp16,
             local_rank=config.local_rank,
         )
@@ -164,6 +166,7 @@ class LSTransformerDecoder(nn.Module):
             activation_dropout_ratio=config.activation_dropout_ratio,
             hidden_dropout_ratio=config.hidden_dropout_ratio,
             pre_layer_norm=config.pre_layer_norm,
+            activation_fn=config.activation_fn,
             fp16=config.fp16,
             local_rank=config.local_rank,
             nlayer=config.num_decoder_layer,
@@ -175,7 +178,6 @@ class LSTransformerDecoder(nn.Module):
         if cache is not None:
             step = trg_tokens.size(1) - 1
             trg_tokens = trg_tokens[:, -1:]
-
         x = self.embed_tokens(trg_tokens, step)
         return x
 

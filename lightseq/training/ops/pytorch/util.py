@@ -13,6 +13,7 @@ def base_architecture(args):
     args.setdefault("activation_dropout_ratio", 0.0)
     args.setdefault("hidden_dropout_ratio", 0.1)
     args.setdefault("pre_layer_norm", True)
+    args.setdefault("activation_fn", "relu")
 
 
 def transformer_base(args):
@@ -35,11 +36,13 @@ def bert_base(args):
     args.setdefault("attn_prob_dropout_ratio", 0.1)
     args.setdefault("activation_dropout_ratio", 0.1)
     args.setdefault("pre_layer_norm", False)
+    args.setdefault("activation_fn", "gelu")
     base_architecture(args)
 
 
 def bert_big(args):
     args.setdefault("pre_layer_norm", False)
+    args.setdefault("activation_fn", "gelu")
     transformer_big(args)
 
 
