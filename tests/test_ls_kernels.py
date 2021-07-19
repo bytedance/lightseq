@@ -397,7 +397,7 @@ def test_launch_ln_bw():
 
 
 @kt.case()
-def test_launch_fuse_transpose_bias_kernel():
+def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
     coef = random.randint(1, 4)
@@ -407,9 +407,9 @@ def test_launch_fuse_transpose_bias_kernel():
     custom_res = kt.rand((coef * hidden_dim))
 
     if kt.dtype == torch.float:
-        func = cuda_module.torch_launch_fuse_transpose_bias_kernel_fp32
+        func = cuda_module.torch_launch_ffn_bias_bwd_fp32
     else:
-        func = cuda_module.torch_launch_fuse_transpose_bias_kernel_fp16
+        func = cuda_module.torch_launch_ffn_bias_bwd_fp16
 
     # [batch_size*seq_len, coef*hidden_dim] ->
     # [batch_size*seq_len, coef*hidden_dim]
@@ -421,7 +421,9 @@ def test_launch_fuse_transpose_bias_kernel():
         ]
 
     def baseline():
-        base = torch.sum(val, 0)
+        temp = val.to(torch.float)
+        base = torch.sum(temp, 0)
+        base = base.to(val)
         return [
             base.contiguous(),
         ]
@@ -522,6 +524,200 @@ def test_adam():
     return custom, baseline
 
 
+@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+def test_launch_dropout_relu_bias():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    test_input = kt.rand((batch_size, seq_len, hidden_dim))
+    test_bias = kt.rand((hidden_dim,))
+    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
+    test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
+    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8,
+        device="cuda:0",
+    )
+    test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8, device="cuda:0"
+    )
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_dropout_relu_bias_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_dropout_relu_bias_fp16
+
+    def custom():
+        cus_func(
+            test_out_cus,
+            test_mask_cus,
+            test_input,
+            test_bias,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return test_out_cus
+
+    def baseline():
+        test_out_base = torch.nn.functional.relu(test_input + test_bias)
+        test_out_base = torch.nn.functional.dropout(test_out_base, p=0)
+
+        return test_out_base
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+def test_launch_dropout_gelu_bias():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    test_input = kt.rand((batch_size, seq_len, hidden_dim))
+    test_bias = kt.rand((hidden_dim,))
+    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
+    test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
+    temp = kt.rand((batch_size, seq_len, hidden_dim))
+    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8,
+        device="cuda:0",
+    )
+    test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8, device="cuda:0"
+    )
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_dropout_gelu_bias_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_dropout_gelu_bias_fp16
+
+    def custom():
+        cus_func(
+            test_out_cus,
+            test_mask_cus,
+            test_input,
+            test_bias,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return test_out_cus
+
+    def baseline():
+        test_out_base = torch.nn.functional.gelu(test_input + test_bias)
+        test_out_base = torch.nn.functional.dropout(test_out_base, p=0)
+
+        return test_out_base
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+def test_launch_dropout_relu_bias_bwd():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim * 4
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    test_input = kt.rand((batch_size, seq_len, hidden_dim))
+    test_bias = kt.rand((hidden_dim))
+    test_out_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    test_in_grad_cus = kt.rand((batch_size, seq_len, hidden_dim))
+    test_bias_grad_cus = kt.rand((hidden_dim))
+    test_mask = torch.ones((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8,
+        device="cuda:0",
+    )
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_dropout_relu_bias_bwd_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_dropout_relu_bias_bwd_fp16
+
+    def custom():
+        cus_func(
+            test_in_grad_cus,
+            test_bias_grad_cus,
+            test_mask,
+            test_input,
+            test_bias,
+            test_out_grad,
+            batch_size * seq_len,
+            hidden_dim,
+            0.1,
+        )
+
+        return test_in_grad_cus, test_bias_grad_cus
+
+    def baseline():
+        temp = test_out_grad * test_mask * (1 / (1 - 0.1))
+        test_in_grad_base = temp * ((test_input + test_bias) > 0)
+        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1))
+
+        return test_in_grad_base, test_bias_grad_base
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+def test_launch_dropout_gelu_bias_bwd():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim * 4
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    test_input = kt.rand((batch_size, seq_len, hidden_dim))
+    test_input.requires_grad_()
+    test_bias = kt.rand((hidden_dim))
+    test_bias.requires_grad_()
+    test_out_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    test_in_grad_cus = kt.rand((batch_size, seq_len, hidden_dim))
+    test_bias_grad_cus = kt.rand((hidden_dim))
+    test_mask = torch.ones((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8,
+        device="cuda:0",
+    )
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_dropout_gelu_bias_bwd_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_dropout_gelu_bias_bwd_fp16
+
+    temp = torch.nn.functional.gelu(test_input + test_bias)
+    base_out = torch.nn.functional.dropout(temp, p=0)
+    base_out = base_out * test_out_grad
+    base_out = base_out.sum()
+
+    def custom():
+        cus_func(
+            test_in_grad_cus,
+            test_bias_grad_cus,
+            test_mask,
+            test_input,
+            test_bias,
+            test_out_grad,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return test_in_grad_cus, test_bias_grad_cus
+
+    def baseline():
+        if test_input.grad is not None:
+            test_input.grad.zero_()
+            test_bias.grad.zero_()
+        base_out.backward(retain_graph=True)
+
+        return [
+            test_input.grad.contiguous().detach(),
+            test_bias.grad.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
@@ -529,12 +725,16 @@ if __name__ == "__main__":
         "test_launch_bias_add_transform_20314",
         "test_launch_transform4d_0213",
         "test_launch_fused_add2",
-        "test_launch_fuse_transpose_bias_kernel",
+        "test_launch_ffn_bias_bwd",
         "test_launch_attn_softmax",
         "test_launch_attn_softmax_bw",
         "test_launch_layer_norm",
         "test_launch_ln_bw",
         "test_launch_concat3_dim1",
         "test_adam",
+        "test_launch_dropout_gelu_bias",
+        "test_launch_dropout_relu_bias",
+        "test_launch_dropout_relu_bias_bwd",
+        "test_launch_dropout_gelu_bias_bwd",
     ]
     kt.run(kernel_list)

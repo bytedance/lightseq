@@ -48,7 +48,7 @@ class TestDecorator(object):
 
     @property
     def hidden_dim(self):
-        hs = random.choice([512, 1024, 2048])
+        hs = random.choice([512, 768, 1024, 1536])
         assert hs % (self.nhead * 8) == 0
         return hs
 
@@ -282,6 +282,9 @@ def split_custom_layer_grad(layer):
 def copy_grad_from_paras(para_list):
     res = []
     for para in para_list:
-        grad = para.grad.data.clone().detach().contiguous()
+        if para.grad is not None:
+            grad = para.grad.data.clone().detach().contiguous()
+        else:
+            grad = torch.zeros_like(para)
         res.append(grad)
     return res

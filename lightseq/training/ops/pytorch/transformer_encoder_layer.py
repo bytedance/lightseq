@@ -43,14 +43,14 @@ class LSTransformerEncoderFunc(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
+        assert ctx.config.training
+
         cuda_module = transformer_cuda_module
         backward_func = (
             cuda_module.transformer_encoder_layer_bw_fp16
             if ctx.config.fp16
             else cuda_module.transformer_encoder_layer_bw_fp32
         )
-
-        assert ctx.config.training
 
         output, input, input_mask = ctx.saved_tensors
         if ctx.config.fp16:
@@ -63,9 +63,6 @@ class LSTransformerEncoderFunc(Function):
         )
 
         grad = _all_layer_grads[ctx.config.layer_id]
-
-        # This appears to be an effective way to release context memory
-        ctx.config = None
 
         return (grad_input, None, grad, None)
 
@@ -122,6 +119,7 @@ class LSTransformerEncoderLayer(nn.Module):
             self.config.activation_dropout_ratio,
             self.config.hidden_dropout_ratio,
             self.config.pre_layer_norm,
+            self.config.activation_fn,
         )
 
         hs = self.config.hidden_size
@@ -187,6 +185,7 @@ class LSTransformerEncoderLayer(nn.Module):
             pre_layer_norm: bool  # pre layer norm or post
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+            activation_fn: str = "relu"  # relu or gelu
 
         if "model" in kwargs:
             if kwargs["model"] not in MODEL_ARCH:

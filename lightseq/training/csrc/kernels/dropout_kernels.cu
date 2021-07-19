@@ -68,34 +68,34 @@ activation_kernel<ActivationType::kRelu, __half2>(__half2 x) {
 template <ActivationType, typename T>
 __forceinline__ __device__ T activation_bwd_kernel(T grad, T x);
 
-// template <>
-// __device__ float activation_bwd_kernel<ActivationType::kGelu, float>(float x)
-// {
-//   const float sqrt_param = 0.79788456080286535587989211986876f;
-//   const float mul_param = 0.044715;
+template <>
+__device__ float activation_bwd_kernel<ActivationType::kGelu, float>(float grad,
+                                                                     float x) {
+  const float sqrt_param = 0.79788456080286535587989211986876f;
+  const float mul_param = 0.044715;
 
-//   float x2mul = x * x * mul_param;
-//   float tan_h = tanhf(sqrt_param * (x + x * x2mul));
-//   float dg1 = 0.5f * (1.0f + tan_h);
-//   float dg2 = x * 0.5f * sqrt_param * (1 - tan_h * tan_h);
-//   float dg3 = dg2 * 3 * x2mul;
-//   return (dg1 + dg2 + dg3);
-// }
+  float x2mul = x * x * mul_param;
+  float tan_h = tanhf(sqrt_param * (x + x * x2mul));
+  float dg1 = 0.5f * (1.0f + tan_h);
+  float dg2 = x * 0.5f * sqrt_param * (1 - tan_h * tan_h);
+  float dg3 = dg2 * 3 * x2mul;
+  return grad * (dg1 + dg2 + dg3);
+}
 
-// template <>
-// __device__ __half
-// activation_bwd_kernel<ActivationType::kGelu, __half>(__half x_half) {
-//   float x = __half2float(x_half);
-//   const float sqrt_param = 0.79788456080286535587989211986876f;
-//   const float mul_param = 0.044715;
+template <>
+__device__ __half activation_bwd_kernel<ActivationType::kGelu, __half>(
+    __half grad, __half x_half) {
+  float x = __half2float(x_half);
+  const float sqrt_param = 0.79788456080286535587989211986876f;
+  const float mul_param = 0.044715;
 
-//   float x2mul = x * x * mul_param;
-//   float tan_h = tanhf(sqrt_param * (x + x * x2mul));
-//   float dg1 = 0.5f * (1.0f + tan_h);
-//   float dg2 = x * 0.5f * sqrt_param * (1 - tan_h * tan_h);
-//   float dg3 = dg2 * 3 * x2mul;
-//   return __float2half(dg1 + dg2 + dg3);
-// }
+  float x2mul = x * x * mul_param;
+  float tan_h = tanhf(sqrt_param * (x + x * x2mul));
+  float dg1 = 0.5f * (1.0f + tan_h);
+  float dg2 = x * 0.5f * sqrt_param * (1 - tan_h * tan_h);
+  float dg3 = dg2 * 3 * x2mul;
+  return grad * __float2half(dg1 + dg2 + dg3);
+}
 
 template <>
 __device__ float activation_bwd_kernel<ActivationType::kRelu, float>(float grad,
@@ -395,7 +395,7 @@ __global__ void ls_dropout_res_bias_kernel(
   m[2] = static_cast<uint8_t>(rand.z > ratio);
   m[3] = static_cast<uint8_t>(rand.w > ratio);
 
-  int bias_i = i & ((hidden_size >> 2) - 1);
+  int bias_i = i % (hidden_size >> 2);
   uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
   mask4[i] = m4[0];
   const float4 input4 = data4[i];
@@ -445,7 +445,7 @@ __global__ void ls_dropout_res_bias_kernel(
   uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
   mask8[i] = m8[0];
 
-  int bias_i = i & ((hidden_size >> 3) - 1);
+  int bias_i = i % (hidden_size >> 3);
   float4 val_float4 = vals_float4[i];
   const float4 b4 = __ldg(&bias4[bias_i]);
   const float4 res4 = residual4[i];
@@ -697,7 +697,7 @@ __global__ void ls_dropout_act_bias_kernel(
   m[2] = (uint8_t)(rand.z > ratio);
   m[3] = (uint8_t)(rand.w > ratio);
 
-  int bias_i = i & ((hidden_size >> 2) - 1);
+  int bias_i = i % (hidden_size >> 2);
   uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
   mask4[i] = m4[0];
   const float4 input4 = data4[i];
@@ -749,7 +749,7 @@ __global__ void ls_dropout_act_bias_kernel(
   uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
   mask8[i] = *m8;
 
-  int bias_i = i & ((hidden_size >> 3) - 1);
+  int bias_i = i % (hidden_size >> 3);
   float4 val_float4 = vals_float4[i];
   const float4 b4 = __ldg(&bias4[bias_i]);
   float4 out_float4;
@@ -872,7 +872,7 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
     for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
       float val = out_grad[idx];
       float in = input[idx];
-      float b = bias[idx & (hidden_size - 1)];
+      float b = bias[idx % hidden_size];
       val = activation_bwd_kernel<act_type, float>(
           val * scale * static_cast<float>(mask[idx]), in + b);
       local_sum += val;
@@ -925,7 +925,7 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
 //     for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
 //       __half2 val = out_grad2[idx];
 //       __half2 in2 = input2[idx];
-//       __half2 b2 = bias2[idx & (hidden_size-1)];
+//       __half2 b2 = bias2[idx % hidden_size ];
 //       __half2 m2 = __floats2half2_rn(mask[2 * idx], mask[2 * idx + 1]);
 //       val = activation_bwd_kernel<ActivationType::kRelu, __half2>(val * scale
 //       *
@@ -984,6 +984,16 @@ template void launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, float>(
     float ratio, cudaStream_t stream);
 
 template void launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, __half>(
+    __half *in_grad, __half *bias_grad, const __half *input, const __half *bias,
+    const __half *out_grad, const uint8_t *mask, int row_size, int dim,
+    float ratio, cudaStream_t stream);
+
+template void launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, float>(
+    float *in_grad, float *bias_grad, const float *input, const float *bias,
+    const float *out_grad, const uint8_t *mask, int row_size, int dim,
+    float ratio, cudaStream_t stream);
+
+template void launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
     __half *in_grad, __half *bias_grad, const __half *input, const __half *bias,
     const __half *out_grad, const uint8_t *mask, int row_size, int dim,
     float ratio, cudaStream_t stream);

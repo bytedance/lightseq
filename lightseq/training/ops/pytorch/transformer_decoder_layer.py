@@ -151,6 +151,7 @@ class LSTransformerDecoderLayer(nn.Module):
             self.config.activation_dropout_ratio,
             self.config.hidden_dropout_ratio,
             self.config.pre_layer_norm,
+            self.config.activation_fn,
         )
 
         hs = self.config.hidden_size
@@ -229,6 +230,7 @@ class LSTransformerDecoderLayer(nn.Module):
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
             nlayer: int  # number of layers
+            activation_fn: str = "relu"  # relu or gelu
 
         if "model" in kwargs:
             if kwargs["model"] not in MODEL_ARCH:

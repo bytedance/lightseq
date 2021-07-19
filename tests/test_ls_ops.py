@@ -49,6 +49,7 @@ def generate_enc_layer(initial_weights=None, initial_biases=None):
         pre_layer_norm=True,
         fp16=True,
         local_rank=0,
+        activation_fn="relu",
     )
     layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
     layer.to(torch.device("cuda:0"), dtype=torch.half)
@@ -73,6 +74,54 @@ for _ in range(num_layers):
     custom_enc_layer_list.append(custom_enc_layer)
     fairseq_enc_layer_list.append(fairseq_enc_layer)
 
+
+###################### bert encoder layer ######################
+
+
+def get_test_bert_encoder(num_layers):
+    def ls_generate_bert_enc_layer(initial_weights=None, initial_biases=None):
+        config = LSTransformerEncoderLayer.get_config(
+            max_batch_tokens=max_batch_tokens,
+            max_seq_len=max_seq_len,
+            hidden_size=1024,
+            intermediate_size=4096,
+            nhead=16,
+            attn_prob_dropout_ratio=0.0,
+            activation_dropout_ratio=0.0,
+            hidden_dropout_ratio=0.0,
+            pre_layer_norm=False,
+            fp16=True,
+            local_rank=0,
+            activation_fn="gelu",
+        )
+        layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
+        layer.to(torch.device("cuda:0"))
+        return layer
+
+    def gen_bert_enc_layer_pair():
+        fairseq_enc_layer = fairseq_layers.generate_bert_enc_layer()
+        fairseq_enc_layer.train()
+        initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(
+            fairseq_enc_layer
+        )
+        custom_enc_layer = ls_generate_bert_enc_layer(
+            initial_enc_weights, initial_enc_biases
+        )
+        custom_enc_layer.train()
+        return fairseq_enc_layer, custom_enc_layer
+
+    custom_bert_enc_layer_list = []
+    fairseq_bert_enc_layer_list = []
+    for _ in range(num_layers):
+        fairseq_enc_layer, custom_enc_layer = gen_bert_enc_layer_pair()
+        custom_bert_enc_layer_list.append(custom_enc_layer)
+        fairseq_bert_enc_layer_list.append(fairseq_enc_layer)
+
+    return torch.nn.ModuleList(custom_bert_enc_layer_list), torch.nn.ModuleList(
+        fairseq_bert_enc_layer_list
+    )
+
+
 ###################### decoding layer ######################
 
 
@@ -90,6 +139,7 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         fp16=True,
         local_rank=0,
         nlayer=num_layers,
+        activation_fn="relu",
     )
     layer = LSFSTransformerDecoderLayer(
         config,
@@ -136,7 +186,7 @@ for i in range(num_layers):
     custom_dec_layer.train()
     custom_dec_layer_list.append(custom_dec_layer)
 
-###################### embedding layer ######################
+# ###################### embedding layer ######################
 
 ls_emb_config_fp16 = LSTransformerEmbeddingLayer.get_config(
     vocab_size=40480,
@@ -310,6 +360,138 @@ def test_encoder_layer_backward():
             grad_list.extend(cur_grads)
         return grad_list
 
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+def test_bert_encoder_layer_forward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    hidden_states = kt.rand((batch_size, seq_len, 1024))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+    num_layers = 1
+
+    custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
+        num_layers
+    )
+
+    custom_bert_enc_layer_list = custom_bert_enc_layer_list.to(kt.dtype)
+    fairseq_bert_enc_layer_list = fairseq_bert_enc_layer_list.to(kt.dtype)
+
+    def custom():
+        res = hidden_states.clone()
+        for i in range(num_layers):
+            res = custom_bert_enc_layer_list[i](res, self_attn_padding_mask)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        res = hidden_states.transpose(0, 1).contiguous().clone()
+        for i in range(num_layers):
+            res = fairseq_bert_enc_layer_list[i](
+                res, self_attn_padding_mask=self_attn_padding_mask
+            )[0]
+        return [
+            res.transpose(0, 1).contiguous().detach(),
+        ]
+
+    del custom_bert_enc_layer_list, fairseq_bert_enc_layer_list
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+def test_bert_encoder_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    hidden_size = 1024
+    shs = hidden_size * hidden_size
+
+    hidden_states = kt.rand((batch_size, seq_len, hidden_size))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+
+    num_layers = 1
+    custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
+        num_layers
+    )
+    custom_bert_enc_layer_list = custom_bert_enc_layer_list.to(kt.dtype).train()
+    fairseq_bert_enc_layer_list = fairseq_bert_enc_layer_list.to(kt.dtype).train()
+
+    cus_x = hidden_states.clone()
+    for i in range(num_layers):
+        cus_x = custom_bert_enc_layer_list[i](cus_x, self_attn_padding_mask)
+    custom_loss = (cus_x / 1000).sum()
+
+    base_x = hidden_states.transpose(0, 1).clone()
+    for i in range(num_layers):
+        base_x = fairseq_bert_enc_layer_list[i](
+            base_x, self_attn_padding_mask=self_attn_padding_mask
+        )[0]
+    fairseq_loss = (base_x.transpose(0, 1) / 1000).sum()
+
+    def custom():
+        custom_bert_enc_layer_list.zero_grad()
+        custom_loss.backward(retain_graph=True)
+        grad_list = []
+        for i in range(num_layers - 1, -1, -1):
+            """
+            attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            """
+            grads = split_custom_layer_grad(custom_bert_enc_layer_list[i])
+            grad_list.extend(
+                [
+                    grads[8],
+                    grads[9],
+                    grads[6],
+                    grads[7],
+                    grads[10],
+                    grads[11],
+                    grads[2],
+                    grads[3],
+                    grads[0][:shs],
+                    grads[1][:hidden_size],
+                    grads[0][shs : shs * 2],
+                    grads[1][hidden_size : hidden_size * 2],
+                    grads[0][shs * 2 : shs * 3],
+                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[4],
+                    grads[5],
+                ]
+            )
+        return grad_list
+
+    def baseline():
+        fairseq_bert_enc_layer_list.zero_grad()
+        fairseq_loss.backward(retain_graph=True)
+        grad_list = []
+        for i in range(num_layers - 1, -1, -1):
+            curl = fairseq_bert_enc_layer_list[i]
+            cur_grads = copy_grad_from_paras(
+                [
+                    curl.fc2.weight,
+                    curl.fc2.bias,
+                    curl.fc1.weight,
+                    curl.fc1.bias,
+                    curl.final_layer_norm.weight,
+                    curl.final_layer_norm.bias,
+                    curl.self_attn.out_proj.weight,
+                    curl.self_attn.out_proj.bias,
+                    curl.self_attn.q_proj.weight,
+                    curl.self_attn.q_proj.bias,
+                    curl.self_attn.k_proj.weight,
+                    curl.self_attn.k_proj.bias,
+                    curl.self_attn.v_proj.weight,
+                    curl.self_attn.v_proj.bias,
+                    curl.self_attn_layer_norm.weight,
+                    curl.self_attn_layer_norm.bias,
+                ]
+            )
+            grad_list.extend(cur_grads)
+        return grad_list
+
+    del custom_bert_enc_layer_list, fairseq_bert_enc_layer_list
     return custom, baseline
 
 
@@ -695,7 +877,7 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
 def test_cross_entropy_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
-    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    print(f"(batch_size, seq_len, vocab_size): ({batch_size}, {seq_len}, {vocab_size})")
 
     inputs = kt.rand((batch_size, seq_len, vocab_size))
     targets = kt.randint(
@@ -735,7 +917,7 @@ def test_cross_entropy_layer_forward():
 def test_cross_entropy_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
-    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    print(f"(batch_size, seq_len, vocab_size): ({batch_size}, {seq_len}, {vocab_size})")
 
     base_inputs = kt.rand((batch_size, seq_len, vocab_size)).requires_grad_()
     cus_inputs = base_inputs.clone().detach().requires_grad_()
@@ -767,7 +949,6 @@ def test_cross_entropy_layer_backward():
         if base_inputs.grad is not None:
             base_inputs.grad.zero_()
         base_res.backward(retain_graph=True)
-        # print(base_inputs.grad)
         return [
             base_inputs.grad.contiguous().detach(),
         ]
@@ -781,6 +962,8 @@ if __name__ == "__main__":
         [
             "test_encoder_layer_forward",
             "test_encoder_layer_backward",
+            "test_bert_encoder_layer_forward",
+            "test_bert_encoder_layer_backward",
             "test_decoder_layer_forward",
             "test_decoder_layer_backward",
             "test_decoder_layer_forward_inference",

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <stdio.h>
@@ -52,18 +53,36 @@ class Dropout {
   }
 
   // dropout inside ffn.
-  void bias_relu_dropout(T *output, const T *input, const T *bias, int rows,
-                         int cols, cudaStream_t stream) {
-    launch_ls_dropout_act_bias<ActivationType::kRelu, T>(
-        output, input, _mask, bias, rows * cols, cols, _config.RATIO(), stream);
+  void bias_act_dropout(T *output, const T *input, const T *bias, int rows,
+                        int cols, std::string activation_fn,
+                        cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_dropout_act_bias<ActivationType::kRelu, T>(
+          output, input, _mask, bias, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_dropout_act_bias<ActivationType::kGelu, T>(
+          output, input, _mask, bias, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
   }
 
-  void d_bias_relu_dropout(T *d_inp_out, T *d_bias_out, const T *input,
-                           const T *bias, int rows, int cols,
-                           cudaStream_t stream) {
-    launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T>(
-        d_inp_out, d_bias_out, input, bias, d_inp_out, _mask, rows, cols,
-        _config.RATIO(), stream);
+  void d_bias_act_dropout(T *d_inp_out, T *d_bias_out, const T *input,
+                          const T *bias, int rows, int cols,
+                          std::string activation_fn, cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T>(
+          d_inp_out, d_bias_out, input, bias, d_inp_out, _mask, rows, cols,
+          _config.RATIO(), stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, T>(
+          d_inp_out, d_bias_out, input, bias, d_inp_out, _mask, rows, cols,
+          _config.RATIO(), stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
   }
 
   bool HasDropout() const { return _config.RATIO() > 0.0; }

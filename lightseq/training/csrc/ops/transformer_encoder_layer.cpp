@@ -8,7 +8,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm)
+    bool pre_or_postLayerNorm, std::string activation_fn)
     : _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -17,6 +17,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
       _intermediate_size(intermediate_size),
       _training(true),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _activation_fn(activation_fn),
       _qkv_linear(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
       _attn_out_linear(
@@ -115,9 +116,9 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   _ff1.Forward(_batch_tokens, _ff1_inp_ptr, _inter_w_ptr, _relu_inp_ptr,
                _cublasHandle);
 
-  _ffn_activation_dropout.bias_relu_dropout(_ff2_inp_ptr, _relu_inp_ptr,
-                                            _inter_b_ptr, _batch_tokens,
-                                            _intermediate_size, _stream);
+  _ffn_activation_dropout.bias_act_dropout(
+      _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
+      _intermediate_size, _activation_fn, _stream);
 
   _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
                _cublasHandle);
@@ -261,9 +262,9 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                 _grad_output_w_ptr, _grad_output_b_ptr, _cublasHandle, _stream,
                 grad_ff1_out_ptr, nullptr, false);
 
-  _ffn_activation_dropout.d_bias_relu_dropout(
+  _ffn_activation_dropout.d_bias_act_dropout(
       grad_ff1_out_ptr, _grad_inter_b_ptr, _relu_inp_ptr, _inter_b_ptr,
-      _batch_tokens, _intermediate_size, _stream);
+      _batch_tokens, _intermediate_size, _activation_fn, _stream);
 
   _ff1.Backward(_batch_tokens, grad_ff1_out_ptr, _ff1_inp_ptr, _inter_w_ptr,
                 _grad_inter_w_ptr, _grad_inter_b_ptr, _cublasHandle, _stream,
