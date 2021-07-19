@@ -64,6 +64,7 @@ class LSLabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         target = model.get_targets(sample, net_output)
         target = target.to(torch.int32)
         loss, nll_loss = self.ls_cross_entropy(net_output[0], target)
+        loss, nll_loss = loss.float(), nll_loss.float()
         sample_size = (
             sample["target"].size(0) if self.sentence_avg else sample["ntokens"]
         )
@@ -79,15 +80,6 @@ class LSLabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         #     logging_output["n_correct"] = utils.item(n_correct.data)
         #     logging_output["total"] = utils.item(total.data)
         return loss, sample_size, logging_output
-
-    # def compute_accuracy(self, model, net_output, sample):
-    #     lprobs, target = self.get_lprobs_and_target(model, net_output, sample)
-    #     mask = target.ne(self.padding_idx)
-    #     n_correct = torch.sum(
-    #         lprobs.argmax(1).masked_select(mask).eq(target.masked_select(mask))
-    #     )
-    #     total = torch.sum(mask)
-    #     return n_correct, total
 
     @classmethod
     def reduce_metrics(cls, logging_outputs) -> None:

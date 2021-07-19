@@ -23,11 +23,12 @@ def gen_bert_config(training_args, config):
         intermediate_size=config.intermediate_size,
         nhead=config.num_attention_heads,
         attn_prob_dropout_ratio=config.attention_probs_dropout_prob,
-        activation_dropout_ratio=0.1,
+        activation_dropout_ratio=config.hidden_dropout_prob,
         hidden_dropout_ratio=config.hidden_dropout_prob,
-        pre_layer_norm=True,
+        pre_layer_norm=False,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,
+        activation_fn="gelu",
     )
     return bert_config
 
@@ -44,15 +45,15 @@ def get_hf_bert_enc_layer_params(layer):
     init_bs.append(layer.attention.self.value.bias.detach().clone())
     init_ws.append(layer.attention.output.dense.weight.detach().clone())
     init_bs.append(layer.attention.output.dense.bias.detach().clone())
-    init_ws.append(layer.output.LayerNorm.weight.detach().clone())
-    init_bs.append(layer.output.LayerNorm.bias.detach().clone())
+    init_ws.append(layer.attention.output.LayerNorm.weight.detach().clone())
+    init_bs.append(layer.attention.output.LayerNorm.bias.detach().clone())
 
     init_ws.append(layer.intermediate.dense.weight.detach().clone())
     init_bs.append(layer.intermediate.dense.bias.detach().clone())
     init_ws.append(layer.output.dense.weight.detach().clone())
     init_bs.append(layer.output.dense.bias.detach().clone())
-    init_ws.append(layer.attention.output.LayerNorm.weight.detach().clone())
-    init_bs.append(layer.attention.output.LayerNorm.bias.detach().clone())
+    init_ws.append(layer.output.LayerNorm.weight.detach().clone())
+    init_bs.append(layer.output.LayerNorm.bias.detach().clone())
 
     return init_ws, init_bs
 
@@ -63,4 +64,4 @@ def inject_ls_enc_layer(model, training_args, config):
         init_ws, init_bs = get_hf_bert_enc_layer_params(model.bert.encoder.layer[i])
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_config, init_ws, init_bs
-        )
+        ).cuda()
