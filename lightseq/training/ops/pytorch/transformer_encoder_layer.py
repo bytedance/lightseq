@@ -43,14 +43,14 @@ class LSTransformerEncoderFunc(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
+        assert ctx.config.training
+
         cuda_module = transformer_cuda_module
         backward_func = (
             cuda_module.transformer_encoder_layer_bw_fp16
             if ctx.config.fp16
             else cuda_module.transformer_encoder_layer_bw_fp32
         )
-
-        assert ctx.config.training
 
         output, input, input_mask = ctx.saved_tensors
         if ctx.config.fp16:
@@ -63,14 +63,6 @@ class LSTransformerEncoderFunc(Function):
         )
 
         grad = _all_layer_grads[ctx.config.layer_id]
-
-        # print("layer id:", ctx.config.layer_id)
-        # print("grad_output zero:",(grad_output==0).sum() / grad_output.numel())
-        # print("grad_input zero:",(grad_input==0).sum() / grad_input.numel())
-        # print("grad zero:",(grad == 0).sum() / grad.numel())
-
-        # This appears to be an effective way to release context memory
-        ctx.config = None
 
         return (grad_input, None, grad, None)
 

@@ -52,17 +52,6 @@ class Dropout {
                                   _config.RATIO(), stream);
   }
 
-  // ActivationType str2act(std::string act_name){
-  //   if (act_name =="relu"){
-  //     return ActivationType::kRelu;
-  //   }else if(act_name == "gelu"){
-  //     return ActivationType::kGelu;
-  //   }
-  //   else{
-  //     throw std::runtime_error("not supported activation: "+ act_name);
-  //   }
-  // }
-
   // dropout inside ffn.
   void bias_act_dropout(T *output, const T *input, const T *bias, int rows,
                         int cols, std::string activation_fn,

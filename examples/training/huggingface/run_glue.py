@@ -411,51 +411,6 @@ def main():
 
     # Replace with LightSeq encoder layers.
     if model_args.with_lightseq:
-        # # model.eval()
-        # ls_model = copy.deepcopy(model).cuda()
-        # # inject_ls_enc_layer(model, training_args, config)
-        # inject_ls_enc_layer(ls_model, training_args, config)
-        # test_input = torch.tensor([[1, 2, 3, 4]]).cuda()
-        # # ls_model.eval()
-        # model.cuda()
-        # test_emb = model.bert.embeddings(test_input)
-        # mask = torch.tensor([[0, 0, 0, 0]]).float().cuda()
-        # mask = mask[:,None,None,:]
-        # assert torch.allclose(
-        #     model.bert.embeddings(test_input), ls_model.bert.embeddings(test_input)
-        # )
-        # print("hf encoder result:", (model.bert.encoder(test_emb, mask)))
-        # print("ls encoder result:", ls_model.bert.encoder(test_emb, mask))
-        # for i in range(24):
-        #     np.testing.assert_allclose(
-        #         model.bert.encoder.layer[i](test_emb, mask)[0].detach().cpu(),
-        #         ls_model.bert.encoder.layer[i](test_emb, mask)[0].detach().cpu(),
-        #         verbose=True,
-        #         rtol=1e-3,
-        #         atol=1e-2,
-        #     )
-        # np.testing.assert_allclose(
-        #     model.bert.encoder(test_emb, mask)[0].detach().cpu(),
-        #     ls_model.bert.encoder(test_emb, mask)[0].detach().cpu(),
-        #     verbose=True,
-        #     rtol=1e-1,
-        #     atol=1e-2,
-        # )
-        # loss = model(test_input).logits.sum()
-        # ls_loss = ls_model(test_input).logits.sum()
-        # loss.backward()
-        # ls_loss.backward()
-        # print("hf weight:", model.bert.encoder.layer[0].attention.self.query.weight)
-        # print("ls weight:", ls_model.bert.encoder.layer[0].para)
-        # print("hf grad:", model.bert.encoder.layer[0].attention.self.query.weight.grad)
-        # print("ls grad:", ls_model.bert.encoder.layer[0].para.grad[: 1024 * 1024 * 3])
-        # import pdb
-
-        # pdb.set_trace()
-        # # print("hf result:", model(test_input))
-        # # print("ls result:", ls_model(test_input))
-        # # assert(torch.allclose(model(test_input), ls_model(test_input)))
-        # sys.exit()
         inject_ls_enc_layer(model, training_args, config)
 
     # Preprocessing the datasets
@@ -625,7 +580,6 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        # import pdb;pdb.set_trace()
         metrics = train_result.metrics
         max_train_samples = (
             data_args.max_train_samples

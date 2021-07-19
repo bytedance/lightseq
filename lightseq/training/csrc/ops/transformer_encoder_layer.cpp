@@ -73,8 +73,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                                      _batch_size, _seq_len, 3, _heads,
                                      _hidden_size / _heads, _stream);
 
-  // print_vec(q_tf_ptr, "self attn q_tf", 10);
-  // print_vec(k_tf_ptr, "self attn k_tf", 10);
   // attention scores, q*k
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
                        _cublasHandle);
@@ -94,7 +92,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   // [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
                              _hidden_size, _heads, 1, _stream);
-  // print_vec(_attn_o_inp_ptr, "ls attn out", 10);
+
   _attn_out_linear.Forward(_batch_tokens, _attn_o_inp_ptr, _attn_ow_ptr,
                            output_ptr, _cublasHandle);
 
@@ -105,9 +103,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
-    // print_vec(_attn_nw_ptr, "ls _attn_nw_ptr", 10);
-    // print_vec(_attn_nb_ptr, "ls _attn_nb_ptr", 10);
-    // print_vec(output_ptr, "ls attn ffn out", 10);
   }
 }
 
