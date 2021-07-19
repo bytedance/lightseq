@@ -119,4 +119,4 @@ class LSCrossEntropyLayer(nn.Module):
         loss, nll_loss = LSCrossEntropyFunc.apply(
             self.config, inputs, targets, **kwargs
         )
-        return loss.to(inputs), nll_loss.to(inputs)
+        return loss, nll_loss
