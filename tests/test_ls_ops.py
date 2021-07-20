@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 
 import torch
 from torch.nn.functional import nll_loss
@@ -19,13 +20,22 @@ from tests.gen_test_layers import (
 
 kt = TestDecorator()
 
-custom_enc_layers, fairseq_enc_layers = gen_enc_layer(global_config)
-custom_dec_layers, fairseq_dec_layers = gen_dec_layer(global_config)
-custom_emb_layer, fairseq_emb_layer = gen_emb_layer(global_config)
-custom_ce_layer, fairseq_ce_layer = gen_ce_layer(global_config)
+# config_32 = deepcopy(global_config)
+# config_32.fp16 = False
+config_16 = deepcopy(global_config)
+config_16.fp16 = True
+
+# custom_enc_layers_32, fairseq_enc_layers_32 = gen_enc_layer(config_32)
+# custom_dec_layers_32, fairseq_dec_layers_32 = gen_dec_layer(config_32)
+# custom_emb_layer_32, fairseq_emb_layer_32 = gen_emb_layer(config_32)
+# custom_ce_layer_32, fairseq_ce_layer_32 = gen_ce_layer(config_32)
+custom_enc_layers_16, fairseq_enc_layers_16 = gen_enc_layer(config_16)
+custom_dec_layers_16, fairseq_dec_layers_16 = gen_dec_layer(config_16)
+custom_emb_layer_16, fairseq_emb_layer_16 = gen_emb_layer(config_16)
+custom_ce_layer_16, fairseq_ce_layer_16 = gen_ce_layer(config_16)
 
 
-@kt.case(rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -34,10 +44,12 @@ def test_encoder_layer_forward():
     hidden_states = kt.rand((batch_size, seq_len, hidden_size))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
-    custom_enc_layers.to(kt.dtype)
-    for layer in custom_enc_layers:
-        layer.config.fp16 = kt.dtype == torch.half
-    fairseq_enc_layers.to(kt.dtype)
+    # if kt.dtype == torch.float:
+    #     custom_enc_layers = custom_enc_layers_32
+    #     fairseq_enc_layers = fairseq_enc_layers_32
+    # else:
+    custom_enc_layers = custom_enc_layers_16
+    fairseq_enc_layers = fairseq_enc_layers_16
 
     def custom():
         res = hidden_states.clone()
@@ -58,7 +70,7 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(rtol=1e-2, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
 def test_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -69,10 +81,14 @@ def test_encoder_layer_backward():
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
     loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
 
+    # if kt.dtype == torch.float:
+    #     custom_enc_layers = custom_enc_layers_32
+    #     fairseq_enc_layers = fairseq_enc_layers_32
+    # else:
+    custom_enc_layers = custom_enc_layers_16
+    fairseq_enc_layers = fairseq_enc_layers_16
+
     # custom fw
-    custom_enc_layers.to(kt.dtype)
-    for layer in custom_enc_layers:
-        layer.config.fp16 = kt.dtype == torch.half
     custom_enc_layers.zero_grad()
     res = hidden_states.clone()
     for layer in custom_enc_layers:
@@ -81,7 +97,6 @@ def test_encoder_layer_backward():
     custom_loss.data.copy_(loss_data)
 
     # fairseq fw
-    fairseq_enc_layers.to(kt.dtype)
     fairseq_enc_layers.zero_grad()
     res = hidden_states.transpose(0, 1).clone()
     for layer in fairseq_enc_layers:
@@ -155,7 +170,7 @@ def test_encoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
@@ -170,10 +185,12 @@ def test_decoder_layer_forward():
     encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
     self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
 
-    custom_dec_layers.to(kt.dtype)
-    for layer in custom_dec_layers:
-        layer.config.fp16 = kt.dtype == torch.half
-    fairseq_dec_layers.to(kt.dtype)
+    # if kt.dtype == torch.float:
+    #     custom_dec_layers = custom_dec_layers_32
+    #     fairseq_dec_layers = fairseq_dec_layers_32
+    # else:
+    custom_dec_layers = custom_dec_layers_16
+    fairseq_dec_layers = fairseq_dec_layers_16
 
     def custom():
         res = hidden_states.clone()
@@ -205,7 +222,7 @@ def test_decoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(rtol=1e-2, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
 def test_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
@@ -222,38 +239,26 @@ def test_decoder_layer_backward():
     self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
     loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
 
-    custom_dec_layers.to(kt.dtype)
-    for layer in custom_dec_layers:
-        layer.config.fp16 = kt.dtype == torch.half
-    custom_dec_layers.zero_grad()
-    res = hidden_states.clone()
-    for layer in custom_dec_layers:
-        res, _, _ = layer(
-            res,
-            encoder_out=encoder_out,
-            encoder_padding_mask=encoder_padding_mask,
-            incremental_state=incremental_state,
-        )
-    custom_loss = (res / 1000).sum()
-    custom_loss.data.copy_(loss_data)
-
-    fairseq_dec_layers.to(kt.dtype)
-    fairseq_dec_layers.zero_grad()
-    res = hidden_states.transpose(0, 1).clone()
-    for layer in fairseq_dec_layers:
-        res, _, _ = layer(
-            res,
-            encoder_out=encoder_out,
-            encoder_padding_mask=encoder_padding_mask,
-            self_attn_mask=self_attn_mask,
-            incremental_state=incremental_state,
-        )
-    fairseq_loss = (res / 1000).sum()
-    fairseq_loss.data.copy_(loss_data)
+    # if kt.dtype == torch.float:
+    #     custom_dec_layers = custom_dec_layers_32
+    #     fairseq_dec_layers = fairseq_dec_layers_32
+    # else:
+    custom_dec_layers = custom_dec_layers_16
+    fairseq_dec_layers = fairseq_dec_layers_16
 
     def custom():
         custom_dec_layers.zero_grad()
-        custom_loss.backward(retain_graph=True)
+        res = hidden_states.clone()
+        for layer in custom_dec_layers:
+            res, _, _ = layer(
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
 
         grad_list = []
         for i in range(global_config.num_layers - 1, -1, -1):
@@ -305,7 +310,18 @@ def test_decoder_layer_backward():
 
     def baseline():
         fairseq_dec_layers.zero_grad()
-        fairseq_loss.backward(retain_graph=True)
+        res = hidden_states.transpose(0, 1).clone()
+        for layer in fairseq_dec_layers:
+            res, _, _ = layer(
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
+            )
+        fairseq_loss = (res / 1000).sum()
+        fairseq_loss.data.copy_(loss_data)
+        fairseq_loss.backward()
 
         grad_list = []
         for i in range(global_config.num_layers - 1, -1, -1):
@@ -328,10 +344,10 @@ def test_decoder_layer_backward():
                     curl.self_attn.v_proj.bias,
                     curl.self_attn_layer_norm.weight,
                     curl.self_attn_layer_norm.bias,
-                    curl.self_attn.q_proj.weight,
-                    curl.self_attn.q_proj.bias,
-                    curl.self_attn.out_proj.weight,
-                    curl.self_attn.out_proj.bias,
+                    curl.encodec_attn.q_proj.weight,
+                    curl.encodec_attn.q_proj.bias,
+                    curl.encodec_attn.out_proj.weight,
+                    curl.encodec_attn.out_proj.bias,
                     curl.encodec_attn_layer_norm.weight,
                     curl.encodec_attn_layer_norm.bias,
                 ]
@@ -352,7 +368,7 @@ def test_decoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
     print(f"(batch_size, enc_seq_len): ({batch_size}, {enc_seq_len})")
@@ -375,6 +391,13 @@ def test_decoder_layer_forward_inference():
         # hidden_states = kt.rand((batch_size*beam_size, 1, hidden_size))
         hidden_states = kt.rand((batch_size, 1, hidden_size))
         hidden_states_list.append(hidden_states)
+
+    # if kt.dtype == torch.float:
+    #     custom_dec_layers = custom_dec_layers_32
+    #     fairseq_dec_layers = fairseq_dec_layers_32
+    # else:
+    custom_dec_layers = custom_dec_layers_16
+    fairseq_dec_layers = fairseq_dec_layers_16
 
     def custom():
         incremental_state = {}
@@ -411,7 +434,7 @@ def test_decoder_layer_forward_inference():
     return custom, baseline
 
 
-@kt.case(rtol=1e-3, atol=1e-3, ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_embedding_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -423,9 +446,12 @@ def test_embedding_layer_forward():
     )
     input = input * (1 - padding_mask) + global_config.padding_idx * padding_mask
 
-    custom_emb_layer.to(kt.dtype)
-    custom_emb_layer.config.fp16 = kt.dtype == torch.half
-    fairseq_emb_layer.to(kt.dtype)
+    # if kt.dtype == torch.float:
+    #     custom_emb_layer = custom_emb_layer_32
+    #     fairseq_emb_layer = fairseq_emb_layer_32
+    # else:
+    custom_emb_layer = custom_emb_layer_16
+    fairseq_emb_layer = fairseq_emb_layer_16
 
     def custom():
         res = custom_emb_layer(input)
@@ -442,7 +468,7 @@ def test_embedding_layer_forward():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_embedding_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -454,15 +480,19 @@ def test_embedding_layer_backward():
     input = input * (1 - padding_mask) + global_config.padding_idx * padding_mask
     loss_data = torch.randn(1, dtype=kt.dtype).sum()
 
-    custom_emb_layer.to(kt.dtype)
-    custom_emb_layer.config.fp16 = kt.dtype == torch.half
+    # if kt.dtype == torch.float:
+    #     custom_emb_layer = custom_emb_layer_32
+    #     fairseq_emb_layer = fairseq_emb_layer_32
+    # else:
+    custom_emb_layer = custom_emb_layer_16
+    fairseq_emb_layer = fairseq_emb_layer_16
+
     custom_emb_layer.zero_grad()
     custom_input = input.clone()
     res = custom_emb_layer(custom_input)
     custom_loss = (res / 1000).sum()
     custom_loss.data.copy_(loss_data)
 
-    fairseq_emb_layer.to(kt.dtype)
     fairseq_emb_layer.zero_grad()
     fs_input = input.clone()
     res = fairseq_emb_layer(fs_input)
@@ -488,24 +518,27 @@ def test_embedding_layer_backward():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_cross_entropy_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
     print(f"(batch_size, seq_len, vocab_size): ({batch_size}, {seq_len}, {vocab_size})")
 
     inputs = kt.rand((batch_size, seq_len, vocab_size))
-    targets = kt.randint(
-        global_config.padding_idx - 1, vocab_size, (batch_size, seq_len)
-    )
+    targets = kt.randint(0, vocab_size, (batch_size, seq_len))
     targets_32 = targets.to(torch.int32)
 
-    custom_ce_layer.to(kt.dtype)
-    custom_ce_layer.config.fp16 = kt.dtype == torch.half
-    fairseq_ce_layer.to(kt.dtype)
+    # if kt.dtype == torch.float:
+    #     custom_ce_layer = custom_ce_layer_32
+    #     fairseq_ce_layer = fairseq_ce_layer_32
+    # else:
+    custom_ce_layer = custom_ce_layer_16
+    fairseq_ce_layer = fairseq_ce_layer_16
 
     def custom():
         loss, cus_nll_loss = custom_ce_layer(inputs, targets_32)
+        loss = loss.to(inputs)
+        cus_nll_loss = cus_nll_loss.to(inputs)
         return [
             loss.contiguous().detach(),
             cus_nll_loss.contiguous().detach(),
@@ -521,7 +554,7 @@ def test_cross_entropy_layer_forward():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_cross_entropy_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
@@ -529,19 +562,21 @@ def test_cross_entropy_layer_backward():
 
     base_inputs = kt.rand((batch_size, seq_len, vocab_size)).requires_grad_()
     cus_inputs = base_inputs.clone().detach().requires_grad_()
-    targets = kt.randint(
-        global_config.padding_idx - 1, vocab_size, (batch_size, seq_len)
-    )
+    targets = kt.randint(0, vocab_size, (batch_size, seq_len))
     targets_32 = targets.to(torch.int32)
 
-    custom_ce_layer.to(kt.dtype)
-    custom_ce_layer.config.fp16 = kt.dtype == torch.half
-    custom_ce_layer.zero_grad()
-    custom_loss, _ = custom_ce_layer(base_inputs, targets_32)
+    # if kt.dtype == torch.float:
+    #     custom_ce_layer = custom_ce_layer_32
+    #     fairseq_ce_layer = fairseq_ce_layer_32
+    # else:
+    custom_ce_layer = custom_ce_layer_16
+    fairseq_ce_layer = fairseq_ce_layer_16
 
-    fairseq_ce_layer.to(kt.dtype)
+    custom_ce_layer.zero_grad()
+    custom_loss, _ = custom_ce_layer(cus_inputs, targets_32)
+
     fairseq_ce_layer.zero_grad()
-    base_loss, _ = fairseq_ce_layer(cus_inputs, targets)
+    base_loss, _ = fairseq_ce_layer(base_inputs, targets)
 
     def custom():
         custom_ce_layer.zero_grad()

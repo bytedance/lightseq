@@ -10,6 +10,7 @@ from tests.fairseq_layers import (
 )
 from lightseq.training import (
     LSTransformerEncoderLayer,
+    LSTransformerDecoderLayer,
     LSTransformerEmbeddingLayer,
     LSCrossEntropyLayer,
 )
@@ -19,46 +20,52 @@ from examples.training.fairseq.fs_modules.ls_fs_transformer_decoder_layer import
 
 
 ###################### encoder layer ######################
-def gen_enc_layer(global_config):
+def gen_enc_layer(config):
     def gen_ls_enc_layer(initial_weights=None, initial_biases=None):
-        config = LSTransformerEncoderLayer.get_config(
-            max_batch_tokens=global_config.max_batch_tokens,
-            max_seq_len=global_config.max_seq_len,
-            hidden_size=global_config.hidden_size,
-            intermediate_size=global_config.intermediate_size,
-            nhead=global_config.nhead,
-            attn_prob_dropout_ratio=global_config.attn_prob_dropout_ratio,
-            activation_dropout_ratio=global_config.activation_dropout_ratio,
-            hidden_dropout_ratio=global_config.hidden_dropout_ratio,
-            pre_layer_norm=global_config.pre_layer_norm,
-            fp16=global_config.fp16,
-            local_rank=global_config.local_rank,
-            activation_fn=global_config.activation_fn,
+        enc_config = LSTransformerEncoderLayer.get_config(
+            max_batch_tokens=config.max_batch_tokens,
+            max_seq_len=config.max_seq_len,
+            hidden_size=config.hidden_size,
+            intermediate_size=config.intermediate_size,
+            nhead=config.nhead,
+            attn_prob_dropout_ratio=config.attn_prob_dropout_ratio,
+            activation_dropout_ratio=config.activation_dropout_ratio,
+            hidden_dropout_ratio=config.hidden_dropout_ratio,
+            pre_layer_norm=config.pre_layer_norm,
+            fp16=config.fp16,
+            local_rank=config.local_rank,
+            activation_fn=config.activation_fn,
         )
-        layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer = LSTransformerEncoderLayer(enc_config, initial_weights, initial_biases)
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
     def gen_fs_enc_layer():
         layer = FSTransformerEncoderLayer(
-            embed_dim=global_config.hidden_size,
-            ffn_embed_dim=global_config.intermediate_size,
-            nhead=global_config.nhead,
-            dropout=global_config.hidden_dropout_ratio,
-            attn_dropout=global_config.attn_prob_dropout_ratio,
-            activation_dropout=global_config.activation_dropout_ratio,
-            normalize_before=global_config.pre_layer_norm,
-            activation_fn=global_config.activation_fn,
+            embed_dim=config.hidden_size,
+            ffn_embed_dim=config.intermediate_size,
+            nhead=config.nhead,
+            dropout=config.hidden_dropout_ratio,
+            attn_dropout=config.attn_prob_dropout_ratio,
+            activation_dropout=config.activation_dropout_ratio,
+            normalize_before=config.pre_layer_norm,
+            activation_fn=config.activation_fn,
         )
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
     custom_enc_layer_list = []
     fairseq_enc_layer_list = []
 
-    for _ in range(global_config.num_layers):
+    for _ in range(config.num_layers):
         fairseq_enc_layer = gen_fs_enc_layer()
         initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(
             fairseq_enc_layer
@@ -73,45 +80,51 @@ def gen_enc_layer(global_config):
 
 
 ###################### decoder layer ######################
-def gen_dec_layer(global_config):
+def gen_dec_layer(config):
     def gen_ls_dec_layer(initial_weights=None, initial_biases=None):
-        config = LSFSTransformerDecoderLayer.get_config(
-            max_batch_tokens=global_config.max_batch_tokens,
-            max_seq_len=global_config.max_seq_len,
-            hidden_size=global_config.hidden_size,
-            intermediate_size=global_config.intermediate_size,
-            nhead=global_config.nhead,
-            attn_prob_dropout_ratio=global_config.attn_prob_dropout_ratio,
-            activation_dropout_ratio=global_config.activation_dropout_ratio,
-            hidden_dropout_ratio=global_config.hidden_dropout_ratio,
-            pre_layer_norm=global_config.pre_layer_norm,
-            fp16=global_config.fp16,
-            local_rank=global_config.local_rank,
-            nlayer=global_config.num_layers,
-            activation_fn=global_config.activation_fn,
+        dec_config = LSFSTransformerDecoderLayer.get_config(
+            max_batch_tokens=config.max_batch_tokens,
+            max_seq_len=config.max_seq_len,
+            hidden_size=config.hidden_size,
+            intermediate_size=config.intermediate_size,
+            nhead=config.nhead,
+            attn_prob_dropout_ratio=config.attn_prob_dropout_ratio,
+            activation_dropout_ratio=config.activation_dropout_ratio,
+            hidden_dropout_ratio=config.hidden_dropout_ratio,
+            pre_layer_norm=config.pre_layer_norm,
+            fp16=config.fp16,
+            local_rank=config.local_rank,
+            nlayer=config.num_layers,
+            activation_fn=config.activation_fn,
         )
         layer = LSFSTransformerDecoderLayer(
-            config,
+            dec_config,
             initial_weights,
             initial_biases,
         )
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
     def gen_fs_dec_layer():
         layer = FSTransformerDecoderLayer(
-            embed_dim=global_config.hidden_size,
-            ffn_embed_dim=global_config.intermediate_size,
-            nhead=global_config.nhead,
-            encoder_embed_dim=global_config.hidden_size,
-            dropout=global_config.hidden_dropout_ratio,
-            attn_dropout=global_config.attn_prob_dropout_ratio,
-            activation_dropout=global_config.activation_dropout_ratio,
-            normalize_before=global_config.pre_layer_norm,
-            activation_fn=global_config.activation_fn,
+            embed_dim=config.hidden_size,
+            ffn_embed_dim=config.intermediate_size,
+            nhead=config.nhead,
+            encoder_embed_dim=config.hidden_size,
+            dropout=config.hidden_dropout_ratio,
+            attn_dropout=config.attn_prob_dropout_ratio,
+            activation_dropout=config.activation_dropout_ratio,
+            normalize_before=config.pre_layer_norm,
+            activation_fn=config.activation_fn,
         )
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
@@ -122,7 +135,7 @@ def gen_dec_layer(global_config):
     _initial_encdec_attn_kvw_list = []
     _initial_encdec_attn_kvb_list = []
 
-    for _ in range(global_config.num_layers):
+    for _ in range(config.num_layers):
         fairseq_dec_layer = gen_fs_dec_layer()
         initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(
             fairseq_dec_layer
@@ -137,7 +150,7 @@ def gen_dec_layer(global_config):
 
     _initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
     _initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
-    for i in range(global_config.num_layers):
+    for i in range(config.num_layers):
         _initial_dec_weights_list[i].pop(7)
         _initial_dec_weights_list[i].pop(6)
         if i == 0:
@@ -157,33 +170,42 @@ def gen_dec_layer(global_config):
 
 
 ###################### embedding layer ######################
-def gen_emb_layer(global_config):
+def gen_emb_layer(config):
     def gen_ls_emb_layer(initial_embedding=None):
-        config = LSTransformerEmbeddingLayer.get_config(
-            vocab_size=global_config.vocab_size,
-            embedding_dim=global_config.hidden_size,
-            max_batch_tokens=global_config.max_batch_tokens,
-            max_seq_len=global_config.max_seq_len,
-            padding_idx=global_config.padding_idx,
-            dropout=global_config.hidden_dropout_ratio,
-            fp16=global_config.fp16,
-            local_rank=global_config.local_rank,
+        emb_config = LSTransformerEmbeddingLayer.get_config(
+            vocab_size=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            max_batch_tokens=config.max_batch_tokens,
+            max_seq_len=config.max_seq_len,
+            padding_idx=config.padding_idx,
+            dropout=config.hidden_dropout_ratio,
+            fp16=config.fp16,
+            local_rank=config.local_rank,
         )
-        layer = LSTransformerEmbeddingLayer(config, initial_embedding)
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer = LSTransformerEmbeddingLayer(
+            emb_config,
+            initial_embedding,
+        )
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
     def gen_fs_emb_layer():
         layer = FSTransformerEmbeddingLayer(
-            vocab_size=global_config.vocab_size,
-            embedding_dim=global_config.hidden_size,
-            max_seq_len=global_config.max_seq_len,
-            padding_idx=global_config.padding_idx,
-            dropout=global_config.hidden_dropout_ratio,
-            fp16=global_config.fp16,
+            vocab_size=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            max_seq_len=config.max_seq_len,
+            padding_idx=config.padding_idx,
+            dropout=config.hidden_dropout_ratio,
+            fp16=config.fp16,
         )
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
@@ -195,26 +217,32 @@ def gen_emb_layer(global_config):
 
 
 ###################### cross entropy layer ######################
-def gen_ce_layer(global_config):
+def gen_ce_layer(config):
     def gen_ls_ce_layer():
-        config = LSCrossEntropyLayer.get_config(
-            max_batch_tokens=global_config.max_batch_tokens,
-            padding_idx=global_config.padding_idx,
-            epsilon=global_config.label_smooth,
-            fp16=global_config.fp16,
-            local_rank=global_config.local_rank,
+        ce_config = LSCrossEntropyLayer.get_config(
+            max_batch_tokens=config.max_batch_tokens,
+            padding_idx=config.padding_idx,
+            epsilon=config.label_smooth,
+            fp16=config.fp16,
+            local_rank=config.local_rank,
         )
-        layer = LSCrossEntropyLayer(config)
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer = LSCrossEntropyLayer(ce_config)
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
     def gen_fs_ce_layer():
         layer = FSCrossEntropyLayer(
-            epsilon=global_config.label_smooth,
-            ignore_index=global_config.padding_idx,
+            epsilon=config.label_smooth,
+            ignore_index=config.padding_idx,
         )
-        layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
+        layer.to(
+            torch.device("cuda:{}".format(config.local_rank)),
+            dtype=(torch.half if config.fp16 else torch.float),
+        )
         layer.train()
         return layer
 
