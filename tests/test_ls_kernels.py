@@ -14,8 +14,7 @@ kt = TestDecorator()
 @kt.case()
 def test_launch_bias_add_transform_20314():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
-    nhead = kt.nhead
+    hidden_dim, nhead = kt.h_nh
     head_dim = int(hidden_dim / nhead)
     count = random.randint(1, 20)
     print(
@@ -56,8 +55,7 @@ def test_launch_bias_add_transform_20314():
 @kt.case()
 def test_launch_transform_0213():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
-    nhead = kt.nhead
+    hidden_dim, nhead = kt.h_nh
     head_dim = int(hidden_dim / nhead)
     print(
         "(batch_size, seq_len, hidden_dim, nhead): "
@@ -93,8 +91,7 @@ def test_launch_transform_0213():
 @kt.case()
 def test_launch_transform4d_0213():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
-    nhead = kt.nhead
+    hidden_dim, nhead = kt.h_nh
     head_dim = int(hidden_dim / nhead)
     trans_count = random.choice([1, 3])
     print(
@@ -128,7 +125,7 @@ def test_launch_transform4d_0213():
     return custom, baseline
 
 
-@kt.case(atol=1e-3, rtol=1e-3, ntest=20)
+@kt.case(rtol=1e-3, atol=1e-3)
 def test_launch_attn_softmax():
     batch_size, from_len = kt.bs_sl()
     is_dec_self_attn = random.choice([True, False])
@@ -145,7 +142,7 @@ def test_launch_attn_softmax():
         beam_size = random.choice([3, 4, 5])
         batch_size *= beam_size
 
-    nhead = kt.nhead
+    _, nhead = kt.h_nh
     print(
         "(batch_size, nhead, from_len, to_len, is_dec_self_attn): "
         f"({batch_size}, {nhead}, {from_len}, {to_len}, {is_dec_self_attn})"
@@ -199,9 +196,9 @@ def test_launch_attn_softmax():
     return custom, baseline
 
 
-@kt.case(atol=1e-2, rtol=1e-3)
+@kt.case(rtol=1e-3, atol=1e-2)
 def test_launch_attn_softmax_bw():
-    nhead = kt.nhead
+    _, nhead = kt.h_nh
     batch_size, from_len = kt.bs_sl()
     _, to_len = kt.bs_sl(batch_size)
     print(
@@ -243,7 +240,7 @@ def test_launch_attn_softmax_bw():
 @kt.case()
 def test_launch_fused_add2():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     print(
         "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
     )
@@ -275,11 +272,11 @@ def test_launch_fused_add2():
     return custom, baseline
 
 
-@kt.case(atol=1e-2, rtol=1e-3)
+@kt.case(rtol=1e-3, atol=1e-2)
 def test_launch_layer_norm():
     batch_size, seq_len = kt.bs_sl()
     bsz_seq = batch_size * seq_len
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     with_mean = random.choice([True, False])
     print(
         "(batch_token_num, hidden_dim, with_mean): "
@@ -316,11 +313,11 @@ def test_launch_layer_norm():
     return custom, baseline
 
 
-@kt.case(atol=1e-3, rtol=1e-2)
+@kt.case(rtol=1e-2, atol=1e-3)
 def test_launch_ln_bw():
     batch_size, seq_len = kt.bs_sl()
     bsz_seq = batch_size * seq_len
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     with_mean = random.choice([True, False])
     fuse_add = random.choice([True, False])
     print(
@@ -396,10 +393,10 @@ def test_launch_ln_bw():
     return custom, baseline
 
 
-@kt.case()
+@kt.case(rtol=1e-3, atol=1e-4)
 def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     coef = random.randint(1, 4)
     print("(rows, cols): " f"({batch_size*seq_len}, {coef*hidden_dim})")
 
@@ -434,8 +431,7 @@ def test_launch_ffn_bias_bwd():
 @kt.case()
 def test_launch_concat3_dim1():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
-    nhead = kt.nhead
+    hidden_dim, nhead = kt.h_nh
     head_dim = int(hidden_dim / nhead)
     assert seq_len > 1
     sl1 = random.randint(1, seq_len - 1)
@@ -465,10 +461,10 @@ def test_launch_concat3_dim1():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float32])
+@kt.case(dtypes=[torch.float])
 def test_adam():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     cus_p = kt.rand((batch_size, seq_len, hidden_dim * 32))
     cus_out_p = kt.rand((batch_size, seq_len, hidden_dim * 32))
     cus_exp_avg = kt.rand((batch_size, seq_len, hidden_dim * 32))
@@ -524,20 +520,15 @@ def test_adam():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+@kt.case(rtol=1e-2, atol=1e-2)
 def test_launch_dropout_relu_bias():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     print("test shape:", (batch_size, seq_len, hidden_dim))
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
     test_bias = kt.rand((hidden_dim,))
-    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
     test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
-    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
-        dtype=torch.uint8,
-        device="cuda:0",
-    )
     test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -569,21 +560,15 @@ def test_launch_dropout_relu_bias():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+@kt.case(rtol=1e-2, atol=1e-2)
 def test_launch_dropout_gelu_bias():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
+    hidden_dim, _ = kt.h_nh
     print("test shape:", (batch_size, seq_len, hidden_dim))
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
     test_bias = kt.rand((hidden_dim,))
-    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
     test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
-    temp = kt.rand((batch_size, seq_len, hidden_dim))
-    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
-        dtype=torch.uint8,
-        device="cuda:0",
-    )
     test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -615,10 +600,11 @@ def test_launch_dropout_gelu_bias():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+@kt.case(rtol=1e-2, atol=1e-2)
 def test_launch_dropout_relu_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim * 4
+    hidden_dim, _ = kt.h_nh
+    hidden_dim *= 4
     print("test shape:", (batch_size, seq_len, hidden_dim))
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
@@ -661,10 +647,11 @@ def test_launch_dropout_relu_bias_bwd():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+@kt.case(rtol=1e-2, atol=1e-2)
 def test_launch_dropout_gelu_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim * 4
+    hidden_dim, _ = kt.h_nh
+    hidden_dim *= 4
     print("test shape:", (batch_size, seq_len, hidden_dim))
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
@@ -719,22 +706,22 @@ def test_launch_dropout_gelu_bias_bwd():
 
 
 if __name__ == "__main__":
-    kt.init(device="cuda:0", nhead=16)
-    kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
-    ]
-    kt.run(kernel_list)
+    kt.run(
+        [
+            "test_launch_transform_0213",
+            "test_launch_bias_add_transform_20314",
+            "test_launch_transform4d_0213",
+            "test_launch_fused_add2",
+            "test_launch_ffn_bias_bwd",
+            "test_launch_attn_softmax",
+            "test_launch_attn_softmax_bw",
+            "test_launch_layer_norm",
+            "test_launch_ln_bw",
+            "test_launch_concat3_dim1",
+            "test_adam",
+            "test_launch_dropout_gelu_bias",
+            "test_launch_dropout_relu_bias",
+            "test_launch_dropout_relu_bias_bwd",
+            "test_launch_dropout_gelu_bias_bwd",
+        ]
+    )

@@ -2,6 +2,7 @@ import random
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -27,10 +28,10 @@ class Config:
     label_smooth: float
 
 
-global_config = Config(
+default_config = Config(
     max_batch_tokens=9216,
     max_seq_len=256,
-    vocab_size=40480,
+    vocab_size=32000,
     padding_idx=0,
     hidden_size=1024,
     intermediate_size=1024 * 4,
@@ -42,7 +43,7 @@ global_config = Config(
     fp16=True,
     local_rank=0,
     activation_fn="relu",
-    num_layers=1,
+    num_layers=2,
     label_smooth=0.1,
 )
 
@@ -52,30 +53,47 @@ class TestDecorator(object):
         self.all_case = OrderedDict()
         self.dtypes = [torch.float, torch.half]
         self.dtype = None
-        self.max_batch_tokens = global_config.max_batch_tokens
-        self.max_seq_len = global_config.max_seq_len
+        self.device = torch.device("cuda:{}".format(default_config.local_rank))
 
-    def init(self, device, nhead):
-        # device: str. e.g. "cuda:0"
-        self.device = torch.device(device)
-        assert nhead % 4 == 0
-        self.nhead = nhead
+    def generate_config(self, use_default=False):
+        if use_default:
+            return deepcopy(default_config)
+        config = deepcopy(default_config)
+        config.vocab_size = random.randint(1000, 42000)
+        hidden_size, nhead = self.h_nh
+        config.hidden_size = hidden_size
+        config.intermediate_size = hidden_size * 4
+        config.nhead = nhead
+        config.pre_layer_norm = random.choice([True, False])
+        config.activation_fn = self.act_fn
+        config.num_layers = random.randint(1, 2)
+        return config
 
     def bs_sl(self, batch_size=None):
         if batch_size is None:
-            seq_len = random.randint(1, self.max_seq_len)
-            max_batch_size = self.max_batch_tokens // seq_len
+            seq_len = random.randint(1, default_config.max_seq_len)
+            max_batch_size = default_config.max_batch_tokens // seq_len
             batch_size = random.randint(1, max_batch_size)
         else:
-            max_seq_len = min(self.max_batch_tokens // batch_size, self.max_seq_len)
+            max_seq_len = min(
+                default_config.max_batch_tokens // batch_size,
+                default_config.max_seq_len,
+            )
             seq_len = random.randint(1, max_seq_len)
         return batch_size, seq_len
 
     @property
-    def hidden_dim(self):
-        hs = random.choice([512, 768, 1024, 1536])
-        assert hs % (self.nhead * 8) == 0
-        return hs
+    def h_nh(self):
+        while True:
+            hs = random.choice([512, 768, 1024, 1536, 2048, 4096])
+            nhead = random.choice([8, 12, 16])
+            if hs % (nhead * 8) == 0:
+                return hs, nhead
+
+    @property
+    def act_fn(self):
+        act = random.choice(["relu", "gelu"])
+        return act
 
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)
@@ -120,7 +138,7 @@ class TestDecorator(object):
         mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
         return mask.to(self.device, dtype=dtype)
 
-    def case(self, dtypes=list(), ntest=5, nrepeat=5, rtol=1e-5, atol=1e-5):
+    def case(self, dtypes=list(), ntest=10, nrepeat=5, rtol=1e-5, atol=1e-5):
         if not dtypes:
             dtypes = self.dtypes
 

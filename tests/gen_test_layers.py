@@ -10,7 +10,6 @@ from tests.fairseq_layers import (
 )
 from lightseq.training import (
     LSTransformerEncoderLayer,
-    LSTransformerDecoderLayer,
     LSTransformerEmbeddingLayer,
     LSCrossEntropyLayer,
 )
