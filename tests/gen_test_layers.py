@@ -35,11 +35,7 @@ def gen_enc_layer(global_config):
             local_rank=global_config.local_rank,
             activation_fn=global_config.activation_fn,
         )
-        layer = LSTransformerEncoderLayer(
-            config,
-            initial_weights,
-            initial_biases
-        )
+        layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
         layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
         layer.train()
         return layer
@@ -64,12 +60,16 @@ def gen_enc_layer(global_config):
 
     for _ in range(global_config.num_layers):
         fairseq_enc_layer = gen_fs_enc_layer()
-        initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
+        initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(
+            fairseq_enc_layer
+        )
         custom_enc_layer = gen_ls_enc_layer(initial_enc_weights, initial_enc_biases)
         custom_enc_layer_list.append(custom_enc_layer)
         fairseq_enc_layer_list.append(fairseq_enc_layer)
-    
-    return torch.nn.ModuleList(custom_enc_layer_list), torch.nn.ModuleList(fairseq_enc_layer_list)
+
+    return torch.nn.ModuleList(custom_enc_layer_list), torch.nn.ModuleList(
+        fairseq_enc_layer_list
+    )
 
 
 ###################### decoder layer ######################
@@ -124,7 +124,9 @@ def gen_dec_layer(global_config):
 
     for _ in range(global_config.num_layers):
         fairseq_dec_layer = gen_fs_dec_layer()
-        initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
+        initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(
+            fairseq_dec_layer
+        )
         fairseq_dec_layer_list.append(fairseq_dec_layer)
         _initial_dec_weights_list.append(initial_dec_weights)
         _initial_dec_biases_list.append(initial_dec_biases)
@@ -148,8 +150,10 @@ def gen_dec_layer(global_config):
             _initial_dec_weights_list[i], _initial_dec_biases_list[i]
         )
         custom_dec_layer_list.append(custom_dec_layer)
-    
-    return torch.nn.ModuleList(custom_dec_layer_list), torch.nn.ModuleList(fairseq_dec_layer_list)
+
+    return torch.nn.ModuleList(custom_dec_layer_list), torch.nn.ModuleList(
+        fairseq_dec_layer_list
+    )
 
 
 ###################### embedding layer ######################
@@ -165,10 +169,7 @@ def gen_emb_layer(global_config):
             fp16=global_config.fp16,
             local_rank=global_config.local_rank,
         )
-        layer = LSTransformerEmbeddingLayer(
-            config,
-            initial_embedding
-        )
+        layer = LSTransformerEmbeddingLayer(config, initial_embedding)
         layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
         layer.train()
         return layer
@@ -180,7 +181,7 @@ def gen_emb_layer(global_config):
             max_seq_len=global_config.max_seq_len,
             padding_idx=global_config.padding_idx,
             dropout=global_config.hidden_dropout_ratio,
-            fp16=global_config.fp16
+            fp16=global_config.fp16,
         )
         layer.to(torch.device("cuda:{}".format(global_config.local_rank)))
         layer.train()
