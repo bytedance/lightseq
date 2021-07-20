@@ -10,8 +10,8 @@ lookup table, scale, add position embedding and dropout.
 
 @thread
 gridDim.x = batch_size
-gridDim.y = threads_per_seq
-blockDim.x = tokens_per_thread
+gridDim.y = blocks_per_seq
+blockDim.x = tokens_per_block
 blockDim.y = min(embedding_dim, MAX_THREADS)
 
 @param
@@ -178,10 +178,11 @@ void launch_lookup_scale_pos_dropout<float>(
   float emb_scale = sqrt(embedding_dim);
   embedding_dim >>= 2;
 
-  int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
-  int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;
-  dim3 grid_dim(batch_size, threads_per_seq);
-  dim3 block_dim(tokens_per_thread, min(embedding_dim, MAX_THREADS));
+  int threads_per_token = min(embedding_dim, MAX_THREADS);
+  int tokens_per_block = MAX_THREADS / threads_per_token;
+  int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
+  dim3 grid_dim(batch_size, blocks_per_seq);
+  dim3 block_dim(tokens_per_block, threads_per_token);
   int seed = std::chrono::duration_cast<std::chrono::microseconds>(
                  std::chrono::system_clock::now().time_since_epoch())
                  .count();
@@ -200,10 +201,11 @@ void launch_lookup_scale_pos_dropout<__half>(
   float emb_scale = sqrt(embedding_dim);
   embedding_dim >>= 3;
 
-  int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
-  int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;
-  dim3 grid_dim(batch_size, threads_per_seq);
-  dim3 block_dim(tokens_per_thread, min(embedding_dim, MAX_THREADS));
+  int threads_per_token = min(embedding_dim, MAX_THREADS);
+  int tokens_per_block = MAX_THREADS / threads_per_token;
+  int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
+  dim3 grid_dim(batch_size, blocks_per_seq);
+  dim3 block_dim(tokens_per_block, threads_per_token);
   int seed = std::chrono::duration_cast<std::chrono::microseconds>(
                  std::chrono::system_clock::now().time_since_epoch())
                  .count();
@@ -219,8 +221,8 @@ backward of embedding layer in fairseq.
 
 @thread
 gridDim.x = batch_size
-gridDim.y = threads_per_seq
-blockDim.x = tokens_per_thread
+gridDim.y = blocks_per_seq
+blockDim.x = tokens_per_block
 blockDim.y = min(embedding_dim, MAX_THREADS)
 
 @param
@@ -360,10 +362,11 @@ void launch_d_lookup_scale_pos_dropout<float>(
   zero_grads<float>
       <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
 
-  int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
-  int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;
-  dim3 grid_dim(batch_size, threads_per_seq);
-  dim3 block_dim(tokens_per_thread, min(embedding_dim, MAX_THREADS));
+  int threads_per_token = min(embedding_dim, MAX_THREADS);
+  int tokens_per_block = MAX_THREADS / threads_per_token;
+  int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
+  dim3 grid_dim(batch_size, blocks_per_seq);
+  dim3 block_dim(tokens_per_block, threads_per_token);
 
   d_lookup_scale_pos_dropout<float><<<grid_dim, block_dim, 0, stream>>>(
       grad_embeddings, grad_output, input, dropout_mask, seq_len, embedding_dim,
@@ -386,10 +389,11 @@ void launch_d_lookup_scale_pos_dropout<__half>(
   zero_grads<__half>
       <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
 
-  int tokens_per_thread = (MAX_THREADS + embedding_dim - 1) / embedding_dim;
-  int threads_per_seq = (seq_len + tokens_per_thread - 1) / tokens_per_thread;
-  dim3 grid_dim(batch_size, threads_per_seq);
-  dim3 block_dim(tokens_per_thread, min(embedding_dim, MAX_THREADS));
+  int threads_per_token = min(embedding_dim, MAX_THREADS);
+  int tokens_per_block = MAX_THREADS / threads_per_token;
+  int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
+  dim3 grid_dim(batch_size, blocks_per_seq);
+  dim3 block_dim(tokens_per_block, threads_per_token);
 
   d_lookup_scale_pos_dropout<__half><<<grid_dim, block_dim, 0, stream>>>(
       grad_embeddings, grad_output, input, dropout_mask, seq_len, embedding_dim,
