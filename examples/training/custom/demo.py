@@ -5,21 +5,26 @@ from lightseq.training import LSTransformer, LSCrossEntropyLayer, LSAdam
 
 
 def create_data():
+    # create Hugging Face tokenizer
     tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
     vocab_size = tokenizer.vocab_size
 
+    # source text to id
     src_text = "Which company do you work for?"
     src_tokens = tokenizer.encode(src_text, return_tensors="pt")
     src_tokens = src_tokens.to(torch.device("cuda:0"))
     batch_size, src_seq_len = src_tokens.size(0), src_tokens.size(1)
 
+    # target text to id
     trg_text = "I guess it must be LightSeq, because ByteDance is the fastest."
     trg_tokens = tokenizer.encode(trg_text, return_tensors="pt")
     trg_tokens = trg_tokens.to(torch.device("cuda:0"))
     trg_seq_len = trg_tokens.size(1)
 
+    # left shift 1 token as the target output
     target = trg_tokens.clone()[:, 1:]
     trg_tokens = trg_tokens[:, :-1]
+
     return (
         tokenizer,
         src_text,
@@ -93,13 +98,19 @@ if __name__ == "__main__":
 
     print("========================TEST========================")
     model.eval()
+    # obtain encoder output and mask
     encoder_out, encoder_padding_mask = model.encoder(src_tokens)
+    # use the first token as initial target input
     predict_tokens = trg_tokens[:, :1]
     for _ in range(trg_seq_len - 1):
+        # TODO: use cache to accelerate the inference
         output = model.decoder(predict_tokens, encoder_out, encoder_padding_mask)
+        # predict the next token
         output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
+        # concatenate the next token with previous tokens
         predict_tokens = torch.cat([predict_tokens, output[:, -1:]], dim=-1)
     predict_tokens = torch.squeeze(predict_tokens)
+    # predict id to text
     predict_text = tokenizer.decode(predict_tokens, skip_special_tokens=True)
     print("source:\n", src_text)
     print("target:\n", trg_text)
