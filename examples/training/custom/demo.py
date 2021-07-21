@@ -105,7 +105,9 @@ if __name__ == "__main__":
     cache = {}
     for _ in range(trg_seq_len - 1):
         # use cache to accelerate the inference
-        output = model.decoder(predict_tokens[:, -1:], encoder_out, encoder_padding_mask, cache)
+        output = model.decoder(
+            predict_tokens[:, -1:], encoder_out, encoder_padding_mask, cache
+        )
         # predict the next token
         output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
         # concatenate the next token with previous tokens
