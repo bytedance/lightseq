@@ -8,7 +8,9 @@ def create_data():
     # create Hugging Face tokenizer
     tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
     vocab_size = tokenizer.vocab_size
-    sep_id = tokenizer.encode(tokenizer.special_tokens_map["sep_token"], add_special_tokens=False)[0]
+    sep_id = tokenizer.encode(
+        tokenizer.special_tokens_map["sep_token"], add_special_tokens=False
+    )[0]
 
     # source text to id
     src_text = [
@@ -17,7 +19,9 @@ def create_data():
         "What do you love me for?",
         "The sparrow outside the window hovering on the telephone pole.",
     ]
-    src_tokens = tokenizer.batch_encode_plus(src_text, padding=True, return_tensors="pt")
+    src_tokens = tokenizer.batch_encode_plus(
+        src_text, padding=True, return_tensors="pt"
+    )
     src_tokens = src_tokens["input_ids"].to(torch.device("cuda:0"))
     batch_size, src_seq_len = src_tokens.size(0), src_tokens.size(1)
 
@@ -28,7 +32,9 @@ def create_data():
         "Love your beauty, smart, virtuous and kind.",
         "You said all this is very summery.",
     ]
-    trg_tokens = tokenizer.batch_encode_plus(trg_text, padding=True, return_tensors="pt")
+    trg_tokens = tokenizer.batch_encode_plus(
+        trg_text, padding=True, return_tensors="pt"
+    )
     trg_tokens = trg_tokens["input_ids"].to(torch.device("cuda:0"))
     trg_seq_len = trg_tokens.size(1)
 
@@ -127,7 +133,7 @@ if __name__ == "__main__":
         predict_tokens = torch.cat([predict_tokens, output], dim=-1)
     # pad all tokens after [SEP]
     mask = torch.cumsum(torch.eq(predict_tokens, sep_id).int(), dim=1)
-    predict_tokens = predict_tokens.masked_fill(mask>0, sep_id)
+    predict_tokens = predict_tokens.masked_fill(mask > 0, sep_id)
     # predict id to text
     predict_text = tokenizer.batch_decode(predict_tokens, skip_special_tokens=True)
     print(">>>>> source text")
