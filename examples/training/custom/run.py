@@ -8,17 +8,28 @@ def create_data():
     # create Hugging Face tokenizer
     tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
     vocab_size = tokenizer.vocab_size
+    sep_id = tokenizer.encode(tokenizer.special_tokens_map["sep_token"], add_special_tokens=False)[0]
 
     # source text to id
-    src_text = "Which company do you work for?"
-    src_tokens = tokenizer.encode(src_text, return_tensors="pt")
-    src_tokens = src_tokens.to(torch.device("cuda:0"))
+    src_text = [
+        "What is the fastest library in the world?",
+        "You are so pretty!",
+        "What do you love me for?",
+        "The sparrow outside the window hovering on the telephone pole.",
+    ]
+    src_tokens = tokenizer.batch_encode_plus(src_text, padding=True, return_tensors="pt")
+    src_tokens = src_tokens["input_ids"].to(torch.device("cuda:0"))
     batch_size, src_seq_len = src_tokens.size(0), src_tokens.size(1)
 
     # target text to id
-    trg_text = "I guess it must be LightSeq, because ByteDance is the fastest."
-    trg_tokens = tokenizer.encode(trg_text, return_tensors="pt")
-    trg_tokens = trg_tokens.to(torch.device("cuda:0"))
+    trg_text = [
+        "I guess it must be LightSeq, because ByteDance is the fastest.",
+        "Thanks very much and you are pretty too.",
+        "Love your beauty, smart, virtuous and kind.",
+        "You said all this is very summery.",
+    ]
+    trg_tokens = tokenizer.batch_encode_plus(trg_text, padding=True, return_tensors="pt")
+    trg_tokens = trg_tokens["input_ids"].to(torch.device("cuda:0"))
     trg_seq_len = trg_tokens.size(1)
 
     # left shift 1 token as the target output
@@ -32,6 +43,7 @@ def create_data():
         trg_text,
         trg_tokens,
         target,
+        sep_id,
         vocab_size,
         batch_size,
         src_seq_len,
@@ -77,6 +89,7 @@ if __name__ == "__main__":
         trg_text,
         trg_tokens,
         target,
+        sep_id,
         vocab_size,
         batch_size,
         src_seq_len,
@@ -88,10 +101,10 @@ if __name__ == "__main__":
 
     print("========================TRAIN========================")
     model.train()
-    for epoch in range(1000):
+    for epoch in range(2000):
         output = model(src_tokens, trg_tokens)
         loss, _ = loss_fn(output, target)
-        if epoch % 100 == 0:
+        if epoch % 200 == 0:
             print("epoch {:03d}: {:.3f}".format(epoch, loss.item()))
         loss.backward()
         opt.step()
@@ -112,9 +125,14 @@ if __name__ == "__main__":
         output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
         # concatenate the next token with previous tokens
         predict_tokens = torch.cat([predict_tokens, output], dim=-1)
-    predict_tokens = torch.squeeze(predict_tokens)
+    # pad all tokens after [SEP]
+    mask = torch.cumsum(torch.eq(predict_tokens, sep_id).int(), dim=1)
+    predict_tokens = predict_tokens.masked_fill(mask>0, sep_id)
     # predict id to text
-    predict_text = tokenizer.decode(predict_tokens, skip_special_tokens=True)
-    print("source:\n", src_text)
-    print("target:\n", trg_text)
-    print("predict:\n", predict_text)
+    predict_text = tokenizer.batch_decode(predict_tokens, skip_special_tokens=True)
+    print(">>>>> source text")
+    print("\n".join(src_text))
+    print(">>>>> target text")
+    print("\n".join(trg_text))
+    print(">>>>> predict text")
+    print("\n".join(predict_text))
