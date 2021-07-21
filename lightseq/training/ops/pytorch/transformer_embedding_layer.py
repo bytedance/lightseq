@@ -49,8 +49,6 @@ class LSTransformerEmbeddingFunc(Function):
 
         grad = _all_layer_grads[ctx.config.layer_id]
 
-        ctx.config = None
-
         return (None, None, grad, None)
 
 
