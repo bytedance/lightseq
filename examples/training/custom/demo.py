@@ -102,13 +102,14 @@ if __name__ == "__main__":
     encoder_out, encoder_padding_mask = model.encoder(src_tokens)
     # use the first token as initial target input
     predict_tokens = trg_tokens[:, :1]
+    cache = {}
     for _ in range(trg_seq_len - 1):
-        # TODO: use cache to accelerate the inference
-        output = model.decoder(predict_tokens, encoder_out, encoder_padding_mask)
+        # use cache to accelerate the inference
+        output = model.decoder(predict_tokens[:, -1:], encoder_out, encoder_padding_mask, cache)
         # predict the next token
         output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
         # concatenate the next token with previous tokens
-        predict_tokens = torch.cat([predict_tokens, output[:, -1:]], dim=-1)
+        predict_tokens = torch.cat([predict_tokens, output], dim=-1)
     predict_tokens = torch.squeeze(predict_tokens)
     # predict id to text
     predict_text = tokenizer.decode(predict_tokens, skip_special_tokens=True)
