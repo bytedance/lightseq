@@ -95,7 +95,7 @@ class LSTransformerDecoderFunc(Function):
             grad_enc_out = None
 
         grad = _all_layer_grads[ctx.config.layer_id]
-        ctx.config = None
+
         return (grad_input, grad_enc_out, None, grad, None, None)
 
 
