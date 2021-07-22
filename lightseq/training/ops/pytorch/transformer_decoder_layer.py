@@ -31,12 +31,6 @@ class LSTransformerDecoderFunc(Function):
             else cuda_module.transformer_decoder_layer_fw_fp32
         )
 
-        if config.fp16:
-            decoder_states = decoder_states.to(torch.half)
-            encoder_out = encoder_out.to(torch.half)
-            encoder_padding_mask = encoder_padding_mask.to(torch.half)
-            # cache = [c.to(torch.half) for c in cache]
-
         (output,) = forward_func(
             config.layer_id,
             decoder_states,
@@ -95,7 +89,6 @@ class LSTransformerDecoderFunc(Function):
             grad_enc_out = None
 
         grad = _all_layer_grads[ctx.config.layer_id]
-
         return (grad_input, grad_enc_out, None, grad, None, None)
 
 
@@ -366,6 +359,11 @@ class LSTransformerDecoderLayer(nn.Module):
             else:
                 self.register_buffer("para_16", self.para.clone().detach().half())
 
+        if self.config.fp16:
+            decoder_states = decoder_states.to(torch.half)
+            encoder_out = encoder_out.to(torch.half)
+            encoder_padding_mask = encoder_padding_mask.to(torch.half)
+
         self.__assign_layer_weight_grad()
         cache_list = []
         if cache is not None:
@@ -374,7 +372,12 @@ class LSTransformerDecoderLayer(nn.Module):
             if cache:
                 # non-empty dict, step 1-n
                 step = cache["dec_self_k"].shape[2]
-                cache_list = [cache["dec_self_k"], cache["dec_self_v"]]
+                # Thanks to fengjiangtao@bytedance.com
+                # for helping us find this bug.
+                cache_list = [
+                    cache["dec_self_k"].contiguous(),
+                    cache["dec_self_v"].contiguous(),
+                ]
             else:
                 # empty dict, step 0
                 step = 0
@@ -398,10 +401,6 @@ class LSTransformerDecoderLayer(nn.Module):
         bs, sl, dim = decoder_states.size()
         if dim % 256 != 0:
             raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
-        if decoder_states.dtype != self.para.dtype:
-            raise TypeError(
-                f"Inputs type {decoder_states.dtype} is not equal to parameters type {self.para.dtype}."
-            )
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
