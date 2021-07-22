@@ -1,8 +1,8 @@
 #include <algorithm>
 
-#include "../../../lightseq/inference/model/decoder.h"
-#include "../../../lightseq/inference/model/encoder.h"
-#include "../../../lightseq/inference/tools/util.h"
+#include "decoder.h"
+#include "encoder.h"
+#include "util.h"
 
 /**
 @file

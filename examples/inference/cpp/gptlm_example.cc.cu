@@ -1,7 +1,7 @@
 #include <algorithm>
 
-#include "../../../lightseq/inference/model/gpt_encoder.h"
-#include "../../../lightseq/inference/tools/util.h"
+#include "gpt_encoder.h"
+#include "util.h"
 
 /**
 @file
