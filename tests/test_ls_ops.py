@@ -17,13 +17,14 @@ from tests.gen_test_layers import (
 
 
 kt = TestDecorator()
-kt.dtypes = [torch.half]
 
-config = None
-custom_enc_layers, fairseq_enc_layers = None, None
-custom_dec_layers, fairseq_dec_layers = None, None
-custom_emb_layer, fairseq_emb_layer = None, None
-custom_ce_layer, fairseq_ce_layer = None, None
+config = kt.generate_config()
+kt.dtypes = [torch.half if config.fp16 else torch.float]
+
+custom_enc_layers, fairseq_enc_layers = gen_enc_layer(config)
+custom_dec_layers, fairseq_dec_layers = gen_dec_layer(config)
+custom_emb_layer, fairseq_emb_layer = gen_emb_layer(config)
+custom_ce_layer, fairseq_ce_layer = gen_ce_layer(config)
 
 
 @kt.case(rtol=1e-3, atol=1e-2)
@@ -526,19 +527,6 @@ def test_cross_entropy_layer_backward():
 
 def main(epoch):
     print(">>>>>>>>>>>>>>>>>>>>>>Test epoch: {}>>>>>>>>>>>>>>>>>>>>>>".format(epoch))
-    global config
-    global custom_enc_layers, fairseq_enc_layers
-    global custom_dec_layers, fairseq_dec_layers
-    global custom_emb_layer, fairseq_emb_layer
-    global custom_ce_layer, fairseq_ce_layer
-
-    config = kt.generate_config(use_default=False)
-    print(config)
-    custom_enc_layers, fairseq_enc_layers = gen_enc_layer(config)
-    custom_dec_layers, fairseq_dec_layers = gen_dec_layer(config)
-    custom_emb_layer, fairseq_emb_layer = gen_emb_layer(config)
-    custom_ce_layer, fairseq_ce_layer = gen_ce_layer(config)
-
     kt.run(
         [
             "test_encoder_layer_forward",
