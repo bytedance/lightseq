@@ -5,13 +5,13 @@
 
 #include <string>
 
-#include "model/gpt_encoder.h"
+#include "../model/gpt_encoder.h"
 #include "model_config.pb.h"
-#include "proto/gpt_weight.h"
-#include "server/custom.h"
-#include "server/model_config.h"
-#include "server/model_config_cuda.h"
-#include "tools/util.h"
+#include "../proto/gpt_weight.h"
+#include "../server/custom.h"
+#include "../server/model_config.h"
+#include "../server/model_config_cuda.h"
+#include "../tools/util.h"
 
 /**
 @file
