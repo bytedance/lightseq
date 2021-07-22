@@ -1,5 +1,5 @@
+import multiprocessing as mp
 import random
-from copy import deepcopy
 
 import torch
 
@@ -17,13 +17,13 @@ from tests.gen_test_layers import (
 
 
 kt = TestDecorator()
-config = kt.generate_config(use_default=False)
-kt.dtypes = [torch.half if config.fp16 else torch.float]
+kt.dtypes = [torch.half]
 
-custom_enc_layers, fairseq_enc_layers = gen_enc_layer(config)
-custom_dec_layers, fairseq_dec_layers = gen_dec_layer(config)
-custom_emb_layer, fairseq_emb_layer = gen_emb_layer(config)
-custom_ce_layer, fairseq_ce_layer = gen_ce_layer(config)
+config = None
+custom_enc_layers, fairseq_enc_layers = None, None
+custom_dec_layers, fairseq_dec_layers = None, None
+custom_emb_layer, fairseq_emb_layer = None, None
+custom_ce_layer, fairseq_ce_layer = None, None
 
 
 @kt.case(rtol=1e-3, atol=1e-2)
@@ -524,17 +524,39 @@ def test_cross_entropy_layer_backward():
     return custom, baseline
 
 
-if __name__ == "__main__":
+def main(epoch):
+    print(">>>>>>>>>>>>>>>>>>>>>>Test epoch: {}>>>>>>>>>>>>>>>>>>>>>>".format(epoch))
+    global config
+    global custom_enc_layers, fairseq_enc_layers
+    global custom_dec_layers, fairseq_dec_layers
+    global custom_emb_layer, fairseq_emb_layer
+    global custom_ce_layer, fairseq_ce_layer
+
+    config = kt.generate_config(use_default=False)
+    print(config)
+    custom_enc_layers, fairseq_enc_layers = gen_enc_layer(config)
+    custom_dec_layers, fairseq_dec_layers = gen_dec_layer(config)
+    custom_emb_layer, fairseq_emb_layer = gen_emb_layer(config)
+    custom_ce_layer, fairseq_ce_layer = gen_ce_layer(config)
+
     kt.run(
         [
             "test_encoder_layer_forward",
             "test_encoder_layer_backward",
             "test_decoder_layer_forward",
             "test_decoder_layer_backward",
-            "test_decoder_layer_forward_inference",
+            # "test_decoder_layer_forward_inference",
             "test_embedding_layer_forward",
             "test_embedding_layer_backward",
             "test_cross_entropy_layer_forward",
             "test_cross_entropy_layer_backward",
         ]
     )
+
+
+if __name__ == "__main__":
+    ctx = mp.get_context("spawn")
+    for i in range(50):
+        p = ctx.Process(target=main, args=(i,))
+        p.start()
+        p.join()
