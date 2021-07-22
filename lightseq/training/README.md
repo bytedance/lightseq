@@ -125,8 +125,9 @@ config = LSTransformerEncoderLayer.get_config(
 enc_layer = LSTransformerEncoderLayer(config)
 ```
 
+Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. Besides, LightSeq also provides the whole Transformer model interface for convenient usage. You can checkout out the `lightseq/training/ops/pytorch` and `lightseq/training/ops/tensorflow` directory for detail.
 
-Currently, LightSeq supports the separate use of five operations: embedding, encoder layer, decoder layer, criterion and optimizer. You can checkout out the `lightseq/training/ops/pytorch` and `lightseq/training/ops/tensorflow` directory for detail.
+We provide a simple example to show how to build the whole Transformer model and train it successfully. Details are illustrated [here](../../examples/training/custom/README.md).
 
 ## Limitations and Future Plans
 * Training with 8 bit integers.
