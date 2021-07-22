@@ -211,32 +211,19 @@ def test_decoder_layer_backward():
     encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
     self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
 
-    cus_res = hidden_states.clone()
-    cus_encoder_out = encoder_out.clone()
-    for layer in custom_dec_layers:
-        cus_res, _, _ = layer(
-            cus_res,
-            encoder_out=cus_encoder_out,
-            encoder_padding_mask=encoder_padding_mask,
-            incremental_state=incremental_state,
-        )
-    custom_loss = (cus_res / 1000).sum()
-
-    base_res = hidden_states.transpose(0, 1).clone()
-    base_encoder_out = encoder_out.clone()
-    for layer in fairseq_dec_layers:
-        base_res, _, _ = layer(
-            base_res,
-            encoder_out=base_encoder_out,
-            encoder_padding_mask=encoder_padding_mask,
-            self_attn_mask=self_attn_mask,
-            incremental_state=incremental_state,
-        )
-    fairseq_loss = (base_res / 1000).sum()
-
     def custom():
         custom_dec_layers.zero_grad()
-        custom_loss.backward(retain_graph=True)
+        cus_res = hidden_states.clone()
+        cus_encoder_out = encoder_out.clone()
+        for layer in custom_dec_layers:
+            cus_res, _, _ = layer(
+                cus_res,
+                encoder_out=cus_encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        custom_loss = (cus_res / 1000).sum()
+        custom_loss.backward()
         grad_list = []
         for i in range(config.num_layers - 1, -1, -1):
             """
@@ -287,7 +274,18 @@ def test_decoder_layer_backward():
 
     def baseline():
         fairseq_dec_layers.zero_grad()
-        fairseq_loss.backward(retain_graph=True)
+        base_res = hidden_states.transpose(0, 1).clone()
+        base_encoder_out = encoder_out.clone()
+        for layer in fairseq_dec_layers:
+            base_res, _, _ = layer(
+                base_res,
+                encoder_out=base_encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
+            )
+        fairseq_loss = (base_res / 1000).sum()
+        fairseq_loss.backward()
 
         grad_list = []
         for i in range(config.num_layers - 1, -1, -1):
