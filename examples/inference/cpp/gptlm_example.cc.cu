@@ -1,7 +1,7 @@
 #include <algorithm>
 
-#include "model/gpt_encoder.h"
-#include "tools/util.h"
+#include "gpt_encoder.h"
+#include "util.h"
 
 /**
 @file

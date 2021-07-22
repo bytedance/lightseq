@@ -1,8 +1,8 @@
 #include <algorithm>
 
-#include "model/decoder.h"
-#include "model/encoder.h"
-#include "tools/util.h"
+#include "decoder.h"
+#include "encoder.h"
+#include "util.h"
 
 /**
 @file

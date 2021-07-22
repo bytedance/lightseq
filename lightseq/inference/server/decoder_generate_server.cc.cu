@@ -5,14 +5,14 @@
 
 #include <string>
 
-#include "model/decoder.h"
-#include "model/encoder.h"
+#include "../model/decoder.h"
+#include "../model/encoder.h"
 #include "model_config.pb.h"
-#include "proto/transformer_weight.h"
-#include "server/custom.h"
-#include "server/model_config.h"
-#include "server/model_config_cuda.h"
-#include "tools/util.h"
+#include "../proto/transformer_weight.h"
+#include "../server/custom.h"
+#include "../server/model_config.h"
+#include "../server/model_config_cuda.h"
+#include "../tools/util.h"
 
 /**
 @file
