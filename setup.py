@@ -11,6 +11,8 @@ import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+from lightseq import __version__
+
 logging.basicConfig()
 logger = logging.getLogger(__file__)
 
@@ -92,7 +94,7 @@ with open("README.md", "r") as fh:
 
 setup_kwargs = dict(
     name="lightseq",
-    version="2.1.0",
+    version=__version__,
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
