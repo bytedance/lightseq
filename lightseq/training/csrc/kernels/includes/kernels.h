@@ -5,6 +5,7 @@
 #include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdexcept>
 
 #define MAX_THREADS 1024
 #define WARP_SIZE 32
