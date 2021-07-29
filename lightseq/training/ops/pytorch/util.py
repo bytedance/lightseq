@@ -5,6 +5,18 @@ def copy_para(x):
     return torch.nn.Parameter(torch.empty_like(x).copy_(x))
 
 
+def state_dict(module, destination=None, prefix="", keep_vars=False):
+    destination = torch.nn.Module.state_dict(
+        module, destination=destination, prefix=prefix, keep_vars=keep_vars
+    )
+
+    for key in destination.keys():
+        if "para_16" in key:
+            destination.pop(key)
+
+    return destination
+
+
 def base_architecture(args):
     args.setdefault("hidden_size", 512)
     args.setdefault("intermediate_size", 2048)
