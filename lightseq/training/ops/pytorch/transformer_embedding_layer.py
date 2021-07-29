@@ -7,6 +7,7 @@ from torch.autograd import Function
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
+from lightseq.training.ops.pytorch.util import state_dict
 
 
 transformer_cuda_module = None
@@ -168,6 +169,12 @@ class LSTransformerEmbeddingLayer(nn.Module):
         grad = torch.empty_like(param)
         func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
+
+    def state_dict(self, destination=None, prefix="", keep_vars=False):
+        destination = state_dict(
+            self, destination=destination, prefix=prefix, keep_vars=keep_vars
+        )
+        return destination
 
     def forward(self, input, step=0, **kwargs):
         self.config.training = self.training

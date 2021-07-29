@@ -6,7 +6,7 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import copy_para, MODEL_ARCH
+from lightseq.training.ops.pytorch.util import copy_para, state_dict, MODEL_ARCH
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -331,6 +331,12 @@ class LSTransformerDecoderLayer(nn.Module):
         weights[14] = weights[14].view(hs, -1)
         weights[18] = weights[18].view(-1, hs)
         return weights
+
+    def state_dict(self, destination=None, prefix="", keep_vars=False):
+        destination = state_dict(
+            self, destination=destination, prefix=prefix, keep_vars=keep_vars
+        )
+        return destination
 
     def forward(
         self, decoder_states, encoder_out, encoder_padding_mask, cache, **kwargs
