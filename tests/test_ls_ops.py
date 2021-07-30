@@ -723,22 +723,22 @@ def test_decoder_layer_backward():
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10, nrepeat=1)
 def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
-    print(f"(batch_size, enc_seq_len): ({batch_size}, {enc_seq_len})")
-    # beam_size = random.randint(2,5)
-    # print(f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})")
+    # print(f"(batch_size, enc_seq_len): ({batch_size}, {enc_seq_len})")
+    beam_size = random.randint(2,5)
+    print(f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})")
 
-    # ls_encoder_out = kt.rand((batch_size, enc_seq_len, 1024))
-    # fs_encoder_out = ls_encoder_out.unsqueeze(1).repeat(1, beam_size, 1, 1).reshape(-1, enc_seq_len, 1024)
-    # ls_enc_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
-    # fs_enc_mask = ls_enc_mask.unsqueeze(1).repeat(1, beam_size, 1).reshape(-1, enc_seq_len)
-    encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
-    encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
+    ls_encoder_out = kt.rand((batch_size, enc_seq_len, 1024))
+    fs_encoder_out = ls_encoder_out.unsqueeze(1).repeat(1, beam_size, 1, 1).reshape(-1, enc_seq_len, 1024)
+    ls_enc_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
+    fs_enc_mask = ls_enc_mask.unsqueeze(1).repeat(1, beam_size, 1).reshape(-1, enc_seq_len)
+    # encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
+    # encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
 
     hidden_states_list = []
     max_step = 10
     for i in range(max_step):
-        # hidden_states = kt.rand((batch_size * beam_size, 1, 1024))
-        hidden_states = kt.rand((batch_size, 1, 1024))
+        hidden_states = kt.rand((batch_size * beam_size, 1, 1024))
+        # hidden_states = kt.rand((batch_size, 1, 1024))
         hidden_states_list.append(hidden_states)
 
     def custom():
@@ -749,10 +749,10 @@ def test_decoder_layer_forward_inference():
             for i in range(num_layers):
                 res, _, _ = custom_dec_layer_list[i](
                     res,
-                    # encoder_out=ls_encoder_out.transpose(0,1),
-                    # encoder_padding_mask=ls_enc_mask,
-                    encoder_out=encoder_out,
-                    encoder_padding_mask=encoder_padding_mask,
+                    encoder_out=ls_encoder_out.transpose(0, 1),
+                    encoder_padding_mask=ls_enc_mask,
+                    # encoder_out=encoder_out,
+                    # encoder_padding_mask=encoder_padding_mask,
                     incremental_state=incremental_state,
                 )
             res_list.append(res)
@@ -766,8 +766,10 @@ def test_decoder_layer_forward_inference():
             for i in range(num_layers):
                 res, _, _ = fairseq_dec_layer_list[i](
                     res,
-                    encoder_out=encoder_out,
-                    encoder_padding_mask=encoder_padding_mask,
+                    encoder_out=fs_encoder_out,
+                    encoder_padding_mask=fs_enc_mask,
+                    # encoder_out=encoder_out,
+                    # encoder_padding_mask=encoder_padding_mask,
                     incremental_state=incremental_state,
                 )
             res_list.append(res)
@@ -960,16 +962,16 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_encoder_layer_forward",
-            "test_encoder_layer_backward",
-            "test_bert_encoder_layer_forward",
-            "test_bert_encoder_layer_backward",
-            "test_decoder_layer_forward",
-            "test_decoder_layer_backward",
+            # "test_encoder_layer_forward",
+            # "test_encoder_layer_backward",
+            # "test_bert_encoder_layer_forward",
+            # "test_bert_encoder_layer_backward",
+            # "test_decoder_layer_forward",
+            # "test_decoder_layer_backward",
             "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_cross_entropy_layer_forward",
-            "test_cross_entropy_layer_backward",
+            # "test_embedding_layer_forward",
+            # "test_embedding_layer_backward",
+            # "test_cross_entropy_layer_forward",
+            # "test_cross_entropy_layer_backward",
         ]
     )
