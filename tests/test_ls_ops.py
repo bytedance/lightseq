@@ -724,7 +724,7 @@ def test_decoder_layer_backward():
 def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
     # print(f"(batch_size, enc_seq_len): ({batch_size}, {enc_seq_len})")
-    beam_size = random.randint(2,5)
+    beam_size = random.randint(2, 5)
     print(f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})")
 
     ls_encoder_out = kt.rand((batch_size, enc_seq_len, 1024))
