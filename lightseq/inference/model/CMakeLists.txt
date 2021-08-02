@@ -16,3 +16,10 @@ target_link_libraries(gpt_model PUBLIC gpt_weight)
 target_link_libraries(gpt_model PUBLIC CUDA::cublas_static CUDA::cublasLt_static)
 target_include_directories(gpt_model INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(gpt_model PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+add_library(bert_model STATIC bert_encoder.cc.cu)
+target_link_libraries(bert_model PUBLIC cuda_kernels)
+target_link_libraries(bert_model PUBLIC bert_weight)
+target_link_libraries(bert_model PUBLIC CUDA::cublas_static
+                                        CUDA::cublasLt_static)
+set_target_properties(bert_model PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
