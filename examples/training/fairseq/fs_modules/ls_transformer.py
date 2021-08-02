@@ -146,11 +146,12 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
 
     @classmethod
     def build_embedding(cls, args, dictionary, embed_dim, max_positions, **kwargs):
+        max_positions = max_positions + dictionary.pad() + 1
         config = LSTransformerEmbeddingLayer.get_config(
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
             max_batch_tokens=args.max_tokens,
-            max_seq_len=MAX_SEQ_LENGTH,  # FIXME later
+            max_seq_len=max_positions,
             padding_idx=dictionary.pad(),
             dropout=args.dropout,
             fp16=args.fp16,
