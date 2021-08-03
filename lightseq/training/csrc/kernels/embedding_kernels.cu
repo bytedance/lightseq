@@ -130,8 +130,7 @@ __global__ void lookup_scale_pos_dropout<float>(
     int offset = i - target_pos * embedding_dim;
     float4 e4 = embeddings4[tid * embedding_dim + offset];
     // step is non-zero only in inference
-    // position numbers begin at padding_idx+1, same to fairseq implementation
-    float4 pe4 = pos_embeddings4[(token_pos_id + step + padding_idx + 1) * embedding_dim + offset];
+    float4 pe4 = pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
     float4 res4;
     res4.x = (emb_scale * e4.x + pe4.x) * scale * m[0];
     res4.y = (emb_scale * e4.y + pe4.y) * scale * m[1];
@@ -196,8 +195,7 @@ __global__ void lookup_scale_pos_dropout<__half>(
     int offset = i - target_pos * embedding_dim;
     float4 e4 = embeddings4[tid * embedding_dim + offset];
     // step is non-zero only in inference
-    // position numbers begin at padding_idx+1, same to fairseq
-    float4 pe4 = pos_embeddings4[(token_pos_id + step + padding_idx + 1) * embedding_dim + offset];
+    float4 pe4 = pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
     float4 res4;
 
     __half2 *e_h2 = reinterpret_cast<__half2 *>(&e4);

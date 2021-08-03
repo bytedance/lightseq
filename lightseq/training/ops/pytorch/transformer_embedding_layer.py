@@ -149,8 +149,6 @@ class LSTransformerEmbeddingLayer(nn.Module):
         )
         if self.config.embedding_dim % 2 == 1:
             emb = torch.cat([emb, torch.zeros(num_pos_embeddings, 1)], dim=1)
-        if self.config.padding_idx is not None:
-            emb[self.config.padding_idx, :] = 0
         return emb
 
     def __assign_layer_weight_grad(self):
