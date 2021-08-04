@@ -20,8 +20,9 @@ batch_size: the size of the current batch
 seq_len: the sequence length of the current batch
 padding_idx: padding index of the sentences (default: 2)
 */
-__global__ void get_tokens_position(
-    int *output, const int *input, int batch_size, int seq_len, int padding_idx) {
+__global__ void get_tokens_position(int *output, const int *input,
+                                    int batch_size, int seq_len,
+                                    int padding_idx) {
   int batch_id = blockIdx.x;
   int start_seq_id = threadIdx.x;
   int threads = blockDim.x;
@@ -38,7 +39,8 @@ __global__ void get_tokens_position(
   for (int seq_id = start_seq_id; seq_id < seq_len; seq_id += threads) {
     target_pos = batch_offset + seq_id;
     pout_idx = temp_offset[pout] + batch_offset + seq_id;
-    temp[pout_idx] = (seq_id > 0 && input[target_pos - 1] != padding_idx) ? 1 : 0;
+    temp[pout_idx] =
+        (seq_id > 0 && input[target_pos - 1] != padding_idx) ? 1 : 0;
   }
   __syncthreads();
   for (int stride = 1; stride < seq_len; stride *= 2) {
@@ -51,7 +53,7 @@ __global__ void get_tokens_position(
         temp[pout_idx] = temp[pin_idx] + temp[pin_idx - stride];
       else
         temp[pout_idx] = temp[pin_idx];
-      }
+    }
     __syncthreads();
   }
 
@@ -144,7 +146,8 @@ __global__ void lookup_scale_pos_dropout<float>(
     int offset = i - target_pos * embedding_dim;
     float4 e4 = embeddings4[tid * embedding_dim + offset];
     // step is non-zero only in inference
-    float4 pe4 = pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
+    float4 pe4 =
+        pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
     float4 res4;
     res4.x = (emb_scale * e4.x + pe4.x) * scale * m[0];
     res4.y = (emb_scale * e4.y + pe4.y) * scale * m[1];
@@ -209,7 +212,8 @@ __global__ void lookup_scale_pos_dropout<__half>(
     int offset = i - target_pos * embedding_dim;
     float4 e4 = embeddings4[tid * embedding_dim + offset];
     // step is non-zero only in inference
-    float4 pe4 = pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
+    float4 pe4 =
+        pos_embeddings4[(token_pos_id + step) * embedding_dim + offset];
     float4 res4;
 
     __half2 *e_h2 = reinterpret_cast<__half2 *>(&e4);

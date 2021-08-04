@@ -356,8 +356,12 @@ def tiny_architecture(args):
 @register_model_architecture("ls_transformer", "ls_transformer")
 def base_architecture(args):
     # specify a small value (300) which meet the needs of most NLP datasets, to avoid OOM error
-    args.max_source_positions = min(MAX_SEQ_LENGTH, getattr(args, "max_source_positions", MAX_SEQ_LENGTH))
-    args.max_target_positions = min(MAX_SEQ_LENGTH, getattr(args, "max_target_positions", MAX_SEQ_LENGTH))
+    args.max_source_positions = min(
+        MAX_SEQ_LENGTH, getattr(args, "max_source_positions", MAX_SEQ_LENGTH)
+    )
+    args.max_target_positions = min(
+        MAX_SEQ_LENGTH, getattr(args, "max_target_positions", MAX_SEQ_LENGTH)
+    )
 
     args.encoder_embed_path = getattr(args, "encoder_embed_path", None)
     args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 512)
