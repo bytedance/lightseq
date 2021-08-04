@@ -22,5 +22,4 @@ fairseq-train /tmp/wmt14_en_de/ \
     --eval-bleu-remove-bpe \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
-    --left-pad-source False \
     --fp16

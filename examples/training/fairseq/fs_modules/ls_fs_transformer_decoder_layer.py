@@ -27,12 +27,13 @@ class LSFSTransformerDecoderLayer(LSTransformerDecoderLayer):
             for k in cache.keys():
                 if k == "encdec_kv":
                     cur_order = new_order // self.beam_size
-                    cur_order = cur_order[:: self.beam_size]
+                    cur_order = cur_order[:: self.beam_size].contiguous()
                     idx = 1
                 else:
-                    cur_order = new_order
+                    cur_order = new_order.contiguous()
                     idx = 0
-                value = cache[k]
+                value = cache[k].contiguous()
+                # print(k, cur_order.size())
                 cache[k] = value.index_select(idx, cur_order).contiguous()
             self.set_self_attn_cache(incremental_state, cache)
 

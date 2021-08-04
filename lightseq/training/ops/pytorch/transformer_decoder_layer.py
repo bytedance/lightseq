@@ -350,6 +350,8 @@ class LSTransformerDecoderLayer(nn.Module):
                       "encdec_kv": [n_dec_layer * 2, batch_size, nhead, src_seq_len, head_dim]
                       }
         """
+        # print("layer:", self.config.layer_id)
+        # print("dec_inp:", decoder_states.size())
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
         decoder_states = decoder_states.contiguous()
