@@ -40,9 +40,9 @@ src_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "embeddings LayerNorm weight",
         "norm_bias": "embeddings LayerNorm bias",
-        # manually process position_embedding to customize for max_step
+        "position_embedding": "embeddings position_embeddings weight",
+        # manually process token_embedding due to "token_type_embeddings"
         # "token_embedding": "embeddings word_embeddings weight",
-        # "position_embedding": "embeddings position_embeddings weight",
     }
 )
 
@@ -108,22 +108,6 @@ def extract_bert_weights(
     token_embedding = token_embedding.flatten().tolist()
     hdf5_file.create_dataset(
         "src_embedding/token_embedding", data=token_embedding, dtype="f4"
-    )
-
-    # special handling for position embedding
-    position_emb = encoder_state_dict["embeddings.position_embeddings.weight"]
-    _max_allowed_step, _hidden_size = position_emb.shape
-    if max_step > _max_allowed_step:
-        print(f"max_step {max_step} exceed max allowed step, abort.")
-        return
-    # truncate position embedding for max_step
-    position_emb = position_emb[:max_step, :]
-    print(
-        f"processed position_embedding with max_step constriant, shape: {position_emb.shape}"
-    )
-    position_emb = position_emb.flatten().tolist()
-    hdf5_file.create_dataset(
-        "src_embedding/position_embedding", data=position_emb, dtype="f4"
     )
 
     # save number of layers metadata
