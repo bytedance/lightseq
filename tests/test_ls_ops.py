@@ -779,7 +779,11 @@ def test_embedding_layer_forward():
     # TODO: can not generate PAD in the middle of the sentences.
     config = ls_emb_config_fp16
     input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
-    input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+    pad_left = random.choice([True, False])
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
 
     if kt.dtype == torch.float:
         custom_layer = custom_emb_layer_fp32
@@ -811,7 +815,11 @@ def test_embedding_layer_backward():
     padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
     config = ls_emb_config_fp16
     input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
-    input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+    pad_left = random.choice([True, False])
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
 
     if kt.dtype == torch.float:
         custom_layer = custom_emb_layer_fp32
