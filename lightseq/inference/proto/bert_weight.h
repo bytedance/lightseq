@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "bert.pb.h"
-#include "tools/util.h"
+#include "../tools/util.h"
 
 namespace lightseq {
 namespace cuda {
