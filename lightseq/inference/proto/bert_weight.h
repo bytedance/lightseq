@@ -32,8 +32,8 @@ class BertWeight {
   std::string proto_parse_emb_wei(const BertEmbeddingLayer &layer);
   std::string proto_parse_enc_wei(const Bert &bert);
 
-  void hdf5_get_model_config(hid_t hdf5_file, bool only_decoder = false);
-  void hdf5_parse_emb_wei(hid_t hdf5_file, std::string source);
+  void hdf5_get_model_config(hid_t hdf5_file);
+  void hdf5_parse_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   // store the weights pointer
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4

@@ -1,6 +1,6 @@
 #include "bert_encoder.h"
-#include "kernels/multilgKernels.h"
-#include "kernels/transformerKernels.h"
+#include "../kernels/multilgKernels.h"
+#include "../kernels/transformerKernels.h"
 
 /**
 @file

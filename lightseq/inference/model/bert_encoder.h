@@ -12,8 +12,8 @@
 #include <iostream>
 #include <string>
 
-#include "proto/bert_weight.h"
-#include "tools/util.h"
+#include "../proto/bert_weight.h"
+#include "../tools/util.h"
 
 /**
 @file

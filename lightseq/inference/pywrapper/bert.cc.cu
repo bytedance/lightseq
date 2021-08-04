@@ -1,9 +1,9 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include "model/bert_encoder.h"
-#include "proto/bert_weight.h"
-#include "tools/util.h"
+#include "../model/bert_encoder.h"
+#include "../proto/bert_weight.h"
+#include "../tools/util.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType bert_optytpe =

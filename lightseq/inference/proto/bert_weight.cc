@@ -196,7 +196,7 @@ std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
 Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
+void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
 
   _inner_size =
@@ -240,14 +240,9 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 
 /**
 Load the weights of embedding layer into GPU memory.
-Compared with the encoder, the decoder has more
-  encoder output project weights, encoder output project bias,
-  logits bias. So we need an "source" parameter to
-  distinguish between encoder and decoder
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                    std::string source) {
+void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
 
   size_t value_size = _src_vocab_size * _hidden_size +
@@ -304,7 +299,7 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -434,9 +429,9 @@ std::string BertWeight<OpType_>::initializing(std::string weight_path) {
     // compatible with the version of the headers we compiled against.
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    std::fstream raw_input(proto_path, std::ios::in | std::ios::binary);
+    std::fstream raw_input(weight_path, std::ios::in | std::ios::binary);
     if (!bert.ParseFromIstream(&raw_input)) {
-      return "Parse weights from [" + proto_path + "] failed.";
+      return "Parse weights from [" + weight_path + "] failed.";
     }
 
     proto_get_model_config(bert);
