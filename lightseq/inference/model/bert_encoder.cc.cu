@@ -162,6 +162,8 @@ void BertEncoder<OpType_>::self_attention() {
       _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
 
 #ifdef DEBUG_RESULT
+  print_vec(_p_d_enc_wei[_weight_offset], "layer norm scale(head): ", 5);
+  print_vec(_p_d_enc_wei[_weight_offset + 1], "layer norm bias(head): ", 5);
   print_vec(_p_d_q, "layer norm out(head): ", 5);
   print_vec(_p_d_q + _batch_token_num * _tw._hidden_size - 5,
             "layer norm out(tail): ", 5);
@@ -223,8 +225,7 @@ void BertEncoder<OpType_>::self_attention() {
       _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_v, "self attn before ffn(head): ",
-            _batch_token_num * _tw._hidden_size);
+  print_vec(_p_d_v, "self attn before ffn(head): ", 5);
 #endif
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
@@ -235,11 +236,11 @@ void BertEncoder<OpType_>::self_attention() {
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_output, "self attn ffn out(head): ", 50);
-  print_vec(_p_d_output + _batch_token_num * _tw._hidden_size - 50,
-            "self attn ffn out(tail): ", 3);
+  print_vec(_p_d_output, "self attn ffn out(head): ", 5);
+  print_vec(_p_d_output + _batch_token_num * _tw._hidden_size - 5,
+            "self attn ffn out(tail): ", 5);
 
-  print_vec(_p_d_enc_wei[_weight_offset + 4], "enc wei:", 30);
+  print_vec(_p_d_enc_wei[_weight_offset + 4], "enc wei:", 5);
 #endif
 
   return;
@@ -255,6 +256,8 @@ void BertEncoder<OpType_>::ffn_add_norm() {
       _tw._is_post_ln);
 
 #ifdef DEBUG_RESULT
+  print_vec(_p_d_enc_wei[_weight_offset + 6], "layer norm scale(head): ", 5);
+  print_vec(_p_d_enc_wei[_weight_offset + 7], "layer norm bias(head): ", 5);
   print_vec(_p_d_ffn_buf1, "layer norm(head): ", 5);
   print_vec(_p_d_ffn_buf1 + _batch_token_num * _tw._hidden_size - 5,
             "layer norm(tail): ", 5);
