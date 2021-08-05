@@ -173,7 +173,7 @@ if __name__ == "__main__":
     extract_bert_weights(
         output_lightseq_model_name,
         input_huggingface_bert_model,
-        head_num=head_number,  # layer number
+        head_num=head_number,
         pad_id=pad_id,
         max_step=max_step,
     )

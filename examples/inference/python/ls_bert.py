@@ -56,14 +56,11 @@ def main():
     args = parser.parse_args()
 
     print("initializing bert tokenizer...")
-    # change to "facebook/bert-large" for large model
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
     print("creating lightseq model...")
-    # change to "lightseq_bart_large.hdf5" for large model
     ls_model = lsi.Bert("lightseq_bert_base_uncased.hdf5", 128)
     print("creating huggingface model...")
-    # change to "facebook/bert-large" for large model
     hf_model = BertModel.from_pretrained("bert-base-uncased")
     hf_model.to("cuda:0")
 
