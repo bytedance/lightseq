@@ -67,9 +67,7 @@ def main():
     hf_model = BertModel.from_pretrained("bert-base-uncased")
     hf_model.to("cuda:0")
 
-    sentences = [
-        "Hello, my dog is cute"
-    ]
+    sentences = ["Hello, my dog is cute"]
 
     print("====================START warmup====================")
     warmup(tokenizer, ls_model, hf_model, sentences)

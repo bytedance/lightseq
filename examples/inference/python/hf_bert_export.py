@@ -62,7 +62,15 @@ def extract_bert_weights(
         l = key.split(".")
         l.insert(3, "final")
         return ".".join(l)
-    encoder_state_dict = OrderedDict([(_insert_final(k), v) if len(k.split(".")) > 3 and k.split(".")[3] == "output" else (k, v) for k, v in encoder_state_dict.items()])
+
+    encoder_state_dict = OrderedDict(
+        [
+            (_insert_final(k), v)
+            if len(k.split(".")) > 3 and k.split(".")[3] == "output"
+            else (k, v)
+            for k, v in encoder_state_dict.items()
+        ]
+    )
 
     enc_var_name_list = list(encoder_state_dict.keys())
 
@@ -101,10 +109,11 @@ def extract_bert_weights(
     )
 
     # handling token_embeddings for BERT
-    token_embedding = (encoder_state_dict["embeddings.word_embeddings.weight"] + encoder_state_dict["embeddings.token_type_embeddings.weight"][0])
-    print(
-        f"processed token_embedding, shape: {token_embedding.shape}"
+    token_embedding = (
+        encoder_state_dict["embeddings.word_embeddings.weight"]
+        + encoder_state_dict["embeddings.token_type_embeddings.weight"][0]
     )
+    print(f"processed token_embedding, shape: {token_embedding.shape}")
     token_embedding = token_embedding.flatten().tolist()
     hdf5_file.create_dataset(
         "src_embedding/token_embedding", data=token_embedding, dtype="f4"
@@ -120,16 +129,18 @@ def extract_bert_weights(
     hdf5_file.create_dataset("model_conf/is_post_ln", data=True, dtype="?")
     hdf5_file.create_dataset("model_conf/use_gelu", data=True, dtype="?")
 
-
     # Move layernorm weights to match layernorm implementation in lightseq
-    tmp_scale, tmp_bias = hdf5_file["src_embedding/norm_scale"][()], hdf5_file["src_embedding/norm_bias"][()]
+    tmp_scale, tmp_bias = (
+        hdf5_file["src_embedding/norm_scale"][()],
+        hdf5_file["src_embedding/norm_bias"][()],
+    )
     for layer_id in sorted(enc_tensor_names.keys()):
         new_tmp_scale = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()]
         new_tmp_bias = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_bias"][()]
         hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()] = tmp_scale
         hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_bias"][()] = tmp_bias
         tmp_scale, tmp_bias = new_tmp_scale, new_tmp_bias
-        
+
         new_tmp_scale = hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_scale"][()]
         new_tmp_bias = hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_bias"][()]
         hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_scale"][()] = tmp_scale
@@ -137,7 +148,6 @@ def extract_bert_weights(
         tmp_scale, tmp_bias = new_tmp_scale, new_tmp_bias
     hdf5_file["src_embedding/norm_scale"][()] = tmp_scale
     hdf5_file["src_embedding/norm_bias"][()] = tmp_bias
-
 
     hdf5_file.close()
     # read-in again to double check
@@ -157,7 +167,7 @@ if __name__ == "__main__":
     output_lightseq_model_name = "lightseq_bert_base_uncased"
     input_huggingface_bert_model = "bert-base-uncased"
     head_number = 12
-    
+
     pad_id = 0
     max_step = 50
     extract_bert_weights(
