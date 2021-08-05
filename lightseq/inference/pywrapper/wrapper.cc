@@ -35,5 +35,7 @@ PYBIND11_MODULE(inference, m) {
 
   py::class_<lightseq::cuda::Bert>(m, "Bert")
       .def(py::init<const std::string, const int>())
-      .def("infer", &lightseq::cuda::Bert::infer);
+      .def("infer", &lightseq::cuda::Bert::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"),
+           py::arg("attn_mask"));
 }

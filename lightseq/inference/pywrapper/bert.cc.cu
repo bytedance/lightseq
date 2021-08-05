@@ -91,10 +91,13 @@ class Bert {
   }
 
   py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
+      py::array_t<int, py::array::c_style | py::array::forcecast> attn_mask) {
     // deal with input
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
+    const int *attn_mask_data = attn_mask.data(0, 0);
+
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
     if (batch_size > _max_batch_size) {
@@ -106,6 +109,9 @@ class Bert {
     }
     CHECK_GPU_ERROR(cudaMemcpyAsync(d_input_, input_seq_data,
                                     sizeof(int) * input_seq_out.size(),
+                                    cudaMemcpyHostToDevice, stream_));
+    CHECK_GPU_ERROR(cudaMemcpyAsync(d_padding_mask_, attn_mask_data,
+                                    sizeof(int) * attn_mask.size(),
                                     cudaMemcpyHostToDevice, stream_));
 
     // Start inference and copy result
