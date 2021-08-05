@@ -3,34 +3,34 @@ import argparse
 
 import torch
 import lightseq.inference as lsi
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertForSequenceClassification
 
 
 def ls_bert(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    last_hidden_state = model.infer(inputs)
+    ls_output = model.infer(inputs)
     torch.cuda.synchronize()
     end_time = time.perf_counter()
-    return last_hidden_state, end_time - start_time
+    return ls_output, end_time - start_time
 
 
 def hf_bert(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    last_hidden_state = model(inputs.to("cuda:0"))
+    hf_output = model(inputs.to("cuda:0"))
     torch.cuda.synchronize()
     end_time = time.perf_counter()
-    return last_hidden_state, end_time - start_time
+    return hf_output, end_time - start_time
 
 
 def ls_generate(model, inputs_id):
     print("=========lightseq=========")
     print("lightseq generating...")
-    ls_hidden_state, ls_time = ls_bert(model, inputs_id)
+    ls_output, ls_time = ls_bert(model, inputs_id)
     print(f"lightseq time: {ls_time}s")
-    print("lightseq results:")
-    print(ls_hidden_state)
+    print("lightseq results (logits):")
+    print(ls_output.detach().cpu().numpy())
 
 
 def hf_generate(model, inputs_id):
@@ -38,8 +38,8 @@ def hf_generate(model, inputs_id):
     print("huggingface generating...")
     hf_output, hf_time = hf_bert(model, inputs_id)
     print(f"huggingface time: {hf_time}s")
-    print("huggingface results:")
-    print(hf_output.last_hidden_state.detach().cpu().numpy())
+    print("huggingface results (logits):")
+    print(hf_output.logits.detach().cpu().numpy())
 
 
 def warmup(tokenizer, ls_model, hf_model, sentences):
@@ -49,6 +49,18 @@ def warmup(tokenizer, ls_model, hf_model, sentences):
     ls_generate(ls_model, inputs_id)
     hf_generate(hf_model, inputs_id)
 
+class LightseqBertClassification:
+    def __init__(self, ls_weight_path, hf_model):
+        self.ls_bert = lsi.Bert(ls_weight_path, 128)
+        self.pooler = hf_model.bert.pooler
+        self.classifier = hf_model.classifier
+    
+    def infer(self, inputs):
+        last_hidden_states = self.ls_bert.infer(inputs)
+        last_hidden_states = torch.Tensor(last_hidden_states).float()
+        pooled_output = self.pooler(last_hidden_states.to("cuda:0"))
+        logits = self.classifier(pooled_output)
+        return logits
 
 def main():
     parser = argparse.ArgumentParser()
@@ -58,13 +70,19 @@ def main():
     print("initializing bert tokenizer...")
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
-    print("creating lightseq model...")
-    ls_model = lsi.Bert("lightseq_bert_base_uncased.hdf5", 128)
     print("creating huggingface model...")
-    hf_model = BertModel.from_pretrained("bert-base-uncased")
+    hf_model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
     hf_model.to("cuda:0")
 
-    sentences = ["Hello, my dog is cute"]
+    print("creating lightseq model...")
+    ls_model = LightseqBertClassification("lightseq_bert_base_uncased.hdf5", hf_model)
+
+    sentences = [
+        "Hello, my dog is cute",
+        "Hey, how are you",
+        "This is a test",
+        "Testing the model again"
+    ]
 
     print("====================START warmup====================")
     warmup(tokenizer, ls_model, hf_model, sentences)
