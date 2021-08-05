@@ -29,8 +29,8 @@ def ls_generate(model, inputs_id):
     print("lightseq generating...")
     ls_output, ls_time = ls_bert(model, inputs_id)
     print(f"lightseq time: {ls_time}s")
-    print("lightseq results (logits):")
-    print(ls_output.detach().cpu().numpy())
+    print("lightseq results (class predictions):")
+    print(ls_output.argmax(axis=1).detach().cpu().numpy())
 
 
 def hf_generate(model, inputs_id):
@@ -38,8 +38,8 @@ def hf_generate(model, inputs_id):
     print("huggingface generating...")
     hf_output, hf_time = hf_bert(model, inputs_id)
     print(f"huggingface time: {hf_time}s")
-    print("huggingface results (logits):")
-    print(hf_output.logits.detach().cpu().numpy())
+    print("huggingface results (class predictions):")
+    print(hf_output.logits.argmax(axis=1).detach().cpu().numpy())
 
 
 def warmup(tokenizer, ls_model, hf_model, sentences):
@@ -49,18 +49,20 @@ def warmup(tokenizer, ls_model, hf_model, sentences):
     ls_generate(ls_model, inputs_id)
     hf_generate(hf_model, inputs_id)
 
+
 class LightseqBertClassification:
     def __init__(self, ls_weight_path, hf_model):
         self.ls_bert = lsi.Bert(ls_weight_path, 128)
         self.pooler = hf_model.bert.pooler
         self.classifier = hf_model.classifier
-    
+
     def infer(self, inputs):
         last_hidden_states = self.ls_bert.infer(inputs)
         last_hidden_states = torch.Tensor(last_hidden_states).float()
         pooled_output = self.pooler(last_hidden_states.to("cuda:0"))
         logits = self.classifier(pooled_output)
         return logits
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -81,7 +83,7 @@ def main():
         "Hello, my dog is cute",
         "Hey, how are you",
         "This is a test",
-        "Testing the model again"
+        "Testing the model again",
     ]
 
     print("====================START warmup====================")
