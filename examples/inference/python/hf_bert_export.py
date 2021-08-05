@@ -21,17 +21,17 @@ enc_layer_mapping_dict = OrderedDict(
         # BERT is post_layernorm
         # NOTE: add an additional "final" at the beginning for some weight
         # to distinguish them from "attention output *"
-        "multihead_norm_scale": "final output LayerNorm weight",
-        "multihead_norm_bias": "final output LayerNorm bias",
+        "multihead_norm_scale": "attention output LayerNorm weight",
+        "multihead_norm_bias": "attention output LayerNorm bias",
         "multihead_project_kernel_qkv": "attention self query weight&&attention self key weight&&attention self value weight&&expression_.transpose(0, 1)",
         "multihead_project_bias_qkv": "attention self query bias&&attention self key bias&&attention self value bias",
         "multihead_project_kernel_output": "attention output dense weight&&expression_.transpose(0, 1)",
         "multihead_project_bias_output": "attention output dense bias",
-        "ffn_norm_scale": "attention output LayerNorm weight",
-        "ffn_norm_bias": "attention output LayerNorm bias",
-        "ffn_first_kernel": "intermediate dense weight",
+        "ffn_norm_scale": "final output LayerNorm weight",
+        "ffn_norm_bias": "final output LayerNorm bias",
+        "ffn_first_kernel": "intermediate dense weight&&expression_.transpose(0, 1)",
         "ffn_first_bias": "intermediate dense bias",
-        "ffn_second_kernel": "final output dense weight",
+        "ffn_second_kernel": "final output dense weight&&expression_.transpose(0, 1)",
         "ffn_second_bias": "final output dense bias",
     }
 )
@@ -119,6 +119,25 @@ def extract_bert_weights(
     hdf5_file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
     hdf5_file.create_dataset("model_conf/is_post_ln", data=True, dtype="?")
     hdf5_file.create_dataset("model_conf/use_gelu", data=True, dtype="?")
+
+
+    # Move layernorm weights to match layernorm implementation in lightseq
+    tmp_scale, tmp_bias = hdf5_file["src_embedding/norm_scale"][()], hdf5_file["src_embedding/norm_bias"][()]
+    for layer_id in sorted(enc_tensor_names.keys()):
+        new_tmp_scale = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()]
+        new_tmp_bias = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_bias"][()]
+        hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()] = tmp_scale
+        hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_bias"][()] = tmp_bias
+        tmp_scale, tmp_bias = new_tmp_scale, new_tmp_bias
+        
+        new_tmp_scale = hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_scale"][()]
+        new_tmp_bias = hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_bias"][()]
+        hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_scale"][()] = tmp_scale
+        hdf5_file[f"encoder_stack/{layer_id}/ffn_norm_bias"][()] = tmp_bias
+        tmp_scale, tmp_bias = new_tmp_scale, new_tmp_bias
+    hdf5_file["src_embedding/norm_scale"][()] = tmp_scale
+    hdf5_file["src_embedding/norm_bias"][()] = tmp_bias
+
 
     hdf5_file.close()
     # read-in again to double check
