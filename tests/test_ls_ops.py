@@ -724,12 +724,20 @@ def test_decoder_layer_backward():
 def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
     beam_size = random.randint(2, 5)
-    print(f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})")
+    print(
+        f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})"
+    )
 
     ls_encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
-    fs_encoder_out = ls_encoder_out.unsqueeze(2).repeat(1, 1, beam_size, 1).reshape(enc_seq_len, -1, 1024)
+    fs_encoder_out = (
+        ls_encoder_out.unsqueeze(2)
+        .repeat(1, 1, beam_size, 1)
+        .reshape(enc_seq_len, -1, 1024)
+    )
     ls_enc_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
-    fs_enc_mask = ls_enc_mask.unsqueeze(1).repeat(1, beam_size, 1).reshape(-1, enc_seq_len)
+    fs_enc_mask = (
+        ls_enc_mask.unsqueeze(1).repeat(1, beam_size, 1).reshape(-1, enc_seq_len)
+    )
 
     hidden_states_list = []
     max_step = 10

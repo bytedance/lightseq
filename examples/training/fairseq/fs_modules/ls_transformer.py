@@ -258,7 +258,6 @@ class LSTransformerEncoder(FairseqEncoder):
         )
 
 
-
 class LSTransformerDecoder(FairseqIncrementalDecoder):
     def __init__(self, args, dictionary, embed_tokens, **kwargs):
         self.args = args
