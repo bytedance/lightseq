@@ -243,12 +243,11 @@ class LSTransformerEncoder(FairseqEncoder):
             self.beam_size = int(new_order.shape[0] / self.batch_size)
         else:
             new_order = new_order // self.beam_size
-        new_order = new_order[:: self.beam_size].contiguous()
-        new_encoder_out = encoder_out.encoder_out.contiguous().index_select(1, new_order).contiguous()
-        # print("enc_out:", new_order.size())
-        new_encoder_padding_mask = encoder_out.encoder_padding_mask.contiguous().index_select(
+        new_order = new_order[:: self.beam_size]
+        new_encoder_out = encoder_out.encoder_out.index_select(1, new_order)
+        new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
             0, new_order
-        ).contiguous()
+        )
         return EncoderOut(
             encoder_out=new_encoder_out,  # T x B x C
             encoder_padding_mask=new_encoder_padding_mask,  # B x T

@@ -350,8 +350,6 @@ class LSTransformerDecoderLayer(nn.Module):
                       "encdec_kv": [n_dec_layer * 2, batch_size, nhead, src_seq_len, head_dim]
                       }
         """
-        # print("layer:", self.config.layer_id)
-        # print("dec_inp:", decoder_states.size())
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
         decoder_states = decoder_states.contiguous()
@@ -389,15 +387,16 @@ class LSTransformerDecoderLayer(nn.Module):
             else:
                 # empty dict, step 0
                 step = 0
-            if self.config.layer_id == 0 and step == 0:
-                shape = (
-                    self.config.nlayer * 2,
-                    encoder_out.shape[0],
-                    encoder_out.shape[1] * self.config.hidden_size,
-                )
-                encdec_kv = torch.zeros(shape).type_as(decoder_states).contiguous()
-                cache["encdec_kv"] = encdec_kv
-                cache_list.append(encdec_kv)
+            if self.config.layer_id == 0:
+                if step == 0:
+                    shape = (
+                        self.config.nlayer * 2,
+                        encoder_out.shape[0],
+                        encoder_out.shape[1] * self.config.hidden_size,
+                    )
+                    encdec_kv = torch.zeros(shape).type_as(decoder_states).contiguous()
+                    cache["encdec_kv"] = encdec_kv
+                cache_list.append(cache["encdec_kv"])
             head_dim = int(self.config.hidden_size / self.config.nhead)
             shape = (batch_beams, self.config.nhead, step + 1, head_dim)
             new_k = torch.zeros(shape).type_as(decoder_states).contiguous()

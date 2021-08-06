@@ -732,7 +732,7 @@ def test_decoder_layer_forward_inference():
     fs_enc_mask = ls_enc_mask.unsqueeze(1).repeat(1, beam_size, 1).reshape(-1, enc_seq_len)
 
     hidden_states_list = []
-    max_step = 30
+    max_step = 10
     for _ in range(max_step):
         hidden_states = kt.rand((batch_size * beam_size, 1, 1024))
         hidden_states_list.append(hidden_states)
@@ -962,16 +962,16 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            # "test_encoder_layer_forward",
-            # "test_encoder_layer_backward",
-            # "test_bert_encoder_layer_forward",
-            # "test_bert_encoder_layer_backward",
-            # "test_decoder_layer_forward",
-            # "test_decoder_layer_backward",
+            "test_encoder_layer_forward",
+            "test_encoder_layer_backward",
+            "test_bert_encoder_layer_forward",
+            "test_bert_encoder_layer_backward",
+            "test_decoder_layer_forward",
+            "test_decoder_layer_backward",
             "test_decoder_layer_forward_inference",
-            # "test_embedding_layer_forward",
-            # "test_embedding_layer_backward",
-            # "test_cross_entropy_layer_forward",
-            # "test_cross_entropy_layer_backward",
+            "test_embedding_layer_forward",
+            "test_embedding_layer_backward",
+            "test_cross_entropy_layer_forward",
+            "test_cross_entropy_layer_backward",
         ]
     )
