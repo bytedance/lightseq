@@ -11,6 +11,8 @@ import setuptools
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
+from lightseq import __version__
+
 logging.basicConfig()
 logger = logging.getLogger(__file__)
 
@@ -92,7 +94,7 @@ with open("README.md", "r") as fh:
 
 setup_kwargs = dict(
     name="lightseq",
-    version="2.1.0",
+    version=__version__,
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
     author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
     ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
@@ -114,8 +116,12 @@ setup_kwargs = dict(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "lightseq-train = examples.training.fairseq."
+            "lightseq-train = examples.training.fairseq.fs_cli."
             "lightseq_fairseq_train_cli:ls_cli_main",
+            "lightseq-generate = examples.training.fairseq.fs_cli."
+            "lightseq_fairseq_generate_cli:ls_cli_main",
+            "lightseq-validate = examples.training.fairseq.fs_cli."
+            "lightseq_fairseq_validate_cli:ls_cli_main",
         ],
     },
 )

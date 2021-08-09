@@ -6,7 +6,7 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import copy_para, MODEL_ARCH
+from lightseq.training.ops.pytorch.util import copy_para, state_dict, MODEL_ARCH
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -332,6 +332,12 @@ class LSTransformerDecoderLayer(nn.Module):
         weights[18] = weights[18].view(-1, hs)
         return weights
 
+    def state_dict(self, destination=None, prefix="", keep_vars=False):
+        destination = state_dict(
+            self, destination=destination, prefix=prefix, keep_vars=keep_vars
+        )
+        return destination
+
     def forward(
         self, decoder_states, encoder_out, encoder_padding_mask, cache, **kwargs
     ):
@@ -381,19 +387,26 @@ class LSTransformerDecoderLayer(nn.Module):
             else:
                 # empty dict, step 0
                 step = 0
-            if self.config.layer_id == 0 and step == 0:
-                shape = (
-                    self.config.nlayer * 2,
-                    encoder_out.shape[0],
-                    encoder_out.shape[1] * self.config.hidden_size,
-                )
-                encdec_kv = torch.zeros(shape).type_as(decoder_states).contiguous()
-                cache["encdec_kv"] = encdec_kv
-                cache_list.append(encdec_kv)
+            if self.config.layer_id == 0:
+                if step == 0:
+                    shape = (
+                        self.config.nlayer * 2,
+                        encoder_out.shape[0],
+                        encoder_out.shape[1] * self.config.hidden_size,
+                    )
+                    encdec_kv = torch.zeros(
+                        shape, dtype=decoder_states.dtype, device=decoder_states.device
+                    ).contiguous()
+                    cache["encdec_kv"] = encdec_kv
+                cache_list.append(cache["encdec_kv"])
             head_dim = int(self.config.hidden_size / self.config.nhead)
             shape = (batch_beams, self.config.nhead, step + 1, head_dim)
-            new_k = torch.zeros(shape).type_as(decoder_states).contiguous()
-            new_v = torch.zeros(shape).type_as(decoder_states).contiguous()
+            new_k = torch.zeros(
+                shape, dtype=decoder_states.dtype, device=decoder_states.device
+            ).contiguous()
+            new_v = torch.zeros(
+                shape, dtype=decoder_states.dtype, device=decoder_states.device
+            ).contiguous()
             cache_list = [new_k, new_v] + cache_list
             cache["dec_self_k"] = new_k
             cache["dec_self_v"] = new_v

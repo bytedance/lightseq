@@ -57,8 +57,7 @@ activation_kernel<ActivationType::kRelu, __half2>(__half2 x) {
 }
 
 /**
- * @brief element-wise activation backward function on device, Gelu not
- * supported now
+ * @brief element-wise activation backward function on device
  *
  * @tparam enum class ActivationType
  * @tparam input type
@@ -897,6 +896,9 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
   }
 }
 
+// @brief fused bias, activation, and dropout backward
+// It is deprecated for precision reason. Keep it for future optimization.
+//
 // template <ActivationType act_type>
 // __global__ void ls_dropout_act_bias_bwd_kernel(
 //     const int row_size, const float ratio, __half * in_grad,

@@ -150,7 +150,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
             max_batch_tokens=args.max_tokens,
-            max_seq_len=MAX_SEQ_LENGTH,  # FIXME later
+            max_seq_len=max_positions,
             padding_idx=dictionary.pad(),
             dropout=args.dropout,
             fp16=args.fp16,
@@ -219,8 +219,8 @@ class LSTransformerEncoder(FairseqEncoder):
             x = layer(x, encoder_padding_mask)
 
         x = self.layer_norm(x)
-        # self.batch_size = x.shape[0]
-        # self.beam_size = -1
+        self.batch_size = x.shape[0]
+        self.beam_size = -1
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -239,7 +239,6 @@ class LSTransformerEncoder(FairseqEncoder):
         return self.args.max_source_positions
 
     def reorder_encoder_out(self, encoder_out, new_order):
-        """
         if self.beam_size < 0:
             self.beam_size = int(new_order.shape[0] / self.batch_size)
         else:
@@ -249,12 +248,6 @@ class LSTransformerEncoder(FairseqEncoder):
         new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
             0, new_order
         )
-        """
-        new_encoder_out = encoder_out.encoder_out.index_select(1, new_order)
-        new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
-            0, new_order
-        )
-
         return EncoderOut(
             encoder_out=new_encoder_out,  # T x B x C
             encoder_padding_mask=new_encoder_padding_mask,  # B x T
@@ -355,6 +348,14 @@ def tiny_architecture(args):
 
 @register_model_architecture("ls_transformer", "ls_transformer")
 def base_architecture(args):
+    # specify a small value (300) which meet the needs of most NLP datasets, to avoid OOM error
+    args.max_source_positions = min(
+        MAX_SEQ_LENGTH, getattr(args, "max_source_positions", MAX_SEQ_LENGTH)
+    )
+    args.max_target_positions = min(
+        MAX_SEQ_LENGTH, getattr(args, "max_target_positions", MAX_SEQ_LENGTH)
+    )
+
     args.encoder_embed_path = getattr(args, "encoder_embed_path", None)
     args.encoder_embed_dim = getattr(args, "encoder_embed_dim", 512)
     args.encoder_ffn_embed_dim = getattr(args, "encoder_ffn_embed_dim", 2048)

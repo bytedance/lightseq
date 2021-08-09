@@ -1,15 +1,14 @@
 import logging
 import math
-from collections.abc import Collection
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing import List
 
 import torch
 import torch.distributed as dist
 import torch.optim
 from fairseq.dataclass import FairseqDataclass
 from fairseq.optim import FairseqOptimizer, register_optimizer
-from omegaconf import II, OmegaConf
+from omegaconf import II
 from lightseq.training.ops.pytorch.adam import LSAdam
 
 logger = logging.getLogger(__name__)

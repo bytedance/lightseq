@@ -35,14 +35,19 @@ bias: [hidden_size], ln bias
 template <typename T>
 __global__ void ker_layer_norm(T *ln_res, T *vars, T *means, const T *inp,
                                const T *scale, const T *bias, int hidden_size) {
-  int offset = blockIdx.x * hidden_size + threadIdx.x;
-  float mean_dim = float(hidden_size) * 4.f;
-  float4 val = ((const float4 *)inp)[offset];
+  // step 0. compute local sum
+  float l_sum = 0;
+  float l_square_sum = 0;
+  const float4 *inp_f4 = (const float4 *)inp + blockIdx.x * hidden_size;
+  for (uint idx = threadIdx.x; idx < hidden_size; idx += blockDim.x) {
+    float4 val = inp_f4[idx];
+    l_sum += val.x + val.y + val.z + val.w;
+    l_square_sum +=
+        val.x * val.x + val.y * val.y + val.z * val.z + val.w * val.w;
+  }
 
-  // step 0. compute mean and variance
-  float l_sum = val.x + val.y + val.z + val.w;
-  float l_square_sum =
-      val.x * val.x + val.y * val.y + val.z * val.z + val.w * val.w;
+  // step 1. compute reduce sum
+  float mean_dim = float(hidden_size) * 4.f;
   float reduce_val[2] = {l_sum, l_square_sum};
   blockReduce<ReduceType::kSum, 2>(reduce_val);
   __shared__ float s_mean, s_var;
@@ -57,14 +62,18 @@ __global__ void ker_layer_norm(T *ln_res, T *vars, T *means, const T *inp,
   }
   __syncthreads();
 
-  // step 1. layer norm result
-  float4 vscale = __ldg((const float4 *)scale + threadIdx.x);
-  float4 vbias = __ldg((const float4 *)bias + threadIdx.x);
-  val.x = (val.x - s_mean) * s_var * vscale.x + vbias.x;
-  val.y = (val.y - s_mean) * s_var * vscale.y + vbias.y;
-  val.z = (val.z - s_mean) * s_var * vscale.z + vbias.z;
-  val.w = (val.w - s_mean) * s_var * vscale.w + vbias.w;
-  ((float4 *)ln_res)[offset] = val;
+  // step 2. layer norm result
+  float4 *output_f4 = (float4 *)ln_res + blockIdx.x * hidden_size;
+  for (uint idx = threadIdx.x; idx < hidden_size; idx += blockDim.x) {
+    float4 vscale = __ldg((const float4 *)scale + idx);
+    float4 vbias = __ldg((const float4 *)bias + idx);
+    float4 val = inp_f4[idx];
+    val.x = (val.x - s_mean) * s_var * vscale.x + vbias.x;
+    val.y = (val.y - s_mean) * s_var * vscale.y + vbias.y;
+    val.z = (val.z - s_mean) * s_var * vscale.z + vbias.z;
+    val.w = (val.w - s_mean) * s_var * vscale.w + vbias.w;
+    output_f4[idx] = val;
+  }
 }
 
 template <>
@@ -72,21 +81,23 @@ __global__ void ker_layer_norm<__half>(__half *ln_res, __half *vars,
                                        __half *means, const __half *inp,
                                        const __half *scale, const __half *bias,
                                        int hidden_size) {
-  int offset = blockIdx.x * hidden_size + threadIdx.x;
-  float mean_dim = float(hidden_size) * 8.f;
-  float4 val_f4 = ((const float4 *)inp)[offset];
-
-  // step 0. compute mean and variance
-  __half2 *val_h2 = reinterpret_cast<__half2 *>(&val_f4);
-  float2 ival[4];
+  // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
+  const float4 *inp_f4 = (const float4 *)inp + blockIdx.x * hidden_size;
+  for (uint idx = threadIdx.x; idx < hidden_size; idx += blockDim.x) {
+    float4 val_f4 = inp_f4[idx];
+    __half2 *val_h2 = (__half2 *)(&val_f4);
 #pragma unroll
-  for (int i = 0; i < 4; i++) {
-    ival[i] = __half22float2(val_h2[i]);
-    l_sum += ival[i].x + ival[i].y;
-    l_square_sum += ival[i].x * ival[i].x + ival[i].y * ival[i].y;
+    for (int i = 0; i < 4; i++) {
+      float2 val_f2 = __half22float2(val_h2[i]);
+      l_sum += val_f2.x + val_f2.y;
+      l_square_sum += val_f2.x * val_f2.x + val_f2.y * val_f2.y;
+    }
   }
+
+  // step 1. compute reduce sum
+  float mean_dim = float(hidden_size) * 8.f;
   float reduce_val[2] = {l_sum, l_square_sum};
   blockReduce<ReduceType::kSum, 2>(reduce_val);
   __shared__ float s_mean, s_var;
@@ -101,22 +112,28 @@ __global__ void ker_layer_norm<__half>(__half *ln_res, __half *vars,
   }
   __syncthreads();
 
-  // step 2. layer norm
-  float4 v_s_f4 = __ldg((const float4 *)scale + threadIdx.x);
-  __half *scale_h = reinterpret_cast<__half *>(&v_s_f4);
-  float4 v_bias_f4 = __ldg((const float4 *)bias + threadIdx.x);
-  __half *bias_h = reinterpret_cast<__half *>(&v_bias_f4);
+  // step 2. layer norm result
+  float4 *output_f4 = (float4 *)ln_res + blockIdx.x * hidden_size;
+  for (uint idx = threadIdx.x; idx < hidden_size; idx += blockDim.x) {
+    // load scale, bias, input
+    float4 scale_f4 = __ldg((const float4 *)scale + idx);
+    __half2 *scale_h2 = (__half2 *)(&scale_f4);
+    float4 bias_f4 = __ldg((const float4 *)bias + idx);
+    __half2 *bias_h2 = (__half2 *)(&bias_f4);
+    float4 val_f4 = inp_f4[idx];
+    __half2 *val_h2 = (__half2 *)(&val_f4);
+
 #pragma unroll
-  for (int i = 0; i < 4; i++) {
-    int idx = i * 2;
-    val_h2[i].x =
-        __float2half((ival[i].x - s_mean) * s_var * __half2float(scale_h[idx]) +
-                     __half2float(bias_h[idx]));
-    val_h2[i].y = __float2half((ival[i].y - s_mean) * s_var *
-                                   __half2float(scale_h[idx + 1]) +
-                               __half2float(bias_h[idx + 1]));
+    for (int i = 0; i < 4; i++) {
+      float2 scale_f2 = __half22float2(scale_h2[i]);
+      float2 bias_f2 = __half22float2(bias_h2[i]);
+      float2 val_f2 = __half22float2(val_h2[i]);
+      val_f2.x = (val_f2.x - s_mean) * s_var * scale_f2.x + bias_f2.x;
+      val_f2.y = (val_f2.y - s_mean) * s_var * scale_f2.y + bias_f2.y;
+      val_h2[i] = __float22half2_rn(val_f2);
+    }
+    output_f4[idx] = val_f4;
   }
-  ((float4 *)ln_res)[offset] = val_f4;
 }
 
 template <>
@@ -124,9 +141,13 @@ void launch_layer_norm<float>(float *ln_res, float *vars, float *means,
                               const float *inp, const float *scale,
                               const float *bias, int batch_size, int hidden_dim,
                               cudaStream_t stream) {
+  if (hidden_dim % 4 != 0) {
+    throw std::runtime_error("violate hidden_dim % 4 = 0");
+  }
   hidden_dim >>= 2;
+  int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
   dim3 grid_dim(batch_size);
-  dim3 block_dim(hidden_dim);
+  dim3 block_dim(nthread);
 
   ker_layer_norm<float><<<grid_dim, block_dim, 0, stream>>>(
       ln_res, vars, means, inp, scale, bias, hidden_dim);
@@ -137,9 +158,13 @@ void launch_layer_norm<__half>(__half *ln_res, __half *vars, __half *means,
                                const __half *inp, const __half *scale,
                                const __half *bias, int batch_size,
                                int hidden_dim, cudaStream_t stream) {
+  if (hidden_dim % 8 != 0) {
+    throw std::runtime_error("violate hidden_dim % 8 = 0");
+  }
   hidden_dim >>= 3;
+  int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
   dim3 grid_dim(batch_size);
-  dim3 block_dim(hidden_dim);
+  dim3 block_dim(nthread);
 
   ker_layer_norm<__half><<<grid_dim, block_dim, 0, stream>>>(
       ln_res, vars, means, inp, scale, bias, hidden_dim);

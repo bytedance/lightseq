@@ -461,9 +461,9 @@ class SinusoidalPositionalEmbedding(nn.Module):
             emb = torch.cat([emb, torch.zeros(num_embeddings, 1)], dim=1)
         return emb
 
-    def make_positions(self, tensor):
-        mask = torch.ones_like(tensor)
-        return (torch.cumsum(mask, dim=1).type_as(mask) - 1).long()
+    def make_positions(self, tensor, padding_idx):
+        mask = tensor.ne(padding_idx).int()
+        return ((torch.cumsum(mask, dim=1).type_as(mask) - 1) * mask).long()
 
     def forward(
         self,
@@ -474,7 +474,7 @@ class SinusoidalPositionalEmbedding(nn.Module):
     ):
         """Input is expected to be of size [bsz x seqlen]."""
         bsz, seq_len = input.size(0), input.size(1)
-        positions = self.make_positions(input)
+        positions = self.make_positions(input, self.padding_idx)
         mask = (
             torch.ne(input, self.padding_idx)
             .unsqueeze(2)
