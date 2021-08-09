@@ -438,13 +438,11 @@ def test_embedding_layer_backward():
     custom_input = input.clone()
     res = custom_emb_layer(custom_input)
     custom_loss = (res / 1000).sum()
-    custom_loss.data.copy_(loss_data)
 
     fairseq_emb_layer.zero_grad()
     fs_input = input.clone()
     res = fairseq_emb_layer(fs_input)
     fs_loss = (res / 1000).sum()
-    fs_loss.data.copy_(loss_data)
 
     def custom():
         custom_emb_layer.zero_grad()
