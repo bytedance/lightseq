@@ -157,7 +157,7 @@ def test_decoder_layer_forward():
 
     print(
         f"(batch_size, enc_seq_len, dec_seq_len, hidden_size): "
-        "({batch_size}, {enc_seq_len}, {dec_seq_len}, {hidden_size})"
+        f"({batch_size}, {enc_seq_len}, {dec_seq_len}, {hidden_size})"
     )
 
     hidden_states = kt.rand((batch_size, dec_seq_len, hidden_size))
@@ -202,7 +202,8 @@ def test_decoder_layer_backward():
     _, dec_seq_len = kt.bs_sl(batch_size)
     hidden_size = config.hidden_size
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len, hidden_size):({batch_size}, {enc_seq_len}, {dec_seq_len}, {hidden_size})"
+        f"(batch_size, enc_seq_len, dec_seq_len, hidden_size): "
+        f"({batch_size}, {enc_seq_len}, {dec_seq_len}, {hidden_size})"
     )
 
     shs = hidden_size * hidden_size
@@ -339,7 +340,8 @@ def test_decoder_layer_forward_inference():
     beam_size = random.randint(2, 5)
     hidden_size = config.hidden_size
     print(
-        f"(batch_size, enc_seq_len, beam_size, hidden_size): ({batch_size}, {enc_seq_len}, {beam_size}, {hidden_size})"
+        f"(batch_size, enc_seq_len, beam_size, hidden_size): "
+        f"({batch_size}, {enc_seq_len}, {beam_size}, {hidden_size})"
     )
 
     ls_encoder_out = kt.rand((enc_seq_len, batch_size, hidden_size))
@@ -532,22 +534,22 @@ def main(epoch):
     print(">>>>>>>>>>>>>>>>>>>>>>Test epoch: {}>>>>>>>>>>>>>>>>>>>>>>".format(epoch))
     kt.run(
         [
-            "test_encoder_layer_forward",
-            "test_encoder_layer_backward",
-            "test_decoder_layer_forward",
+            # "test_encoder_layer_forward",
+            # "test_encoder_layer_backward",
+            # "test_decoder_layer_forward",
             "test_decoder_layer_backward",
-            "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_cross_entropy_layer_forward",
-            "test_cross_entropy_layer_backward",
+            # "test_decoder_layer_forward_inference",
+            # "test_embedding_layer_forward",
+            # "test_embedding_layer_backward",
+            # "test_cross_entropy_layer_forward",
+            # "test_cross_entropy_layer_backward",
         ]
     )
 
 
 if __name__ == "__main__":
     ctx = mp.get_context("spawn")
-    for i in range(50):
+    for i in range(1):
         p = ctx.Process(target=main, args=(i,))
         p.start()
         p.join()
