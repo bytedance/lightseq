@@ -428,16 +428,11 @@ def test_embedding_layer_backward():
 
     padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
     input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
-<<<<<<< HEAD
-    input = input * (1 - padding_mask) + config.padding_idx * padding_mask
-    loss_data = torch.randn(1, dtype=kt.dtype).sum()
-=======
     pad_left = random.choice([True, False])
     if pad_left:
         input = input * padding_mask + config.padding_idx * (1 - padding_mask)
     else:
         input = input * (1 - padding_mask) + config.padding_idx * padding_mask
->>>>>>> master
 
     custom_emb_layer.zero_grad()
     custom_input = input.clone()
@@ -543,7 +538,7 @@ def main(epoch):
             "test_encoder_layer_backward",
             "test_decoder_layer_forward",
             "test_decoder_layer_backward",
-            # "test_decoder_layer_forward_inference",
+            "test_decoder_layer_forward_inference",
             "test_embedding_layer_forward",
             "test_embedding_layer_backward",
             "test_cross_entropy_layer_forward",
