@@ -266,9 +266,11 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
                                          std::vector<T *> &cache) {
   _stream = Context::Instance().get_stream();
   _cublasHandle = Context::Instance().get_cublashandle();
-  if (_predict && _step == 0 && _layer_id == 0) {
+  if (_predict && _layer_id == 0) {
     _shared_infer_encdec_kv_ptr = cache[4];
-    encdec_kv_fw(enc_output_ptr);
+    if (_step == 0) {
+      encdec_kv_fw(enc_output_ptr);
+    }
   }
   if (!_predict && _layer_id == 0) {
     encdec_kv_fw(enc_output_ptr);
@@ -287,8 +289,6 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
   encdec_attn_layer_fw(encdec_attn_inp_ptr, enc_mask_ptr, ffn_inp_ptr, buffer);
 
   ffn_layer_fw(ffn_inp_ptr, dec_output_ptr);
-  // cudaStreamSynchronize(_stream);
-  // CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 /*------backward------*/
@@ -557,8 +557,6 @@ void TransformerDecoderLayer<T>::Backward(
   if (_layer_id == 0) {
     encdec_kv_bw(enc_output_ptr, grad_enc_output_ptr);
   }
-  // cudaStreamSynchronize(_stream);
-  // CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 template <typename T>
