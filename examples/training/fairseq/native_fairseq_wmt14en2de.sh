@@ -21,4 +21,5 @@ fairseq-train /tmp/wmt14_en_de/ \
     --eval-bleu-detok moses \
     --eval-bleu-remove-bpe \
     --eval-bleu-print-samples \
-    --best-checkpoint-metric bleu --maximize-best-checkpoint-metric --fp16
+    --best-checkpoint-metric bleu --maximize-best-checkpoint-metric \
+    --fp16

@@ -34,7 +34,8 @@ lightseq-validate /tmp/wmt14_en_de/ \
     --task translation \
     --max-tokens 8192 \
     --criterion ls_label_smoothed_cross_entropy \
-    --fp16
+    --fp16 \
+    --quiet
 ```
 
 ## Generate
@@ -47,5 +48,6 @@ lightseq-generate /tmp/wmt14_en_de/ \
     --max-tokens 8192 \
     --beam 5 \
     --lenpen 0.6 \
-    --fp16
+    --fp16 \
+    --quiet
 ```

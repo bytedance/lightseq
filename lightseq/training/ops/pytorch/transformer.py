@@ -188,12 +188,17 @@ class LSTransformerDecoder(nn.Module):
     def forward(self, trg_tokens, encoder_out, encoder_padding_mask, cache=None):
         x = self.forward_embedding(trg_tokens, cache)
 
-        for layer in self.layers:
+        if cache == {}:
+            for i in range(self.num_layers):
+                cache[i] = {}
+
+        for i, layer in enumerate(self.layers):
+            layer_cache = cache[i] if cache else None
             x = layer(
                 x,
                 encoder_out,
                 encoder_padding_mask,
-                cache,
+                layer_cache,
             )
 
         x = self.layer_norm(x)

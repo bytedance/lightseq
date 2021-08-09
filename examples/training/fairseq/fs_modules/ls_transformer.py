@@ -219,8 +219,8 @@ class LSTransformerEncoder(FairseqEncoder):
             x = layer(x, encoder_padding_mask)
 
         x = self.layer_norm(x)
-        # self.batch_size = x.shape[0]
-        # self.beam_size = -1
+        self.batch_size = x.shape[0]
+        self.beam_size = -1
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -239,7 +239,6 @@ class LSTransformerEncoder(FairseqEncoder):
         return self.args.max_source_positions
 
     def reorder_encoder_out(self, encoder_out, new_order):
-        """
         if self.beam_size < 0:
             self.beam_size = int(new_order.shape[0] / self.batch_size)
         else:
@@ -249,12 +248,6 @@ class LSTransformerEncoder(FairseqEncoder):
         new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
             0, new_order
         )
-        """
-        new_encoder_out = encoder_out.encoder_out.index_select(1, new_order)
-        new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
-            0, new_order
-        )
-
         return EncoderOut(
             encoder_out=new_encoder_out,  # T x B x C
             encoder_padding_mask=new_encoder_padding_mask,  # B x T

@@ -159,7 +159,7 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
       cache_ptr[2] = (T *)cache[2].data_ptr();  // old dec-self-attn k
       cache_ptr[3] = (T *)cache[3].data_ptr();  // old dec-self-attn v
     }
-    if (step == 0 && layer_id == 0) {
+    if (layer_id == 0) {
       cache_ptr[4] =
           (T *)cache[cache.size() - 1].data_ptr();  // enc-dec-attn kv
     }
