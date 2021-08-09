@@ -534,22 +534,22 @@ def main(epoch):
     print(">>>>>>>>>>>>>>>>>>>>>>Test epoch: {}>>>>>>>>>>>>>>>>>>>>>>".format(epoch))
     kt.run(
         [
-            # "test_encoder_layer_forward",
-            # "test_encoder_layer_backward",
-            # "test_decoder_layer_forward",
+            "test_encoder_layer_forward",
+            "test_encoder_layer_backward",
+            "test_decoder_layer_forward",
             "test_decoder_layer_backward",
-            # "test_decoder_layer_forward_inference",
-            # "test_embedding_layer_forward",
-            # "test_embedding_layer_backward",
-            # "test_cross_entropy_layer_forward",
-            # "test_cross_entropy_layer_backward",
+            "test_decoder_layer_forward_inference",
+            "test_embedding_layer_forward",
+            "test_embedding_layer_backward",
+            "test_cross_entropy_layer_forward",
+            "test_cross_entropy_layer_backward",
         ]
     )
 
 
 if __name__ == "__main__":
     ctx = mp.get_context("spawn")
-    for i in range(1):
+    for i in range(50):
         p = ctx.Process(target=main, args=(i,))
         p.start()
         p.join()
