@@ -19,6 +19,7 @@ class AdamBuilder(CUDAOpBuilder):
     def sources(self):
         return [
             "csrc/kernels/fused_adam_kernel.cu",
+            "csrc/kernels/cuda_util.cu",
             "csrc/torch/pybind_adam.cpp",
         ]
 

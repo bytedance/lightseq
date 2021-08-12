@@ -135,20 +135,15 @@ class LSAdam(torch.optim.Optimizer):
                         "please consider SparseAdam instead"
                     )
 
-                p_data_fp32 = p.data.float()
-
                 state = self.state[p]
 
                 # State initialization
                 if len(state) == 0:
                     state["step"] = 0
                     # Exponential moving average of gradient values
-                    state["exp_avg"] = torch.zeros_like(p_data_fp32)
+                    state["exp_avg"] = torch.zeros_like(p.data).float()
                     # Exponential moving average of squared gradient values
-                    state["exp_avg_sq"] = torch.zeros_like(p_data_fp32)
-                else:
-                    state["exp_avg"] = state["exp_avg"].to(p_data_fp32)
-                    state["exp_avg_sq"] = state["exp_avg_sq"].to(p_data_fp32)
+                    state["exp_avg_sq"] = torch.zeros_like(p.data).float()
 
                 exp_avg = state["exp_avg"]
                 exp_avg_sq = state["exp_avg_sq"]
@@ -156,11 +151,9 @@ class LSAdam(torch.optim.Optimizer):
 
                 state["step"] += 1
 
-                out_p = p.data
                 with torch.cuda.device(p.device):
-                    fused_adam_cuda.adam(
-                        p_data_fp32,
-                        out_p,
+                    fused_adam_cuda.apex_adam(
+                        p.data,
                         exp_avg,
                         exp_avg_sq,
                         grad,
