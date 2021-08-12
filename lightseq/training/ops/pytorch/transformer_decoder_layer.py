@@ -422,6 +422,13 @@ class LSTransformerDecoderLayer(nn.Module):
             raise ValueError(
                 f"Sequence length {sl} exceeds the limit {self.config.max_seq_len}."
             )
+        assert encoder_out.size(0) == encoder_padding_mask.size(0) and encoder_out.size(
+            1
+        ) == encoder_padding_mask.size(1)
+        if cache is None:
+            assert bs == encoder_out.size(0)
+        else:
+            assert bs % encoder_out.size(0) == 0
         output = LSTransformerDecoderFunc.apply(
             decoder_states,
             encoder_out,
