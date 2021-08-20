@@ -64,3 +64,19 @@ MODEL_ARCH = {
     "bert-base": bert_base,
     "bert-big": bert_big,
 }
+
+
+def check_config(config):
+    if config.hidden_size % config.nhead != 0:
+        raise Exception(f"hidden_size % nhead != 0")
+
+    factor = 8 if config.fp16 else 4
+    upbound = factor * 1024
+    if config.hidden_size > upbound:
+        # as required by ln backward kernel currently
+        raise Exception(f"hidden_size > {upbound}")
+
+    head_dim = config.hidden_size // config.nhead
+    if head_dim % factor != 0:
+        # as required by reshape kernel
+        raise Exception(f"head_dim({head_dim}) % {factor} != 0")
