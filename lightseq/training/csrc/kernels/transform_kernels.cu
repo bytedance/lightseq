@@ -250,11 +250,8 @@ void launch_bias_add_transform_20314<__half>(__half *output,
 Reshape the input matrix to merge the heads
 
 @thread
-gridDim.x = trans_count
-gridDim.y = nblock_per_trans
-blockDim.x = head_dim
-blockDim.y = nhead
-blockDim.z = ntoken_per_block
+gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
+blockDim.x = max_block_thread
 
 @param
 input: [trans_count, batch_size, nhead, seq_len, head_dim]
@@ -267,32 +264,22 @@ trans_count: 1 or 3, the count of matrice need to be transformed
 */
 template <typename T>
 __global__ void transform4d_0213(T *output, const T *input, int batch_size,
-                                 int seq_len) {
-  int batch_token_id = flat_2dim(blockIdx.y, threadIdx.z, blockDim.z);
-  if (batch_token_id >= batch_size * seq_len) {
+                                 int seq_len, int trans_count, int nhead,
+                                 int head_dim, int num_all) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
     return;
   }
-
-  int trans_count = gridDim.x;
-  int nhead = blockDim.y;
-  int head_dim = blockDim.x;
-
-  int matrix_id = blockIdx.x;
-  int head_id = threadIdx.y;
-  int dim_id = threadIdx.x;
-  int batch_id = batch_token_id / seq_len;
-  int token_id = batch_token_id % seq_len;
-
-  // [tc, b, nh, s, ad]
-  int src_offset = flat_5dim(matrix_id, batch_id, head_id, token_id, dim_id,
-                             batch_size, nhead, seq_len, head_dim);
+  int trans_id, batch_id, head_id, token_id, dim_id;
+  decompose_5dim(offset, batch_size, nhead, seq_len, head_dim, &trans_id,
+                 &batch_id, &head_id, &token_id, &dim_id);
   // [b, s, tc, nh, ad]
-  int trg_offset = flat_5dim(batch_id, token_id, matrix_id, head_id, dim_id,
+  int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
                              seq_len, trans_count, nhead, head_dim);
 
   const float4 *input4 = reinterpret_cast<const float4 *>(input);
   float4 *res4 = reinterpret_cast<float4 *>(output);
-  res4[trg_offset] = input4[src_offset];
+  res4[trg_offset] = input4[offset];
 }
 
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
@@ -303,15 +290,12 @@ void launch_transform4d_0213<float>(float *output, const float *input,
                                     cudaStream_t stream) {
   hidden_dim >>= 2;
   int head_dim = hidden_dim / nhead;
-  int ntoken_per_block = MAX_THREADS / hidden_dim;
-  int nblock_per_trans =
-      (batch_size * seq_len + ntoken_per_block - 1) / ntoken_per_block;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
 
-  dim3 grid_dim(trans_count, nblock_per_trans);
-  dim3 block_dim(head_dim, nhead, ntoken_per_block);
-
-  transform4d_0213<float>
-      <<<grid_dim, block_dim, 0, stream>>>(output, input, batch_size, seq_len);
+  transform4d_0213<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim,
+      num_all);
 }
 
 template <>
@@ -321,13 +305,10 @@ void launch_transform4d_0213<__half>(__half *output, const __half *input,
                                      cudaStream_t stream) {
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
-  int ntoken_per_block = MAX_THREADS / hidden_dim;
-  int nblock_per_trans =
-      (batch_size * seq_len + ntoken_per_block - 1) / ntoken_per_block;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
 
-  dim3 grid_dim(trans_count, nblock_per_trans);
-  dim3 block_dim(head_dim, nhead, ntoken_per_block);
-
-  transform4d_0213<__half>
-      <<<grid_dim, block_dim, 0, stream>>>(output, input, batch_size, seq_len);
+  transform4d_0213<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim,
+      num_all);
 }

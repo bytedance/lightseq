@@ -48,9 +48,17 @@ class TestDecorator(object):
 
     @property
     def hidden_dim(self):
-        hs = random.choice([512, 768, 1024, 1536])
-        assert hs % (self.nhead * 8) == 0
+        upbound = 1024 // self.nhead
+        head_dim = random.choice(range(1, upbound + 1))
+        hs = head_dim * self.nhead * self.io_factor
         return hs
+
+    @property
+    def io_factor(self):
+        if self.dtype == torch.float32:
+            return 4
+        else:
+            return 8
 
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)

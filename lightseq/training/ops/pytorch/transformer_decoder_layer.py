@@ -6,7 +6,12 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import copy_para, state_dict, MODEL_ARCH
+from lightseq.training.ops.pytorch.util import (
+    copy_para,
+    state_dict,
+    MODEL_ARCH,
+    check_config,
+)
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -231,7 +236,9 @@ class LSTransformerDecoderLayer(nn.Module):
             MODEL_ARCH[kwargs["model"]](kwargs)
             del kwargs["model"]
 
-        return Config(**kwargs)
+        config = Config(**kwargs)
+        check_config(config)
+        return config
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -412,8 +419,6 @@ class LSTransformerDecoderLayer(nn.Module):
             cache["dec_self_v"] = new_v
             self.config.training = False
         bs, sl, dim = decoder_states.size()
-        if dim % 256 != 0:
-            raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
