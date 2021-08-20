@@ -17,7 +17,9 @@ THIS_DIR=$(dirname $(readlink -f $0))
 
 export TASK_NAME=stsb
 
-python3 $THIS_DIR/run_glue.py \
+python3 -m torch.distributed.launch \
+  --nproc_per_node=1 \
+  $THIS_DIR/run_glue.py \
   --model_name_or_path bert-large-cased \
   --task_name $TASK_NAME \
   --do_train \
