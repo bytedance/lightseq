@@ -9,33 +9,43 @@
 #include <curand_kernel.h>
 
 int8_t float2int8(float f, float scale) {
-    int8_t i = int8_t(f * scale + 0.5);
+    int8_t i = int8_t(f * scale);
     if (i < -127) i = -127;
     if (i > 127) i = 127;
     return i;
 }
 
 template <typename T, typename S>
-float cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA, cublasOperation_t transB,
-                     int m, int n, int k, T *A, T *B, S *C, int lda, int ldb, int ldc,
-                     S *alpha, S *beta, int algo) {
+void allocate_memory(int m, int n, int k, T **A, T **B, S **C) {
+    cudaMallocManaged(A, m * k * sizeof(T));
+    cudaMallocManaged(B, k * n * sizeof(T));
+    cudaMallocManaged(C, m * n * sizeof(S));
+}
+
+template <typename T, typename S>
+void free_memory(T *A, T *B, S *C) {
+    cudaFree(A);
+    cudaFree(B);
+    cudaFree(C);
+}
+
+template <typename T, typename S>
+int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA, cublasOperation_t transB,
+                   int m, int n, int k, T *A, T *B, S *C, int lda, int ldb, int ldc,
+                   S *alpha, S *beta, int algo) {
     cudaDataType_t AType, BType, CType, ComputeType;
-    if (std::is_same<T, int8_t>::value) {
-        AType = BType = CUDA_R_8I;
-        CType = ComputeType = CUDA_R_32I;
-    } else if (std::is_same<T, float>::value) {
+    if (std::is_same<T, float>::value) {
         AType = BType = CType = ComputeType = CUDA_R_32F;
     } else if (std::is_same<T, __half>::value) {
         AType = BType = CType = ComputeType = CUDA_R_16F;
+    } else if (std::is_same<T, int8_t>::value) {
+        AType = BType = CUDA_R_8I;
+        CType = ComputeType = CUDA_R_32I;
     } else {
         printf("Not supported data type.");
         return -1;
     }
     cublasStatus_t status;
-    struct timeval start, end;
-    cudaDeviceSynchronize();
-    cudaProfilerStart();
-    gettimeofday(&start, NULL);
     status = cublasGemmEx(handle,
                           transA,
                           transB,
@@ -55,122 +65,45 @@ float cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA, cublasOper
                           ldc,
                           ComputeType,
                           static_cast<cublasGemmAlgo_t>(algo));
-    cudaDeviceSynchronize();
-    gettimeofday(&end, NULL);
-    cudaProfilerStop();
+    
     if (status == CUBLAS_STATUS_SUCCESS)
-        return (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
+        return 1;
     else
         return -1;
 }
 
-void test_int8(int m, int n, int k, int algo, int iteration) {
-    int8_t *A, *B;
-    int32_t *C;
-    cudaMallocManaged(&A, m * k * sizeof(int8_t));
-    cudaMallocManaged(&B, k * n * sizeof(int8_t));
-    cudaMallocManaged(&C, m * n * sizeof(int32_t));
-    for (int i = 0; i < m * k; ++i) A[i] = i % 2;
-    for (int i = 0; i < k * n; ++i) B[i] = i % 2;
-    int32_t alpha = 1, beta = 0;
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+template <typename T, typename S>
+void test_gemm(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
+               S *alpha, S *beta, int algo, int iteration) {
     float total_time = 0;
     for (int i = 0; i < iteration; ++i) {
-        float time = cublas_gemm_ex(handle,
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    n,
-                                    m,
-                                    k,
-                                    B,
-                                    A,
-                                    C,
-                                    n,
-                                    k,
-                                    n,
-                                    &alpha,
-                                    &beta,
-                                    static_cast<cublasGemmAlgo_t>(algo));
-        if (i > 0) total_time += time;
+        struct timeval start, end;
+        cudaDeviceSynchronize();
+        cudaProfilerStart();
+        gettimeofday(&start, NULL);
+        int success = cublas_gemm_ex(handle,
+                                     CUBLAS_OP_N,
+                                     CUBLAS_OP_N,
+                                     n,
+                                     m,
+                                     k,
+                                     B,
+                                     A,
+                                     C,
+                                     n,
+                                     k,
+                                     n,
+                                     alpha,
+                                     beta,
+                                     static_cast<cublasGemmAlgo_t>(algo));
+        cudaDeviceSynchronize();
+        gettimeofday(&end, NULL);
+        cudaProfilerStop();
+        if (success > 0 && i > 0)
+            total_time += (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) * 0.001;
     }
     if (total_time > 0)
-        printf("int8 (algo %d): %.3f ms\n", algo, total_time / (iteration - 1));
-    cudaFree(A);
-    cudaFree(B);
-    cudaFree(C);
-}
-
-void test_fp32(int m, int n, int k, int algo, int iteration) {
-    float *A, *B, *C;
-    cudaMallocManaged(&A, m * k * sizeof(float));
-    cudaMallocManaged(&B, k * n * sizeof(float));
-    cudaMallocManaged(&C, m * n * sizeof(float));
-    for (int i = 0; i < m * k; ++i) A[i] = i % 2;
-    for (int i = 0; i < k * n; ++i) B[i] = i % 2;
-    float alpha = 1, beta = 0;
-    cublasHandle_t handle;
-    cublasCreate(&handle);
-    float total_time = 0;
-    for (int i = 0; i < iteration; ++i) {
-        float time = cublas_gemm_ex(handle,
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    n,
-                                    m,
-                                    k,
-                                    B,
-                                    A,
-                                    C,
-                                    n,
-                                    k,
-                                    n,
-                                    &alpha,
-                                    &beta,
-                                    static_cast<cublasGemmAlgo_t>(algo));
-        if (i > 0) total_time += time;
-    }
-    if (total_time > 0)
-        printf("fp32 (algo %d): %.3f ms\n", algo, total_time / (iteration - 1));
-    cudaFree(A);
-    cudaFree(B);
-    cudaFree(C);
-}
-
-void test_fp16(int m, int n, int k, int algo, int iteration) {
-    __half *A, *B, *C;
-    cudaMallocManaged(&A, m * k * sizeof(__half));
-    cudaMallocManaged(&B, k * n * sizeof(__half));
-    cudaMallocManaged(&C, m * n * sizeof(__half));
-    for (int i = 0; i < m * k; ++i) A[i] = __float2half_rn(i % 2);
-    for (int i = 0; i < k * n; ++i) B[i] = __float2half_rn(i % 2);
-    __half alpha = __float2half_rn(1.0), beta = __float2half_rn(0.0);
-    cublasHandle_t handle;
-    cublasCreate(&handle);
-    float total_time = 0;
-    for (int i = 0; i < iteration; ++i) {
-        float time = cublas_gemm_ex(handle,
-                                    CUBLAS_OP_N,
-                                    CUBLAS_OP_N,
-                                    n,
-                                    m,
-                                    k,
-                                    B,
-                                    A,
-                                    C,
-                                    n,
-                                    k,
-                                    n,
-                                    &alpha,
-                                    &beta,
-                                    static_cast<cublasGemmAlgo_t>(algo));
-        if (i > 0) total_time += time;
-    }
-    if (total_time > 0)
-        printf("fp16 (algo %d): %.3f ms\n", algo, total_time / (iteration - 1));
-    cudaFree(A);
-    cudaFree(B);
-    cudaFree(C);
+        printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
 }
 
 int main() {
@@ -182,25 +115,60 @@ int main() {
     int end_algo_t_op = CUBLAS_GEMM_ALGO15_TENSOR_OP;
     int iteration = 10;
 
-    for (int algo = start_algo; algo <= end_algo; ++algo) {
-        test_int8(m, n, k, algo, iteration);
+    float *fA, *fB, *fC;
+    __half *hA, *hB, *hC;
+    int8_t *iA, *iB; int32_t *iC;
+    float f_alpha = 1, f_beta = 0;
+    __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
+    int32_t i_alpha = 1, i_beta = 0;
+    allocate_memory(m, n, k, &fA, &fB, &fC);
+    allocate_memory(m, n, k, &hA, &hB, &hC);
+    allocate_memory(m, n, k, &iA, &iB, &iC);
+    for (int i = 0; i < m * k; ++i) {
+        fA[i] = float(i % 255 - 127) / 127;
+        hA[i] = __float2half_rn(fA[i]);
+        iA[i] = float2int8(fA[i], 127);
+    } 
+    for (int i = 0; i < k * n; ++i) {
+        fB[i] = float(i % 255 - 127) / 127;
+        hB[i] = __float2half_rn(fB[i]);
+        iB[i] = float2int8(fB[i], 127);
     }
-    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo) {
-        test_int8(m, n, k, algo, iteration);
-    }
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+    
+    printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+    for (int algo = start_algo; algo <= end_algo; ++algo)
+        test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
+    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
+        test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
+    
 
-    for (int algo = start_algo; algo <= end_algo; ++algo) {
-        test_fp32(m, n, k, algo, iteration);
-    }
-    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo) {
-        test_fp32(m, n, k, algo, iteration);
-    }
+    printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
+    for (int algo = start_algo; algo <= end_algo; ++algo)
+        test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, algo, iteration);
+    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
+        test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, algo, iteration);
 
-    for (int algo = start_algo; algo <= end_algo; ++algo) {
-        test_fp16(m, n, k, algo, iteration);
-    }
-    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo) {
-        test_fp16(m, n, k, algo, iteration);
-    }
+    printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
+    for (int algo = start_algo; algo <= end_algo; ++algo)
+        test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, algo, iteration);
+    for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
+        test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, algo, iteration);
+    
+    printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
+    printf("fp32: ");
+    for (int i = 0; i < 10; ++i)
+        printf("%.5f%c", fC[i], " \n"[i==9]);
+    printf("fp16: ");
+    for (int i = 0; i < 10; ++i)
+        printf("%.5f%c", float(hC[i]), " \n"[i==9]);
+    printf("int8: ");
+    for (int i = 0; i < 10; ++i)
+        printf("%.5f%c", float(iC[i])/127/127, " \n"[i==9]);
+
+    free_memory(iA, iB, iC);
+    free_memory(fA, fB, fC);
+    free_memory(hA, hB, hC);
     return 0;
 }
