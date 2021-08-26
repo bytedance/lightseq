@@ -111,22 +111,16 @@ int main() {
   cublasCreate(&handle);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  for (int algo = start_algo; algo <= end_algo; ++algo)
-    test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
-  for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
-    test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, algo, iteration);
+  test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, -1, iteration);
+  test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  for (int algo = start_algo; algo <= end_algo; ++algo)
-    test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, algo, iteration);
-  for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
-    test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, algo, iteration);
+  test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, -1, iteration);
+  test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  for (int algo = start_algo; algo <= end_algo; ++algo)
-    test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, algo, iteration);
-  for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo)
-    test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, algo, iteration);
+  test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, -1, iteration);
+  test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp32: ");
