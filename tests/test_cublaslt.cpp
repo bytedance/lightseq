@@ -7,8 +7,6 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-int version;
-
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
   if (i < -127) i = -127;
@@ -52,33 +50,20 @@ void test_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
   cublasLtMatmulDesc_t operationDesc;
   cublasLtMatrixLayout_t ADesc, BDesc, CDesc;
   cudaDataType_t AType, BType, CType, scaleType;
-  cudaDataType_t ComputeType_cu10;
-  cublasComputeType_t ComputeType_cu11;
+  cublasComputeType_t ComputeType;
   cublasOperation_t transa = CUBLAS_OP_N;
   cublasOperation_t transb = CUBLAS_OP_N;
 
   if (std::is_same<T, float>::value) {
     AType = BType = CType = scaleType = CUDA_R_32F;
-    if (version == 11) {
-      ComputeType_cu11 = CUBLAS_COMPUTE_32F;
-    } else {
-      ComputeType_cu10 = CUDA_R_32F;
-    }
+    ComputeType = CUBLAS_COMPUTE_32F;
   } else if (std::is_same<T, __half>::value) {
     AType = BType = CType = scaleType = CUDA_R_16F;
-    if (version == 11) {
-      ComputeType_cu11 = CUBLAS_COMPUTE_16F;
-    } else {
-      ComputeType_cu10 = CUDA_R_16F;
-    }
+    ComputeType = CUBLAS_COMPUTE_16F;
   } else if (std::is_same<T, int8_t>::value) {
     AType = BType = CUDA_R_8I;
     CType = scaleType = CUDA_R_32I;
-    if (version == 11) {
-      ComputeType_cu11 = CUBLAS_COMPUTE_32I;
-    } else {
-      ComputeType_cu10 = CUDA_R_32I;
-    }
+    ComputeType = CUBLAS_COMPUTE_32I;
   } else {
     printf("Not supported data type.");
     return;
@@ -87,11 +72,7 @@ void test_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
   cublasLtMatrixLayoutCreate(&ADesc, AType, k, m, k);
   cublasLtMatrixLayoutCreate(&BDesc, BType, n, k, n);
   cublasLtMatrixLayoutCreate(&CDesc, CType, n, m, n);
-  if (version == 11) {
-    cublasLtMatmulDescCreate(&operationDesc, ComputeType_cu11, scaleType);
-  } else {
-    cublasLtMatmulDescCreate(&operationDesc, ComputeType_cu10);
-  }
+  cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
 
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
                                  &transa, sizeof(cublasOperation_t));
@@ -117,8 +98,6 @@ void test_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
 }
 
 int main() {
-  cudaRuntimeGetVersion(&version);
-  version /= 100;
   int m = 4096, n = 8192, k = 1024;
   printf("shape: (%d, %d) x (%d, %d)\n", m, k, k, n);
   int iteration = 10;
