@@ -13,6 +13,15 @@ int8_t float2int8(float f, float scale) {
   return i;
 }
 
+template <typename T>
+void transpose(T *A, T *AT, int m, int n) {
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < n; ++j) {
+      AT[j * m + i] = A[i * n + j];
+    }
+  }
+}
+
 template <typename T, typename S>
 void allocate_memory(int m, int n, int k, T **A, T **B, S **C) {
   cudaMallocManaged(A, m * k * sizeof(T));
@@ -144,15 +153,15 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int m, int n, int k, int8_t *A
   ComputeType = CUDA_R_32I;
 #endif
 
-  int lda = 32 * m;
-  int ldb = 256 * ((n + 7) / 8);
-  int ldc = 32 * m;
+  int lda = 256 * ((m + 7) / 8);
+  int ldb = 32 * n;
+  int ldc = 32 * n;
 
   cublasLtMatrixLayoutCreate(&ADesc, AType, m, k, lda);
   cublasLtMatrixLayoutSetAttribute(ADesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
   cublasLtMatrixLayoutCreate(&BDesc, BType, n, k, ldb);
   cublasLtMatrixLayoutSetAttribute(BDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
-  cublasLtMatrixLayoutCreate(&CDesc, CType, m, n, ldc);
+  cublasLtMatrixLayoutCreate(&CDesc, CType, n, m, ldc);
   cublasLtMatrixLayoutSetAttribute(CDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
 #if CUBLAS_VER_MAJOR == 11
   cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
@@ -170,8 +179,8 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int m, int n, int k, int8_t *A
     cudaDeviceSynchronize();
     cudaProfilerStart();
     gettimeofday(&start, NULL);
-    int success = cublas_lt_matmul(handle, operationDesc, ADesc, BDesc, CDesc,
-                                   A, B, C, alpha, beta);
+    int success = cublas_lt_matmul(handle, operationDesc, BDesc, ADesc, CDesc,
+                                   B, A, C, alpha, beta);
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
     cudaProfilerStop();
@@ -207,6 +216,8 @@ int main() {
     hB[i] = __float2half_rn(fB[i]);
     iB[i] = float2int8(fB[i], 127);
   }
+  int8_t *iAT;
+  cudaMallocManaged(&iAT, k * m * sizeof(int8_t));
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
@@ -218,7 +229,7 @@ int main() {
   test_lt_matmul(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_lt_matmul_int8(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, iteration);
+  test_lt_matmul_int8(handle, m, n, k, iAT, iB, iC, &i_alpha, &i_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp32: ");
