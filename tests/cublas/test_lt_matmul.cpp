@@ -138,6 +138,10 @@ void test_lt_matmul(cublasLtHandle_t handle, int B, int H, int O, T *X, T *W,
                     (end.tv_usec - start.tv_usec) * 0.001;
   }
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
+  cublasLtMatmulDescDestroy(operationDesc);
+  cublasLtMatrixLayoutDestroy(XDesc);
+  cublasLtMatrixLayoutDestroy(WDesc);
+  cublasLtMatrixLayoutDestroy(YDesc);
 }
 
 void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X, int8_t *W,
@@ -206,7 +210,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X
 int main() {
   // Y = X * W^T
   // Y^T = W * X^T
-  int B = 512, H = 256, O = 1024;
+  int B = 32, H = 64, O = 128;
   printf("shape: X(%d, %d), W(%d, %d)\n", B, H, O, H);
   int iteration = 10;
 
@@ -228,21 +232,20 @@ int main() {
   for (int i = 0; i < B * H; ++i) {
     fX[i] = float(i % 255 - 127) / 127;
     hX[i] = __float2half_rn(fX[i]);
-    iX[i] = float2int8(fX[i], 127);
+    // iX[i] = float2int8(fX[i], 127);
+    iX[i] = int8_t(1);
   }
   for (int i = 0; i < O * H; ++i) {
     fW[i] = float(i % 255 - 127) / 127;
     hW[i] = __float2half_rn(fW[i]);
-    iW[i] = float2int8(fW[i], 127);
+    // iW[i] = float2int8(fW[i], 127);
+    iW[i] = int8_t(1);
   }
   transpose(fW, fW_T, O, H);
   transpose(hW, hW_T, O, H);
   transpose(iW, iW_T, O, H);
-  transpose(iX, iX_T, B, H);
+  // transpose(iX, iX_T, B, H);
   matmul(fX, fW_T, Y, B, O, H);
-  // int8_t *iAT;
-  // cudaMallocManaged(&iAT, k * m * sizeof(int8_t));
-  // transpose(iA, iAT, m, k);
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
@@ -251,7 +254,7 @@ int main() {
   // test_lt_matmul(handle, B, H, O, fX, fW_T, fY, &f_alpha, &f_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  test_lt_matmul(handle, B, H, O, hX, hW_T, hY, &h_alpha, &h_beta, iteration);
+  // test_lt_matmul(handle, B, H, O, hX, hW_T, hY, &h_alpha, &h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
   // test_lt_matmul(handle, B, H, O, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
@@ -276,9 +279,9 @@ int main() {
   printf("  error: %.5f\n", he / B / O);
   printf("int8:\n  ");
   for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+    printf("%.5f%c", float(iY[i]), " \n"[i == 9]);
   for (int i = 0; i < B * O; ++i)
-    ie += fabs(Y[i] - float(iY[i]) / 127 / 127);
+    ie += fabs(Y[i] - float(iY[i]));
   printf("  error: %.5f\n", ie / B / O);
 
   free_memory(iX, iW, iY);
