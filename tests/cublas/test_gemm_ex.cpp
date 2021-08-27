@@ -5,6 +5,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <algorithm>
 
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
@@ -13,11 +14,31 @@ int8_t float2int8(float f, float scale) {
   return i;
 }
 
+template <typename T>
+void transpose(T *A, T *A_T, int m, int n) {
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < n; ++j) {
+      A_T[j * m + i] = A[i * n + j];
+    }
+  }
+}
+
+void matmul(float *A, float *B, float *C, int m, int n, int k) {
+  for (int i = 0; i < m; ++i) {
+    for (int j = 0; j < n; ++j) {
+      C[i*n+j] = 0;
+      for (int kk = 0; kk < k; ++kk) {
+        C[i*n+j] += A[i*k+kk] * B[kk*n+j];
+      }
+    }
+  }
+}
+
 template <typename T, typename S>
-void allocate_memory(int m, int n, int k, T **A, T **B, S **C) {
-  cudaMallocManaged(A, m * k * sizeof(T));
-  cudaMallocManaged(B, k * n * sizeof(T));
-  cudaMallocManaged(C, m * n * sizeof(S));
+void allocate_memory(int B, int H, int O, T **X, T **W, S **Y) {
+  cudaMallocManaged(X, B * H * sizeof(T));
+  cudaMallocManaged(W, O * H * sizeof(T));
+  cudaMallocManaged(Y, B * O * sizeof(S));
 }
 
 template <typename T, typename S>
@@ -55,7 +76,7 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA,
 }
 
 template <typename T, typename S>
-void test_gemm_ex(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
+void test_gemm_ex(cublasHandle_t handle, int B, int H, int O, T *X, T *W, S *Y,
                   S *alpha, S *beta, int algo, int iteration) {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -64,8 +85,8 @@ void test_gemm_ex(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
     cudaProfilerStart();
     gettimeofday(&start, NULL);
     int success =
-        cublas_gemm_ex(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, B, A, C, n, k,
-                       n, alpha, beta, static_cast<cublasGemmAlgo_t>(algo));
+        cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, O, B, H, W, X, Y, H, H,
+                       O, alpha, beta, static_cast<cublasGemmAlgo_t>(algo));
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
     cudaProfilerStop();
@@ -78,60 +99,84 @@ void test_gemm_ex(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
 }
 
 int main() {
-  int m = 8192, n = 1024, k = 4096;
-  printf("shape: (%d, %d) x (%d, %d)\n", m, k, k, n);
+  // Y = X * W^T
+  // Y^T = W * X^T
+  int B = 512, H = 256, O = 1024;
+  printf("shape: X(%d, %d), W(%d, %d)\n", B, H, O, H);
   int start_algo = CUBLAS_GEMM_DEFAULT;
   int end_algo = CUBLAS_GEMM_ALGO23;
   int start_algo_t_op = CUBLAS_GEMM_DEFAULT_TENSOR_OP;
   int end_algo_t_op = CUBLAS_GEMM_ALGO15_TENSOR_OP;
   int iteration = 10;
 
-  float *fA, *fB, *fC;
-  __half *hA, *hB, *hC;
-  int8_t *iA, *iB;
-  int32_t *iC;
+  float *fX, *fW, *fY;
+  __half *hX, *hW, *hY;
+  int8_t *iX, *iW;
+  int32_t *iY;
+  float *fW_T, *Y;
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
-  allocate_memory(m, n, k, &fA, &fB, &fC);
-  allocate_memory(m, n, k, &hA, &hB, &hC);
-  allocate_memory(m, n, k, &iA, &iB, &iC);
-  for (int i = 0; i < m * k; ++i) {
-    fA[i] = float(i % 255 - 127) / 127;
-    hA[i] = __float2half_rn(fA[i]);
-    iA[i] = float2int8(fA[i], 127);
+  cudaMallocManaged(&fW_T, H * O * sizeof(float));
+  cudaMallocManaged(&Y, B * O * sizeof(float));
+  allocate_memory(B, H, O, &fX, &fW, &fY);
+  allocate_memory(B, H, O, &hX, &hW, &hY);
+  allocate_memory(B, H, O, &iX, &iW, &iY);
+  for (int i = 0; i < B * H; ++i) {
+    fX[i] = float(i % 255 - 127) / 127;
+    hX[i] = __float2half_rn(fX[i]);
+    iX[i] = float2int8(fX[i], 127);
   }
-  for (int i = 0; i < k * n; ++i) {
-    fB[i] = float(i % 255 - 127) / 127;
-    hB[i] = __float2half_rn(fB[i]);
-    iB[i] = float2int8(fB[i], 127);
+  for (int i = 0; i < O * H; ++i) {
+    fW[i] = float(i % 255 - 127) / 127;
+    hW[i] = __float2half_rn(fW[i]);
+    iW[i] = float2int8(fW[i], 127);
   }
+  transpose(fW, fW_T, O, H);
+  matmul(fX, fW_T, Y, B, O, H);
   cublasHandle_t handle;
   cublasCreate(&handle);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, -1, iteration);
-  test_gemm_ex(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, 99, iteration);
+  test_gemm_ex(handle, B, H, O, fX, fW, fY, &f_alpha, &f_beta, -1, iteration);
+  test_gemm_ex(handle, B, H, O, fX, fW, fY, &f_alpha, &f_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, -1, iteration);
-  test_gemm_ex(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, 99, iteration);
+  test_gemm_ex(handle, B, H, O, hX, hW, hY, &h_alpha, &h_beta, -1, iteration);
+  test_gemm_ex(handle, B, H, O, hX, hW, hY, &h_alpha, &h_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, -1, iteration);
-  test_gemm_ex(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, 99, iteration);
+  test_gemm_ex(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, -1, iteration);
+  test_gemm_ex(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, 99, iteration);
 
+  float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
-  printf("fp32: ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", fC[i], " \n"[i == 9]);
-  printf("fp16: ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hC[i]), " \n"[i == 9]);
-  printf("int8: ");
+  printf("oracle:\n  ");
   for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", float(iC[i]) / 127 / 127, " \n"[i == 9]);
+    printf("%.5f%c", Y[i], " \n"[i == 9]);
+  printf("fp32:\n  ");
+  for (int i = 0; i < 10; ++i)
+    printf("%.5f%c", fY[i], " \n"[i == 9]);
+  for (int i = 0; i < B * O; ++i)
+    fe += fabs(Y[i] - fY[i]);
+  printf("  error: %.5f\n", fe / B / O);
+  printf("fp16:\n  ");
+  for (int i = 0; i < 10; ++i)
+    printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
+  for (int i = 0; i < B * O; ++i)
+    he += fabs(Y[i] - float(hY[i]));
+  printf("  error: %.5f\n", he / B / O);
+  printf("int8:\n  ");
+  for (int i = 0; i < 10; ++i)
+    printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+  for (int i = 0; i < B * O; ++i)
+    ie += fabs(Y[i] - float(iY[i]) / 127 / 127);
+  printf("  error: %.5f\n", ie / B / O);
 
-  free_memory(iA, iB, iC);
-  free_memory(fA, fB, fC);
-  free_memory(hA, hB, hC);
+  free_memory(iX, iW, iY);
+  free_memory(fX, fW, fY);
+  free_memory(hX, hW, hY);
+  cudaFree(Y);
+  cudaFree(fW_T);
   return 0;
 }
