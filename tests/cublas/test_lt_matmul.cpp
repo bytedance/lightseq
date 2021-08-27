@@ -198,7 +198,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
     cudaDeviceSynchronize();
     cudaProfilerStart();
     gettimeofday(&start, NULL);
-    int success = cublas_lt_matmul(handle, operationDesc, WDesc, XDesc, YDesc,
+    int success = cublas_lt_matmul(handle, operationDesc, XDesc, WDesc, YDesc,
                                    X, W, Y, alpha, beta);
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
@@ -213,7 +213,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
 int main() {
   // Y = X * W^T
   // Y^T = W * X^T
-  int B = 32, H = 64, O = 128;
+  int B = 128, H = 256, O = 512;
   printf("shape: X(%d, %d), W(%d, %d)\n", B, H, O, H);
   int iteration = 10;
 
@@ -246,8 +246,8 @@ int main() {
   }
   // transpose(fW, fW_T, O, H);
   // transpose(hW, hW_T, O, H);
-  transpose(iW, iW_T, O, H);
-  transpose(iX, iX_T, B, H);
+  // transpose(iW, iW_T, O, H);
+  // transpose(iX, iX_T, B, H);
   // matmul(fX, fW_T, Y, B, O, H);
 
   cublasLtHandle_t handle;
@@ -261,19 +261,7 @@ int main() {
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
   // test_lt_matmul(handle, B, H, O, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iX[i]), " \n"[i == 9]);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iW[i]), " \n"[i == 9]);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iY[i]), " \n"[i == 9]);
   test_lt_matmul_int8(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta, iteration);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iX[i]), " \n"[i == 9]);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iW[i]), " \n"[i == 9]);
-  for (int i = 0; i < 10; ++i)
-    printf("%d%c", int(iY[i]), " \n"[i == 9]);
 
   float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
