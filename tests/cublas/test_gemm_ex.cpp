@@ -109,11 +109,10 @@ int main() {
   int end_algo_t_op = CUBLAS_GEMM_ALGO15_TENSOR_OP;
   int iteration = 10;
 
-  float *fX, *fW, *fY;
+  float *Y;
+  float *fX, *fW, *fY, *fW_T;
   __half *hX, *hW, *hY;
-  int8_t *iX, *iW;
-  int32_t *iY;
-  float *fW_T, *Y;
+  int8_t *iX, *iW; int32_t *iY;
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
