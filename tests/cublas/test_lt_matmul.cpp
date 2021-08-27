@@ -60,8 +60,11 @@ int cublas_lt_matmul(cublasLtHandle_t handle,
 
   if (status == CUBLAS_STATUS_SUCCESS)
     return 1;
-  else
+  else {
+    printf("%d\n", status);
     return -1;
+  }
+    
 }
 
 template <typename T, typename S>
@@ -144,7 +147,7 @@ void test_lt_matmul(cublasLtHandle_t handle, int B, int H, int O, T *X, T *W,
   cublasLtMatrixLayoutDestroy(YDesc);
 }
 
-void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X, int8_t *W,
+void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X, int8_t *W,
                     int32_t *Y, int32_t *alpha, int32_t *beta, int iteration) {
   cublasLtMatmulDesc_t operationDesc;
   cublasLtMatrixLayout_t XDesc, WDesc, YDesc;
@@ -258,7 +261,19 @@ int main() {
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
   // test_lt_matmul(handle, B, H, O, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
-  test_lt_matmul_int8(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, iteration);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iX[i]), " \n"[i == 9]);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iW[i]), " \n"[i == 9]);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iY[i]), " \n"[i == 9]);
+  test_lt_matmul_int8(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta, iteration);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iX[i]), " \n"[i == 9]);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iW[i]), " \n"[i == 9]);
+  for (int i = 0; i < 10; ++i)
+    printf("%d%c", int(iY[i]), " \n"[i == 9]);
 
   float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
