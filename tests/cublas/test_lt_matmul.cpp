@@ -155,8 +155,8 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X
 #else
   cudaDataType_t ComputeType;
 #endif
-  cublasOperation_t transX = CUBLAS_OP_T;
-  cublasOperation_t transW = CUBLAS_OP_N;
+  cublasOperation_t transX = CUBLAS_OP_N;
+  cublasOperation_t transW = CUBLAS_OP_T;
   cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
   cublasLtOrder_t order_B = CUBLASLT_ORDER_COL4_4R2_8C;
 
@@ -171,13 +171,13 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X
 
   int ldX = 32 * B;
   int ldW = 32 * O;
-  int ldY = 32 * O;
+  int ldY = 32 * B;
 
   cublasLtMatrixLayoutCreate(&XDesc, XType, B, H, ldX);
-  cublasLtMatrixLayoutSetAttribute(XDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutSetAttribute(XDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
   cublasLtMatrixLayoutCreate(&WDesc, WType, O, H, ldW);
-  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
-  cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, ldY);
+  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutCreate(&YDesc, YType, B, O, ldY);
   cublasLtMatrixLayoutSetAttribute(YDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
 #if CUBLAS_VER_MAJOR == 11
   cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
@@ -185,9 +185,9 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X
   cublasLtMatmulDescCreate(&operationDesc, ComputeType);
 #endif
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                 &transW, sizeof(cublasOperation_t));
-  cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
                                  &transX, sizeof(cublasOperation_t));
+  cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
+                                 &transW, sizeof(cublasOperation_t));
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -196,7 +196,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int H, int O, int8_t *X
     cudaProfilerStart();
     gettimeofday(&start, NULL);
     int success = cublas_lt_matmul(handle, operationDesc, WDesc, XDesc, YDesc,
-                                   W, X, Y, alpha, beta);
+                                   X, W, Y, alpha, beta);
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
     cudaProfilerStop();
@@ -241,11 +241,11 @@ int main() {
     // iW[i] = float2int8(fW[i], 127);
     iW[i] = int8_t(1);
   }
-  transpose(fW, fW_T, O, H);
-  transpose(hW, hW_T, O, H);
+  // transpose(fW, fW_T, O, H);
+  // transpose(hW, hW_T, O, H);
   transpose(iW, iW_T, O, H);
-  // transpose(iX, iX_T, B, H);
-  matmul(fX, fW_T, Y, B, O, H);
+  transpose(iX, iX_T, B, H);
+  // matmul(fX, fW_T, Y, B, O, H);
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
@@ -258,7 +258,7 @@ int main() {
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
   // test_lt_matmul(handle, B, H, O, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
-  test_lt_matmul_int8(handle, B, H, O, iX_T, iW_T, iY, &i_alpha, &i_beta, iteration);
+  test_lt_matmul_int8(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, iteration);
 
   float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
