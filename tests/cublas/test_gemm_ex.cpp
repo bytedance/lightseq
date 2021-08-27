@@ -1,4 +1,3 @@
-#include <iostream>
 #include <sys/time.h>
 #include <cuda_profiler_api.h>
 #include <cublas_v2.h>
@@ -56,8 +55,8 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA,
 }
 
 template <typename T, typename S>
-void test_gemm(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
-               S *alpha, S *beta, int algo, int iteration) {
+void test_gemm_ex(cublasHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
+                  S *alpha, S *beta, int algo, int iteration) {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
     struct timeval start, end;
@@ -111,16 +110,16 @@ int main() {
   cublasCreate(&handle);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, -1, iteration);
-  test_gemm(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, 99, iteration);
+  test_gemm_ex(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, -1, iteration);
+  test_gemm_ex(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, -1, iteration);
-  test_gemm(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, 99, iteration);
+  test_gemm_ex(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, -1, iteration);
+  test_gemm_ex(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, -1, iteration);
-  test_gemm(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, 99, iteration);
+  test_gemm_ex(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, -1, iteration);
+  test_gemm_ex(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp32: ");

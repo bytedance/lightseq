@@ -1,4 +1,3 @@
-#include <iostream>
 #include <sys/time.h>
 #include <cuda_profiler_api.h>
 #include <cublasLt.h>
@@ -45,25 +44,45 @@ int cublas_lt_matmul(cublasLtHandle_t handle,
 }
 
 template <typename T, typename S>
-void test_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
-                 S *alpha, S *beta, int iteration) {
+void test_lt_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B,
+                    S *C, S *alpha, S *beta, int iteration) {
   cublasLtMatmulDesc_t operationDesc;
   cublasLtMatrixLayout_t ADesc, BDesc, CDesc;
-  cudaDataType_t AType, BType, CType, scaleType;
+  cudaDataType_t AType, BType, CType;
+#if CUBLAS_VER_MAJOR == 11
   cublasComputeType_t ComputeType;
+  cudaDataType_t scaleType;
+#else
+  cudaDataType_t ComputeType;
+#endif
   cublasOperation_t transa = CUBLAS_OP_N;
   cublasOperation_t transb = CUBLAS_OP_N;
 
   if (std::is_same<T, float>::value) {
-    AType = BType = CType = scaleType = CUDA_R_32F;
+    AType = BType = CType = CUDA_R_32F;
+#if CUBLAS_VER_MAJOR == 11
     ComputeType = CUBLAS_COMPUTE_32F;
+    scaleType = CUDA_R_32F;
+#else
+    ComputeType = CUDA_R_32F;
+#endif
   } else if (std::is_same<T, __half>::value) {
-    AType = BType = CType = scaleType = CUDA_R_16F;
+    AType = BType = CType = CUDA_R_16F;
+#if CUBLAS_VER_MAJOR == 11
     ComputeType = CUBLAS_COMPUTE_16F;
+    scaleType = CUDA_R_16F;
+#else
+    ComputeType = CUDA_R_16F;
+#endif
   } else if (std::is_same<T, int8_t>::value) {
     AType = BType = CUDA_R_8I;
-    CType = scaleType = CUDA_R_32I;
+    CType = CUDA_R_32I;
+#if CUBLAS_VER_MAJOR == 11
     ComputeType = CUBLAS_COMPUTE_32I;
+    scaleType = CUDA_R_32I;
+#else
+    ComputeType = CUDA_R_32I;
+#endif
   } else {
     printf("Not supported data type.");
     return;
@@ -72,8 +91,11 @@ void test_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B, S *C,
   cublasLtMatrixLayoutCreate(&ADesc, AType, k, m, k);
   cublasLtMatrixLayoutCreate(&BDesc, BType, n, k, n);
   cublasLtMatrixLayoutCreate(&CDesc, CType, n, m, n);
+#if CUBLAS_VER_MAJOR == 11
   cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
-
+#else
+  cublasLtMatmulDescCreate(&operationDesc, ComputeType);
+#endif
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
                                  &transa, sizeof(cublasOperation_t));
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
@@ -127,13 +149,13 @@ int main() {
   cublasLtCreate(&handle);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  test_matmul(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration);
+  test_lt_matmul(handle, m, n, k, fA, fB, fC, &f_alpha, &f_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  test_matmul(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, iteration);
+  test_lt_matmul(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_matmul(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, iteration);
+  test_lt_matmul(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp32: ");
