@@ -55,8 +55,8 @@ void test_lt_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B,
 #else
   cudaDataType_t ComputeType;
 #endif
-  cublasOperation_t transa = CUBLAS_OP_N;
-  cublasOperation_t transb = CUBLAS_OP_N;
+  cublasOperation_t transA = CUBLAS_OP_N;
+  cublasOperation_t transB = CUBLAS_OP_N;
 
   if (std::is_same<T, float>::value) {
     AType = BType = CType = CUDA_R_32F;
@@ -97,9 +97,9 @@ void test_lt_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B,
   cublasLtMatmulDescCreate(&operationDesc, ComputeType);
 #endif
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                 &transa, sizeof(cublasOperation_t));
+                                 &transA, sizeof(cublasOperation_t));
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                 &transb, sizeof(cublasOperation_t));
+                                 &transB, sizeof(cublasOperation_t));
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -109,6 +109,69 @@ void test_lt_matmul(cublasLtHandle_t handle, int m, int n, int k, T *A, T *B,
     gettimeofday(&start, NULL);
     int success = cublas_lt_matmul(handle, operationDesc, BDesc, ADesc, CDesc,
                                    B, A, C, alpha, beta);
+    cudaDeviceSynchronize();
+    gettimeofday(&end, NULL);
+    cudaProfilerStop();
+    if (success > 0 && i > 0)
+      total_time += (end.tv_sec - start.tv_sec) * 1000 +
+                    (end.tv_usec - start.tv_usec) * 0.001;
+  }
+  if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
+}
+
+void test_lt_matmul_int8(cublasLtHandle_t handle, int m, int n, int k, int8_t *A, int8_t *B,
+                    int32_t *C, int32_t *alpha, int32_t *beta, int iteration) {
+  cublasLtMatmulDesc_t operationDesc;
+  cublasLtMatrixLayout_t ADesc, BDesc, CDesc;
+  cudaDataType_t AType, BType, CType;
+#if CUBLAS_VER_MAJOR == 11
+  cublasComputeType_t ComputeType;
+  cudaDataType_t scaleType;
+#else
+  cudaDataType_t ComputeType;
+#endif
+  cublasOperation_t transA = CUBLAS_OP_N;
+  cublasOperation_t transB = CUBLAS_OP_T;
+  cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
+  cublasLtOrder_t order_B = CUBLASLT_ORDER_COL4_4R2_8C;
+
+  AType = BType = CUDA_R_8I;
+  CType = CUDA_R_32I;
+#if CUBLAS_VER_MAJOR == 11
+  ComputeType = CUBLAS_COMPUTE_32I;
+  scaleType = CUDA_R_32I;
+#else
+  ComputeType = CUDA_R_32I;
+#endif
+
+  int lda = 32 * m;
+  int ldb = 256 * ((n + 7) / 8);
+  int ldc = 32 * m;
+
+  cublasLtMatrixLayoutCreate(&ADesc, AType, m, k, lda);
+  cublasLtMatrixLayoutSetAttribute(ADesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutCreate(&BDesc, BType, n, k, ldb);
+  cublasLtMatrixLayoutSetAttribute(BDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutCreate(&CDesc, CType, m, n, ldc);
+  cublasLtMatrixLayoutSetAttribute(CDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
+#if CUBLAS_VER_MAJOR == 11
+  cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
+#else
+  cublasLtMatmulDescCreate(&operationDesc, ComputeType);
+#endif
+  cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
+                                 &transA, sizeof(cublasOperation_t));
+  cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
+                                 &transB, sizeof(cublasOperation_t));
+
+  float total_time = 0;
+  for (int i = 0; i < iteration; ++i) {
+    struct timeval start, end;
+    cudaDeviceSynchronize();
+    cudaProfilerStart();
+    gettimeofday(&start, NULL);
+    int success = cublas_lt_matmul(handle, operationDesc, ADesc, BDesc, CDesc,
+                                   A, B, C, alpha, beta);
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
     cudaProfilerStop();
@@ -155,7 +218,7 @@ int main() {
   test_lt_matmul(handle, m, n, k, hA, hB, hC, &h_alpha, &h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_lt_matmul(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, iteration);
+  test_lt_matmul_int8(handle, m, n, k, iA, iB, iC, &i_alpha, &i_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("fp32: ");
