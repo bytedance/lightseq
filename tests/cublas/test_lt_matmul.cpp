@@ -158,9 +158,9 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int m, int n, int k, int8_t *A
   int ldc = 32 * n;
 
   cublasLtMatrixLayoutCreate(&ADesc, AType, m, k, lda);
-  cublasLtMatrixLayoutSetAttribute(ADesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutSetAttribute(ADesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
   cublasLtMatrixLayoutCreate(&BDesc, BType, n, k, ldb);
-  cublasLtMatrixLayoutSetAttribute(BDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutSetAttribute(BDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
   cublasLtMatrixLayoutCreate(&CDesc, CType, n, m, ldc);
   cublasLtMatrixLayoutSetAttribute(CDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
 #if CUBLAS_VER_MAJOR == 11
@@ -218,6 +218,7 @@ int main() {
   }
   int8_t *iAT;
   cudaMallocManaged(&iAT, k * m * sizeof(int8_t));
+  transpose(iA, iAT, m, k);
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
