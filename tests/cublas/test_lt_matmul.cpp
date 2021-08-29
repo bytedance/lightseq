@@ -161,7 +161,13 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
   cublasOperation_t transX = CUBLAS_OP_N;
   cublasOperation_t transW = CUBLAS_OP_T;
   cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
-  cublasLtOrder_t order_B = CUBLASLT_ORDER_COL4_4R2_8C;
+  cublasLtOrder_t order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
+
+  cublasLtMatrixTransformDesc_t transformDesc;
+  int8_t *Xtransform, *Wtransform;
+  int32_t *Ytransform;
+  cublasLtMatrixLayout_t XtransformDesc, WtransformDesc, YtransformDesc;
+  float transformAlpha = 1.0f, transformBeta = 0.0f;
 
   XType = WType = CUDA_R_8I;
   YType = CUDA_R_32I;
@@ -172,15 +178,21 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
   ComputeType = CUDA_R_32I;
 #endif
 
-  int ldX = 32 * B;
-  int ldW = 32 * O;
-  int ldY = 32 * B;
+  int ldXtransform = 32 * B;
+  int ldWtransform = 32 * O;
+  int ldYtransform = 32 * B;
 
-  cublasLtMatrixLayoutCreate(&XDesc, XType, B, H, ldX);
+  cudaMalloc(reinterpret_cast<void**>(&Xtransform), sizeof(int8_t) * B * H);
+  cudaMalloc(reinterpret_cast<void**>(&Wtransform), sizeof(int8_t) * O * H);
+  cudaMalloc(reinterpret_cast<void**>(&Ytransform), sizeof(int32_t) * B * O);
+
+  cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F);
+
+  cublasLtMatrixLayoutCreate(&XDesc, XType, B, H, B);
   cublasLtMatrixLayoutSetAttribute(XDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
-  cublasLtMatrixLayoutCreate(&WDesc, WType, O, H, ldW);
-  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_B, sizeof(cublasLtOrder_t));
-  cublasLtMatrixLayoutCreate(&YDesc, YType, B, O, ldY);
+  cublasLtMatrixLayoutCreate(&WDesc, WType, O, H, O);
+  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C, sizeof(cublasLtOrder_t));
+  cublasLtMatrixLayoutCreate(&YDesc, YType, B, O, B);
   cublasLtMatrixLayoutSetAttribute(YDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(cublasLtOrder_t));
 #if CUBLAS_VER_MAJOR == 11
   cublasLtMatmulDescCreate(&operationDesc, ComputeType, scaleType);
@@ -192,14 +204,24 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
                                  &transW, sizeof(cublasOperation_t));
 
+  cublasLtMatrixLayoutCreate(&XtransformDesc, CUDA_R_8I, B, H, ldXtransform);
+  cublasLtMatrixLayoutSetAttribute(XtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(order_COL32));
+  cublasLtMatrixLayoutCreate(&WtransformDesc, CUDA_R_8I, O, H, ldWtransform);
+  cublasLtMatrixLayoutSetAttribute(WtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C, sizeof(order_COL4_4R2_8C));
+  cublasLtMatrixLayoutCreate(&YtransformDesc, CUDA_R_32I, B, O, ldYtransform);
+  cublasLtMatrixLayoutSetAttribute(YtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(order_COL32));
+
+  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, X, XDesc, &transformBeta, NULL, NULL, Xtransform, XtransformDesc, 0);
+  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, W, WDesc, &transformBeta, NULL, NULL, Wtransform, WtransformDesc, 0);
+
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
     struct timeval start, end;
     cudaDeviceSynchronize();
     cudaProfilerStart();
     gettimeofday(&start, NULL);
-    int success = cublas_lt_matmul(handle, operationDesc, XDesc, WDesc, YDesc,
-                                   X, W, Y, alpha, beta);
+    int success = cublas_lt_matmul(handle, operationDesc, XtransformDesc, WtransformDesc, YtransformDesc,
+                                   Xtransform, Wtransform, Ytransform, alpha, beta);
     cudaDeviceSynchronize();
     gettimeofday(&end, NULL);
     cudaProfilerStop();
@@ -207,6 +229,12 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
       total_time += (end.tv_sec - start.tv_sec) * 1000 +
                     (end.tv_usec - start.tv_usec) * 0.001;
   }
+  cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &transX, sizeof(transX));
+  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, Ytransform, YtransformDesc, &transformBeta, NULL, NULL, Y, YDesc, 0);
+  cudaDeviceSynchronize();
+  cudaFree(Xtransform);
+  cudaFree(Wtransform);
+  cudaFree(Ytransform);
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
 }
 
