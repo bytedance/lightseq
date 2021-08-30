@@ -35,17 +35,21 @@ void matmul(float *A, float *B, float *C, int m, int n, int k) {
 }
 
 template <typename T, typename S>
-void allocate_memory(int m, int n, int k, T **A, T **B, S **C) {
-  cudaMallocManaged(A, m * k * sizeof(T));
-  cudaMallocManaged(B, k * n * sizeof(T));
-  cudaMallocManaged(C, m * n * sizeof(S));
+void allocate_memory(int B, int O, int H, T **X, T **W, S **Y, T **X_T, T **W_T) {
+  cudaMallocManaged(X, B * H * sizeof(T));
+  cudaMallocManaged(W, O * H * sizeof(T));
+  cudaMallocManaged(Y, B * O * sizeof(S));
+  cudaMallocManaged(X_T, H * B * sizeof(T));
+  cudaMallocManaged(W_T, H * O * sizeof(T));
 }
 
 template <typename T, typename S>
-void free_memory(T *A, T *B, S *C) {
-  cudaFree(A);
-  cudaFree(B);
-  cudaFree(C);
+void free_memory(T *X, T *W, S *Y, T *X_T, T *W_T) {
+  cudaFree(X);
+  cudaFree(W);
+  cudaFree(Y);
+  cudaFree(X_T);
+  cudaFree(W_T);
 }
 
 template <typename T, typename S>
@@ -68,7 +72,7 @@ int cublas_lt_matmul(cublasLtHandle_t handle,
 }
 
 template <typename T, typename S>
-void test_lt_matmul(cublasLtHandle_t handle, int B, int H, int O, T *X, T *W,
+void test_lt_matmul(cublasLtHandle_t handle, int B, int O, int H, T *X, T *W,
                     S *Y, S *alpha, S *beta, int iteration) {
   cublasLtMatmulDesc_t operationDesc;
   cublasLtMatrixLayout_t XDesc, WDesc, YDesc;
@@ -79,8 +83,8 @@ void test_lt_matmul(cublasLtHandle_t handle, int B, int H, int O, T *X, T *W,
 #else
   cudaDataType_t ComputeType;
 #endif
-  cublasOperation_t transX = CUBLAS_OP_N;
-  cublasOperation_t transW = CUBLAS_OP_N;
+  cublasOperation_t opNTrans = CUBLAS_OP_N;
+  cublasOperation_t opTrans = CUBLAS_OP_T;
 
   if (std::is_same<T, float>::value) {
     XType = WType = YType = CUDA_R_32F;
@@ -121,9 +125,9 @@ void test_lt_matmul(cublasLtHandle_t handle, int B, int H, int O, T *X, T *W,
   cublasLtMatmulDescCreate(&operationDesc, ComputeType);
 #endif
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                 &transW, sizeof(cublasOperation_t));
+                                 &opNTrans, sizeof(cublasOperation_t));
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                 &transX, sizeof(cublasOperation_t));
+                                 &opNTrans, sizeof(cublasOperation_t));
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -158,8 +162,8 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
 #else
   cudaDataType_t ComputeType;
 #endif
-  cublasOperation_t transX = CUBLAS_OP_N;
-  cublasOperation_t transW = CUBLAS_OP_T;
+  cublasOperation_t opNTrans = CUBLAS_OP_N;
+  cublasOperation_t opTrans = CUBLAS_OP_T;
   cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
   cublasLtOrder_t order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
 
@@ -197,9 +201,9 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
   cublasLtMatmulDescCreate(&operationDesc, ComputeType);
 #endif
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                 &transX, sizeof(cublasOperation_t));
+                                 &opNTrans, sizeof(cublasOperation_t));
   cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                 &transW, sizeof(cublasOperation_t));
+                                 &opTrans, sizeof(cublasOperation_t));
 
   cublasLtMatrixLayoutCreate(&XtransformDesc, CUDA_R_8I, B, H, ldXtransform);
   cublasLtMatrixLayoutSetAttribute(XtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(order_COL32));
@@ -208,7 +212,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
   cublasLtMatrixLayoutCreate(&YtransformDesc, CUDA_R_32I, B, O, ldYtransform);
   cublasLtMatrixLayoutSetAttribute(YtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32, sizeof(order_COL32));
 
-  cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &transW, sizeof(transW))
+  cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans, sizeof(cublasOperation_t));
   cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, X, XDesc, &transformBeta, NULL, NULL, Xtransform, XtransformDesc, 0);
   cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, W, WDesc, &transformBeta, NULL, NULL, Wtransform, WtransformDesc, 0);
 
@@ -227,7 +231,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
       total_time += (end.tv_sec - start.tv_sec) * 1000 +
                     (end.tv_usec - start.tv_usec) * 0.001;
   }
-  cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &transW, sizeof(transW));
+  cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans, sizeof(cublasOperation_t));
   cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, Ytransform, YtransformDesc, &transformBeta, NULL, NULL, Y, YDesc, 0);
   cudaDeviceSynchronize();
   cudaFree(Xtransform);
@@ -239,67 +243,63 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H, int8_t *X
 int main() {
   // Y = X * W^T
   // Y^T = W * X^T
-  int B = 128, H = 256, O = 512;
+  int B = 512, H = 256, O = 1024;
   printf("shape: X(%d, %d), W(%d, %d)\n", B, H, O, H);
   int iteration = 10;
 
   float *Y;
-  float *fX, *fW, *fY, *fW_T;
-  __half *hX, *hW, *hY, *hW_T;
+  float *fX, *fW, *fY, *fX_T, *fW_T;
+  __half *hX, *hW, *hY, *hX_T, *hW_T;
   int8_t *iX, *iW, *iX_T, *iW_T; int32_t *iY;
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
   cudaMallocManaged(&Y, B * O * sizeof(float));
-  cudaMallocManaged(&fW_T, H * O * sizeof(float));
-  cudaMallocManaged(&hW_T, H * O * sizeof(__half));
-  cudaMallocManaged(&iX_T, H * B * sizeof(int8_t));
-  cudaMallocManaged(&iW_T, H * O * sizeof(int8_t));
-  allocate_memory(B, H, O, &fX, &fW, &fY);
-  allocate_memory(B, H, O, &hX, &hW, &hY);
-  allocate_memory(B, H, O, &iX, &iW, &iY);
+  allocate_memory(B, O, H, &fX, &fW, &fY, &fX_T, &fW_T);
+  allocate_memory(B, O, H, &hX, &hW, &hY, &hX_T, &hW_T);
+  allocate_memory(B, O, H, &iX, &iW, &iY, &iX_T, &iW_T);
   for (int i = 0; i < B * H; ++i) {
     fX[i] = float(i % 255 - 127) / 127;
     hX[i] = __float2half_rn(fX[i]);
     iX[i] = float2int8(fX[i], 127);
-    // iX[i] = int8_t(1);
   }
   for (int i = 0; i < O * H; ++i) {
     fW[i] = float(i % 255 - 127) / 127;
     hW[i] = __float2half_rn(fW[i]);
     iW[i] = float2int8(fW[i], 127);
-    // iW[i] = int8_t(1);
   }
-  // transpose(fW, fW_T, O, H);
-  // transpose(hW, hW_T, O, H);
-  // transpose(iW, iW_T, O, H);
-  // transpose(iX, iX_T, B, H);
-  // matmul(fX, fW_T, Y, B, O, H);
+  transpose(fX, fX_T, B, H);
+  transpose(fW, fW_T, O, H);
+  transpose(hX, hX_T, B, H);
+  transpose(hW, hW_T, O, H);
+  transpose(iX, iX_T, B, H);
+  transpose(iW, iW_T, O, H);
+  matmul(fX, fW_T, Y, B, O, H);
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
 
-  // printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  // test_lt_matmul(handle, B, H, O, fX, fW_T, fY, &f_alpha, &f_beta, iteration);
+  printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+  test_lt_matmul(handle, B, O, H, fX, fW_T, fY, &f_alpha, &f_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  // test_lt_matmul(handle, B, H, O, hX, hW_T, hY, &h_alpha, &h_beta, iteration);
+  test_lt_matmul(handle, B, O, H, hX, hW_T, hY, &h_alpha, &h_beta, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  // test_lt_matmul(handle, B, H, O, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
+  // test_lt_matmul(handle, B, O, H, iX, iW_T, iY, &i_alpha, &i_beta, iteration);
   test_lt_matmul_int8(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta, iteration);
 
   float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
   printf("oracle:\n  ");
   for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", Y[i], " \n"[i == 9]);
-  // printf("fp32:\n  ");
-  // for (int i = 0; i < 10; ++i)
-  //   printf("%.5f%c", fY[i], " \n"[i == 9]);
-  // for (int i = 0; i < B * O; ++i)
-  //   fe += fabs(Y[i] - fY[i]);
-  // printf("  error: %.5f\n", fe / B / O);
+    printf("%.5f%c", Y[B*O-1-i], " \n"[i == 9]);
+  printf("fp32:\n  ");
+  for (int i = 0; i < 10; ++i)
+    printf("%.5f%c", fY[i], " \n"[i == 9]);
+  for (int i = 0; i < B * O; ++i)
+    fe += fabs(Y[i] - fY[i]);
+  printf("  error: %.5f\n", fe / B / O);
   printf("fp16:\n  ");
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
@@ -313,13 +313,9 @@ int main() {
     ie += fabs(Y[i] - float(iY[i])/127/127);
   printf("  error: %.5f\n", ie / B / O);
 
-  free_memory(iX, iW, iY);
-  free_memory(fX, fW, fY);
-  free_memory(hX, hW, hY);
+  free_memory(fX, fW, fY, fX_T, fW_T);
+  free_memory(hX, hW, hY, hX_T, hW_T);
+  free_memory(iX, iW, iY, iX_T, iW_T);
   cudaFree(Y);
-  cudaFree(fW_T);
-  cudaFree(hW_T);
-  cudaFree(iW_T);
-  cudaFree(iX_T);
   return 0;
 }

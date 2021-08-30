@@ -35,7 +35,7 @@ void matmul(float *A, float *B, float *C, int m, int n, int k) {
 }
 
 template <typename T, typename S>
-void allocate_memory(int B, int H, int O, T **X, T **W, S **Y) {
+void allocate_memory(int B, int O, int H, T **X, T **W, S **Y) {
   cudaMallocManaged(X, B * H * sizeof(T));
   cudaMallocManaged(W, O * H * sizeof(T));
   cudaMallocManaged(Y, B * O * sizeof(S));
@@ -76,7 +76,7 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA,
 }
 
 template <typename T, typename S>
-void test_gemm_ex(cublasHandle_t handle, int B, int H, int O, T *X, T *W, S *Y,
+void test_gemm_ex(cublasHandle_t handle, int B, int O, int H, T *X, T *W, S *Y,
                   S *alpha, S *beta, int algo, int iteration) {
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -118,9 +118,9 @@ int main() {
   int32_t i_alpha = 1, i_beta = 0;
   cudaMallocManaged(&fW_T, H * O * sizeof(float));
   cudaMallocManaged(&Y, B * O * sizeof(float));
-  allocate_memory(B, H, O, &fX, &fW, &fY);
-  allocate_memory(B, H, O, &hX, &hW, &hY);
-  allocate_memory(B, H, O, &iX, &iW, &iY);
+  allocate_memory(B, O, H, &fX, &fW, &fY);
+  allocate_memory(B, O, H, &hX, &hW, &hY);
+  allocate_memory(B, O, H, &iX, &iW, &iY);
   for (int i = 0; i < B * H; ++i) {
     fX[i] = float(i % 255 - 127) / 127;
     hX[i] = __float2half_rn(fX[i]);
@@ -137,16 +137,16 @@ int main() {
   cublasCreate(&handle);
 
   printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, B, H, O, fX, fW, fY, &f_alpha, &f_beta, -1, iteration);
-  test_gemm_ex(handle, B, H, O, fX, fW, fY, &f_alpha, &f_beta, 99, iteration);
+  test_gemm_ex(handle, B, O, H, fX, fW, fY, &f_alpha, &f_beta, -1, iteration);
+  test_gemm_ex(handle, B, O, H, fX, fW, fY, &f_alpha, &f_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, B, H, O, hX, hW, hY, &h_alpha, &h_beta, -1, iteration);
-  test_gemm_ex(handle, B, H, O, hX, hW, hY, &h_alpha, &h_beta, 99, iteration);
+  test_gemm_ex(handle, B, O, H, hX, hW, hY, &h_alpha, &h_beta, -1, iteration);
+  test_gemm_ex(handle, B, O, H, hX, hW, hY, &h_alpha, &h_beta, 99, iteration);
 
   printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  test_gemm_ex(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, -1, iteration);
-  test_gemm_ex(handle, B, H, O, iX, iW, iY, &i_alpha, &i_beta, 99, iteration);
+  test_gemm_ex(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta, -1, iteration);
+  test_gemm_ex(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta, 99, iteration);
 
   float fe = 0, he = 0, ie = 0; 
   printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
