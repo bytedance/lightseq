@@ -90,10 +90,10 @@ void test_gemm_ex(cublasHandle_t handle, int B, int O, int H, T *X, T *W, S *Y,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    if (success > 0 && i > 0) total_time += time;
+    if (success > 0 && i >= 10) total_time += time;
   }
   if (total_time > 0)
-    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
+    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 10));
 }
 
 void _main(int B, int O, int H, int iteration, bool debug) {

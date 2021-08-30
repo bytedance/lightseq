@@ -247,7 +247,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H,
     cudaEventElapsedTime(&time, start, stop);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    if (success > 0 && i > 0) total_time += time;
+    if (success > 0 && i >= 10) total_time += time;
   }
   cublasLtMatrixTransformDescSetAttribute(transformDesc,
                                           CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
@@ -259,7 +259,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H,
   cudaFree(Xtransform);
   cudaFree(Wtransform);
   cudaFree(Ytransform);
-  if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
+  if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 10));
 }
 
 void _main(int B, int O, int H, int iteration, bool debug) {
