@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include <algorithm>
+#include <vector>
 
 int8_t float2int8(float f, float scale) {
   int8_t i = int8_t(f * scale);
@@ -66,7 +67,6 @@ int cublas_lt_matmul(cublasLtHandle_t handle,
   if (status == CUBLAS_STATUS_SUCCESS)
     return 1;
   else {
-    printf("%d\n", status);
     return -1;
   }
 }
@@ -131,18 +131,21 @@ void test_lt_matmul(cublasLtHandle_t handle, int B, int O, int H, T *X, T *W,
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
-    cudaDeviceSynchronize();
-    cudaProfilerStart();
-    gettimeofday(&start, NULL);
+    cudaEvent_t start, stop;
+    float time;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start, 0);
     int success = cublas_lt_matmul(handle, operationDesc, WDesc, XDesc, YDesc,
                                    W, X, Y, alpha, beta);
-    cudaDeviceSynchronize();
-    gettimeofday(&end, NULL);
-    cudaProfilerStop();
-    if (success > 0 && i > 0)
-      total_time += (end.tv_sec - start.tv_sec) * 1000 +
-                    (end.tv_usec - start.tv_usec) * 0.001;
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+
+    cudaEventElapsedTime(&time, start, stop);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    if (success > 0 && i > 0) total_time += time;
   }
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
   cublasLtMatmulDescDestroy(operationDesc);
@@ -229,19 +232,22 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H,
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
-    struct timeval start, end;
-    cudaDeviceSynchronize();
-    cudaProfilerStart();
-    gettimeofday(&start, NULL);
+    cudaEvent_t start, stop;
+    float time;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start, 0);
     int success = cublas_lt_matmul(handle, operationDesc, XtransformDesc,
                                    WtransformDesc, YtransformDesc, Xtransform,
                                    Wtransform, Ytransform, alpha, beta);
-    cudaDeviceSynchronize();
-    gettimeofday(&end, NULL);
-    cudaProfilerStop();
-    if (success > 0 && i > 0)
-      total_time += (end.tv_sec - start.tv_sec) * 1000 +
-                    (end.tv_usec - start.tv_usec) * 0.001;
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+
+    cudaEventElapsedTime(&time, start, stop);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+    if (success > 0 && i > 0) total_time += time;
   }
   cublasLtMatrixTransformDescSetAttribute(transformDesc,
                                           CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
@@ -256,25 +262,26 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int B, int O, int H,
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 1));
 }
 
-int main() {
-  // Y = X * W^T
-  // Y^T = W * X^T
-  int B = 512, H = 256, O = 1024;
-  printf("shape: X(%d, %d), W(%d, %d)\n", B, H, O, H);
-  int iteration = 10;
+void _main(int B, int O, int H, int iteration, bool debug) {
+  printf(
+      ">>>>>>>>>>>>>>>>>>>> shape: X(%d, %d), W(%d, %d) >>>>>>>>>>>>>>>>>>>>\n",
+      B, H, O, H);
 
   float *Y;
+  if (debug) cudaMallocManaged(&Y, B * O * sizeof(float));
+
   float *fX, *fW, *fY, *fX_T, *fW_T;
   __half *hX, *hW, *hY, *hX_T, *hW_T;
   int8_t *iX, *iW, *iX_T, *iW_T;
   int32_t *iY;
-  float f_alpha = 1, f_beta = 0;
-  __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
-  int32_t i_alpha = 1, i_beta = 0;
-  cudaMallocManaged(&Y, B * O * sizeof(float));
   allocate_memory(B, O, H, &fX, &fW, &fY, &fX_T, &fW_T);
   allocate_memory(B, O, H, &hX, &hW, &hY, &hX_T, &hW_T);
   allocate_memory(B, O, H, &iX, &iW, &iY, &iX_T, &iW_T);
+
+  float f_alpha = 1, f_beta = 0;
+  __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
+  int32_t i_alpha = 1, i_beta = 0;
+
   for (int i = 0; i < B * H; ++i) {
     fX[i] = float(i % 255 - 127) / 127;
     hX[i] = __float2half_rn(fX[i]);
@@ -285,51 +292,72 @@ int main() {
     hW[i] = __float2half_rn(fW[i]);
     iW[i] = float2int8(fW[i], 127);
   }
+
   transpose(fX, fX_T, B, H);
   transpose(fW, fW_T, O, H);
   transpose(hX, hX_T, B, H);
   transpose(hW, hW_T, O, H);
   transpose(iX, iX_T, B, H);
   transpose(iW, iW_T, O, H);
-  matmul(fX, fW_T, Y, B, O, H);
+  if (debug) matmul(fX, fW_T, Y, B, O, H);
 
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
 
-  printf(">>>>>>>>>>>>>>>>> test fp32 >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>> test fp32 >>>>>\n");
   test_lt_matmul(handle, B, O, H, fX, fW_T, fY, &f_alpha, &f_beta, iteration);
 
-  printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
+  printf(">>>>> test fp16 >>>>>\n");
   test_lt_matmul(handle, B, O, H, hX, hW_T, hY, &h_alpha, &h_beta, iteration);
 
-  printf(">>>>>>>>>>>>>>>>> test int8 >>>>>>>>>>>>>>>>>\n");
-  // test_lt_matmul(handle, B, O, H, iX, iW_T, iY, &i_alpha, &i_beta,
-  // iteration);
+  printf(">>>>> test int8 >>>>>\n");
   test_lt_matmul_int8(handle, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
                       iteration);
 
   float fe = 0, he = 0, ie = 0;
-  printf(">>>>>>>>>>>>>>>>> compare result >>>>>>>>>>>>>>>>>\n");
-  printf("oracle:\n  ");
-  for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", Y[B * O - 1 - i], " \n"[i == 9]);
+  printf(">>>>> compare result >>>>>\n");
+  if (debug) {
+    printf("oracle:\n  ");
+    for (int i = 0; i < 10; ++i)
+      printf("%.5f%c", Y[B * O - 1 - i], " \n"[i == 9]);
+  }
+
   printf("fp32:\n  ");
   for (int i = 0; i < 10; ++i) printf("%.5f%c", fY[i], " \n"[i == 9]);
-  for (int i = 0; i < B * O; ++i) fe += fabs(Y[i] - fY[i]);
-  printf("  error: %.5f\n", fe / B / O);
+  for (int i = 0; i < B * O; ++i) fe += fabs((debug ? Y[i] : fY[i]) - fY[i]);
+  printf("  diff: %.5f\n", fe / B / O);
+
   printf("fp16:\n  ");
   for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
-  for (int i = 0; i < B * O; ++i) he += fabs(Y[i] - float(hY[i]));
-  printf("  error: %.5f\n", he / B / O);
+  for (int i = 0; i < B * O; ++i)
+    he += fabs((debug ? Y[i] : fY[i]) - float(hY[i]));
+  printf("  diff: %.5f\n", he / B / O);
+
   printf("int8:\n  ");
   for (int i = 0; i < 10; ++i)
     printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
-  for (int i = 0; i < B * O; ++i) ie += fabs(Y[i] - float(iY[i]) / 127 / 127);
-  printf("  error: %.5f\n", ie / B / O);
+  for (int i = 0; i < B * O; ++i)
+    ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
+  printf("  diff: %.5f\n", ie / B / O);
 
   free_memory(fX, fW, fY, fX_T, fW_T);
   free_memory(hX, hW, hY, hX_T, hW_T);
   free_memory(iX, iW, iY, iX_T, iW_T);
-  cudaFree(Y);
+  if (debug) cudaFree(Y);
+}
+
+int main() {
+  int iteration = 50;
+  bool debug = false;
+  std::vector<int> Bs = {8, 16, 1024};
+  std::vector<int> Os = {1024, 3072, 4096};
+  std::vector<int> Hs = {1024, 4096};
+  for (int i = 0; i < Bs.size(); ++i) {
+    for (int j = 0; j < Os.size(); ++j) {
+      for (int k = 0; k < Hs.size(); ++k) {
+        _main(Bs[i], Os[j], Hs[k], iteration, debug);
+      }
+    }
+  }
   return 0;
 }
