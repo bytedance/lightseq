@@ -333,7 +333,7 @@ void _main(int B, int O, int H, int iteration, bool debug) {
 int main() {
   int iteration = 50;
   bool debug = false;
-  std::vector<int> Bs = {8, 16, 1024};
+  std::vector<int> Bs = {8, 16, 4096};
   std::vector<int> Os = {1024, 3072, 4096};
   std::vector<int> Hs = {1024, 4096};
   for (int i = 0; i < Bs.size(); ++i) {
