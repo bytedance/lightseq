@@ -40,7 +40,7 @@ int cublas_gemm_strided_batched_ex(
 
 template <typename T, typename S>
 void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
-                  S *Y, S *alpha, S *beta, int algo, int iteration) {
+                  S *Y, S *alpha, S *beta, int iteration) {
   cudaDataType_t AType, BType, CType, ComputeType;
   if (std::is_same<T, float>::value) {
     AType = BType = CType = ComputeType = CUDA_R_32F;
@@ -67,11 +67,11 @@ void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
       cublas_gemm_strided_batched_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, C, O, B,
                                      H, W, X, Y, H, H, O, AType, BType, CType,
                                      ComputeType, alpha, beta,
-                                     static_cast<cublasGemmAlgo_t>(algo));
+                                     static_cast<cublasGemmAlgo_t>(99));
     else
       cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, O, B, H, W, X, Y, H, H,
                      O, AType, BType, CType, ComputeType, alpha, beta,
-                     static_cast<cublasGemmAlgo_t>(algo));
+                     static_cast<cublasGemmAlgo_t>(99));
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
 
@@ -79,10 +79,9 @@ void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    if (success > 0 && i >= 10) total_time += time;
+    if (success > 0 && i >= 1) total_time += time;
   }
-  if (total_time > 0)
-    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 10));
+  printf("    gemm_ex: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
 }
 
 template <typename T, typename S>
@@ -208,9 +207,9 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
     cudaEventElapsedTime(&time, start, stop);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    if (success > 0 && i >= 10) total_time += time;
+    if (success > 0 && i >= 1) total_time += time;
   }
-  if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 10));
+  printf("  lt_matmul: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
 
   checkCublasStatus(cublasLtMatrixLayoutDestroy(WtransformDesc));
   checkCublasStatus(cublasLtMatrixLayoutDestroy(XDesc));
@@ -350,9 +349,9 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
     cudaEventElapsedTime(&time, start, stop);
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    if (success > 0 && i >= 10) total_time += time;
+    if (success > 0 && i >= 1) total_time += time;
   }
-  if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 10));
+  printf("  lt_matmul: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
   checkCublasStatus(cublasLtMatrixTransformDescSetAttribute(
       transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
       sizeof(opTrans)));

@@ -33,18 +33,17 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   cublasLtHandle_t lt_handle;
   checkCublasStatus(cublasCreate(&handle));
   checkCublasStatus(cublasLtCreate(&lt_handle));
-  
+
   // test cublas
-  test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta, 99,
-               iteration);
-  test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta, 99,
-               iteration);
-  test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta, 99,
-               iteration);
+  test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta, iteration);
+  test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta, iteration);
+  test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta, iteration);
 
   // test cublas_lt
-  test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta, iteration);
-  test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta, iteration);
+  test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                 iteration);
+  test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                 iteration);
   test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
                       iteration);
 
@@ -57,7 +56,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
 }
 
 int main() {
-  int iteration = 50;
+  int iteration = 10;
   bool debug = false;
   std::vector<int> Cs = {1, 8, 64};
   std::vector<int> Bs = {8, 16, 4096};
