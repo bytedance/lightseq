@@ -376,9 +376,9 @@ int main() {
   int iteration = 50;
   bool debug = false;
   std::vector<int> Cs = {1, 8, 512};
-  std::vector<int> Bs = {8, 16, 512};
-  std::vector<int> Os = {512, 512, 512};
-  std::vector<int> Hs = {512, 512};
+  std::vector<int> Bs = {8, 16, 4096};
+  std::vector<int> Os = {1024, 3072, 4096};
+  std::vector<int> Hs = {1024, 4096};
   for (int l = 0; l < Cs.size(); ++l)
     for (int i = 0; i < Bs.size(); ++i)
       for (int j = 0; j < Os.size(); ++j)
