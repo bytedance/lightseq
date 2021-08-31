@@ -70,30 +70,35 @@ void init_data(float *fX, __half *hX, int8_t *iX, float *fW, __half *hW,
 }
 
 void print_res(float *Y, float *fY, __half *hY, int32_t *iY, int C, int B,
-               int O, int H, bool debug) {
+               int O, int H, float ft, float ht, float it, bool debug) {
   float fe = 0, he = 0, ie = 0;
-  printf(">>>>> compare result >>>>>\n");
   if (debug) {
-    printf("oracle:\n  ");
+    printf("oracle:\n");
     for (int i = 0; i < 10; ++i) printf("%.5f%c", Y[i], " \n"[i == 9]);
   }
 
-  printf("fp32:\n  ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", fY[i], " \n"[i == 9]);
+  printf("fp32:\n");
+  if (debug)
+    for (int i = 0; i < 10; ++i) printf("%.5f%c", fY[i], " \n"[i == 9]);
   for (int i = 0; i < C * B * O; ++i)
     fe += fabs((debug ? Y[i] : fY[i]) - fY[i]);
   printf("  diff: %.5f\n", fe / C / B / O);
+  printf("  time: %.3f ms\n", ft);
 
-  printf("fp16:\n  ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
+  printf("fp16:\n");
+  if (debug)
+    for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
   for (int i = 0; i < C * B * O; ++i)
     he += fabs((debug ? Y[i] : fY[i]) - float(hY[i]));
   printf("  diff: %.5f\n", he / C / B / O);
+  printf("  time: %.3f ms\n", ht);
 
-  printf("int8:\n  ");
-  for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+  printf("int8:\n");
+  if (debug)
+    for (int i = 0; i < 10; ++i)
+      printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
   for (int i = 0; i < C * B * O; ++i)
     ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
   printf("  diff: %.5f\n", ie / C / B / O);
+  printf("  time: %.3f ms\n", it);
 }

@@ -34,20 +34,23 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   checkCublasStatus(cublasCreate(&handle));
   checkCublasStatus(cublasLtCreate(&lt_handle));
 
-  // test cublas
-  test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta, iteration);
-  test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta, iteration);
-  test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta, iteration);
+  printf(">>>>> test cublas gemm ex >>>>>\n");
+  float ft = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                          iteration);
+  float ht = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                          iteration);
+  float it = test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
+                          iteration);
+  print_res(Y, fY, hY, iY, C, B, O, H, ft, ht, it, debug);
 
-  // test cublas_lt
-  test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
-                 iteration);
-  test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
-                 iteration);
-  test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
+  printf(">>>>> test cublas lt matmul >>>>>\n");
+  ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
                       iteration);
-
-  print_res(Y, fY, hY, iY, C, B, O, H, debug);
+  ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                      iteration);
+  it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
+                           iteration);
+  print_res(Y, fY, hY, iY, C, B, O, H, ft, ht, it, debug);
 
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
@@ -58,7 +61,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
 int main() {
   int iteration = 10;
   bool debug = false;
-  std::vector<int> Cs = {1, 8, 64};
+  std::vector<int> Cs = {1, 8, 32};
   std::vector<int> Bs = {8, 16, 4096};
   std::vector<int> Os = {1024, 3072, 4096};
   std::vector<int> Hs = {1024, 4096};

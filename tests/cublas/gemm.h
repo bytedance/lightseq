@@ -39,8 +39,8 @@ int cublas_gemm_strided_batched_ex(
 }
 
 template <typename T, typename S>
-void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
-                  S *Y, S *alpha, S *beta, int iteration) {
+float test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X,
+                   T *W, S *Y, S *alpha, S *beta, int iteration) {
   cudaDataType_t AType, BType, CType, ComputeType;
   if (std::is_same<T, float>::value) {
     AType = BType = CType = ComputeType = CUDA_R_32F;
@@ -51,7 +51,7 @@ void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
     CType = ComputeType = CUDA_R_32I;
   } else {
     printf("Not supported data type.");
-    return;
+    return -1;
   }
 
   float total_time = 0;
@@ -64,14 +64,14 @@ void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
     cudaEventRecord(start, 0);
     int success;
     if (C > 1)
-      cublas_gemm_strided_batched_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, C, O, B,
-                                     H, W, X, Y, H, H, O, AType, BType, CType,
-                                     ComputeType, alpha, beta,
-                                     static_cast<cublasGemmAlgo_t>(99));
+      success = cublas_gemm_strided_batched_ex(
+          handle, CUBLAS_OP_T, CUBLAS_OP_N, C, O, B, H, W, X, Y, H, H, O, AType,
+          BType, CType, ComputeType, alpha, beta,
+          static_cast<cublasGemmAlgo_t>(99));
     else
-      cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, O, B, H, W, X, Y, H, H,
-                     O, AType, BType, CType, ComputeType, alpha, beta,
-                     static_cast<cublasGemmAlgo_t>(99));
+      success = cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, O, B, H, W, X,
+                               Y, H, H, O, AType, BType, CType, ComputeType,
+                               alpha, beta, static_cast<cublasGemmAlgo_t>(99));
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
 
@@ -81,7 +81,8 @@ void test_gemm_ex(cublasHandle_t handle, int C, int B, int O, int H, T *X, T *W,
 
     if (success > 0 && i >= 1) total_time += time;
   }
-  printf("    gemm_ex: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
+
+  return total_time > 0 ? total_time / (iteration - 1) : -1;
 }
 
 template <typename T, typename S>
@@ -101,8 +102,8 @@ int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
 }
 
 template <typename T, typename S>
-void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
-                    T *W, S *Y, S *alpha, S *beta, int iteration) {
+float test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
+                     T *W, S *Y, S *alpha, S *beta, int iteration) {
   cudaDataType_t XType, WType, YType;
 #if CUBLAS_VER_MAJOR == 11
   cublasComputeType_t ComputeType;
@@ -128,7 +129,7 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
 #endif
   } else {
     printf("Not supported data type.");
-    return;
+    return -1;
   }
 
   int64_t strideX = B * H, strideW = O * H, strideY = B * O;
@@ -209,7 +210,6 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
     cudaEventDestroy(stop);
     if (success > 0 && i >= 1) total_time += time;
   }
-  printf("  lt_matmul: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
 
   checkCublasStatus(cublasLtMatrixLayoutDestroy(WtransformDesc));
   checkCublasStatus(cublasLtMatrixLayoutDestroy(XDesc));
@@ -219,11 +219,13 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
   checkCublasStatus(cublasLtMatrixTransformDescDestroy(transformDesc));
   cudaDeviceSynchronize();
   checkCudaStatus(cudaFree(Wtransform));
+
+  return total_time > 0 ? total_time / (iteration - 1) : -1;
 }
 
-void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
-                         int8_t *X, int8_t *W, int32_t *Y, int32_t *alpha,
-                         int32_t *beta, int iteration) {
+float test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
+                          int8_t *X, int8_t *W, int32_t *Y, int32_t *alpha,
+                          int32_t *beta, int iteration) {
 #if CUBLAS_VER_MAJOR == 11
   cublasComputeType_t ComputeType = CUBLAS_COMPUTE_32I;
   cudaDataType_t scaleType = CUDA_R_32I;
@@ -351,7 +353,7 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
     cudaEventDestroy(stop);
     if (success > 0 && i >= 1) total_time += time;
   }
-  printf("  lt_matmul: %.3f ms\n", total_time > 0 ? total_time / (iteration - 1) : -1);
+
   checkCublasStatus(cublasLtMatrixTransformDescSetAttribute(
       transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
       sizeof(opTrans)));
@@ -371,4 +373,6 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
   checkCudaStatus(cudaFree(Xtransform));
   checkCudaStatus(cudaFree(Wtransform));
   checkCudaStatus(cudaFree(Ytransform));
+
+  return total_time > 0 ? total_time / (iteration - 1) : -1;
 }
