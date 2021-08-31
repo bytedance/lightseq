@@ -177,11 +177,11 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
   int8_t *Xtransform, *Wtransform;
   int32_t *Ytransform;
   checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Xtransform),
-                             sizeof(int8_t) * B * H));
+                             sizeof(int8_t) * C * B * H));
   checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Wtransform),
-                             sizeof(int8_t) * O * H));
+                             sizeof(int8_t) * C * O * H));
   checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Ytransform),
-                             sizeof(int32_t) * B * O));
+                             sizeof(int32_t) * C * B * O));
 
   int ldXtransform = 32 * B;
   int ldWtransform = 32 * O;
