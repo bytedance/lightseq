@@ -184,12 +184,9 @@ int main() {
   std::vector<int> Bs = {8, 16, 4096};
   std::vector<int> Os = {1024, 3072, 4096};
   std::vector<int> Hs = {1024, 4096};
-  for (int i = 0; i < Bs.size(); ++i) {
-    for (int j = 0; j < Os.size(); ++j) {
-      for (int k = 0; k < Hs.size(); ++k) {
+  for (int i = 0; i < Bs.size(); ++i)
+    for (int j = 0; j < Os.size(); ++j)
+      for (int k = 0; k < Hs.size(); ++k)
         _main(Bs[i], Os[j], Hs[k], iteration, debug);
-      }
-    }
-  }
   return 0;
 }
