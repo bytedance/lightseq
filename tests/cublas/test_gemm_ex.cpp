@@ -1,42 +1,7 @@
-#include <sys/time.h>
-#include <cuda_profiler_api.h>
 #include <cublas_v2.h>
-#include <cuda.h>
-#include <cuda_fp16.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
-#include <algorithm>
 #include <vector>
-
-int8_t float2int8(float f, float scale) {
-  int8_t i = int8_t(f * scale);
-  if (i < -127) i = -127;
-  if (i > 127) i = 127;
-  return i;
-}
-
-void matmul(float *A, float *B, float *C, int m, int n, int k) {
-  for (int i = 0; i < m; ++i)
-    for (int j = 0; j < n; ++j) {
-      C[i * n + j] = 0;
-      for (int kk = 0; kk < k; ++kk)
-        C[i * n + j] += A[i * k + kk] * B[j * k + kk];
-    }
-}
-
-template <typename T, typename S>
-void allocate_memory(int B, int O, int H, T **X, T **W, S **Y) {
-  cudaMallocManaged(X, B * H * sizeof(T));
-  cudaMallocManaged(W, O * H * sizeof(T));
-  cudaMallocManaged(Y, B * O * sizeof(S));
-}
-
-template <typename T, typename S>
-void free_memory(T *A, T *B, S *C) {
-  cudaFree(A);
-  cudaFree(B);
-  cudaFree(C);
-}
+#include "util.h"
 
 template <typename T, typename S>
 int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA,
@@ -106,15 +71,15 @@ void _main(int B, int O, int H, int iteration, bool debug) {
   int end_algo_t_op = CUBLAS_GEMM_ALGO15_TENSOR_OP;
 
   float *Y;
-  if (debug) cudaMallocManaged(&Y, B * O * sizeof(float));
+  if (debug) checkCudaStatus(cudaMallocManaged(&Y, B * O * sizeof(float)));
 
   float *fX, *fW, *fY;
   __half *hX, *hW, *hY;
   int8_t *iX, *iW;
   int32_t *iY;
-  allocate_memory(B, O, H, &fX, &fW, &fY);
-  allocate_memory(B, O, H, &hX, &hW, &hY);
-  allocate_memory(B, O, H, &iX, &iW, &iY);
+  allocate_memory(1, B, O, H, &fX, &fW, &fY);
+  allocate_memory(1, B, O, H, &hX, &hW, &hY);
+  allocate_memory(1, B, O, H, &iX, &iW, &iY);
 
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
@@ -130,10 +95,10 @@ void _main(int B, int O, int H, int iteration, bool debug) {
     hW[i] = __float2half_rn(fW[i]);
     iW[i] = float2int8(fW[i], 127);
   }
-  if (debug) matmul(fX, fW, Y, B, O, H);
+  if (debug) matmul(fX, fW, Y, 1, B, O, H);
 
   cublasHandle_t handle;
-  cublasCreate(&handle);
+  checkCublasStatus(cublasCreate(&handle));
 
   printf(">>>>> test fp32 >>>>>\n");
   test_gemm_ex(handle, B, O, H, fX, fW, fY, &f_alpha, &f_beta, -1, iteration);
@@ -175,7 +140,7 @@ void _main(int B, int O, int H, int iteration, bool debug) {
   free_memory(iX, iW, iY);
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
-  if (debug) cudaFree(Y);
+  if (debug) checkCudaStatus(cudaFree(Y));
 }
 
 int main() {

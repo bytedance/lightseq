@@ -1,44 +1,7 @@
-#include <sys/time.h>
-#include <cuda_profiler_api.h>
 #include <cublasLt.h>
-#include <cuda.h>
-#include <cuda_fp16.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
-#include <algorithm>
 #include <vector>
-
-int8_t float2int8(float f, float scale) {
-  int8_t i = int8_t(f * scale);
-  if (i < -127) i = -127;
-  if (i > 127) i = 127;
-  return i;
-}
-
-void matmul(float *A, float *B, float *C, int bsz, int m, int n, int k) {
-  for (int l = 0; l < bsz; ++l)
-    for (int i = 0; i < m; ++i)
-      for (int j = 0; j < n; ++j) {
-        int sA = l * m * k, sB = l * k * n, sC = l * m * n;
-        C[sC + i * n + j] = 0;
-        for (int kk = 0; kk < k; ++kk)
-          C[sC + i * n + j] += A[sA + i * k + kk] * B[sB + j * k + kk];
-      }
-}
-
-template <typename T, typename S>
-void allocate_memory(int C, int B, int O, int H, T **X, T **W, S **Y) {
-  cudaMallocManaged(X, C * B * H * sizeof(T));
-  cudaMallocManaged(W, C * O * H * sizeof(T));
-  cudaMallocManaged(Y, C * B * O * sizeof(S));
-}
-
-template <typename T, typename S>
-void free_memory(T *X, T *W, S *Y) {
-  cudaFree(X);
-  cudaFree(W);
-  cudaFree(Y);
-}
+#include "util.h"
 
 template <typename T, typename S>
 int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
@@ -91,52 +54,56 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
   cublasOperation_t opTrans = CUBLAS_OP_T;
 
   cublasLtMatrixLayout_t XDesc, WDesc, YDesc;
-  cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H);
-  cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H);
-  cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O);
-  cublasLtMatrixLayoutSetAttribute(XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(XDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideX, sizeof(strideX));
-  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(WDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideW, sizeof(strideW));
-  cublasLtMatrixLayoutSetAttribute(YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(YDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideY, sizeof(strideY));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+      sizeof(strideX)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+      sizeof(strideW)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+      sizeof(strideY)));
 
   T *Wtransform;
-  cudaMalloc(reinterpret_cast<void **>(&Wtransform), sizeof(T) * C * O * H);
+  checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Wtransform),
+                             sizeof(T) * C * O * H));
 
   cublasLtMatrixLayout_t WtransformDesc;
-  cublasLtMatrixLayoutCreate(&WtransformDesc, WType, O, H, O);
-  cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(WtransformDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideW, sizeof(strideW));
+  checkCublasStatus(
+      cublasLtMatrixLayoutCreate(&WtransformDesc, WType, O, H, O));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+      sizeof(strideW)));
 
   cublasLtMatrixTransformDesc_t transformDesc;
-  cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F);
-  cublasLtMatrixTransformDescSetAttribute(transformDesc,
-                                          CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
-                                          &opTrans, sizeof(opTrans));
+  checkCublasStatus(
+      cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F));
+  checkCublasStatus(cublasLtMatrixTransformDescSetAttribute(
+      transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
+      sizeof(opTrans)));
 
   float transformAlpha = 1.0f, transformBeta = 0.0f;
-  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, W, WDesc,
-                          &transformBeta, NULL, NULL, Wtransform,
-                          WtransformDesc, 0);
+  checkCublasStatus(cublasLtMatrixTransform(
+      handle, transformDesc, &transformAlpha, W, WDesc, &transformBeta, NULL,
+      NULL, Wtransform, WtransformDesc, 0));
 
   cublasLtMatmulDesc_t matmulDesc;
 #if CUBLAS_VER_MAJOR == 11
-  cublasLtMatmulDescCreate(&matmulDesc, ComputeType, scaleType);
+  checkCublasStatus(
+      cublasLtMatmulDescCreate(&matmulDesc, ComputeType, scaleType));
 #else
-  cublasLtMatmulDescCreate(&matmulDesc, ComputeType);
+  checkCublasStatus(cublasLtMatmulDescCreate(&matmulDesc, ComputeType));
 #endif
 
   float total_time = 0;
@@ -159,14 +126,14 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
   }
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 10));
 
-  cublasLtMatrixLayoutDestroy(WtransformDesc);
-  cublasLtMatrixLayoutDestroy(XDesc);
-  cublasLtMatrixLayoutDestroy(WDesc);
-  cublasLtMatrixLayoutDestroy(YDesc);
-  cublasLtMatmulDescDestroy(matmulDesc);
-  cublasLtMatrixTransformDescDestroy(transformDesc);
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(WtransformDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(XDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(WDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(YDesc));
+  checkCublasStatus(cublasLtMatmulDescDestroy(matmulDesc));
+  checkCublasStatus(cublasLtMatrixTransformDescDestroy(transformDesc));
   cudaDeviceSynchronize();
-  cudaFree(Wtransform);
+  checkCudaStatus(cudaFree(Wtransform));
 }
 
 void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
@@ -188,83 +155,93 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
   cublasLtOrder_t order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
 
   cublasLtMatrixLayout_t XDesc, WDesc, YDesc;
-  cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H);
-  cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H);
-  cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O);
-  cublasLtMatrixLayoutSetAttribute(XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(XDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideX, sizeof(strideX));
-  cublasLtMatrixLayoutSetAttribute(WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(WDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideW, sizeof(strideW));
-  cublasLtMatrixLayoutSetAttribute(YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                   &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(YDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideY, sizeof(strideY));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+      sizeof(strideX)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+      sizeof(strideW)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+      sizeof(strideY)));
 
   int8_t *Xtransform, *Wtransform;
   int32_t *Ytransform;
-  cudaMalloc(reinterpret_cast<void **>(&Xtransform), sizeof(int8_t) * B * H);
-  cudaMalloc(reinterpret_cast<void **>(&Wtransform), sizeof(int8_t) * O * H);
-  cudaMalloc(reinterpret_cast<void **>(&Ytransform), sizeof(int32_t) * B * O);
+  checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Xtransform),
+                             sizeof(int8_t) * B * H));
+  checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Wtransform),
+                             sizeof(int8_t) * O * H));
+  checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Ytransform),
+                             sizeof(int32_t) * B * O));
 
   int ldXtransform = 32 * B;
   int ldWtransform = 32 * O;
   int ldYtransform = 32 * B;
   cublasLtMatrixLayout_t XtransformDesc, WtransformDesc, YtransformDesc;
-  cublasLtMatrixLayoutCreate(&XtransformDesc, CUDA_R_8I, B, H, ldXtransform);
-  cublasLtMatrixLayoutCreate(&WtransformDesc, CUDA_R_8I, O, H, ldWtransform);
-  cublasLtMatrixLayoutCreate(&YtransformDesc, CUDA_R_32I, B, O, ldYtransform);
-  cublasLtMatrixLayoutSetAttribute(YtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
-                                   &order_COL32, sizeof(order_COL32));
-  cublasLtMatrixLayoutSetAttribute(WtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
-                                   &order_COL4_4R2_8C,
-                                   sizeof(order_COL4_4R2_8C));
-  cublasLtMatrixLayoutSetAttribute(XtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
-                                   &order_COL32, sizeof(order_COL32));
-  cublasLtMatrixLayoutSetAttribute(
-      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(XtransformDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideX, sizeof(strideX));
-  cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(WtransformDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideW, sizeof(strideW));
-  cublasLtMatrixLayoutSetAttribute(
-      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C));
-  cublasLtMatrixLayoutSetAttribute(YtransformDesc,
-                                   CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-                                   &strideY, sizeof(strideY));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&XtransformDesc, CUDA_R_8I, B, H,
+                                               ldXtransform));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&WtransformDesc, CUDA_R_8I, O, H,
+                                               ldWtransform));
+  checkCublasStatus(cublasLtMatrixLayoutCreate(&YtransformDesc, CUDA_R_32I, B,
+                                               O, ldYtransform));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32,
+      sizeof(order_COL32)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
+      sizeof(order_COL4_4R2_8C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32,
+      sizeof(order_COL32)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+      sizeof(strideX)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+      sizeof(strideW)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+      sizeof(strideY)));
 
   cublasLtMatrixTransformDesc_t transformDesc;
-  cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F);
-  cublasLtMatrixTransformDescSetAttribute(transformDesc,
-                                          CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
-                                          &opTrans, sizeof(opTrans));
+  checkCublasStatus(
+      cublasLtMatrixTransformDescCreate(&transformDesc, CUDA_R_32F));
+  checkCublasStatus(cublasLtMatrixTransformDescSetAttribute(
+      transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
+      sizeof(opTrans)));
 
   float transformAlpha = 1.0f, transformBeta = 0.0f;
-  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, X, XDesc,
-                          &transformBeta, NULL, NULL, Xtransform,
-                          XtransformDesc, 0);
-  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, W, WDesc,
-                          &transformBeta, NULL, NULL, Wtransform,
-                          WtransformDesc, 0);
+  checkCublasStatus(cublasLtMatrixTransform(
+      handle, transformDesc, &transformAlpha, X, XDesc, &transformBeta, NULL,
+      NULL, Xtransform, XtransformDesc, 0));
+  checkCublasStatus(cublasLtMatrixTransform(
+      handle, transformDesc, &transformAlpha, W, WDesc, &transformBeta, NULL,
+      NULL, Wtransform, WtransformDesc, 0));
 
   cublasLtMatmulDesc_t matmulDesc;
 #if CUBLAS_VER_MAJOR == 11
-  cublasLtMatmulDescCreate(&matmulDesc, ComputeType, scaleType);
+  checkCublasStatus(
+      cublasLtMatmulDescCreate(&matmulDesc, ComputeType, scaleType));
 #else
-  cublasLtMatmulDescCreate(&matmulDesc, ComputeType);
+  checkCublasStatus(cublasLtMatmulDescCreate(&matmulDesc, ComputeType));
 #endif
-  cublasLtMatmulDescSetAttribute(matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                 &opTrans, sizeof(opTrans));
+  checkCublasStatus(cublasLtMatmulDescSetAttribute(
+      matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB, &opTrans, sizeof(opTrans)));
 
   float total_time = 0;
   for (int i = 0; i < iteration; ++i) {
@@ -286,25 +263,25 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
     if (success > 0 && i >= 10) total_time += time;
   }
   if (total_time > 0) printf("%.3f ms\n", total_time / (iteration - 10));
-  cublasLtMatrixTransformDescSetAttribute(transformDesc,
-                                          CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
-                                          &opTrans, sizeof(opTrans));
-  cublasLtMatrixTransform(handle, transformDesc, &transformAlpha, Ytransform,
-                          YtransformDesc, &transformBeta, NULL, NULL, Y, YDesc,
-                          0);
+  checkCublasStatus(cublasLtMatrixTransformDescSetAttribute(
+      transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
+      sizeof(opTrans)));
+  checkCublasStatus(cublasLtMatrixTransform(
+      handle, transformDesc, &transformAlpha, Ytransform, YtransformDesc,
+      &transformBeta, NULL, NULL, Y, YDesc, 0));
 
-  cublasLtMatrixLayoutDestroy(XtransformDesc);
-  cublasLtMatrixLayoutDestroy(WtransformDesc);
-  cublasLtMatrixLayoutDestroy(YtransformDesc);
-  cublasLtMatrixLayoutDestroy(XDesc);
-  cublasLtMatrixLayoutDestroy(WDesc);
-  cublasLtMatrixLayoutDestroy(YDesc);
-  cublasLtMatmulDescDestroy(matmulDesc);
-  cublasLtMatrixTransformDescDestroy(transformDesc);
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(XtransformDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(WtransformDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(YtransformDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(XDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(WDesc));
+  checkCublasStatus(cublasLtMatrixLayoutDestroy(YDesc));
+  checkCublasStatus(cublasLtMatmulDescDestroy(matmulDesc));
+  checkCublasStatus(cublasLtMatrixTransformDescDestroy(transformDesc));
   cudaDeviceSynchronize();
-  cudaFree(Xtransform);
-  cudaFree(Wtransform);
-  cudaFree(Ytransform);
+  checkCudaStatus(cudaFree(Xtransform));
+  checkCudaStatus(cudaFree(Wtransform));
+  checkCudaStatus(cudaFree(Ytransform));
 }
 
 void _main(int C, int B, int O, int H, int iteration, bool debug) {
@@ -315,7 +292,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
       C, B, H, C, O, H);
 
   float *Y;
-  if (debug) cudaMallocManaged(&Y, C * B * O * sizeof(float));
+  if (debug) checkCudaStatus(cudaMallocManaged(&Y, C * B * O * sizeof(float)));
 
   float *fX, *fW, *fY;
   __half *hX, *hW, *hY;
@@ -329,25 +306,29 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
 
-  for (int j = 0; j < C; ++j)
+  for (int j = 0; j < C; ++j) {
+    int start = j * B * H;
     for (int i = 0; i < B * H; ++i) {
-      int start = j * B * H;
-      fX[start + i] = float(i % 255 - 127) / 127;
-      hX[start + i] = __float2half_rn(fX[start + i]);
-      iX[start + i] = float2int8(fX[start + i], 127);
+      float x = float(i % 255 - 127) / 127;
+      fX[start + i] = x;
+      hX[start + i] = __float2half_rn(x);
+      iX[start + i] = float2int8(x, 127);
     }
-  for (int j = 0; j < C; ++j)
+  }
+  for (int j = 0; j < C; ++j) {
+    int start = j * O * H;
     for (int i = 0; i < O * H; ++i) {
-      int start = j * O * H;
-      fW[start + i] = float(i % 255 - 127) / 127;
-      hW[start + i] = __float2half_rn(fW[start + i]);
-      iW[start + i] = float2int8(fW[start + i], 127);
+      float x = float(i % 255 - 127) / 127;
+      fW[start + i] = x;
+      hW[start + i] = __float2half_rn(x);
+      iW[start + i] = float2int8(x, 127);
     }
+  }
 
   if (debug) matmul(fX, fW, Y, C, B, O, H);
 
   cublasLtHandle_t handle;
-  cublasLtCreate(&handle);
+  checkCublasStatus(cublasLtCreate(&handle));
 
   printf(">>>>> test fp32 >>>>>\n");
   test_lt_matmul(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta, iteration);
@@ -388,16 +369,16 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
   free_memory(iX, iW, iY);
-  if (debug) cudaFree(Y);
+  if (debug) checkCudaStatus(cudaFree(Y));
 }
 
 int main() {
   int iteration = 50;
   bool debug = false;
-  std::vector<int> Cs = {1, 128, 512};
-  std::vector<int> Bs = {8, 16, 4096};
-  std::vector<int> Os = {1024, 3072, 4096};
-  std::vector<int> Hs = {1024, 4096};
+  std::vector<int> Cs = {1, 8, 512};
+  std::vector<int> Bs = {8, 16, 512};
+  std::vector<int> Os = {512, 512, 512};
+  std::vector<int> Hs = {512, 512};
   for (int l = 0; l < Cs.size(); ++l)
     for (int i = 0; i < Bs.size(); ++i)
       for (int j = 0; j < Os.size(); ++j)
