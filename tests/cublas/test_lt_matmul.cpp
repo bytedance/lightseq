@@ -57,21 +57,23 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
   checkCublasStatus(cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H));
   checkCublasStatus(cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H));
   checkCublasStatus(cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
-      sizeof(strideX)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
-      sizeof(strideW)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
-      sizeof(strideY)));
+  if (C > 1) {
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+        sizeof(strideX)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+        sizeof(strideW)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+        sizeof(strideY)));
+  }
 
   T *Wtransform;
   checkCudaStatus(cudaMalloc(reinterpret_cast<void **>(&Wtransform),
@@ -80,11 +82,13 @@ void test_lt_matmul(cublasLtHandle_t handle, int C, int B, int O, int H, T *X,
   cublasLtMatrixLayout_t WtransformDesc;
   checkCublasStatus(
       cublasLtMatrixLayoutCreate(&WtransformDesc, WType, O, H, O));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
-      sizeof(strideW)));
+  if (C > 1) {
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+        sizeof(strideW)));
+  }
 
   cublasLtMatrixTransformDesc_t transformDesc;
   checkCublasStatus(
@@ -158,21 +162,23 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
   checkCublasStatus(cublasLtMatrixLayoutCreate(&XDesc, XType, H, B, H));
   checkCublasStatus(cublasLtMatrixLayoutCreate(&WDesc, WType, H, O, H));
   checkCublasStatus(cublasLtMatrixLayoutCreate(&YDesc, YType, O, B, O));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
-      sizeof(strideX)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
-      sizeof(strideW)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
-      sizeof(strideY)));
+  if (C > 1) {
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+        sizeof(strideX)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+        sizeof(strideW)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+        sizeof(strideY)));
+  }
 
   int8_t *Xtransform, *Wtransform;
   int32_t *Ytransform;
@@ -202,21 +208,23 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
   checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
       XtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32,
       sizeof(order_COL32)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      XtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
-      sizeof(strideX)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
-      sizeof(strideW)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
-  checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
-      YtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
-      sizeof(strideY)));
+  if (C > 1) {
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        XtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideX,
+        sizeof(strideX)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        WtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideW,
+        sizeof(strideW)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YtransformDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &C, sizeof(C)));
+    checkCublasStatus(cublasLtMatrixLayoutSetAttribute(
+        YtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideY,
+        sizeof(strideY)));
+  }
 
   cublasLtMatrixTransformDesc_t transformDesc;
   checkCublasStatus(
@@ -285,7 +293,6 @@ void test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
 }
 
 void _main(int C, int B, int O, int H, int iteration, bool debug) {
-  // X:(C, B, H), W:(C, O, H), Y:(C, B, O)
   printf(
       ">>>>>>>>>>>>>>>>>>>> shape: X(%d, %d, %d), W(%d, %d, %d) "
       ">>>>>>>>>>>>>>>>>>>>\n",
@@ -306,24 +313,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
 
-  for (int j = 0; j < C; ++j) {
-    int start = j * B * H;
-    for (int i = 0; i < B * H; ++i) {
-      float x = float(i % 255 - 127) / 127;
-      fX[start + i] = x;
-      hX[start + i] = __float2half_rn(x);
-      iX[start + i] = float2int8(x, 127);
-    }
-  }
-  for (int j = 0; j < C; ++j) {
-    int start = j * O * H;
-    for (int i = 0; i < O * H; ++i) {
-      float x = float(i % 255 - 127) / 127;
-      fW[start + i] = x;
-      hW[start + i] = __float2half_rn(x);
-      iW[start + i] = float2int8(x, 127);
-    }
-  }
+  init_data(fX, hX, iX, fW, hW, iW, C, B, O, H);
 
   if (debug) matmul(fX, fW, Y, C, B, O, H);
 
@@ -340,31 +330,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
   test_lt_matmul_int8(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
                       iteration);
 
-  float fe = 0, he = 0, ie = 0;
-  printf(">>>>> compare result >>>>>\n");
-  if (debug) {
-    printf("oracle:\n  ");
-    for (int i = 0; i < 10; ++i) printf("%.5f%c", Y[i], " \n"[i == 9]);
-  }
-
-  printf("fp32:\n  ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", fY[i], " \n"[i == 9]);
-  for (int i = 0; i < C * B * O; ++i)
-    fe += fabs((debug ? Y[i] : fY[i]) - fY[i]);
-  printf("  diff: %.5f\n", fe / C / B / O);
-
-  printf("fp16:\n  ");
-  for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
-  for (int i = 0; i < C * B * O; ++i)
-    he += fabs((debug ? Y[i] : fY[i]) - float(hY[i]));
-  printf("  diff: %.5f\n", he / C / B / O);
-
-  printf("int8:\n  ");
-  for (int i = 0; i < 10; ++i)
-    printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
-  for (int i = 0; i < C * B * O; ++i)
-    ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
-  printf("  diff: %.5f\n", ie / C / B / O);
+  print_res(Y, fY, hY, iY, C, B, O, H, debug);
 
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
@@ -375,7 +341,7 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
 int main() {
   int iteration = 50;
   bool debug = false;
-  std::vector<int> Cs = {1, 8, 512};
+  std::vector<int> Cs = {1, 8, 64};
   std::vector<int> Bs = {8, 16, 4096};
   std::vector<int> Os = {1024, 3072, 4096};
   std::vector<int> Hs = {1024, 4096};
