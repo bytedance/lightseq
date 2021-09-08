@@ -1,6 +1,8 @@
 from collections import OrderedDict
-import numpy as np
+import math
 import logging
+import numpy as np
+import torch
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -154,7 +156,56 @@ def _fill_encdec_weight(
         )
 
 
-def export_encoder(transformer, state_dict, hidden_size, intermediate_size):
+def _gather_token_embedding(tensor_names, state_dict, tn_pattern):
+    target_tn = []
+    for tn in tensor_names:
+        if tn_pattern == tn.split(".")[-1]:
+            target_tn.append(tn)
+            continue
+    target_tensor = [state_dict[name] for name in target_tn]
+    target_tensor = np.concatenate(target_tensor, axis=0)
+    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+    return target_tensor, target_tn
+
+
+def _get_pos_embedding(max_length, embedding_dim):
+    half_dim = embedding_dim // 2
+    emb = math.log(10000) / (half_dim - 1)
+    emb = torch.exp(torch.arange(half_dim, dtype=torch.float) * -emb)
+    emb = torch.arange(max_length, dtype=torch.float).unsqueeze(1) * emb.unsqueeze(0)
+    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1).view(max_length, -1)
+    if embedding_dim % 2 == 1:
+        emb = torch.cat([emb, torch.zeros(max_length, 1)], dim=1)
+    return emb
+
+
+def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
+    var_name_list = list(state_dict.keys())
+    emb, target_tn = _gather_token_embedding(var_name_list, state_dict, "embeddings")
+    if is_encoder:
+        transformer.src_embedding.token_embedding[:] = emb.flatten().tolist()
+    else:
+        transformer.trg_embedding.token_embedding[:] = (
+            emb.transpose().flatten().tolist()
+        )
+    logging.info(
+        "%s -> %s_embedding.token_embedding, convert finished."
+        % (target_tn, "src" if is_encoder else "trg")
+    )
+
+    pos_emb = _get_pos_embedding(max_length, emb.shape[-1])
+    if is_encoder:
+        transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+    else:
+        transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+    target_tn = [tn.replace("embeddings", "pos_embeddings") for tn in target_tn]
+    logging.info(
+        "%s -> %s_embedding.position_embedding, convert finished."
+        % (target_tn, "src" if is_encoder else "trg")
+    )
+
+
+def export_ls_encoder(transformer, state_dict, hidden_size, intermediate_size):
     hs, ims = hidden_size, intermediate_size
     offsets = _gen_enc_offset(hs, ims)
     mapping_dict = OrderedDict(
@@ -200,7 +251,7 @@ def export_encoder(transformer, state_dict, hidden_size, intermediate_size):
     _fill_encdec_weight(transformer, state_dict, mapping_dict, True)
 
 
-def export_decoder(transformer, state_dict, hidden_size, intermediate_size, nlayer):
+def export_ls_decoder(transformer, state_dict, hidden_size, intermediate_size, nlayer):
     hs, ims = hidden_size, intermediate_size
     offsets = _gen_dec_offset(hs, ims, nlayer)
     mapping_dict = OrderedDict(
@@ -276,7 +327,7 @@ def export_decoder(transformer, state_dict, hidden_size, intermediate_size, nlay
     )
 
 
-def export_config(
+def export_ls_config(
     transformer,
     nhead,
     pad_id,
