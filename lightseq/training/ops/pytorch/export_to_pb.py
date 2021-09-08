@@ -186,7 +186,7 @@ def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
         transformer.src_embedding.token_embedding[:] = emb.flatten().tolist()
     else:
         transformer.trg_embedding.token_embedding[:] = (
-            emb.transpose().flatten().tolist()
+            emb.transpose(0, 1).flatten().tolist()
         )
     logging.info(
         "%s -> %s_embedding.token_embedding, convert finished."

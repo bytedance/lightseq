@@ -64,15 +64,15 @@ def export_ls_fs_transformer(ckpt_path, pb_path):
         args.decoder_layers,
     )
     export_fs_weights(transformer, state_dict)
-    export_ls_config(transformer, args.encoder_attention_heads, 2, 6, 6)
+    export_ls_config(transformer, args.encoder_attention_heads, 2, 2, 6)
 
     with open(pb_path, "wb") as fout:
         fout.write(transformer.SerializeToString())
 
 
 if __name__ == "__main__":
-    ckpt_path = "checkpoints/checkpoint_best.pt"
-    pb_path = "checkpoints/transformer.pb"
+    ckpt_path = "/opt/tiger/lightseq/checkpoints/checkpoint_best.pt"
+    pb_path = "/opt/tiger/lightseq/checkpoints/transformer.pb"
     export_ls_fs_transformer(ckpt_path, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
     model = lsi.Transformer(pb_path, 128)
