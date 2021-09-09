@@ -72,8 +72,8 @@ cd examples/inference/python
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python hf_bart_export.py
-python ls_bart.py
+python export/hf_bart_export.py
+python test/ls_bart.py
 ```
 
 on our Tesla V100 we can get following output, 10x speedup have been obtained from running LightSeq rather than HuggingFace.
