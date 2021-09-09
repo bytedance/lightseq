@@ -23,3 +23,10 @@ target_link_libraries(bert_model PUBLIC bert_weight)
 target_link_libraries(bert_model PUBLIC CUDA::cublas_static
                                         CUDA::cublasLt_static)
 set_target_properties(bert_model PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+add_library(xlmr_model STATIC xlmr_encoder.cc.cu xlmr_decoder.cc.cu)
+target_link_libraries(xlmr_model PUBLIC cuda_kernels)
+target_link_libraries(xlmr_model PUBLIC xlmr_weight)
+target_link_libraries(xlmr_model PUBLIC CUDA::cublas_static
+                                        CUDA::cublasLt_static)
+set_target_properties(xlmr_model PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

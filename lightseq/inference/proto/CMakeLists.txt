@@ -14,6 +14,8 @@ protobuf_generate_cpp(GPT_PROTO_SRC GPT_PROTO_HEADER gpt.proto)
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
 protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
                       transformer.proto)
+protobuf_generate_cpp(XLMR_PROTO_SRC XLMR_PROTO_HEADER
+                      xlmr.proto)
 
 add_library(gpt_weight STATIC gpt_weight.cc ${GPT_PROTO_SRC} ${GPT_PROTO_HEADER})
 target_link_libraries(gpt_weight PUBLIC utils ${Protobuf_LIBRARIES} ${HDF5_LIBRARIES})
@@ -30,3 +32,8 @@ add_library(transformer_weight STATIC transformer_weight.cc ${TRANSFORMER_PROTO_
 target_link_libraries(transformer_weight PUBLIC utils ${Protobuf_LIBRARIES} ${HDF5_LIBRARIES})
 target_include_directories(transformer_weight INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(transformer_weight INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(xlmr_weight STATIC xlmr_weight.cc ${XLMR_PROTO_SRC} ${XLMR_PROTO_HEADER})
+target_link_libraries(xlmr_weight PUBLIC utils ${Protobuf_LIBRARIES} ${HDF5_LIBRARIES})
+target_include_directories(xlmr_weight INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(xlmr_weight INTERFACE ${CMAKE_CURRENT_BINARY_DIR})

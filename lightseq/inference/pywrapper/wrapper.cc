@@ -1,10 +1,12 @@
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 
 #include "bert.cc.cu"
 #include "gpt.cc.cu"
 #include "transformer.cc.cu"
 #include "transformer_decoder.cc.cu"
+#include "xlmr.cc.cu"
 
 namespace py = pybind11;
 
@@ -38,4 +40,10 @@ PYBIND11_MODULE(inference, m) {
       .def("infer", &lightseq::cuda::Bert::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"),
            py::arg("attn_mask"));
+
+  py::class_<lightseq::cuda::XLMR>(m, "XLMR")
+      .def(py::init<const std::string, const int>())
+      .def("infer", &lightseq::cuda::XLMR::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"),
+           py::arg("src_lang_id"), py::arg("trg_lang_id"));
 }
