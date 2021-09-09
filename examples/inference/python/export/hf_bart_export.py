@@ -5,8 +5,8 @@ import tensorflow as tf
 import h5py
 import numpy as np
 from operator import attrgetter
-from utils import _gather_token_embedding, _get_encode_output_mapping_dict
-from lightseq.training.ops.pytorch.export import fill_layer
+from utils import _get_encode_output_mapping_dict
+from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_layer
 from proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
@@ -294,8 +294,8 @@ def extract_transformer_weights(
                 .shape
             )
         )
-        src_tb = _gather_token_embedding(
-            enc_var_name_list, encoder_state_dict, "shared"
+        src_tb, _ = gather_token_embedding(
+            enc_var_name_list, encoder_state_dict, "shared", scale=False
         )
         transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
 
@@ -323,7 +323,9 @@ def extract_transformer_weights(
         )
     )
     # assert lang in LANG2ID
-    trg_tb = _gather_token_embedding(dec_var_name_list, decoder_state_dict, "shared")
+    trg_tb, _ = gather_token_embedding(
+        dec_var_name_list, decoder_state_dict, "shared", scale=False
+    )
     transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(
         "token_embedding.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(

@@ -60,15 +60,16 @@ def gen_dec_offset(hidden_size, intermediate_size, nlayer):
     return offsets
 
 
-def gather_token_embedding(tensor_names, state_dict, tn_pattern):
+def gather_token_embedding(tensor_names, state_dict, tn_pattern, scale=True):
     target_tn = []
     for tn in tensor_names:
-        if tn_pattern == tn.split(".")[-1]:
+        if tn_pattern in tn.split("."):
             target_tn.append(tn)
             continue
     target_tensor = [state_dict[name] for name in target_tn]
     target_tensor = np.concatenate(target_tensor, axis=0)
-    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+    if scale:
+        target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
     return target_tensor, target_tn
 
 
