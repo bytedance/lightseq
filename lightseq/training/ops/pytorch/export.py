@@ -1,12 +1,12 @@
 from collections import OrderedDict
 import logging
 import numpy as np
-from lightseq.training.ops.pytorch.util import gather_token_embedding, get_pos_embedding
+from lightseq.training.ops.pytorch.util import get_pos_embedding
 
 logging.getLogger().setLevel(logging.INFO)
 
 
-def _calc_offset(sizes):
+def calc_offset(sizes):
     offsets = [0]
     tmp = 0
     for x in sizes:
@@ -15,7 +15,7 @@ def _calc_offset(sizes):
     return offsets
 
 
-def _gen_enc_offset(hidden_size, intermediate_size):
+def gen_enc_offset(hidden_size, intermediate_size):
     hs, ims = hidden_size, intermediate_size
     sizes = [
         hs * hs * 3,  # attn_qkvw
@@ -31,11 +31,11 @@ def _gen_enc_offset(hidden_size, intermediate_size):
         hs,  # ffn_nw
         hs,  # ffn_nb
     ]
-    offsets = _calc_offset(sizes)
+    offsets = calc_offset(sizes)
     return offsets
 
 
-def _gen_dec_offset(hidden_size, intermediate_size, nlayer):
+def gen_dec_offset(hidden_size, intermediate_size, nlayer):
     hs, ims = hidden_size, intermediate_size
     sizes = [
         hs * hs * 3,  # attn_qkvw
@@ -59,65 +59,88 @@ def _gen_dec_offset(hidden_size, intermediate_size, nlayer):
         hs * hs * 2 * nlayer,  # encdec_attn_kvw
         hs * 2 * nlayer,  # encdec_attn_kvb
     ]
-    offsets = _calc_offset(sizes)
+    offsets = calc_offset(sizes)
     return offsets
 
 
-def _fill_layer(tensor_names, state_dict, layer, mapping_dict):
-    def _check_rule(tensor_name, rule):
+def gather_token_embedding(tensor_names, state_dict, tn_pattern):
+    target_tn = []
+    for tn in tensor_names:
+        if tn_pattern == tn.split(".")[-1]:
+            target_tn.append(tn)
+            continue
+    target_tensor = [state_dict[name] for name in target_tn]
+    target_tensor = np.concatenate(target_tensor, axis=0)
+    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+    return target_tensor, target_tn
+
+
+def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
+    def check_rule(tensor_name, rule):
         if "Adam" in tensor_name or "adam" in tensor_name:
             return False
         assert isinstance(rule, str) and rule
-        r_size = len(rule.split("."))
-        t = tensor_name.split(".")
-        if len(t) < r_size:
-            return False
-        return rule == ".".join(t[-r_size:])
+        rule = rule.split("-")
+        assert len(rule) < 3
+        if len(rule) == 2:
+            white, black = rule[0].split(" "), rule[1].split(" ")
+        else:
+            white, black = rule[0].split(" "), []
+        for b in black:
+            if b in tensor_name.split("."):
+                return False
+        for w in white:
+            if w not in tensor_name.split("."):
+                return False
+        return True
 
+    expression = [ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")]
+
+    ckpt_rule = [
+        ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
+    ]
+
+    assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
+        len(ckpt_rule) == 0 and len(expression) > 0
+    )
+
+    if len(expression) < 2:
+        expression = "" if not expression else expression[0].split("_")[1]
+    else:
+        expression = [exp.split("_")[1] for exp in expression]
+
+    target_tn = []
+    for cr in ckpt_rule:
+        tmp = []
+        for tn in tensor_names:
+            if check_rule(tn, cr):
+                tmp.append(tn)
+        assert len(tmp) == 1
+        target_tn.extend(tmp)
+    target_tensor = [state_dict[name] for name in target_tn]
+    tt = {}
+    if target_tensor:
+        exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
+    else:
+        if not isinstance(expression, list):
+            expression = [expression]
+        exec("tt['save'] = [%s]" % ",".join(expression))
+
+    target_tensor = np.concatenate(tt["save"], axis=-1)
+    logging.info(
+        "%s -> %s, convert finished."
+        % (target_tn if target_tn else "created", proto_name)
+    )
+    return target_tensor
+
+
+def fill_layer(tensor_names, state_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
-        expression = [
-            ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
-        ]
-
-        ckpt_rule = [
-            ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
-        ]
-
-        assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
-            len(ckpt_rule) == 0 and len(expression) > 0
-        )
-
-        if len(expression) < 2:
-            expression = "" if not expression else expression[0].split("_")[1]
-        else:
-            expression = [exp.split("_")[1] for exp in expression]
-
-        target_tn = []
-        for cr in ckpt_rule:
-            tmp = []
-            for tn in tensor_names:
-                if _check_rule(tn, cr):
-                    tmp.append(tn)
-            assert len(tmp) == 1
-            target_tn.extend(tmp)
-        target_tensor = [state_dict[name] for name in target_tn]
-        tt = {}
-        if target_tensor:
-            exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
-        else:
-            if not isinstance(expression, list):
-                expression = [expression]
-            exec("tt['save'] = [%s]" % ",".join(expression))
-
-        target_tensor = np.concatenate(tt["save"], axis=-1)
-        logging.info(
-            "%s -> %s, convert finished."
-            % (target_tn if target_tn else "created", proto_name)
-        )
+        target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
 
-def _fill_encdec_weight(
+def fill_encdec_weight(
     transformer, state_dict, mapping_dict, is_encoder, enc_out_mapping_dict=None
 ):
     var_name_list = list(state_dict.keys())
@@ -139,7 +162,7 @@ def _fill_encdec_weight(
             layer = transformer.encoder_stack.add()
         else:
             layer = transformer.decoder_stack.add()
-        _fill_layer(
+        fill_layer(
             tensor_names[layer_id],
             state_dict,
             layer,
@@ -147,7 +170,7 @@ def _fill_encdec_weight(
         )
 
     if not is_encoder:
-        _fill_layer(
+        fill_layer(
             tensor_names[0],
             state_dict,
             transformer.trg_embedding,
@@ -183,7 +206,7 @@ def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
 
 def export_ls_encoder(transformer, state_dict, hidden_size, intermediate_size):
     hs, ims = hidden_size, intermediate_size
-    offsets = _gen_enc_offset(hs, ims)
+    offsets = gen_enc_offset(hs, ims)
     mapping_dict = OrderedDict(
         {
             "multihead_project_kernel_qkv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
@@ -224,12 +247,12 @@ def export_ls_encoder(transformer, state_dict, hidden_size, intermediate_size):
             ),
         }
     )
-    _fill_encdec_weight(transformer, state_dict, mapping_dict, True)
+    fill_encdec_weight(transformer, state_dict, mapping_dict, True)
 
 
 def export_ls_decoder(transformer, state_dict, hidden_size, intermediate_size, nlayer):
     hs, ims = hidden_size, intermediate_size
-    offsets = _gen_dec_offset(hs, ims, nlayer)
+    offsets = gen_dec_offset(hs, ims, nlayer)
     mapping_dict = OrderedDict(
         {
             "self_project_kernel_qkv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
@@ -298,7 +321,7 @@ def export_ls_decoder(transformer, state_dict, hidden_size, intermediate_size, n
             ),
         }
     )
-    _fill_encdec_weight(
+    fill_encdec_weight(
         transformer, state_dict, mapping_dict, False, enc_out_mapping_dict
     )
 
