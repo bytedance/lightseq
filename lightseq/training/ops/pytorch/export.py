@@ -126,20 +126,30 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
 
     target_tensor = np.concatenate(tt["save"], axis=-1)
     print(
-        "%s -> %s, convert finished."
+        "%s -> %s, convert finished!"
         % (target_tn if target_tn else "created", proto_name)
     )
     return target_tensor
 
 
-def fill_layer(tensor_names, state_dict, layer, mapping_dict):
+def fill_pb_layer(tensor_names, state_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
         target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
 
+def fill_hdf5_layer(
+    tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict
+):
+    for proto_name, ckpt_rule in mapping_dict.items():
+        target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
+        hdf5_file.create_dataset(
+            hdf5_dataset_prefix + proto_name, data=target_tensor.flatten().tolist()
+        )
+
+
 def fill_encdec_weight(
-    transformer, state_dict, mapping_dict, is_encoder, enc_out_mapping_dict=None
+    file, state_dict, mapping_dict, is_encoder, save_pb, enc_out_mapping_dict=None
 ):
     var_name_list = list(state_dict.keys())
 
@@ -156,53 +166,96 @@ def fill_encdec_weight(
     assert len(tensor_names) > 0
 
     for layer_id in sorted(tensor_names.keys()):
-        if is_encoder:
-            layer = transformer.encoder_stack.add()
+        if save_pb:
+            if is_encoder:
+                layer = file.encoder_stack.add()
+            else:
+                layer = file.decoder_stack.add()
+            fill_pb_layer(
+                tensor_names[layer_id],
+                state_dict,
+                layer,
+                mapping_dict,
+            )
         else:
-            layer = transformer.decoder_stack.add()
-        fill_layer(
-            tensor_names[layer_id],
-            state_dict,
-            layer,
-            mapping_dict,
-        )
+            if is_encoder:
+                dataset_prefix = f"encoder_stack/{layer_id}/"
+            else:
+                dataset_prefix = f"decoder_stack/{layer_id}/"
+            fill_hdf5_layer(
+                tensor_names[layer_id],
+                state_dict,
+                file,
+                dataset_prefix,
+                mapping_dict,
+            )
 
     if not is_encoder:
-        fill_layer(
-            tensor_names[0],
-            state_dict,
-            transformer.trg_embedding,
-            enc_out_mapping_dict,
-        )
+        if save_pb:
+            fill_pb_layer(
+                tensor_names[0],
+                state_dict,
+                file.trg_embedding,
+                enc_out_mapping_dict,
+            )
+        else:
+            fill_hdf5_layer(
+                tensor_names[0],
+                state_dict,
+                file,
+                f"trg_embedding/",
+                enc_out_mapping_dict,
+            )
 
 
-def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
+def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
     var_name_list = list(state_dict.keys())
     emb, target_tn = gather_token_embedding(var_name_list, state_dict, "embeddings")
     if is_encoder:
-        transformer.src_embedding.token_embedding[:] = emb.flatten().tolist()
+        emb_list = emb.flatten().tolist()
+        if save_pb:
+            file.src_embedding.token_embedding[:] = emb_list
+        else:
+            file.create_dataset(
+                "src_embedding/token_embedding", data=emb_list, dtype="f4"
+            )
     else:
-        transformer.trg_embedding.token_embedding[:] = (
-            emb.transpose(0, 1).flatten().tolist()
-        )
+        emb_list = emb.transpose(0, 1).flatten().tolist()
+        if save_pb:
+            file.trg_embedding.token_embedding[:] = emb_list
+        else:
+            file.create_dataset(
+                "trg_embedding/token_embedding", data=emb_list, dtype="f4"
+            )
     print(
-        "%s -> %s_embedding.token_embedding, convert finished."
+        "%s -> %s_embedding.token_embedding, convert finished!"
         % (target_tn, "src" if is_encoder else "trg")
     )
 
     pos_emb = get_pos_embedding(max_length, emb.shape[-1])
+    pos_emb_list = pos_emb.flatten().tolist()
     if is_encoder:
-        transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+        if save_pb:
+            file.src_embedding.position_embedding[:] = pos_emb_list
+        else:
+            file.create_dataset(
+                "src_embedding/position_embedding", data=pos_emb_list, dtype="f4"
+            )
     else:
-        transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+        if save_pb:
+            file.trg_embedding.position_embedding[:] = pos_emb_list
+        else:
+            file.create_dataset(
+                "trg_embedding/position_embedding", data=pos_emb_list, dtype="f4"
+            )
     target_tn = [tn.replace("embeddings", "pos_embeddings") for tn in target_tn]
     print(
-        "%s -> %s_embedding.position_embedding, convert finished."
+        "%s -> %s_embedding.position_embedding, convert finished!"
         % (target_tn, "src" if is_encoder else "trg")
     )
 
 
-def export_ls_encoder(transformer, state_dict, hidden_size, intermediate_size):
+def export_ls_encoder(file, state_dict, hidden_size, intermediate_size, save_pb=True):
     hs, ims = hidden_size, intermediate_size
     offsets = gen_enc_offset(hs, ims)
     mapping_dict = OrderedDict(
@@ -245,10 +298,12 @@ def export_ls_encoder(transformer, state_dict, hidden_size, intermediate_size):
             ),
         }
     )
-    fill_encdec_weight(transformer, state_dict, mapping_dict, True)
+    fill_encdec_weight(file, state_dict, mapping_dict, True, save_pb)
 
 
-def export_ls_decoder(transformer, state_dict, hidden_size, intermediate_size, nlayer):
+def export_ls_decoder(
+    file, state_dict, hidden_size, intermediate_size, nlayer, save_pb=True
+):
     hs, ims = hidden_size, intermediate_size
     offsets = gen_dec_offset(hs, ims, nlayer)
     mapping_dict = OrderedDict(
@@ -320,16 +375,18 @@ def export_ls_decoder(transformer, state_dict, hidden_size, intermediate_size, n
         }
     )
     fill_encdec_weight(
-        transformer, state_dict, mapping_dict, False, enc_out_mapping_dict
+        file, state_dict, mapping_dict, False, save_pb, enc_out_mapping_dict
     )
 
 
 def export_ls_config(
-    transformer,
+    file,
     nhead,
     pad_id,
     start_id,
     end_id,
+    encoder_layers,
+    decoder_layers,
     is_post_ln=False,
     no_scale_embedding=False,
     use_gelu=False,
@@ -340,19 +397,54 @@ def export_ls_config(
     topk=1,
     topp=0.75,
     diverse_lambda=0,
+    save_pb=True,
 ):
-    transformer.model_conf.head_num = nhead
-    transformer.model_conf.src_padding_id = pad_id
-    transformer.model_conf.trg_start_id = start_id
-    transformer.model_conf.trg_end_id = end_id
-    transformer.model_conf.is_post_ln = is_post_ln
-    transformer.model_conf.no_scale_embedding = no_scale_embedding
-    transformer.model_conf.use_gelu = use_gelu
+    if save_pb:
+        file.model_conf.head_num = nhead
+        file.model_conf.src_padding_id = pad_id
+        file.model_conf.trg_start_id = start_id
+        file.model_conf.trg_end_id = end_id
+        file.model_conf.is_post_ln = is_post_ln
+        file.model_conf.no_scale_embedding = no_scale_embedding
+        file.model_conf.use_gelu = use_gelu
 
-    transformer.model_conf.beam_size = beam_size
-    transformer.model_conf.length_penalty = length_penalty
-    transformer.model_conf.extra_decode_length = extra_decode_length
-    transformer.model_conf.sampling_method = generation_method
-    transformer.model_conf.topk = topk
-    transformer.model_conf.topp = topp
-    transformer.model_conf.diverse_lambda = diverse_lambda
+        file.model_conf.beam_size = beam_size
+        file.model_conf.length_penalty = length_penalty
+        file.model_conf.extra_decode_length = extra_decode_length
+        file.model_conf.sampling_method = generation_method
+        file.model_conf.topk = topk
+        file.model_conf.topp = topp
+        file.model_conf.diverse_lambda = diverse_lambda
+    else:
+        file.create_dataset(
+            "model_conf/n_encoder_stack", data=encoder_layers, dtype="i4"
+        )
+        file.create_dataset(
+            "model_conf/n_decoder_stack", data=decoder_layers, dtype="i4"
+        )
+        file.create_dataset("model_conf/head_num", data=nhead, dtype="i4")
+        file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
+        file.create_dataset("model_conf/trg_start_id", data=start_id, dtype="i4")
+        file.create_dataset("model_conf/trg_end_id", data=end_id, dtype="i4")
+        file.create_dataset("model_conf/is_post_ln", data=is_post_ln, dtype="?")
+        file.create_dataset(
+            "model_conf/no_scale_embedding", data=no_scale_embedding, dtype="?"
+        )
+        file.create_dataset("model_conf/use_gelu", data=use_gelu, dtype="?")
+
+        file.create_dataset("model_conf/beam_size", data=beam_size, dtype="i4")
+        file.create_dataset(
+            "model_conf/length_penalty", data=length_penalty, dtype="f4"
+        )
+        file.create_dataset(
+            "model_conf/extra_decode_length", data=extra_decode_length, dtype="i4"
+        )
+        generation_method = np.array([ord(c) for c in generation_method]).astype(
+            np.int8
+        )
+        file.create_dataset("model_conf/sampling_method", data=generation_method)
+        file.create_dataset("model_conf/topk", data=topk, dtype="f4")
+        file.create_dataset("model_conf/topp", data=topp, dtype="f4")
+        file.create_dataset(
+            "model_conf/diverse_lambda", data=diverse_lambda, dtype="f4"
+        )
