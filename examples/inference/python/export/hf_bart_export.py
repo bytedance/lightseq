@@ -5,7 +5,6 @@ import tensorflow as tf
 import h5py
 import numpy as np
 from operator import attrgetter
-from utils import _get_encode_output_mapping_dict
 from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
 from proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
@@ -73,6 +72,24 @@ trg_emb_mapping_dict = OrderedDict(
         "shared_bias": "final_logits_bias",
     }
 )
+
+
+def _get_encode_output_mapping_dict(dec_layer_num):
+    encode_output_kernel_pattern = [
+        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(ele)
+        for ele in range(dec_layer_num)
+    ]
+    encode_output_bias_pattern = [
+        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(ele)
+        for ele in range(dec_layer_num)
+    ]
+
+    return {
+        "encode_output_project_kernel_kv": "&&".join(
+            encode_output_kernel_pattern + ["expression_.transpose(0, 1)"]
+        ),
+        "encode_output_project_bias_kv": "&&".join(encode_output_bias_pattern),
+    }
 
 
 def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
