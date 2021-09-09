@@ -1,9 +1,6 @@
 from collections import OrderedDict
-import logging
 import numpy as np
 from lightseq.training.ops.pytorch.util import get_pos_embedding
-
-logging.getLogger().setLevel(logging.INFO)
 
 
 def calc_offset(sizes):
@@ -127,7 +124,7 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
         exec("tt['save'] = [%s]" % ",".join(expression))
 
     target_tensor = np.concatenate(tt["save"], axis=-1)
-    logging.info(
+    print(
         "%s -> %s, convert finished."
         % (target_tn if target_tn else "created", proto_name)
     )
@@ -187,7 +184,7 @@ def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
         transformer.trg_embedding.token_embedding[:] = (
             emb.transpose(0, 1).flatten().tolist()
         )
-    logging.info(
+    print(
         "%s -> %s_embedding.token_embedding, convert finished."
         % (target_tn, "src" if is_encoder else "trg")
     )
@@ -198,7 +195,7 @@ def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
     else:
         transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     target_tn = [tn.replace("embeddings", "pos_embeddings") for tn in target_tn]
-    logging.info(
+    print(
         "%s -> %s_embedding.position_embedding, convert finished."
         % (target_tn, "src" if is_encoder else "trg")
     )
