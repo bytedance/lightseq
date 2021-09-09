@@ -220,7 +220,7 @@ def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
                 "src_embedding/token_embedding", data=emb_list, dtype="f4"
             )
     else:
-        emb_list = emb.transpose(0, 1).flatten().tolist()
+        emb_list = emb.transpose().flatten().tolist()
         if save_pb:
             file.trg_embedding.token_embedding[:] = emb_list
         else:
