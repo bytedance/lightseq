@@ -10,7 +10,7 @@ from utils import (
     _gather_token_embedding,
     _get_encode_output_mapping_dict,
 )
-from transformer_pb2 import Transformer
+from proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"

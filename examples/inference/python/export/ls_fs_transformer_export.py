@@ -1,5 +1,5 @@
 import torch
-from transformer_pb2 import Transformer
+from proto.transformer_pb2 import Transformer
 from lightseq.training import (
     export_ls_config,
     export_ls_embedding,
@@ -71,8 +71,8 @@ def export_ls_fs_transformer(ckpt_path, pb_path):
 
 
 if __name__ == "__main__":
-    ckpt_path = "checkpoints/checkpoint_best.pt"
-    pb_path = "checkpoints/transformer.pb"
+    ckpt_path = "/opt/tiger/lightseq/checkpoints/checkpoint_best.pt"
+    pb_path = "/opt/tiger/lightseq/checkpoints/transformer.pb"
     export_ls_fs_transformer(ckpt_path, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
     model = lsi.Transformer(pb_path, 128)

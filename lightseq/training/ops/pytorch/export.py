@@ -1,8 +1,7 @@
 from collections import OrderedDict
-import math
 import logging
 import numpy as np
-import torch
+from lightseq.training.ops.pytorch.util import gather_token_embedding, get_pos_embedding
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -156,32 +155,9 @@ def _fill_encdec_weight(
         )
 
 
-def _gather_token_embedding(tensor_names, state_dict, tn_pattern):
-    target_tn = []
-    for tn in tensor_names:
-        if tn_pattern == tn.split(".")[-1]:
-            target_tn.append(tn)
-            continue
-    target_tensor = [state_dict[name] for name in target_tn]
-    target_tensor = np.concatenate(target_tensor, axis=0)
-    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
-    return target_tensor, target_tn
-
-
-def _get_pos_embedding(max_length, embedding_dim):
-    half_dim = embedding_dim // 2
-    emb = math.log(10000) / (half_dim - 1)
-    emb = torch.exp(torch.arange(half_dim, dtype=torch.float) * -emb)
-    emb = torch.arange(max_length, dtype=torch.float).unsqueeze(1) * emb.unsqueeze(0)
-    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1).view(max_length, -1)
-    if embedding_dim % 2 == 1:
-        emb = torch.cat([emb, torch.zeros(max_length, 1)], dim=1)
-    return emb
-
-
 def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
     var_name_list = list(state_dict.keys())
-    emb, target_tn = _gather_token_embedding(var_name_list, state_dict, "embeddings")
+    emb, target_tn = gather_token_embedding(var_name_list, state_dict, "embeddings")
     if is_encoder:
         transformer.src_embedding.token_embedding[:] = emb.flatten().tolist()
     else:
@@ -193,7 +169,7 @@ def export_ls_embedding(transformer, state_dict, max_length, is_encoder):
         % (target_tn, "src" if is_encoder else "trg")
     )
 
-    pos_emb = _get_pos_embedding(max_length, emb.shape[-1])
+    pos_emb = get_pos_embedding(max_length, emb.shape[-1])
     if is_encoder:
         transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:

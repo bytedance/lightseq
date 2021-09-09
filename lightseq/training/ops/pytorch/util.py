@@ -1,3 +1,4 @@
+import math
 import torch
 
 
@@ -80,3 +81,26 @@ def check_config(config):
     if head_dim % factor != 0:
         # as required by reshape kernel
         raise Exception(f"head_dim({head_dim}) % {factor} != 0")
+
+
+def gather_token_embedding(tensor_names, state_dict, tn_pattern):
+    target_tn = []
+    for tn in tensor_names:
+        if tn_pattern == tn.split(".")[-1]:
+            target_tn.append(tn)
+            continue
+    target_tensor = [state_dict[name] for name in target_tn]
+    target_tensor = np.concatenate(target_tensor, axis=0)
+    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+    return target_tensor, target_tn
+
+
+def get_pos_embedding(max_length, embedding_dim):
+    half_dim = embedding_dim // 2
+    emb = math.log(10000) / (half_dim - 1)
+    emb = torch.exp(torch.arange(half_dim, dtype=torch.float) * -emb)
+    emb = torch.arange(max_length, dtype=torch.float).unsqueeze(1) * emb.unsqueeze(0)
+    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1).view(max_length, -1)
+    if embedding_dim % 2 == 1:
+        emb = torch.cat([emb, torch.zeros(max_length, 1)], dim=1)
+    return emb
