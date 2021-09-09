@@ -101,9 +101,9 @@ if __name__ == "__main__":
     print("export to hdf5 model >>>>>>")
     export_ls_fs_transformer(ckpt_path, hdf5_path, save_pb=False)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
-    pb_model = lsi.Transformer(pb_path, 128)
+    pb_model = lsi.Transformer(pb_path, 8)
     pb_output = pb_model.infer(src)
-    hdf5_model = lsi.Transformer(hdf5_path, 128)
+    hdf5_model = lsi.Transformer(hdf5_path, 8)
     hdf5_output = hdf5_model.infer(src)
     print("pb results:", pb_output)
     print("hdf5 results:", hdf5_output)
