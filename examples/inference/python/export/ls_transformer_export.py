@@ -74,6 +74,7 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         end_id,
         config.num_encoder_layer,
         config.num_decoder_layer,
+        beam_size=1,
     )
 
     with open(pb_path, "wb") as fout:
@@ -160,8 +161,7 @@ def create_model(vocab_size):
 
 def ls_train_predict(ls_train_model, src_tokens, trg_tokens, batch_size):
     """
-    NOTE: We do not use beam search here for simplicity,
-    so the torch speed is faster than normal situation.
+    NOTE: We do not use beam search here for implementation simplicity.
     """
     torch.cuda.synchronize()
     start_time = time.perf_counter()
