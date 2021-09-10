@@ -1,9 +1,12 @@
+"""
+Export Hugging Face GPT2 models to hdf5 format.
+"""
 import os
 import h5py
 import numpy as np
 from collections import OrderedDict
 from transformers import GPT2LMHeadModel
-from utils import fill_hdf5_layer
+from lightseq.training.ops.pytorch.export import fill_hdf5_layer
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 

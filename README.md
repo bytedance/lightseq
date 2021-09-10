@@ -96,8 +96,8 @@ cd examples/inference/python
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python hf_bart_export.py
-python ls_bart.py
+python export/hf_bart_export.py
+python test/ls_bart.py
 ```
 
 LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
