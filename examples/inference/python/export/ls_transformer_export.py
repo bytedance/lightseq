@@ -234,7 +234,6 @@ if __name__ == "__main__":
     predict_text = tokenizer.batch_decode(predict_tokens, skip_special_tokens=True)
 
     print("========================LIGHTSEQ TEST========================")
-
     ls_output, ls_time = ls_predict(ls_model, src_tokens_np)
     ls_output = [ids[0] for ids in ls_output[0]]
     ls_predict_text = tokenizer.batch_decode(ls_output, skip_special_tokens=True)
