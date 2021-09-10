@@ -11,6 +11,7 @@ from lightseq.training.ops.pytorch.util import (
     state_dict,
     MODEL_ARCH,
     check_config,
+    calc_offset,
 )
 
 transformer_cuda_module = None
@@ -154,37 +155,13 @@ class LSTransformerDecoderLayer(nn.Module):
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
-        nums = [
-            hs * hs * 3,  # attn_qkvw
-            hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            hs,  # attn_ob
-            hs,  # attn_nw
-            hs,  # attn_nb
-            hs * hs,  # encdec_attn_qw
-            hs,  # encdec_attn_qb
-            hs * hs,  # encdec_attn_ow
-            hs,  # encdec_attn_ob
-            hs,  # encdec_attn_nw
-            hs,  # encdec_attn_nb
-            hs * ims,  # inter_w
-            ims,  # inter_b
-            hs * ims,  # output_w
-            hs,  # output_b
-            hs,  # ffn_nw
-            hs,  # ffn_nb
-        ]
+
+        self.para_offset = LSTransformerDecoderLayer.gen_offset(
+            hs, ims, self.config.nlayer
+        )
         if self.config.layer_id == 0:
-            nums += [
-                hs * hs * 2 * self.config.nlayer,  # encdec_attn_kvw
-                hs * 2 * self.config.nlayer,  # encdec_attn_kvb
-            ]
-        offset = 0
-        self.para_offset = [offset]
-        for n in nums:
-            offset += n
-            self.para_offset.append(offset)
-        self.para = nn.Parameter(torch.Tensor(offset))
+            self.para_offset = self.para_offset[:-2]
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
         if initial_weights is None and initial_biases is None:
             # enc-dec kv weights and bias
@@ -239,6 +216,34 @@ class LSTransformerDecoderLayer(nn.Module):
         config = Config(**kwargs)
         check_config(config)
         return config
+
+    @staticmethod
+    def gen_offset(hidden_size, intermediate_size, nlayer):
+        hs, ims = hidden_size, intermediate_size
+        sizes = [
+            hs * hs * 3,  # attn_qkvw
+            hs * 3,  # attn_qkvb
+            hs * hs,  # attn_ow
+            hs,  # attn_ob
+            hs,  # attn_nw
+            hs,  # attn_nb
+            hs * hs,  # encdec_attn_qw
+            hs,  # encdec_attn_qb
+            hs * hs,  # encdec_attn_ow
+            hs,  # encdec_attn_ob
+            hs,  # encdec_attn_nw
+            hs,  # encdec_attn_nb
+            hs * ims,  # inter_w
+            ims,  # inter_b
+            hs * ims,  # output_w
+            hs,  # output_b
+            hs,  # ffn_nw
+            hs,  # ffn_nb
+            hs * hs * 2 * nlayer,  # encdec_attn_kvw
+            hs * 2 * nlayer,  # encdec_attn_kvb
+        ]
+        offsets = calc_offset(sizes)
+        return offsets
 
     def _get_weights(self, i):
         return self.para.data.narrow(
