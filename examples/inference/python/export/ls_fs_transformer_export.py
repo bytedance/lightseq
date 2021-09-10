@@ -1,3 +1,7 @@
+'''
+Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format.
+Refer to the `examples/training/fairseq` directory for more training details.
+'''
 import torch
 import h5py
 from proto.transformer_pb2 import Transformer
