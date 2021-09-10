@@ -159,7 +159,7 @@ class LSTransformerDecoderLayer(nn.Module):
         self.para_offset = LSTransformerDecoderLayer.gen_offset(
             hs, ims, self.config.nlayer
         )
-        if self.config.layer_id == 0:
+        if self.config.layer_id != 0:
             self.para_offset = self.para_offset[:-2]
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
