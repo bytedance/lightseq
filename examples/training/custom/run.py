@@ -115,6 +115,9 @@ if __name__ == "__main__":
         loss.backward()
         opt.step()
 
+    torch.save(model.state_dict(), "checkpoint.pt")
+    print("model saved.")
+
     print("========================TEST========================")
     model.eval()
     # obtain encoder output and mask

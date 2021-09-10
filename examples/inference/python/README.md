@@ -26,6 +26,11 @@ Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format
 ```shell
 python export/ls_fs_transformer_export.py
 ```
+5. LightSeq Transformer
+Export LightSeq Transformer models to protobuf/hdf5 format. Refer to the `examples/training/custom` directory for more training details.
+```shell
+python export/ls_transformer_export.py
+```
 
 ### Inference using LightSeq
 1. BART
