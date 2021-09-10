@@ -97,9 +97,9 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
 
 
 if __name__ == "__main__":
-    ckpt_path = "/opt/tiger/lightseq/checkpoints/checkpoint_best.pt"
-    pb_path = "/opt/tiger/lightseq/checkpoints/transformer.pb"
-    hdf5_path = "/opt/tiger/lightseq/checkpoints/transformer.hdf5"
+    ckpt_path = "checkpoints/checkpoint_best.pt"
+    pb_path = "checkpoints/transformer.pb"
+    hdf5_path = "checkpoints/transformer.hdf5"
     print("export to pb model >>>>>>")
     export_ls_fs_transformer(ckpt_path, pb_path)
     print("export to hdf5 model >>>>>>")
