@@ -35,6 +35,15 @@ def check_config(config):
         raise Exception(f"head_dim({head_dim}) % {factor} != 0")
 
 
+def calc_offset(sizes):
+    offsets = [0]
+    tmp = 0
+    for x in sizes:
+        tmp += x
+        offsets.append(tmp)
+    return offsets
+
+
 def get_pos_embedding(max_length, embedding_dim):
     half_dim = embedding_dim // 2
     emb = math.log(10000) / (half_dim - 1)
