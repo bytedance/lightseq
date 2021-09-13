@@ -123,4 +123,4 @@ If you use LightSeq in your research, please cite the following paper.
 ## Contact
 
 Any questions or suggestions, please feel free to contact us at
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, qian.xian@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lileilab@bytedance.com
+wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, qian.xian@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lilei@cs.ucsb.edu
