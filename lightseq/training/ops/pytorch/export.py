@@ -1,63 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 from lightseq.training.ops.pytorch.util import get_pos_embedding
-
-
-def calc_offset(sizes):
-    offsets = [0]
-    tmp = 0
-    for x in sizes:
-        tmp += x
-        offsets.append(tmp)
-    return offsets
-
-
-def gen_enc_offset(hidden_size, intermediate_size):
-    hs, ims = hidden_size, intermediate_size
-    sizes = [
-        hs * hs * 3,  # attn_qkvw
-        hs * 3,  # attn_qkvb
-        hs * hs,  # attn_ow
-        hs,  # attn_ob
-        hs,  # attn_nw
-        hs,  # attn_nb
-        hs * ims,  # inter_w
-        ims,  # inter_b
-        hs * ims,  # output_w
-        hs,  # output_b
-        hs,  # ffn_nw
-        hs,  # ffn_nb
-    ]
-    offsets = calc_offset(sizes)
-    return offsets
-
-
-def gen_dec_offset(hidden_size, intermediate_size, nlayer):
-    hs, ims = hidden_size, intermediate_size
-    sizes = [
-        hs * hs * 3,  # attn_qkvw
-        hs * 3,  # attn_qkvb
-        hs * hs,  # attn_ow
-        hs,  # attn_ob
-        hs,  # attn_nw
-        hs,  # attn_nb
-        hs * hs,  # encdec_attn_qw
-        hs,  # encdec_attn_qb
-        hs * hs,  # encdec_attn_ow
-        hs,  # encdec_attn_ob
-        hs,  # encdec_attn_nw
-        hs,  # encdec_attn_nb
-        hs * ims,  # inter_w
-        ims,  # inter_b
-        hs * ims,  # output_w
-        hs,  # output_b
-        hs,  # ffn_nw
-        hs,  # ffn_nb
-        hs * hs * 2 * nlayer,  # encdec_attn_kvw
-        hs * 2 * nlayer,  # encdec_attn_kvb
-    ]
-    offsets = calc_offset(sizes)
-    return offsets
+from lightseq.training import LSTransformerEncoderLayer, LSTransformerDecoderLayer
 
 
 def gather_token_embedding(tensor_names, state_dict, tn_pattern, scale=True):
@@ -257,7 +201,7 @@ def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
 
 def export_ls_encoder(file, state_dict, hidden_size, intermediate_size, save_pb=True):
     hs, ims = hidden_size, intermediate_size
-    offsets = gen_enc_offset(hs, ims)
+    offsets = LSTransformerEncoderLayer.gen_offset(hs, ims)
     mapping_dict = OrderedDict(
         {
             "multihead_project_kernel_qkv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
@@ -305,7 +249,7 @@ def export_ls_decoder(
     file, state_dict, hidden_size, intermediate_size, nlayer, save_pb=True
 ):
     hs, ims = hidden_size, intermediate_size
-    offsets = gen_dec_offset(hs, ims, nlayer)
+    offsets = LSTransformerDecoderLayer.gen_offset(hs, ims, nlayer)
     mapping_dict = OrderedDict(
         {
             "self_project_kernel_qkv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
@@ -381,70 +325,33 @@ def export_ls_decoder(
 
 def export_ls_config(
     file,
-    nhead,
-    pad_id,
-    start_id,
-    end_id,
-    encoder_layers,
-    decoder_layers,
+    head_num,
+    src_padding_id,
+    trg_start_id,
+    trg_end_id,
+    n_encoder_stack,
+    n_decoder_stack,
     is_post_ln=False,
     no_scale_embedding=False,
     use_gelu=False,
     beam_size=4,
     length_penalty=0.6,
     extra_decode_length=50,
-    generation_method="beam_search",
+    sampling_method="beam_search",
     topk=1,
     topp=0.75,
     diverse_lambda=0,
     save_pb=True,
 ):
+    args = locals()
+    args.pop("file")
+    args.pop("save_pb")
     if save_pb:
-        file.model_conf.head_num = nhead
-        file.model_conf.src_padding_id = pad_id
-        file.model_conf.trg_start_id = start_id
-        file.model_conf.trg_end_id = end_id
-        file.model_conf.is_post_ln = is_post_ln
-        file.model_conf.no_scale_embedding = no_scale_embedding
-        file.model_conf.use_gelu = use_gelu
-
-        file.model_conf.beam_size = beam_size
-        file.model_conf.length_penalty = length_penalty
-        file.model_conf.extra_decode_length = extra_decode_length
-        file.model_conf.sampling_method = generation_method
-        file.model_conf.topk = topk
-        file.model_conf.topp = topp
-        file.model_conf.diverse_lambda = diverse_lambda
+        args.pop("n_encoder_stack")
+        args.pop("n_decoder_stack")
+        for v in list(args.keys()):
+            exec("file.model_conf.{0} = {0}".format(v))
     else:
-        file.create_dataset(
-            "model_conf/n_encoder_stack", data=encoder_layers, dtype="i4"
-        )
-        file.create_dataset(
-            "model_conf/n_decoder_stack", data=decoder_layers, dtype="i4"
-        )
-        file.create_dataset("model_conf/head_num", data=nhead, dtype="i4")
-        file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
-        file.create_dataset("model_conf/trg_start_id", data=start_id, dtype="i4")
-        file.create_dataset("model_conf/trg_end_id", data=end_id, dtype="i4")
-        file.create_dataset("model_conf/is_post_ln", data=is_post_ln, dtype="?")
-        file.create_dataset(
-            "model_conf/no_scale_embedding", data=no_scale_embedding, dtype="?"
-        )
-        file.create_dataset("model_conf/use_gelu", data=use_gelu, dtype="?")
-
-        file.create_dataset("model_conf/beam_size", data=beam_size, dtype="i4")
-        file.create_dataset(
-            "model_conf/length_penalty", data=length_penalty, dtype="f4"
-        )
-        file.create_dataset(
-            "model_conf/extra_decode_length", data=extra_decode_length, dtype="i4"
-        )
-        generation_method = np.array([ord(c) for c in generation_method]).astype(
-            np.int8
-        )
-        file.create_dataset("model_conf/sampling_method", data=generation_method)
-        file.create_dataset("model_conf/topk", data=topk, dtype="f4")
-        file.create_dataset("model_conf/topp", data=topp, dtype="f4")
-        file.create_dataset(
-            "model_conf/diverse_lambda", data=diverse_lambda, dtype="f4"
-        )
+        sampling_method = np.array([ord(c) for c in sampling_method]).astype(np.int8)
+        for v in list(args.keys()):
+            exec("file.create_dataset('model_conf/{0}', data={0})".format(v))
