@@ -63,8 +63,9 @@ was used as the benchmark of Tensorflow.
 More results is available [here](./docs/inference/performance.md).
 
 
-
 ## Quick Start
+Complete user guide is available [here](docs/guide.md).
+
 ### Fast training from Fairseq
 
 You can experience lightning fast training by running following commands,

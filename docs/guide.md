@@ -101,7 +101,7 @@ To use the LightSeq inference engine, you must export the checkpoints to protobu
 
 The export process can be divided into two steps:
 1. Create an object of Transformer proto or hdf5 file.
-2. Extract all weights in the checkpoints and assign them to the object. 
+2. Extract all weights in the checkpoints and assign them to the object.
 
 If you use LightSeq modules for training, you can directly call the export interface provided by LightSeq. First, the following functions must be imported:
 ```python
