@@ -1,6 +1,6 @@
-# A Guide of LightSeq Training, Export and Inference
+# A Guide of LightSeq Training and Inference
 ## Introduction
-This document mainly introduces the detailed process of LightSeq training, model export and inference. In short, the process can be divided into the following three steps:
+This document mainly introduces the detailed process of LightSeq training and inference. In short, the process can be divided into the following three steps:
 1. Train models integrated with LightSeq training modules, and save the checkpoints.
 2. Export the checkpoints to protobuf/hdf5 format for futher inference.
 3. Load the protobuf/hdf5 format models into LightSeq inference engine.
@@ -94,7 +94,8 @@ LightSeq integrates all the above modules into Fairseq. After installing the Lig
 ### DeepSpeed
 Similar to Fairseq, you can use `deepspeed` to start the Fairseq training and use `--user-dir` to specify the Fairseq modules using LightSeq. More details are available [here](../examples/training/deepspeed)
 
-## Export
+## Inference
+### Export
 After the model is trained, you can directly load the saved checkpoint to fine-tune or infer. But this will call the inference part of the training models, which is actually the forward propagation. It needs to frequently switch between Python and C++ code, and a lot of variables for backpropagation are calculated, which is not needed. Therefore, the speed is slower than LightSeq inference engine.
 
 To use the LightSeq inference engine, you must export the checkpoints to protobuf or hdf5 format. LightSeq defines the proto of Transformer models, and the details can be available [here](inference/export_model.md).
@@ -117,7 +118,7 @@ These functions can export the configuration, embedding, encoder and decoder wei
 
 LightSeq provides export examples of native Hugging Face BERT/BART/GPT2, Fairseq trained with LightSeq and LightSeq Transformer. All codes are available [here](../examples/inference/python/export).
 
-### Fairseq
+#### Fairseq
 The main code is as follows (some parameters are omitted). Complete code is available [here](../examples/inference/python/export/ls_fs_transformer_export.py).
 ```python
 model = Transformer()
@@ -134,13 +135,13 @@ First, you need to divide the state dict into two parts of encoder and decoder, 
 
 The above functions export the checkpoints to protobuf by default. Specify `save_pb=False` to export to hdf5 files. You can use the [Fairseq training example](../examples/training/fairseq) to obtain the trained checkpoints.
 
-### Hugging Face
+#### Hugging Face
 LightSeq provides three examples of exporting native Hugging Face models ([BERT](../examples/inference/python/export/hf_bert_export.py), [BART](../examples/inference/python/export/hf_bart_export.py) and [GPT2](../examples/inference/python/export/hf_gpt2_export.py)). Because these native models did not use LightSeq modules to pretrain, the users must manually make the export rules.
 
-### LightSeq Transformer
+#### LightSeq Transformer
 LightSeq provide an example of exporting its own Transformer module, which is similar to Fairseq models export. You can use the [custom training example](../examples/training/custom) to obtain the trained checkpoints. This export example can also compare the results and speeds of forward propagation in training library, inference library loading both protobuf and hdf5 files. The results show that the inference library is faster than the forward propagation of training library by about 2x.
 
-### Custom models
+#### Custom models
 LightSeq can not parse the parameter names of custom models which do not use LightSeq modules. Therefore you must make the export rules to extract the weights and assign them to corresponding positions in the protobuf or hdf5 files.
 
 For example, suppose that the name of the layer norm weight in the last part of the encoder is `encoder.layer_norm.weight`, you can use the following code to export it:
@@ -152,7 +153,7 @@ transformer.src_embedding.norm_scale[:] = enc_norm_w
 
 The other weights are exported in similar ways. You can find all definitions of the proto [here](../lightseq/inference/proto).
 
-## Inference
+### Inference in three lines of codes!
 After exporting to the protobuf or hdf5 files, LightSeq can easily infer using only three lines of codes:
 ```python
 import lightseq.inference as lsi
