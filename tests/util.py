@@ -84,16 +84,23 @@ class TestDecorator(object):
 
     @property
     def h_nh(self):
-        while True:
-            hs = random.choice([512, 768, 1024, 1536, 2048, 4096])
-            nhead = random.choice([8, 12, 16])
-            if hs % (nhead * 8) == 0:
-                return hs, nhead
+        nhead = random.choice([8, 12, 16])
+        upbound = 1024 // nhead
+        head_dim = random.choice(range(1, upbound + 1))
+        hs = head_dim * nhead * self.io_factor
+        return hs, nhead
 
     @property
     def act_fn(self):
         act = random.choice(["relu", "gelu"])
         return act
+
+    @property
+    def io_factor(self):
+        if self.dtype == torch.float32:
+            return 4
+        else:
+            return 8
 
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)

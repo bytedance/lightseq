@@ -1,3 +1,6 @@
+"""
+Export Hugging Face BART models to protobuf/hdf5 format.
+"""
 import os
 from collections import OrderedDict
 
@@ -5,12 +8,8 @@ import tensorflow as tf
 import h5py
 import numpy as np
 from operator import attrgetter
-from utils import (
-    fill_proto_layer,
-    _gather_token_embedding,
-    _get_encode_output_mapping_dict,
-)
-from transformer_pb2 import Transformer
+from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
+from proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -76,6 +75,24 @@ trg_emb_mapping_dict = OrderedDict(
         "shared_bias": "final_logits_bias",
     }
 )
+
+
+def _get_encode_output_mapping_dict(dec_layer_num):
+    encode_output_kernel_pattern = [
+        "encoder_attn {0} k_proj weight&&encoder_attn {0} v_proj weight".format(ele)
+        for ele in range(dec_layer_num)
+    ]
+    encode_output_bias_pattern = [
+        "encoder_attn {0} k_proj bias&&encoder_attn {0} v_proj bias".format(ele)
+        for ele in range(dec_layer_num)
+    ]
+
+    return {
+        "encode_output_project_kernel_kv": "&&".join(
+            encode_output_kernel_pattern + ["expression_.transpose(0, 1)"]
+        ),
+        "encode_output_project_bias_kv": "&&".join(encode_output_bias_pattern),
+    }
 
 
 def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
@@ -246,7 +263,7 @@ def extract_transformer_weights(
             enc_tensor_names.setdefault(layer_id, []).append(name)
 
         for layer_id in sorted(enc_tensor_names.keys()):
-            fill_proto_layer(
+            fill_pb_layer(
                 enc_tensor_names[layer_id],
                 encoder_state_dict,
                 transformer.encoder_stack.add(),
@@ -263,7 +280,7 @@ def extract_transformer_weights(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_proto_layer(
+        fill_pb_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
             transformer.decoder_stack.add(),
@@ -272,7 +289,7 @@ def extract_transformer_weights(
 
     # fill src_embedding
     if not only_decoder:
-        fill_proto_layer(
+        fill_pb_layer(
             enc_var_name_list,
             encoder_state_dict,
             transformer.src_embedding,
@@ -297,15 +314,15 @@ def extract_transformer_weights(
                 .shape
             )
         )
-        src_tb = _gather_token_embedding(
-            enc_var_name_list, encoder_state_dict, "shared"
+        src_tb, _ = gather_token_embedding(
+            enc_var_name_list, encoder_state_dict, "shared", scale=False
         )
         transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
 
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_proto_layer(
+    fill_pb_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,
@@ -326,8 +343,8 @@ def extract_transformer_weights(
         )
     )
     # assert lang in LANG2ID
-    trg_tb = _gather_token_embedding(
-        dec_var_name_list, decoder_state_dict, "shared", lang=lang
+    trg_tb, _ = gather_token_embedding(
+        dec_var_name_list, decoder_state_dict, "shared", scale=False
     )
     transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(

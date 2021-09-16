@@ -7,7 +7,13 @@ from torch.autograd import Function
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import copy_para, state_dict, MODEL_ARCH
+from lightseq.training.ops.pytorch.util import (
+    copy_para,
+    state_dict,
+    MODEL_ARCH,
+    check_config,
+    calc_offset,
+)
 
 transformer_cuda_module = None
 _all_layer_grads = dict()
@@ -124,26 +130,8 @@ class LSTransformerEncoderLayer(nn.Module):
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
-        nums = [
-            hs * hs * 3,  # attn_qkvw
-            hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            hs,  # attn_ob
-            hs,  # attn_nw
-            hs,  # attn_nb
-            hs * ims,  # inter_w
-            ims,  # inter_b
-            hs * ims,  # output_w
-            hs,  # output_b
-            hs,  # ffn_nw
-            hs,  # ffn_nb
-        ]
-        offset = 0
-        self.para_offset = [offset]
-        for n in nums:
-            offset += n
-            self.para_offset.append(offset)
-        self.para = nn.Parameter(torch.Tensor(offset))
+        self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
         if initial_weights is None and initial_biases is None:
             self.init_transformer_weights()
@@ -193,7 +181,29 @@ class LSTransformerEncoderLayer(nn.Module):
             MODEL_ARCH[kwargs["model"]](kwargs)
             del kwargs["model"]
 
-        return Config(**kwargs)
+        config = Config(**kwargs)
+        check_config(config)
+        return config
+
+    @staticmethod
+    def gen_offset(hidden_size, intermediate_size):
+        hs, ims = hidden_size, intermediate_size
+        sizes = [
+            hs * hs * 3,  # attn_qkvw
+            hs * 3,  # attn_qkvb
+            hs * hs,  # attn_ow
+            hs,  # attn_ob
+            hs,  # attn_nw
+            hs,  # attn_nb
+            hs * ims,  # inter_w
+            ims,  # inter_b
+            hs * ims,  # output_w
+            hs,  # output_b
+            hs,  # ffn_nw
+            hs,  # ffn_nb
+        ]
+        offsets = calc_offset(sizes)
+        return offsets
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -270,9 +280,6 @@ class LSTransformerEncoderLayer(nn.Module):
 
         self.__assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
-        if dim % 256 != 0:
-            raise ValueError(f"Hidden dim {dim} is not an integer multiple of 256.")
-
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."

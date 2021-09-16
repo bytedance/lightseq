@@ -7,7 +7,7 @@ from torch.autograd import Function
 
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.util import state_dict
+from lightseq.training.ops.pytorch.util import state_dict, get_pos_embedding
 
 
 transformer_cuda_module = None
@@ -89,9 +89,9 @@ class LSTransformerEmbeddingLayer(nn.Module):
             self.embeddings = torch.nn.Parameter(
                 torch.empty_like(initial_embeddings).copy_(initial_embeddings)
             )
-        self.pos_embeddings = self.get_pos_embedding(self.config.max_seq_len).to(
-            self.config.local_rank
-        )
+        self.pos_embeddings = get_pos_embedding(
+            self.config.max_seq_len, self.config.embedding_dim
+        ).to(self.config.local_rank)
         if self.config.fp16:
             self.pos_embeddings = self.pos_embeddings.to(torch.half)
 
@@ -136,20 +136,6 @@ class LSTransformerEmbeddingLayer(nn.Module):
     def reset_parameters(self):
         nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim ** -0.5)
         nn.init.constant_(self.embeddings[self.config.padding_idx], 0)
-
-    def get_pos_embedding(self, num_pos_embeddings):
-        half_dim = self.config.embedding_dim // 2
-        emb = math.log(10000) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, dtype=torch.float) * -emb)
-        emb = torch.arange(num_pos_embeddings, dtype=torch.float).unsqueeze(
-            1
-        ) * emb.unsqueeze(0)
-        emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1).view(
-            num_pos_embeddings, -1
-        )
-        if self.config.embedding_dim % 2 == 1:
-            emb = torch.cat([emb, torch.zeros(num_pos_embeddings, 1)], dim=1)
-        return emb
 
     def __assign_layer_weight_grad(self):
         param = (
