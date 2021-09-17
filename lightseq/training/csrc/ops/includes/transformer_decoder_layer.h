@@ -13,6 +13,7 @@
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "feed_forward_v2.h"
 
 template <typename T>
 class TransformerDecoderLayer {
@@ -303,6 +304,7 @@ class TransformerDecoderLayer {
   bool _predict;
 
   cublasHandle_t _cublasHandle;
+  cublasLtHandle_t _cublasLtHandle;
   cudaStream_t _stream;
 
   // layers
@@ -314,6 +316,7 @@ class TransformerDecoderLayer {
       _encdec_attn_dropout, _ffn_activation_dropout, _ffn_dropout;
   StridedBatchGemm<T> _attn_scores, _attn_context, _encdec_attn_scores,
       _encdec_attn_context;
+  FeedForwardV2<T> _ff1_infer, _ff2_infer;
 
   // layer's local GPU memory
   T *_gemmQKV_inp_ptr;

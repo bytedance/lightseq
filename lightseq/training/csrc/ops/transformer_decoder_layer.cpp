@@ -65,6 +65,8 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename Dropout<T>::Config(activation_dropout_ratio),
           _max_batch_tokens * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),
+      _ff1_infer(typename FeedForwardV2<T>::Config(_intermediate_size * hidden_size, 0)),
+      _ff2_infer(typename FeedForwardV2<T>::Config(_intermediate_size * hidden_size, 0)),
       _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                    _max_batch_tokens * _hidden_size) {
   assert(_hidden_size % _heads == 0);
@@ -238,15 +240,28 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
-  _ff1.Forward(_batch_tokens, _ff1_inp_ptr, _inter_w_ptr, _relu_inp_ptr,
+  if (_predict) {
+    _ff1_infer.Forward(1, _intermediate_size, _batch_tokens, _hidden_size, _inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr,
+               _cublasLtHandle);
+  } else {
+    _ff1.Forward(_batch_tokens, _ff1_inp_ptr, _inter_w_ptr, _relu_inp_ptr,
                _cublasHandle);
+  }
 
   _ffn_activation_dropout.bias_act_dropout(
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
-  _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
+  if (_predict) {
+    _ff2_infer.Forward(1, _hidden_size, _batch_tokens, _intermediate_size, _output_w_ptr, _ff2_inp_ptr, out_ptr,
+               _cublasLtHandle);
+    _ff2_infer.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
                _cublasHandle);
+  } else {
+    _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
+               _cublasHandle);
+  }
+  
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
@@ -266,6 +281,7 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
                                          std::vector<T *> &cache) {
   _stream = Context::Instance().get_stream();
   _cublasHandle = Context::Instance().get_cublashandle();
+  _cublasLtHandle = Context::Instance().get_cublaslthandle();
   if (_predict && _layer_id == 0) {
     _shared_infer_encdec_kv_ptr = cache[4];
     if (_step == 0) {
