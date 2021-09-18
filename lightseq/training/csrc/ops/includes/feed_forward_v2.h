@@ -58,10 +58,10 @@ class FeedForwardV2 {
   }
 
   ~FeedForwardV2() {
-    cublasLtMatrixLayoutDestroy(_ADesc);
-    cublasLtMatrixLayoutDestroy(_BDesc);
-    cublasLtMatrixLayoutDestroy(_CDesc);
-    cublasLtMatmulDescDestroy(_matmulDesc);
+    if (_ADesc) cublasLtMatrixLayoutDestroy(_ADesc);
+    if (_BDesc) cublasLtMatrixLayoutDestroy(_BDesc);
+    if (_CDesc) cublasLtMatrixLayoutDestroy(_CDesc);
+    if (_matmulDesc) cublasLtMatmulDescDestroy(_matmulDesc);
   }
 
   void Forward(const T *A, const T *B, T *C, int transA, int transB,
@@ -120,6 +120,6 @@ class FeedForwardV2 {
   cudaDataType_t _ComputeType;
 #endif
   cublasOperation_t _opTrans = CUBLAS_OP_T;
-  cublasLtMatrixLayout_t _ADesc, _BDesc, _CDesc;
-  cublasLtMatmulDesc_t _matmulDesc;
+  cublasLtMatrixLayout_t _ADesc = NULL, _BDesc = NULL, _CDesc = NULL;
+  cublasLtMatmulDesc_t _matmulDesc = NULL;
 };
