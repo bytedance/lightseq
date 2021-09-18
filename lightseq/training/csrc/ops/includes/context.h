@@ -2,6 +2,7 @@
 
 #include <cublas_v2.h>
 #include <cuda.h>
+#include <cublasLt.h>
 
 #include <iostream>
 #include <string>
@@ -12,6 +13,7 @@ class Context {
  public:
   Context() : _stream(nullptr) {
     CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
+    CHECK_GPU_ERROR(cublasLtCreate(&_cublasLtHandle));
   }
 
   virtual ~Context() {}
@@ -30,7 +32,10 @@ class Context {
 
   cublasHandle_t get_cublashandle() { return _cublasHandle; }
 
+  cublasLtHandle_t get_cublaslthandle() { return _cublasLtHandle; }
+
  private:
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
+  cublasLtHandle_t _cublasLtHandle;
 };

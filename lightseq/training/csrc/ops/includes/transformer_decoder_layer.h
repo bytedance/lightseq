@@ -10,10 +10,10 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
+#include "feed_forward_v2.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
-#include "feed_forward_v2.h"
 
 template <typename T>
 class TransformerDecoderLayer {

@@ -20,6 +20,7 @@ class TransformerBuilder(CUDAOpBuilder):
     def sources(self):
         return [
             "csrc/kernels/cublas_wrappers.cu",
+            "csrc/kernels/cublaslt_wrappers.cu",
             "csrc/kernels/transform_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",

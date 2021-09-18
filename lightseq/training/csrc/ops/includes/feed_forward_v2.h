@@ -20,36 +20,53 @@ class FeedForwardV2 {
   struct Config {
     int max_size_A, max_size_B;
     Config(int max_size_A, int max_size_B)
-        : max_size_A(max_size_A),
-          max_size_B(max_size_B) {}
+        : max_size_A(max_size_A), max_size_B(max_size_B) {}
   };
 
   FeedForwardV2(Config config) : _config(config) {
     if (config.max_size_A > 0) {
       _transA = true;
       // _transformA = cuda_malloc<T>(config.max_size_A);
+    } else {
+      _transA = false;
     }
     if (config.max_size_B > 0) {
       _transB = true;
       // _transformB = cuda_malloc<T>(config.max_size_B);
+    } else {
+      _transB = false;
     }
 
     if (std::is_same<T, float>::value) {
       _AType = _BType = _CType = CUDA_R_32F;
-#if CUBLAS_VER_MAJOR == 11
-      _ComputeType = CUBLAS_COMPUTE_32F;
-      _scaleType = CUDA_R_32F;
-#else
+      // #if CUBLAS_VER_MAJOR == 11
+      //       _ComputeType = CUBLAS_COMPUTE_32F;
+      //       _scaleType = CUDA_R_32F;
+      // #else
       _ComputeType = CUDA_R_32F;
-#endif
+      // #endif
     } else if (std::is_same<T, __half>::value) {
       _AType = _BType = _CType = CUDA_R_16F;
-#if CUBLAS_VER_MAJOR == 11
-      _ComputeType = CUBLAS_COMPUTE_16F;
-      _scaleType = CUDA_R_16F;
-#else
+      // #if CUBLAS_VER_MAJOR == 11
+      //       _ComputeType = CUBLAS_COMPUTE_16F;
+      //       _scaleType = CUDA_R_16F;
+      // #else
       _ComputeType = CUDA_R_16F;
-#endif
+      // #endif
+    }
+
+    // #if CUBLAS_VER_MAJOR == 11
+    //     cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType);
+    // #else
+    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType);
+    // #endif
+    if (_transA) {
+      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA,
+                                     &_opTrans, sizeof(_opTrans));
+    }
+    if (_transB) {
+      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
+                                     &_opTrans, sizeof(_opTrans));
     }
   }
 
@@ -69,7 +86,7 @@ class FeedForwardV2 {
     _strideA = m * k;
     _strideB = n * k;
     _strideC = m * n;
-    
+
     if (_transA) {
       cublasLtMatrixLayoutCreate(&_ADesc, _AType, k, m, k);
       // cublasLtMatrixLayoutCreate(&_transformADesc, _AType, m, k, m);
@@ -83,7 +100,7 @@ class FeedForwardV2 {
       cublasLtMatrixLayoutCreate(&_BDesc, _BType, k, n, k);
     }
     cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m);
-      
+
     if (bsz > 1) {
       cublasLtMatrixLayoutSetAttribute(
           _ADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
@@ -102,50 +119,39 @@ class FeedForwardV2 {
           sizeof(_strideC));
       // if (_transA) {
       //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
+      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz,
+      //     sizeof(bsz));
       //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideA,
-      //     sizeof(strideA));
+      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
+      //     &strideA, sizeof(strideA));
       // }
       // if (_transB) {
       //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
+      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz,
+      //     sizeof(bsz));
       //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideB,
-      //     sizeof(strideB));
+      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
+      //     &strideB, sizeof(strideB));
       // }
     }
 
-#if CUBLAS_VER_MAJOR == 11
-    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType);
-#else
-    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType);
-#endif
-    if (_transA) {
-      cublasLtMatmulDescSetAttribute(
-        _matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA, &_opTrans, sizeof(_opTrans));
-    }
-    if (_transB) {
-      cublasLtMatmulDescSetAttribute(
-        _matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB, &_opTrans, sizeof(_opTrans));
-    }
-
-    cublas_lt_matmul(handle, _matmulDesc, _ADesc, _BDesc, _CDesc, A, B, C, &_alpha, &_beta, stream);
+    cublas_lt_matmul(handle, _matmulDesc, _ADesc, _BDesc, _CDesc, A, B, C,
+                     &_alpha, &_beta, stream);
   }
- 
+
  private:
   Config _config;
-  // bool _transA, _transB;
+  bool _transA, _transB;
   // T *_transformA, *_transformB;
   T _alpha = T(1.), _beta = T(0.);
   int64_t _strideA, _strideB, _strideC;
   cudaDataType_t _AType, _BType, _CType;
-#if CUBLAS_VER_MAJOR == 11
-  cublasComputeType_t _ComputeType;
-  cudaDataType_t _scaleType;
-#else
+  // #if CUBLAS_VER_MAJOR == 11
+  //   cublasComputeType_t _ComputeType;
+  //   cudaDataType_t _scaleType;
+  // #else
   cudaDataType_t _ComputeType;
-#endif
+  // #endif
   cublasOperation_t _opTrans = CUBLAS_OP_T;
   cublasLtMatrixLayout_t _ADesc, _BDesc, _CDesc;
   cublasLtMatmulDesc_t _matmulDesc;
