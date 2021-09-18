@@ -66,6 +66,7 @@ class TransformerDecoderLayer {
     _batch_tokens = batch_size * trg_seq_len;
     _batch_heads = batch_size * _heads;
     _batch_dim = _batch_tokens * _hidden_size;
+    int batch_heads = step >= 0 ? _batch_heads * _trg_seq_len : _batch_heads;
 
     _encdec_attn_scores.SetConfig(_src_seq_len, _trg_seq_len,
                                   _hidden_size / _heads);
@@ -83,6 +84,31 @@ class TransformerDecoderLayer {
       _attn_context.SetConfig(_hidden_size / _heads, _trg_seq_len,
                               _trg_seq_len);
     }
+
+    _qkv_linear_v2.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
+    if (step >= 0) {
+      _attn_scores_v2.SetConfig(batch_heads, step + 1, 1,
+                                _hidden_size / _heads);
+      _attn_context_v2.SetConfig(batch_heads, _hidden_size / _heads, 1,
+                                 step + 1);
+    } else {
+      _attn_scores_v2.SetConfig(batch_heads, _trg_seq_len, _trg_seq_len,
+                                _hidden_size / _heads);
+      _attn_context_v2.SetConfig(batch_heads, _hidden_size / _heads,
+                                 _trg_seq_len, _trg_seq_len);
+    }
+    _attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
+    _encdec_q_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
+    _encdec_kv_linear_v2.SetConfig(1, _shared_nlayer * 2 * _hidden_size,
+                                   batch_size * src_seq_len, _hidden_size);
+    _encdec_attn_scores_v2.SetConfig(_batch_heads, _src_seq_len, _trg_seq_len,
+                                     _hidden_size / _heads);
+    _encdec_attn_context_v2.SetConfig(_batch_heads, _hidden_size / _heads,
+                                      _trg_seq_len, _src_seq_len);
+    _encdec_attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens,
+                                         _hidden_size);
+    _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training) {
@@ -311,12 +337,15 @@ class TransformerDecoderLayer {
   Normalize_Layer<T> _attn_ln, _encdec_attn_ln, _ffn_ln;
   FeedForward<T> _qkv_linear, _attn_out_linear, _encdec_q_linear,
       _encdec_kv_linear, _encdec_attn_out_linear, _ff1, _ff2;
+  FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2, _encdec_q_linear_v2,
+      _encdec_kv_linear_v2, _encdec_attn_out_linear_v2, _ff1_v2, _ff2_v2;
   Softmax<T> _softmax, _encdec_softmax;
   Dropout<T> _attn_prob_dropout, _attn_dropout, _encdec_attn_prob_dropout,
       _encdec_attn_dropout, _ffn_activation_dropout, _ffn_dropout;
   StridedBatchGemm<T> _attn_scores, _attn_context, _encdec_attn_scores,
       _encdec_attn_context;
-  FeedForwardV2<T> _ff1_infer, _ff2_infer;
+  FeedForwardV2<T> _attn_scores_v2, _attn_context_v2, _encdec_attn_scores_v2,
+      _encdec_attn_context_v2;
 
   // layer's local GPU memory
   T *_gemmQKV_inp_ptr;

@@ -18,143 +18,108 @@ template <typename T>
 class FeedForwardV2 {
  public:
   struct Config {
-    int max_size_A, max_size_B;
-    Config(int max_size_A, int max_size_B)
-        : max_size_A(max_size_A), max_size_B(max_size_B) {}
+    int bsz, m, n, k;
+    T alpha, beta;
+    int max_m, max_n, max_k;
+    Config(int max_m, int max_n, int max_k, T alpha = 1.0, T beta = 0.0)
+        : max_m(max_m), max_n(max_n), max_k(max_k), alpha(alpha), beta(beta) {}
+    void SetConfig(int b, int mm, int nn, int kk) {
+      bsz = b;
+      m = mm;
+      n = nn;
+      k = kk;
+    }
   };
 
   FeedForwardV2(Config config) : _config(config) {
-    if (config.max_size_A > 0) {
-      _transA = true;
-      // _transformA = cuda_malloc<T>(config.max_size_A);
-    } else {
-      _transA = false;
-    }
-    if (config.max_size_B > 0) {
-      _transB = true;
-      // _transformB = cuda_malloc<T>(config.max_size_B);
-    } else {
-      _transB = false;
-    }
-
     if (std::is_same<T, float>::value) {
       _AType = _BType = _CType = CUDA_R_32F;
-      // #if CUBLAS_VER_MAJOR == 11
-      //       _ComputeType = CUBLAS_COMPUTE_32F;
-      //       _scaleType = CUDA_R_32F;
-      // #else
+#if CUBLAS_VER_MAJOR == 11
+      _ComputeType = CUBLAS_COMPUTE_32F;
+      _scaleType = CUDA_R_32F;
+#else
       _ComputeType = CUDA_R_32F;
-      // #endif
+#endif
     } else if (std::is_same<T, __half>::value) {
       _AType = _BType = _CType = CUDA_R_16F;
-      // #if CUBLAS_VER_MAJOR == 11
-      //       _ComputeType = CUBLAS_COMPUTE_16F;
-      //       _scaleType = CUDA_R_16F;
-      // #else
+#if CUBLAS_VER_MAJOR == 11
+      _ComputeType = CUBLAS_COMPUTE_16F;
+      _scaleType = CUDA_R_16F;
+#else
       _ComputeType = CUDA_R_16F;
-      // #endif
+#endif
     }
 
-    // #if CUBLAS_VER_MAJOR == 11
-    //     cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType);
-    // #else
+#if CUBLAS_VER_MAJOR == 11
+    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType);
+#else
     cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType);
-    // #endif
-    if (_transA) {
-      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                     &_opTrans, sizeof(_opTrans));
-    }
-    if (_transB) {
-      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                     &_opTrans, sizeof(_opTrans));
-    }
+#endif
   }
 
   ~FeedForwardV2() {
-    // if (_transA)
-    //   cuda_free(_transformA);
-    // if (_transB)
-    //   cuda_free(_transformB);
     cublasLtMatrixLayoutDestroy(_ADesc);
     cublasLtMatrixLayoutDestroy(_BDesc);
     cublasLtMatrixLayoutDestroy(_CDesc);
     cublasLtMatmulDescDestroy(_matmulDesc);
   }
 
-  void Forward(int bsz, int m, int n, int k, const T *A, const T *B, T *C,
+  void Forward(const T *A, const T *B, T *C, int transA, int transB,
                cublasLtHandle_t handle, cudaStream_t stream) {
-    _strideA = m * k;
-    _strideB = n * k;
-    _strideC = m * n;
+    if (transA)
+      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA,
+                                     &_opTrans, sizeof(_opTrans));
+    if (transB)
+      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
+                                     &_opTrans, sizeof(_opTrans));
 
-    if (_transA) {
-      cublasLtMatrixLayoutCreate(&_ADesc, _AType, k, m, k);
-      // cublasLtMatrixLayoutCreate(&_transformADesc, _AType, m, k, m);
-    } else {
-      cublasLtMatrixLayoutCreate(&_ADesc, _AType, m, k, m);
-    }
-    if (_transB) {
-      cublasLtMatrixLayoutCreate(&_BDesc, _BType, n, k, n);
-      // cublasLtMatrixLayoutCreate(&_transformBDesc, _BType, k, n, k);
-    } else {
-      cublasLtMatrixLayoutCreate(&_BDesc, _BType, k, n, k);
-    }
+    int m = _config.m, n = _config.n, k = _config.k;
+    cublasLtMatrixLayoutCreate(&_ADesc, _AType, transA ? k : m, transA ? m : k,
+                               transA ? k : m);
+    cublasLtMatrixLayoutCreate(&_BDesc, _BType, transB ? n : k, transB ? k : n,
+                               transB ? n : k);
     cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m);
 
-    if (bsz > 1) {
+    if (_config.bsz > 1) {
+      int64_t strideA = m * k, strideB = n * k, strideC = m * n;
+      cublasLtMatrixLayoutSetAttribute(_ADesc,
+                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                       &_config.bsz, sizeof(_config.bsz));
       cublasLtMatrixLayoutSetAttribute(
-          _ADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
+          _ADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideA,
+          sizeof(strideA));
+      cublasLtMatrixLayoutSetAttribute(_BDesc,
+                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                       &_config.bsz, sizeof(_config.bsz));
       cublasLtMatrixLayoutSetAttribute(
-          _ADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &_strideA,
-          sizeof(_strideA));
+          _BDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideB,
+          sizeof(strideB));
+      cublasLtMatrixLayoutSetAttribute(_CDesc,
+                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                       &_config.bsz, sizeof(_config.bsz));
       cublasLtMatrixLayoutSetAttribute(
-          _BDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
-      cublasLtMatrixLayoutSetAttribute(
-          _BDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &_strideB,
-          sizeof(_strideB));
-      cublasLtMatrixLayoutSetAttribute(
-          _CDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz, sizeof(bsz));
-      cublasLtMatrixLayoutSetAttribute(
-          _CDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &_strideC,
-          sizeof(_strideC));
-      // if (_transA) {
-      //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz,
-      //     sizeof(bsz));
-      //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-      //     &strideA, sizeof(strideA));
-      // }
-      // if (_transB) {
-      //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &bsz,
-      //     sizeof(bsz));
-      //   cublasLtMatrixLayoutSetAttribute(
-      //     _transformBDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-      //     &strideB, sizeof(strideB));
-      // }
+          _CDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideC,
+          sizeof(strideC));
     }
 
     cublas_lt_matmul(handle, _matmulDesc, _ADesc, _BDesc, _CDesc, A, B, C,
-                     &_alpha, &_beta, stream);
+                     &_config.alpha, &_config.beta, stream);
+  }
+
+  inline void SetConfig(int bsz, int m, int n, int k) {
+    _config.SetConfig(bsz, m, n, k);
   }
 
  private:
   Config _config;
-  bool _transA, _transB;
-  // T *_transformA, *_transformB;
-  T _alpha = T(1.), _beta = T(0.);
-  int64_t _strideA, _strideB, _strideC;
   cudaDataType_t _AType, _BType, _CType;
-  // #if CUBLAS_VER_MAJOR == 11
-  //   cublasComputeType_t _ComputeType;
-  //   cudaDataType_t _scaleType;
-  // #else
+#if CUBLAS_VER_MAJOR == 11
+  cublasComputeType_t _ComputeType;
+  cudaDataType_t _scaleType;
+#else
   cudaDataType_t _ComputeType;
-  // #endif
+#endif
   cublasOperation_t _opTrans = CUBLAS_OP_T;
   cublasLtMatrixLayout_t _ADesc, _BDesc, _CDesc;
   cublasLtMatmulDesc_t _matmulDesc;
-  // cublasLtMatrixLayout_t _transformADesc, _transformBDesc;
-  // cublasLtMatrixTransformDesc_t _transformDesc;
 };

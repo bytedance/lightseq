@@ -10,6 +10,7 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
+#include "feed_forward_v2.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
@@ -51,6 +52,15 @@ class TransformerEncoderLayer {
     _batch_dim = _batch_tokens * _hidden_size;
     _attn_scores.SetConfig(_seq_len, _seq_len, _hidden_size / _heads);
     _attn_context.SetConfig(_hidden_size / _heads, _seq_len, _seq_len);
+
+    _qkv_linear_v2.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
+    _attn_scores_v2.SetConfig(_batch_heads, _seq_len, _seq_len,
+                              _hidden_size / _heads);
+    _attn_context_v2.SetConfig(_batch_heads, _hidden_size / _heads, _seq_len,
+                               _seq_len);
+    _attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
+    _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training);
@@ -183,14 +193,17 @@ class TransformerEncoderLayer {
   bool _training;
 
   cublasHandle_t _cublasHandle;
+  cublasLtHandle_t _cublasLtHandle;
   cudaStream_t _stream;
 
   // layers
   FeedForward<T> _qkv_linear;
   FeedForward<T> _attn_out_linear;
+  FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2;
   Normalize_Layer<T> _attn_ln;
   Normalize_Layer<T> _ffn_ln;
   FeedForward<T> _ff1, _ff2;
+  FeedForwardV2<T> _ff1_v2, _ff2_v2;
   Softmax<T> _softmax;
   Dropout<T> _attn_prob_dropout;
   Dropout<T> _attn_dropout;
@@ -198,6 +211,7 @@ class TransformerEncoderLayer {
   Dropout<T> _ffn_dropout;
   StridedBatchGemm<T> _attn_scores;
   StridedBatchGemm<T> _attn_context;
+  FeedForwardV2<T> _attn_scores_v2, _attn_context_v2;
 
   // local GPU memory
   T *_gemmQKV_inp_ptr;
