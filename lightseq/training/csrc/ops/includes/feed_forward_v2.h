@@ -51,55 +51,58 @@ class FeedForwardV2 {
     }
 
 #if CUBLAS_VER_MAJOR == 11
-    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType);
+    CHECK_GPU_ERROR(
+        cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType, _scaleType));
 #else
-    cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType);
+    CHECK_GPU_ERROR(cublasLtMatmulDescCreate(&_matmulDesc, _ComputeType));
 #endif
   }
 
   ~FeedForwardV2() {
-    if (_ADesc) cublasLtMatrixLayoutDestroy(_ADesc);
-    if (_BDesc) cublasLtMatrixLayoutDestroy(_BDesc);
-    if (_CDesc) cublasLtMatrixLayoutDestroy(_CDesc);
-    if (_matmulDesc) cublasLtMatmulDescDestroy(_matmulDesc);
+    if (_ADesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(_ADesc));
+    if (_BDesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(_BDesc));
+    if (_CDesc) CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(_CDesc));
+    if (_matmulDesc) CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(_matmulDesc));
   }
 
   void Forward(const T *A, const T *B, T *C, int transA, int transB,
                cublasLtHandle_t handle, cudaStream_t stream) {
     if (transA)
-      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA,
-                                     &_opTrans, sizeof(_opTrans));
+      CHECK_GPU_ERROR(cublasLtMatmulDescSetAttribute(
+          _matmulDesc, CUBLASLT_MATMUL_DESC_TRANSA, &_opTrans,
+          sizeof(_opTrans)));
     if (transB)
-      cublasLtMatmulDescSetAttribute(_matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
-                                     &_opTrans, sizeof(_opTrans));
+      CHECK_GPU_ERROR(cublasLtMatmulDescSetAttribute(
+          _matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB, &_opTrans,
+          sizeof(_opTrans)));
 
     int m = _config.m, n = _config.n, k = _config.k;
-    cublasLtMatrixLayoutCreate(&_ADesc, _AType, transA ? k : m, transA ? m : k,
-                               transA ? k : m);
-    cublasLtMatrixLayoutCreate(&_BDesc, _BType, transB ? n : k, transB ? k : n,
-                               transB ? n : k);
-    cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m);
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_ADesc, _AType, transA ? k : m,
+                                               transA ? m : k, transA ? k : m));
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_BDesc, _BType, transB ? n : k,
+                                               transB ? k : n, transB ? n : k));
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m));
 
     if (_config.bsz > 1) {
       int64_t strideA = m * k, strideB = n * k, strideC = m * n;
-      cublasLtMatrixLayoutSetAttribute(_ADesc,
-                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                       &_config.bsz, sizeof(_config.bsz));
-      cublasLtMatrixLayoutSetAttribute(
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+          _ADesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &_config.bsz,
+          sizeof(_config.bsz)));
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
           _ADesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideA,
-          sizeof(strideA));
-      cublasLtMatrixLayoutSetAttribute(_BDesc,
-                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                       &_config.bsz, sizeof(_config.bsz));
-      cublasLtMatrixLayoutSetAttribute(
+          sizeof(strideA)));
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+          _BDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &_config.bsz,
+          sizeof(_config.bsz)));
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
           _BDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideB,
-          sizeof(strideB));
-      cublasLtMatrixLayoutSetAttribute(_CDesc,
-                                       CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-                                       &_config.bsz, sizeof(_config.bsz));
-      cublasLtMatrixLayoutSetAttribute(
+          sizeof(strideB)));
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+          _CDesc, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &_config.bsz,
+          sizeof(_config.bsz)));
+      CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
           _CDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideC,
-          sizeof(strideC));
+          sizeof(strideC)));
     }
 
     cublas_lt_matmul(handle, _matmulDesc, _ADesc, _BDesc, _CDesc, A, B, C,

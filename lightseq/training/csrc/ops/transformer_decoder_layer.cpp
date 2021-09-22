@@ -135,8 +135,10 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     v_tf_ptr = cache[1];
   }
   // attention scores, q*k
-  _attn_scores_v2.Forward(k_tf_ptr, q_tf_ptr, _soft_out_ptr, 1, 0,
-                          _cublasLtHandle, _stream);
+  _attn_scores.Forward(batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
+                       _cublasHandle);
+  // _attn_scores_v2.Forward(k_tf_ptr, q_tf_ptr, _soft_out_ptr, 1, 0,
+  //                         _cublasLtHandle, _stream);
   // Softmax + Mask
   _softmax.Forward(_soft_out_ptr, nullptr, batch_size, from_len, to_len,
                    _stream, _predict ? false : true);
@@ -145,8 +147,10 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
   _attn_prob_dropout.dropout(_attn_score_ptr, _soft_out_ptr,
                              batch_heads * from_len * to_len, _stream);
   // attention context, score * v
-  _attn_context_v2.Forward(v_tf_ptr, _attn_score_ptr, buffer, 0, 0,
-                           _cublasLtHandle, _stream);
+  _attn_context.Forward(batch_heads, buffer, v_tf_ptr, _attn_score_ptr,
+                        _cublasHandle);
+  // _attn_context_v2.Forward(v_tf_ptr, _attn_score_ptr, buffer, 0, 0,
+  //                          _cublasLtHandle, _stream);
 
   // [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
