@@ -134,7 +134,7 @@ class FeedForwardV3 {
         sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
         handle, _transformDesc, &_config.transform_alpha, _CTransform,
-        _CTransformDesc, &_config.transform_beta, NULL, NULL, C, _CDesc, 0))
+        _CTransformDesc, &_config.transform_beta, NULL, NULL, C, _CDesc, 0));
   }
 
   void set_batch_size(cublasLtMatrixLayout_t &ADesc,
