@@ -22,3 +22,9 @@ int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
                      cublasLtMatrixLayout_t CDesc, const __half *A,
                      const __half *B, __half *C, __half *alpha, __half *beta,
                      cudaStream_t stream);
+
+int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
+                     cublasLtMatrixLayout_t ADesc, cublasLtMatrixLayout_t BDesc,
+                     cublasLtMatrixLayout_t CDesc, const int8_t *A,
+                     const int8_t *B, int32_t *C, int32_t *alpha, int32_t *beta,
+                     cudaStream_t stream);

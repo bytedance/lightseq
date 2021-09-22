@@ -31,3 +31,18 @@ int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
   }
   return 0;
 }
+
+int cublas_lt_matmul(cublasLtHandle_t handle, cublasLtMatmulDesc_t matmulDesc,
+                     cublasLtMatrixLayout_t ADesc, cublasLtMatrixLayout_t BDesc,
+                     cublasLtMatrixLayout_t CDesc, const int8_t *A,
+                     const int8_t *B, int32_t *C, int32_t *alpha, int32_t *beta,
+                     cudaStream_t stream) {
+  cublasStatus_t status;
+  status = cublasLtMatmul(handle, matmulDesc, alpha, A, ADesc, B, BDesc, beta,
+                          C, CDesc, C, CDesc, nullptr, nullptr, 0, stream);
+  if (status != CUBLAS_STATUS_SUCCESS) {
+    fprintf(stderr, "!!!! kernel execution error. (error: %d) \n", (int)status);
+    return EXIT_FAILURE;
+  }
+  return 0;
+}
