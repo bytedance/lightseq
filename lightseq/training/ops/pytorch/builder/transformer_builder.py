@@ -29,6 +29,7 @@ class TransformerBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/cross_entropy.cu",
+            "csrc/kernels/int8_kernels.cu",
             "csrc/ops/cross_entropy_layer.cpp",
             "csrc/ops/transformer_encoder_layer.cpp",
             "csrc/ops/transformer_decoder_layer.cpp",

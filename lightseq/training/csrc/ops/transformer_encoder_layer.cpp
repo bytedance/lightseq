@@ -33,6 +33,8 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
       _ff1(typename FeedForward<T>::Config(_intermediate_size, _hidden_size)),
       _ff1_v2(typename FeedForwardV2<T>::Config(
           1, _intermediate_size, _max_batch_tokens, _hidden_size, true, false)),
+      _ff1_v3(typename FeedForwardV3<T>::Config(
+          1, _intermediate_size, _max_batch_tokens, _hidden_size, true, true)),
       _ff2(typename FeedForward<T>::Config(_hidden_size, _intermediate_size)),
       _ff2_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _intermediate_size, true, false)),
@@ -128,7 +130,9 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
-  _ff1_v2.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
+  // _ff1_v2.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
+  //                 _stream);
+  _ff1_v3.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
                   _stream);
 
   _ffn_activation_dropout.bias_act_dropout(

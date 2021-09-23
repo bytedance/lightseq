@@ -10,9 +10,10 @@
 
 #include <array>
 
+#include "cuda_util.h"
 #include "cublaslt_wrappers.h"
 #include "kernels.h"
-#include "cuda_util.h"
+#include "int8_kernels.h"
 
 template <typename T>
 class FeedForwardV3 {
@@ -62,7 +63,15 @@ class FeedForwardV3 {
     _BTransform =
         cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
     _CTransform =
-        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
+        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
+        _config.max_n);
+    _AQuant =
+        cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
+    _BQuant =
+        cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
+    _CQuant =
+        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
+        _config.max_n);
   }
 
   ~FeedForwardV3() {
@@ -81,11 +90,17 @@ class FeedForwardV3 {
     cuda_free(_ATransform);
     cuda_free(_BTransform);
     cuda_free(_CTransform);
+    cuda_free(_AQuant);
+    cuda_free(_BQuant);
+    cuda_free(_CQuant);
   }
 
   void Forward(const T *A, const T *B, T *C, cublasLtHandle_t handle,
                cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
+    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, 127, 1.0, stream);
+    launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, 127, 16.0, stream);
+
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
         &_ADesc, _AType, _config.transA ? k : m, _config.transA ? m : k,
         _config.transA ? k : m));
@@ -117,11 +132,11 @@ class FeedForwardV3 {
                      k);
 
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
-        handle, _transformDesc, &_config.transform_alpha, A, _ADesc,
+        handle, _transformDesc, &_config.transform_alpha, _AQuant, _ADesc,
         &_config.transform_beta, NULL, NULL, _ATransform, _ATransformDesc,
         stream));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
-        handle, _transformDesc, &_config.transform_alpha, B, _BDesc,
+        handle, _transformDesc, &_config.transform_alpha, _BQuant, _BDesc,
         &_config.transform_beta, NULL, NULL, _BTransform, _BTransformDesc,
         stream));
 
@@ -134,7 +149,10 @@ class FeedForwardV3 {
         sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
         handle, _transformDesc, &_config.transform_alpha, _CTransform,
-        _CTransformDesc, &_config.transform_beta, NULL, NULL, C, _CDesc, 0));
+        _CTransformDesc, &_config.transform_beta, NULL, NULL, _CQuant, _CDesc,
+        0));
+    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, 127, 16.0,
+                             stream);
   }
 
   void set_batch_size(cublasLtMatrixLayout_t &ADesc,
@@ -184,4 +202,6 @@ class FeedForwardV3 {
   cublasLtMatrixTransformDesc_t _transformDesc = NULL;
   int8_t *_ATransform, *_BTransform;
   int32_t *_CTransform;
+  int8_t *_AQuant, *_BQuant;
+  int32_t *_CQuant;
 };

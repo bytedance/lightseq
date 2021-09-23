@@ -110,6 +110,10 @@ template __half *cuda_malloc<__half>(size_t ele_num);
 
 template uint8_t *cuda_malloc<uint8_t>(size_t ele_num);
 
+template int8_t *cuda_malloc<int8_t>(size_t ele_num);
+
+template int32_t *cuda_malloc<int32_t>(size_t ele_num);
+
 void cuda_free(void *pdata) {
   if (pdata != nullptr) {
     cudaFree(pdata);
