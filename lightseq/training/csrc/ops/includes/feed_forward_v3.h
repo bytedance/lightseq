@@ -96,8 +96,11 @@ class FeedForwardV3 {
   void Forward(const T *A, const T *B, T *C, cublasLtHandle_t handle,
                cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, 127, 0.5, stream);
-    launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, 127, 16.0, stream);
+    float scale_A = 127, scale_B = 127, clip_max_A = 0.4, clip_max_B = 16.0;
+    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, scale_A, clip_max_A,
+                           stream);
+    launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, scale_B, clip_max_B,
+                           stream);
 
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
         &_ADesc, _AType, _config.transA ? k : m, _config.transA ? m : k,
@@ -166,8 +169,8 @@ class FeedForwardV3 {
         handle, _transformDesc, &_config.transform_alpha, _CTransform,
         _CTransformDesc, &_config.transform_beta, NULL, NULL, _CQuant, _CDesc,
         0));
-    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, 127 * 127, 8.0,
-                             stream);
+    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, scale_A * scale_B,
+                             clip_max_A * clip_max_B, stream);
   }
 
   void set_batch_size(cublasLtMatrixLayout_t &ADesc,
