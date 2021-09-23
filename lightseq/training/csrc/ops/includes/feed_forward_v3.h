@@ -96,7 +96,7 @@ class FeedForwardV3 {
   void Forward(const T *A, const T *B, T *C, cublasLtHandle_t handle,
                cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, 127, 1.0, stream);
+    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, 127, 0.5, stream);
     launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, 127, 16.0, stream);
 
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
@@ -108,8 +108,9 @@ class FeedForwardV3 {
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m));
     if (_config.bsz > 1) set_batch_size(_ADesc, _BDesc, _CDesc, m, n, k);
 
-    int ldATransform = 32 * m, ldBTransform = 256 * ((n + 7) / 8),
-        ldCTransform = 32 * m;
+    // int ldATransform = 32 * m, ldBTransform = 256 * ((n + 7) / 8),
+    //     ldCTransform = 32 * m;
+    int ldATransform = m, ldBTransform = n, ldCTransform = m;
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_ATransformDesc, _AType, m, k,
                                                ldATransform));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_BTransformDesc, _BType, n, k,
@@ -129,10 +130,26 @@ class FeedForwardV3 {
       set_batch_size(_ATransformDesc, _BTransformDesc, _CTransformDesc, m, n,
                      k);
 
+    if (_config.transA)
+      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opTrans,
+          sizeof(_opTrans)));
+    else
+      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
+          sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
         handle, _transformDesc, &_config.transform_alpha, _AQuant, _ADesc,
         &_config.transform_beta, NULL, NULL, _ATransform, _ATransformDesc,
         stream));
+    if (_config.transB)
+      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opTrans,
+          sizeof(_opTrans)));
+    else
+      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
+          sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
         handle, _transformDesc, &_config.transform_alpha, _BQuant, _BDesc,
         &_config.transform_beta, NULL, NULL, _BTransform, _BTransformDesc,
@@ -149,7 +166,7 @@ class FeedForwardV3 {
         handle, _transformDesc, &_config.transform_alpha, _CTransform,
         _CTransformDesc, &_config.transform_beta, NULL, NULL, _CQuant, _CDesc,
         0));
-    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, 127, 16.0,
+    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, 127 * 127, 8.0,
                              stream);
   }
 
@@ -191,8 +208,10 @@ class FeedForwardV3 {
   cudaDataType_t _ComputeType = CUDA_R_32I;
 #endif
   cublasOperation_t _opTrans = CUBLAS_OP_T, _opNTrans = CUBLAS_OP_N;
-  cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL32;
-  cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
+  //   cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL32;
+  //   cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
+  cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL;
+  cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL;
   cublasLtMatrixLayout_t _ADesc = NULL, _BDesc = NULL, _CDesc = NULL;
   cublasLtMatrixLayout_t _ATransformDesc = NULL, _BTransformDesc = NULL,
                          _CTransformDesc = NULL;

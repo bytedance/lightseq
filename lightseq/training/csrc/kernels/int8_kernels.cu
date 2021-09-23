@@ -49,7 +49,7 @@ __global__ void quantize_tensor_kernel<__half>(const __half *input,
   int8_t *out1 = reinterpret_cast<int8_t *>(&out8);
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
-    out1[j] = float2int(float(inp_h[j]), scale, clip_max);
+    out1[j] = float2int(__half2float(inp_h[j]), scale, clip_max);
   }
   output4[i] = out8;
 }
@@ -111,7 +111,7 @@ __global__ void dequantize_tensor_kernel<__half>(const int32_t *input,
   __half *out1 = reinterpret_cast<__half *>(&out4);
 #pragma unroll
   for (uint j = 0; j < 4; ++j) {
-    out1[j] = float(inp1[j]) / scale * clip_max;
+    out1[j] = __float2half(float(inp1[j]) / scale * clip_max);
   }
   output4[i] = out4;
 }
