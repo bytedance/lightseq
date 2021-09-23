@@ -63,15 +63,13 @@ class FeedForwardV3 {
     _BTransform =
         cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
     _CTransform =
-        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
-        _config.max_n);
+        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
     _AQuant =
         cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
     _BQuant =
         cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
     _CQuant =
-        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
-        _config.max_n);
+        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
   }
 
   ~FeedForwardV3() {
