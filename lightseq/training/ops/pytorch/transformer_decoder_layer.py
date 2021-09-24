@@ -350,9 +350,7 @@ class LSTransformerDecoderLayer(nn.Module):
         )
         return destination
 
-    def forward(
-        self, decoder_states, encoder_out, encoder_padding_mask, cache, **kwargs
-    ):
+    def forward(self, decoder_states, encoder_out, encoder_padding_mask, cache):
         """
         decoder_states, [batch_size, trg_len, hidden_size] or [batch_size * beam_size, 1, hidden_size]
         encoder_out, [src_len, batch_size, hidden_size]

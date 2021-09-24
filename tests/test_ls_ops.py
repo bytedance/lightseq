@@ -500,7 +500,8 @@ def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len}, {dec_seq_len})"
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
     )
 
     hidden_states = kt.rand((batch_size, dec_seq_len, 1024))
@@ -544,7 +545,8 @@ def test_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len}, {dec_seq_len})"
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
     )
     hidden_size = 1024
     shs = hidden_size * hidden_size
@@ -725,7 +727,8 @@ def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
     beam_size = random.randint(2, 5)
     print(
-        f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})"
+        f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len},"
+        f" {beam_size})"
     )
 
     ls_encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
@@ -836,26 +839,26 @@ def test_embedding_layer_backward():
         custom_layer = custom_emb_layer_fp16
         fs_layer = fs_emb_layer_fp16
 
-    loss_data = torch.randn(1, dtype=kt.dtype).sum()
+    custom_input = input.detach().clone()
+    res = custom_layer(custom_input)
+    custom_loss = (res / 1000).sum()
 
     def custom():
         custom_layer.zero_grad()
-        custom_input = input.clone()
-        res = custom_layer(custom_input)
-        custom_loss = (res / 1000).sum()
-        custom_loss.data.copy_(loss_data)
-        custom_loss.backward()
+        custom_loss.backward(retain_graph=True)
+
         return [
             custom_layer.embeddings.grad.contiguous().detach(),
         ]
 
+    fs_input = input.detach().clone()
+    res = fs_layer(fs_input)
+    fs_loss = (res / 1000).sum()
+
     def baseline():
         fs_layer.zero_grad()
-        fs_input = input.clone()
-        res = fs_layer(fs_input)
-        fs_loss = (res / 1000).sum()
-        fs_loss.data.copy_(loss_data)
-        fs_loss.backward()
+        fs_loss.backward(retain_graph=True)
+
         return [
             fs_layer.embeddings.weight.grad.contiguous().detach(),
         ]

@@ -1,5 +1,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <torch/extension.h>
+#include <torch/autograd.h>
+#include <torch/types.h>
 #include <string>
 
 #include "context.h"
@@ -37,7 +39,7 @@ int create_transformer_encoder_layer(
 
   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
 
-  std::cout << "Encoder layer #" << layer_id << " is created with date type ["
+  std::cout << "Encoder layer #" << layer_id << " is created with data type ["
             << dtype << "]." << std::endl;
 
   return 0;
@@ -118,7 +120,7 @@ int create_transformer_decoder_layer(
 
   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
 
-  std::cout << "Decoder layer #" << layer_id << " is created with date type ["
+  std::cout << "Decoder layer #" << layer_id << " is created with data type ["
             << dtype << "]." << std::endl;
 
   return 0;
@@ -217,12 +219,13 @@ std::vector<torch::Tensor> transformer_decoder_layer_bw(
 static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_embedding_layers;
 
+static std::unordered_map<int, torch::Tensor> s_transformer_embedding_grads;
+
 template <typename T>
-int create_transformer_embedding_layer(int layer_id,
-                                       const torch::Tensor &pos_embeddings,
-                                       int max_batch_tokens, int embedding_dim,
-                                       int vocab_size, float dropout_ratio,
-                                       int padding_idx) {
+int64_t create_transformer_embedding_layer(
+    int64_t layer_id, const torch::Tensor &pos_embeddings,
+    int64_t max_batch_tokens, int64_t embedding_dim, int64_t vocab_size,
+    double dropout_ratio, int64_t padding_idx) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   const T *pos_embeddings_ptr = (const T *)pos_embeddings.data_ptr();
@@ -235,15 +238,16 @@ int create_transformer_embedding_layer(int layer_id,
 
   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
 
-  std::cout << "Embedding layer #" << layer_id << " is created with date type ["
+  std::cout << "Embedding layer #" << layer_id << " is created with data type ["
             << dtype << "]." << std::endl;
 
   return 0;
 }
 
 template <typename T>
-std::vector<torch::Tensor> transformer_embedding_layer_fw(
-    int layer_id, const torch::Tensor &input, int step, bool training_mode) {
+torch::Tensor transformer_embedding_layer_fw(int64_t layer_id,
+                                             const torch::Tensor &input,
+                                             int64_t step, bool training_mode) {
   CHECK_INPUT(input);
   const int *input_ptr = (const int *)input.data_ptr();
 
@@ -267,11 +271,11 @@ std::vector<torch::Tensor> transformer_embedding_layer_fw(
   layer->SetTrainingMode(training_mode);
   layer->Forward(input_ptr, out_ptr, step);
 
-  return {output};
+  return output;
 }
 
 template <typename T>
-void transformer_embedding_layer_bw(int layer_id,
+void transformer_embedding_layer_bw(int64_t layer_id,
                                     const torch::Tensor &grad_output,
                                     const torch::Tensor &input) {
   auto g_output = grad_output.contiguous();
@@ -290,15 +294,83 @@ void transformer_embedding_layer_bw(int layer_id,
   return;
 }
 
+class TransformerEmbeddingFunction
+    : public torch::autograd::Function<TransformerEmbeddingFunction> {
+ public:
+  static torch::autograd::variable_list forward(
+      torch::autograd::AutogradContext *ctx, const torch::Tensor &input,
+      // const torch::Tensor &embedding, const torch::Tensor &grad_embedding,
+      const torch::Tensor &embedding, int64_t layer_id, int64_t step,
+      bool training, bool is_grad_enabled, bool fp16) {
+    at::AutoNonVariableTypeMode g;
+
+    ctx->saved_data["training"] = training;
+    ctx->saved_data["layer_id"] = layer_id;
+    ctx->saved_data["fp16"] = fp16;
+
+    if (training && is_grad_enabled) {
+      ctx->save_for_backward({input, embedding});
+    }
+
+    if (fp16) {
+      return {transformer_embedding_layer_fw<__half>(layer_id, input, step,
+                                                     training)};
+    } else {
+      return {transformer_embedding_layer_fw<float>(layer_id, input, step,
+                                                    training)};
+    }
+  }
+
+  static torch::autograd::tensor_list backward(
+      torch::autograd::AutogradContext *ctx,
+      torch::autograd::tensor_list grad_outputs) {
+    auto training = ctx->saved_data["training"].toBool();
+    auto layer_id = ctx->saved_data["layer_id"].toInt();
+    auto fp16 = ctx->saved_data["fp16"].toBool();
+
+    if (!training) {
+      throw std::runtime_error(
+          "Can't call TransformerEmbedding::backward() with training=False");
+    }
+    auto saved = ctx->get_saved_variables();
+    auto input = saved[0];
+    auto embedding = saved[1];
+
+    auto grad_output = grad_outputs[0];
+
+    if (fp16) {
+      transformer_embedding_layer_bw<__half>(layer_id, grad_output, input);
+    } else {
+      transformer_embedding_layer_bw<float>(layer_id, grad_output, input);
+    }
+
+    // Get grad tensor from static variable to keep use_count. Torch will steal
+    // this grad tensor to variable.grad when calling backward() if use_count ==
+    // 1. This will result in 2 * grad because of grad accumulation.
+    torch::Tensor grad_embedding = s_transformer_embedding_grads[layer_id];
+    return {torch::Tensor(), grad_embedding,  torch::Tensor(), torch::Tensor(),
+            torch::Tensor(), torch::Tensor(), torch::Tensor()};
+  }
+};
+
+torch::Tensor transformer_embedding_autograd(torch::Tensor &input,
+                                             torch::Tensor &embedding,
+                                             int64_t layer_id, int64_t step,
+                                             bool training,
+                                             bool is_grad_enabled, bool fp16) {
+  return TransformerEmbeddingFunction::apply(
+      input, embedding, layer_id, step, training, is_grad_enabled, fp16)[0];
+}
+
 template <typename T>
 void assign_layer_weight_grad(const torch::Tensor &weights,
                               torch::Tensor &grads, std::string layer_name,
-                              int layer_id) {
+                              int64_t layer_id) {
   CHECK_INPUT(weights);
-  const T *wptr = (const T *)weights.data_ptr();
+  const T *wptr = static_cast<const T *>(weights.data_ptr());
 
   CHECK_INPUT(grads);
-  T *gptr = (T *)grads.data_ptr();
+  T *gptr = static_cast<T *>(grads.data_ptr());
 
   if (layer_name == "TransformerDecoderLayer") {
     std::shared_ptr<TransformerDecoderLayer<T>> layer =
@@ -316,6 +388,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
     std::shared_ptr<TransformerEmbeddingLayer<T>> layer =
         std::static_pointer_cast<TransformerEmbeddingLayer<T>>(
             s_transformer_embedding_layers[layer_id]);
+    s_transformer_embedding_grads[layer_id] = grads;
     layer->assign_weight_ptr(wptr);
     layer->assign_grad_ptr(gptr);
   }
@@ -336,7 +409,7 @@ int create_cross_entropy_layer(const int layer_id, const float epsilon,
 
   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
 
-  std::cout << "CrossEntropyLayer is created with date type [" << dtype << "]."
+  std::cout << "CrossEntropyLayer is created with data type [" << dtype << "]."
             << std::endl;
 
   return 0;
@@ -476,4 +549,21 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Bind layer weights and grads");
   m.def("assign_layer_weight_grad_fp16", &assign_layer_weight_grad<__half>,
         "Bind layer weights and grads");
+}
+
+TORCH_LIBRARY(lightseq_ops, m) {
+  m.def("create_transformer_embedding_layer_fp32",
+        &create_transformer_embedding_layer<float>);
+  m.def("create_transformer_embedding_layer_fp16",
+        &create_transformer_embedding_layer<__half>);
+  m.def("assign_layer_weight_grad_fp32", &assign_layer_weight_grad<float>);
+  m.def("assign_layer_weight_grad_fp16", &assign_layer_weight_grad<__half>);
+  m.def(
+      "transformer_embedding(Tensor input, Tensor embedding, int layer_id, int "
+      "step, bool training, bool "
+      "is_grad_enabled, bool fp16) -> Tensor");
+}
+
+TORCH_LIBRARY_IMPL(lightseq_ops, Autograd, m) {
+  m.impl("transformer_embedding", transformer_embedding_autograd);
 }

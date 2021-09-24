@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     print("========================TRAIN========================")
     model.train()
-    for epoch in range(2000):
+    for epoch in range(100):
         output = model(src_tokens, trg_tokens)
         loss, _ = loss_fn(output, target)
         if epoch % 200 == 0:
@@ -115,33 +115,36 @@ if __name__ == "__main__":
         loss.backward()
         opt.step()
 
-    torch.save(model.state_dict(), "checkpoint.pt")
-    print("model saved.")
+    jit_model = torch.jit.script(model)
 
-    print("========================TEST========================")
-    model.eval()
-    # obtain encoder output and mask
-    encoder_out, encoder_padding_mask = model.encoder(src_tokens)
-    # use the first token as initial target input
-    predict_tokens = trg_tokens[:, :1]
-    cache = {}
-    for _ in range(trg_seq_len - 1):
-        # use cache to accelerate the inference
-        output = model.decoder(
-            predict_tokens[:, -1:], encoder_out, encoder_padding_mask, cache
-        )
-        # predict the next token
-        output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
-        # concatenate the next token with previous tokens
-        predict_tokens = torch.cat([predict_tokens, output], dim=-1)
-    # pad all tokens after [SEP]
-    mask = torch.cumsum(torch.eq(predict_tokens, sep_id).int(), dim=1)
-    predict_tokens = predict_tokens.masked_fill(mask > 0, sep_id)
-    # predict id to text
-    predict_text = tokenizer.batch_decode(predict_tokens, skip_special_tokens=True)
-    print(">>>>> source text")
-    print("\n".join(src_text))
-    print(">>>>> target text")
-    print("\n".join(trg_text))
-    print(">>>>> predict text")
-    print("\n".join(predict_text))
+    # torch.save(model.state_dict(), "checkpoint.pt")
+    # print("model saved.")
+
+    # print("========================TEST========================")
+    # model.eval()
+    # # obtain encoder output and mask
+    # encoder_out, encoder_padding_mask = model.encoder(src_tokens)
+    # # use the first token as initial target input
+    # predict_tokens = trg_tokens[:, :1]
+
+    # cache = {}
+    # for _ in range(trg_seq_len - 1):
+    #     # use cache to accelerate the inference
+    #     output = model.decoder(
+    #         predict_tokens[:, -1:], encoder_out, encoder_padding_mask, cache
+    #     )
+    #     # predict the next token
+    #     output = torch.reshape(torch.argmax(output, dim=-1), (batch_size, -1))
+    #     # concatenate the next token with previous tokens
+    #     predict_tokens = torch.cat([predict_tokens, output], dim=-1)
+    # # pad all tokens after [SEP]
+    # mask = torch.cumsum(torch.eq(predict_tokens, sep_id).int(), dim=1)
+    # predict_tokens = predict_tokens.masked_fill(mask > 0, sep_id)
+    # # predict id to text
+    # predict_text = tokenizer.batch_decode(predict_tokens, skip_special_tokens=True)
+    # print(">>>>> source text")
+    # print("\n".join(src_text))
+    # print(">>>>> target text")
+    # print("\n".join(trg_text))
+    # print(">>>>> predict text")
+    # print("\n".join(predict_text))

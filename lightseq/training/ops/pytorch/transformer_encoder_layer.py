@@ -265,7 +265,7 @@ class LSTransformerEncoderLayer(nn.Module):
         )
         return destination
 
-    def forward(self, hidden_states, encoder_padding_mask, **kwargs):
+    def forward(self, hidden_states, encoder_padding_mask):
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
         hidden_states = hidden_states.contiguous()
