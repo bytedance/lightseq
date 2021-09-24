@@ -63,7 +63,10 @@ class TransformerEncoderLayer {
     _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
     _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
 
+    _qkv_linear_v3.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
+    _attn_out_linear_v3.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
     _ff1_v3.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v3.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training);
@@ -203,11 +206,12 @@ class TransformerEncoderLayer {
   FeedForward<T> _qkv_linear;
   FeedForward<T> _attn_out_linear;
   FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2;
+  FeedForwardV3<T> _qkv_linear_v3, _attn_out_linear_v3;
   Normalize_Layer<T> _attn_ln;
   Normalize_Layer<T> _ffn_ln;
   FeedForward<T> _ff1, _ff2;
   FeedForwardV2<T> _ff1_v2, _ff2_v2;
-  FeedForwardV3<T> _ff1_v3;
+  FeedForwardV3<T> _ff1_v3, _ff2_v3;
   Softmax<T> _softmax;
   Dropout<T> _attn_prob_dropout;
   Dropout<T> _attn_dropout;

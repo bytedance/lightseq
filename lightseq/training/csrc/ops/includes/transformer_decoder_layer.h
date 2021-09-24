@@ -11,6 +11,7 @@
 #include "dropout.h"
 #include "feed_forward.h"
 #include "feed_forward_v2.h"
+#include "feed_forward_v3.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
@@ -109,6 +110,16 @@ class TransformerDecoderLayer {
                                          _hidden_size);
     _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
     _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
+
+    _qkv_linear_v3.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
+    _attn_out_linear_v3.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
+    _encdec_q_linear_v3.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
+    _encdec_kv_linear_v3.SetConfig(1, _shared_nlayer * 2 * _hidden_size,
+                                   batch_size * src_seq_len, _hidden_size);
+    _encdec_attn_out_linear_v3.SetConfig(1, _hidden_size, _batch_tokens,
+                                         _hidden_size);
+    _ff1_v3.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v3.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training) {
@@ -278,6 +289,10 @@ class TransformerDecoderLayer {
     _shared_grad_encdec_kv_ptr = cuda_malloc<T>(smem_size);
     _encdec_kv_linear.reset_size(_shared_nlayer * 2 * _hidden_size,
                                  _hidden_size);
+    _encdec_kv_linear_v2.reset_max_shape(1, _shared_nlayer * 2 * _hidden_size,
+                                         _max_batch_tokens, _hidden_size);
+    _encdec_kv_linear_v3.reset_max_shape(1, _shared_nlayer * 2 * _hidden_size,
+                                         _max_batch_tokens, _hidden_size);
     std::cout << "Decoder layer #" << _layer_id << " allocate encdec_kv memory"
               << std::endl;
   }
@@ -339,6 +354,8 @@ class TransformerDecoderLayer {
       _encdec_kv_linear, _encdec_attn_out_linear, _ff1, _ff2;
   FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2, _encdec_q_linear_v2,
       _encdec_kv_linear_v2, _encdec_attn_out_linear_v2, _ff1_v2, _ff2_v2;
+  FeedForwardV3<T> _qkv_linear_v3, _attn_out_linear_v3, _encdec_q_linear_v3,
+      _encdec_kv_linear_v3, _encdec_attn_out_linear_v3, _ff1_v3, _ff2_v3;
   Softmax<T> _softmax, _encdec_softmax;
   Dropout<T> _attn_prob_dropout, _attn_dropout, _encdec_attn_prob_dropout,
       _encdec_attn_dropout, _ffn_activation_dropout, _ffn_dropout;

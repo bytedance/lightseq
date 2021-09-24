@@ -57,19 +57,6 @@ class FeedForwardV3 {
     CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
         _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opTrans,
         sizeof(_opTrans)));
-
-    _ATransform =
-        cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
-    _BTransform =
-        cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
-    _CTransform =
-        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
-    _AQuant =
-        cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
-    _BQuant =
-        cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
-    _CQuant =
-        cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
   }
 
   ~FeedForwardV3() {
@@ -95,8 +82,10 @@ class FeedForwardV3 {
 
   void Forward(const T *A, const T *B, T *C, cublasLtHandle_t handle,
                cudaStream_t stream) {
+    allocate_memory();
     int m = _config.m, n = _config.n, k = _config.k;
-    float scale_A = 127, scale_B = 127, clip_max_A = 0.4, clip_max_B = 16.0;
+    n = (n + 3) / 4 * 4;
+    float scale_A = 127, scale_B = 127, clip_max_A = 0.5, clip_max_B = 16.0;
     launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, scale_A, clip_max_A,
                            stream);
     launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, scale_B, clip_max_B,
@@ -169,8 +158,30 @@ class FeedForwardV3 {
         handle, _transformDesc, &_config.transform_alpha, _CTransform,
         _CTransformDesc, &_config.transform_beta, NULL, NULL, _CQuant, _CDesc,
         0));
-    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * n, scale_A * scale_B,
-                             clip_max_A * clip_max_B, stream);
+    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * _config.n,
+                             scale_A * scale_B, clip_max_A * clip_max_B,
+                             stream);
+  }
+
+  void allocate_memory() {
+    if (!_ATransform)
+      _ATransform =
+          cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
+    if (!_BTransform)
+      _BTransform =
+          cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
+    if (!_CTransform)
+      _CTransform =
+          cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
+    if (!_AQuant)
+      _AQuant =
+          cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
+    if (!_BQuant)
+      _BQuant =
+          cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
+    if (!_CQuant)
+      _CQuant =
+          cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
   }
 
   void set_batch_size(cublasLtMatrixLayout_t &ADesc,
@@ -201,6 +212,13 @@ class FeedForwardV3 {
     _config.SetConfig(bsz, m, n, k);
   }
 
+  inline void reset_max_shape(int max_bsz, int max_m, int max_n, int max_k) {
+    _config.max_bsz = max_bsz;
+    _config.max_m = max_m;
+    _config.max_n = max_n;
+    _config.max_k = max_k;
+  }
+
  private:
   Config _config;
   cudaDataType_t _AType = CUDA_R_8I, _BType = CUDA_R_8I, _CType = CUDA_R_32I;
@@ -220,8 +238,8 @@ class FeedForwardV3 {
                          _CTransformDesc = NULL;
   cublasLtMatmulDesc_t _matmulDesc = NULL;
   cublasLtMatrixTransformDesc_t _transformDesc = NULL;
-  int8_t *_ATransform, *_BTransform;
-  int32_t *_CTransform;
-  int8_t *_AQuant, *_BQuant;
-  int32_t *_CQuant;
+  int8_t *_ATransform = NULL, *_BTransform = NULL;
+  int32_t *_CTransform = NULL;
+  int8_t *_AQuant = NULL, *_BQuant = NULL;
+  int32_t *_CQuant = NULL;
 };

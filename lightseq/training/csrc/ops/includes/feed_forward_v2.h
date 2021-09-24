@@ -128,6 +128,13 @@ class FeedForwardV2 {
     _config.SetConfig(bsz, m, n, k);
   }
 
+  inline void reset_max_shape(int max_bsz, int max_m, int max_n, int max_k) {
+    _config.max_bsz = max_bsz;
+    _config.max_m = max_m;
+    _config.max_n = max_n;
+    _config.max_k = max_k;
+  }
+
  private:
   Config _config;
   cudaDataType_t _AType, _BType, _CType;
