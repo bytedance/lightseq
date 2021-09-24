@@ -120,6 +120,17 @@ void launch_d_lookup_scale_pos_dropout(
     const uint8_t *dropout_mask, int batch_size, int seq_len, int embedding_dim,
     int vocab_size, int padding_idx, float dropout_ratio, cudaStream_t &stream);
 
+void launch_split_multilg_request(const int *req, int *src_lang_id,
+                                  int *trg_lang_id, int *src_token_id,
+                                  int batch_size, int req_len,
+                                  cudaStream_t &stream);
+
+template <typename T>
+void launch_enc_emb(int batch_size, int batch_seq_len, int hidden_size,
+                    cudaStream_t stream, const T *token_emb, const T *pos_emb,
+                    const int *token_id, T *output, int *padding_mask,
+                    int padding_id, int max_thread_per_block);
+
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
   return id1 * dim2 + id2;

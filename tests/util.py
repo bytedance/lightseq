@@ -131,7 +131,7 @@ class TestDecorator(object):
             if res:
                 continue
             passed = False
-            print("torch.allclose failed, use numpy.allclose to log detail.")
+            print("torch.allclose failed, use numpy.allclose to log detail.---->>>>")
             t1 = t1.cpu().numpy().flatten()
             t2 = t2.cpu().numpy().flatten()
             try:

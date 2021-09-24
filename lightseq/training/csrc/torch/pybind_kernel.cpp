@@ -197,6 +197,34 @@ void torch_launch_ls_dropout_act_bias_bwd(
       stream);
 }
 
+void torch_launch_split_multilg_request(const torch::Tensor &req,
+                                        torch::Tensor &src_lang_id,
+                                        torch::Tensor &trg_lang_id,
+                                        torch::Tensor &src_token_id) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  int batch_size = req.size(0);
+  int req_len = req.size(1);
+  launch_split_multilg_request(rptr<int>(req), rptr<int>(src_lang_id),
+                               rptr<int>(trg_lang_id), rptr<int>(src_token_id),
+                               batch_size, req_len, stream);
+  // cudaStreamSynchronize(stream);
+  // CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_launch_enc_emb(const torch::Tensor &token_emb,
+                          const torch::Tensor &pos_emb,
+                          const torch::Tensor &token_id, torch::Tensor &res,
+                          torch::Tensor &pad_mask, int pad_id) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  int batch_size = token_id.size(0);
+  int seq_len = token_id.size(1);
+  int hidden_dim = token_emb.size(1);
+  launch_enc_emb(batch_size, seq_len, hidden_dim, stream, rptr<T>(token_emb),
+                 rptr<T>(pos_emb), rptr<int>(token_id), rptr<T>(res),
+                 rptr<int>(pad_mask), pad_id, 1024);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -262,5 +290,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp16",
         &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_split_multilg_request",
+        &torch_launch_split_multilg_request, "Test kernel wrapper");
+  m.def("torch_launch_enc_emb_fp32", &torch_launch_enc_emb<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_enc_emb_fp16", &torch_launch_enc_emb<__half>,
         "Test kernel wrapper");
 }

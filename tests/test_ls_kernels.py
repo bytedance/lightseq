@@ -718,23 +718,82 @@ def test_launch_dropout_gelu_bias_bwd():
     return custom, baseline
 
 
+@kt.case(ntest=20)
+def test_launch_split_multilg_request():
+    batch_size, seq_len = kt.bs_sl()
+    req_len = seq_len + 2
+    print(f"(batch_size, seq_len): {batch_size}, {req_len}")
+
+    req = torch.randint(
+        0, 100000, (batch_size, req_len), dtype=torch.int32, device=kt.device
+    )
+    cus_src_lang_id = torch.zeros(batch_size, dtype=torch.int32, device=kt.device)
+    cus_trg_lang_id = torch.zeros(batch_size, dtype=torch.int32, device=kt.device)
+    cus_src_token_id = torch.zeros(
+        batch_size, req_len - 2, dtype=torch.int32, device=kt.device
+    )
+    cus_func = cuda_module.torch_launch_split_multilg_request
+
+    def custom():
+        cus_func(req, cus_src_lang_id, cus_trg_lang_id, cus_src_token_id)
+        return [cus_src_lang_id, cus_trg_lang_id, cus_src_token_id]
+
+    def baseline():
+        src_lang_id = req[:, 0].clone().contiguous()
+        trg_lang_id = req[:, 1].clone().contiguous()
+        src_token_id = req[:, 2:].clone().contiguous()
+        return [src_lang_id, trg_lang_id, src_token_id]
+
+    return custom, baseline
+
+
+@kt.case(ntest=50)
+def test_launch_enc_emb():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    batch_size, seq_len = 15, 15
+    hidden_dim = 2560
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    vocab_size = random.randint(2000, 3000)  # []
+    pad_id = random.randint(0, vocab_size - 1)  # []
+    token_emb = kt.rand((vocab_size, hidden_dim))
+    pos_emb = kt.rand((seq_len, hidden_dim))
+
+    token_id = torch.randint(
+        0, vocab_size, (batch_size, seq_len), dtype=torch.int32, device=kt.device
+    )  # [)
+    tmp = (
+        torch.randint(0, 3, (batch_size, seq_len), dtype=torch.int32, device=kt.device)
+        == 1
+    )  # [)
+    token_id[tmp] = pad_id
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_enc_emb_fp32
+    else:
+        cus_func = cuda_module.torch_launch_enc_emb_fp16
+    cus_res = kt.rand((batch_size, seq_len, hidden_dim))
+    cus_mask = torch.zeros((batch_size, seq_len), dtype=torch.int32, device=kt.device)
+
+    def custom():
+        cus_func(token_emb, pos_emb, token_id, cus_res, cus_mask, pad_id)
+        return kt.norm_res_list([cus_res, cus_mask])
+
+    def baseline():
+        res = token_emb[token_id.flatten().to(torch.long)]
+        res = res.reshape(batch_size, seq_len, -1) + pos_emb
+        pad_mask = token_id == pad_id
+        pad_mask_expand = pad_mask.unsqueeze(2).repeat(1, 1, hidden_dim)
+        res[pad_mask_expand] = 0
+        return kt.norm_res_list([res, pad_mask])
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
+        "test_launch_enc_emb",
     ]
     kt.run(kernel_list)
