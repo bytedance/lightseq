@@ -15,3 +15,11 @@ template <typename T>
 void launch_dequantize_tensor(const int32_t *input, T *output, int total_count,
                               float scale, float clip_max,
                               cudaStream_t &stream);
+
+__forceinline__ __host__ __device__ int8_t float2int8(float x,
+                                                      float scale_div_clipmax,
+                                                      float clip_max) {
+  if (x > clip_max) x = clip_max;
+  if (x < -clip_max) x = -clip_max;
+  return int8_t(x * scale_div_clipmax);
+}

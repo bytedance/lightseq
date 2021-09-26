@@ -3,13 +3,6 @@
 
 #include "int8_kernels.h"
 
-__host__ __device__ int8_t float2int(float x, float scale, float clip_max) {
-  if (x > clip_max) x = clip_max;
-  if (x < -clip_max) x = -clip_max;
-  int8_t y = int8_t(x / clip_max * scale);
-  return y;
-}
-
 template <typename T>
 __global__ void quantize_tensor_kernel(const T *input, int8_t *output,
                                        int total_count, float scale,
@@ -18,7 +11,8 @@ __global__ void quantize_tensor_kernel(const T *input, int8_t *output,
 template <>
 __global__ void quantize_tensor_kernel<float>(const float *input,
                                               int8_t *output, int total_count,
-                                              float scale, float clip_max) {
+                                              float scale_div_clipmax,
+                                              float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 4 >= total_count) return;
 
@@ -27,17 +21,18 @@ __global__ void quantize_tensor_kernel<float>(const float *input,
   float4 inp4 = input4[i];
   int32_t out4;
   int8_t *out1 = reinterpret_cast<int8_t *>(&out4);
-  out1[0] = float2int(inp4.x, scale, clip_max);
-  out1[1] = float2int(inp4.y, scale, clip_max);
-  out1[2] = float2int(inp4.z, scale, clip_max);
-  out1[3] = float2int(inp4.w, scale, clip_max);
+  out1[0] = float2int8(inp4.x, scale_div_clipmax, clip_max);
+  out1[1] = float2int8(inp4.y, scale_div_clipmax, clip_max);
+  out1[2] = float2int8(inp4.z, scale_div_clipmax, clip_max);
+  out1[3] = float2int8(inp4.w, scale_div_clipmax, clip_max);
   output4[i] = out4;
 }
 
 template <>
 __global__ void quantize_tensor_kernel<__half>(const __half *input,
                                                int8_t *output, int total_count,
-                                               float scale, float clip_max) {
+                                               float scale_div_clipmax,
+                                               float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 8 >= total_count) return;
 
@@ -49,7 +44,7 @@ __global__ void quantize_tensor_kernel<__half>(const __half *input,
   int8_t *out1 = reinterpret_cast<int8_t *>(&out8);
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
-    out1[j] = float2int(__half2float(inp_h[j]), scale, clip_max);
+    out1[j] = float2int8(__half2float(inp_h[j]), scale_div_clipmax, clip_max);
   }
   output4[i] = out8;
 }
@@ -60,7 +55,7 @@ void launch_quantize_tensor<float>(const float *input, int8_t *output,
                                    cudaStream_t &stream) {
   int grid_dim = total_count >> 12;
   quantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, total_count, scale, clip_max);
+      input, output, total_count, scale / clip_max, clip_max);
 }
 
 template <>
@@ -69,7 +64,7 @@ void launch_quantize_tensor<__half>(const __half *input, int8_t *output,
                                     float clip_max, cudaStream_t &stream) {
   int grid_dim = total_count >> 13;
   quantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, total_count, scale, clip_max);
+      input, output, total_count, scale / clip_max, clip_max);
 }
 
 template <typename T>
