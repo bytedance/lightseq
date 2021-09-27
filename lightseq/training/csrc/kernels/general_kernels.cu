@@ -746,3 +746,56 @@ template void launch_enc_emb_multilg_sentence<__half>(
     const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
     int pad_id, int batch_size, int seq_len, int hidden_dim,
     cudaStream_t stream);
+
+/**
+@brief: ker_dec_embedding
+for decoder, look up token embedding, add position embedding
+
+@thread
+gridDim.x = batch_size * beam_size
+blockDim.x = max_thread_per_block
+
+@param
+token_emb: [hidden_size, vocab_size], note, it is different with encoder
+pos_emb: [max_step, hidden_size]
+token_id: input token id, [batch_size, beam_size, max_step]
+output: result, [batch_size, beam_size, hidden_size]
+step: current step
+max_step: max decoder steps
+vocab_size: vocabulary size
+*/
+template <typename T>
+__global__ void ker_dec_embedding(const T *token_emb, const T *pos_emb,
+                                  const int *token_id, T *output, int step,
+                                  int max_step, int vocab_size,
+                                  int hidden_size) {
+  for (uint offset = threadIdx.x; offset < hidden_size; offset += blockDim.x) {
+    int token_idx = token_id[blockIdx.x * max_step + step];
+    output[blockIdx.x * hidden_size + offset] =
+        token_emb[offset * vocab_size + token_idx] +
+        pos_emb[step * hidden_size + offset];
+  }
+}
+
+template <typename T>
+void ker_dec_embedding_launcher(int step_token_num, int hidden_size,
+                                cudaStream_t stream, const T *token_emb,
+                                const T *pos_emb, const int *token_id,
+                                T *output, int step, int max_step,
+                                int vocab_size, int max_thread_per_block) {
+  ker_dec_embedding<T><<<step_token_num, max_thread_per_block, 0, stream>>>(
+      token_emb, pos_emb, token_id, output, step, max_step, vocab_size,
+      hidden_size);
+}
+
+template void ker_dec_embedding_launcher<float>(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const float *token_emb, const float *pos_emb, const int *token_id,
+    float *output, int step, int max_step, int vocab_size,
+    int max_thread_per_block);
+
+template void ker_dec_embedding_launcher<__half>(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const __half *token_emb, const __half *pos_emb, const int *token_id,
+    __half *output, int step, int max_step, int vocab_size,
+    int max_thread_per_block);

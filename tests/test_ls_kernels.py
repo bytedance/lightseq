@@ -825,9 +825,87 @@ def test_launch_enc_emb():
     return custom, baseline
 
 
+"""
+token_emb: [hidden_size, vocab_size], note, it is different with encoder
+pos_emb: [max_step, hidden_size]
+tokens: input token id, [batch_size, beam_size, max_step]
+lang_emb: [lang_num, hidden_size]
+lang_id: [batch_size, ]
+res: result, [batch_size, beam_size, hidden_size]
+"""
+
+
+@kt.case(ntest=50)
+def test_launch_dec_emb():
+    batch_size = random.randint(1, 100)
+    beam_size = random.randint(1, 8)
+    hidden_dim = kt.hidden_dim
+    multilg_type = random.randint(0, 2)
+    print(
+        f"test shape: ({batch_size}, {beam_size}, {hidden_dim}), multilg_type: {multilg_type}"
+    )
+
+    vocab_size = random.randint(2000, 5000)  # []
+    num_lang = random.randint(10, 30)  # []
+    max_step = random.randint(200, 600)  # []
+    step = random.randint(0, max_step - 1)
+    if random.randint(0, 2) == 1:
+        step = 0
+
+    token_emb = kt.rand((hidden_dim, vocab_size))
+    pos_emb = kt.rand((max_step, hidden_dim))
+    tokens = torch.randint(
+        0,
+        vocab_size,
+        (batch_size, beam_size, max_step),
+        dtype=torch.int32,
+        device=kt.device,
+    )
+    lang_emb = kt.rand((num_lang, hidden_dim))
+    lang_id = torch.randint(
+        0, num_lang, (batch_size,), dtype=torch.int32, device=kt.device
+    )
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_dec_emb_fp32
+    else:
+        cus_func = cuda_module.torch_launch_dec_emb_fp16
+    cus_res = kt.rand((batch_size, beam_size, hidden_dim))
+    """
+    (const torch::Tensor &token_emb,
+                          const torch::Tensor &pos_emb,
+                          const torch::Tensor &tokens,
+                          const torch::Tensor &lang_emb,
+                          const torch::Tensor &lang_id, torch::Tensor &res,
+                          int step, int multilg_type)
+    """
+
+    def custom():
+        cus_func(
+            token_emb, pos_emb, tokens, lang_emb, lang_id, cus_res, step, multilg_type
+        )
+        return kt.norm_res_list(
+            [
+                cus_res,
+            ]
+        )
+
+    def baseline():
+        cur_step_token = tokens[:, :, step].flatten().to(torch.long)  # [batch * beam]
+        emb = token_emb.transpose(0, 1)[cur_step_token]  # [batch * beam, hidden_dim]
+        emb += pos_emb[step]
+        return kt.norm_res_list(
+            [
+                emb,
+            ]
+        )
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_enc_emb",
+        "test_launch_dec_emb",
     ]
     kt.run(kernel_list)
