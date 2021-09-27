@@ -126,10 +126,24 @@ void launch_split_multilg_request(const int *req, int *src_lang_id,
                                   cudaStream_t &stream);
 
 template <typename T>
-void launch_enc_emb(int batch_size, int batch_seq_len, int hidden_size,
-                    cudaStream_t stream, const T *token_emb, const T *pos_emb,
-                    const int *token_id, T *output, int *padding_mask,
-                    int padding_id, int max_thread_per_block);
+void launch_enc_emb(const T *token_emb, const T *pos_emb, const int *tokens,
+                    T *output, int *pad_mask, int pad_id, int batch_size,
+                    int seq_len, int hidden_dim, cudaStream_t stream);
+
+template <typename T>
+void launch_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
+                                  const int *tokens, const T *lang_emb,
+                                  const int *lang_id, T *output, int *pad_mask,
+                                  int pad_id, int batch_size, int seq_len,
+                                  int hidden_dim, cudaStream_t stream);
+
+template <typename T>
+void launch_enc_emb_multilg_sentence(const T *token_emb, const T *pos_emb,
+                                     const int *tokens, const T *lang_emb,
+                                     const int *lang_id, T *output,
+                                     int *pad_mask, int pad_id, int batch_size,
+                                     int seq_len, int hidden_dim,
+                                     cudaStream_t stream);
 
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {

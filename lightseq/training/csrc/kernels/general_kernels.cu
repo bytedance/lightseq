@@ -286,113 +286,463 @@ void launch_split_multilg_request(const int *req, int *src_lang_id,
 for encoder, look up token embedding, add position embedding
 
 @thread
-gridDim.x = batch_size
-gridDim.y = batch_seq_len
-blockDim.x = max_thread_per_block
+gridDim.x = (nele + MAX_THREADS - 1) / MAX_THREADS
+blockDim.x = MAX_THREADS;
 
 @param
-token_emb: [vocab_size, hidden_size]
-pos_emb: [max_step, hidden_size]
-token_id: input token id, [batch_size, batch_seq_len]
-output: result, [batch_size, batch_seq_len, hidden_size]
-padding_mask: record the padding token, [batch_size, batch_seq_len]
-padding_id, the padding token id
+token_emb: [vocab_size, hidden_dim]
+pos_emb: [max_step, hidden_dim]
+token_id: input token id, [batch_size, seq_len]
+output: result, [batch_size, seq_len, hidden_dim]
+pad_mask: record the padding token, [batch_size, seq_len]
+pad_id, the padding token id
 */
 template <typename T>
 __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
-                            const int *token_id, T *output, int *padding_mask,
-                            int padding_id, const int hidden_size) {
-  int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
-  int start = target_pos * hidden_size + threadIdx.x;
-  int end = (target_pos + 1) * hidden_size;
-  int tid = token_id[target_pos];
-  if (tid == padding_id) {
-    // for padding id
-    if (threadIdx.x == 0) padding_mask[target_pos] = 1;
-    for (uint i = start; i < end; i += blockDim.x) {
-      // output[target_pos * blockDim.x + threadIdx.x] = 0.f;
-      output[i] = 0.f;
-    }
+                            const int *tokens, T *output, int *pad_mask,
+                            int pad_id, int batch_size, int seq_len,
+                            int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
     return;
   }
-  if (threadIdx.x == 0) {
-    padding_mask[target_pos] = 0;
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  int token = tokens[tokens_idx];
+  float4 value;
+
+  if (token == pad_id) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    value.x += pemb.x;
+    value.y += pemb.y;
+    value.z += pemb.z;
+    value.w += pemb.w;
   }
-  for (uint i = start; i < end; i += blockDim.x) {
-    int offset = i - target_pos * hidden_size;
-    output[i] = token_emb[tid * hidden_size + offset] +
-                pos_emb[blockIdx.y * hidden_size + offset];
-  }
+  ((float4 *)output)[idx] = value;
 }
 
 template <>
 __global__ void ker_enc_emb<__half>(const __half *token_emb,
-                                    const __half *pos_emb, const int *token_id,
-                                    __half *output, int *padding_mask,
-                                    int padding_id,
-                                    const int half_hidden_size) {
-  int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
-  int start = target_pos * half_hidden_size + threadIdx.x;
-  int end = (target_pos + 1) * half_hidden_size;
-  int tid = token_id[target_pos];
-  half2 *output_h = (half2 *)output;
-
-  if (tid == padding_id) {
-    // for padding id
-    if (threadIdx.x == 0) padding_mask[target_pos] = 1;
-    for (uint i = start; i < end; i += blockDim.x) {
-      output_h[i] = __float2half2_rn(0.f);
-    }
+                                    const __half *pos_emb, const int *tokens,
+                                    __half *output, int *pad_mask, int pad_id,
+                                    int batch_size, int seq_len,
+                                    int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
     return;
   }
-  if (threadIdx.x == 0) {
-    padding_mask[target_pos] = 0;
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  int token = tokens[tokens_idx];
+  float4 value;
+
+  if (token == pad_id) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    __half2 *value_h2 = (__half2 *)(&value);
+    __half2 *pemb_h2 = (__half2 *)(&pemb);
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+      float2 value_f2 = __half22float2(value_h2[i]);
+      float2 pemb_f2 = __half22float2(pemb_h2[i]);
+      value_f2.x += pemb_f2.x;
+      value_f2.y += pemb_f2.y;
+      value_h2[i] = __float22half2_rn(value_f2);
+    }
   }
-  for (uint i = start; i < end; i += blockDim.x) {
-    int offset = i - target_pos * half_hidden_size;
-    float2 te = __half22float2(
-        ((const half2 *)token_emb)[tid * half_hidden_size + offset]);
-    float2 pe = __half22float2(
-        ((const half2 *)pos_emb)[blockIdx.y * half_hidden_size + offset]);
-    te.x += pe.x;
-    te.y += pe.y;
-    output_h[i] = __float22half2_rn(te);
-  }
+  ((float4 *)output)[idx] = value;
 }
 
 template <typename T>
-void launch_enc_emb(int batch_size, int batch_seq_len, int hidden_size,
-                    cudaStream_t stream, const T *token_emb, const T *pos_emb,
-                    const int *token_id, T *output, int *padding_mask,
-                    int padding_id, int max_thread_per_block) {
-  ker_enc_emb<T>
-      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
-          token_emb, pos_emb, token_id, output, padding_mask, padding_id,
-          hidden_size);
+void launch_enc_emb(const T *token_emb, const T *pos_emb, const int *tokens,
+                    T *output, int *pad_mask, int pad_id, int batch_size,
+                    int seq_len, int hidden_dim, cudaStream_t stream) {
+  if (hidden_dim % 4 != 0) {
+    throw std::runtime_error("violate hidden_dim % 4 = 0");
+  }
+  hidden_dim >>= 2;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb<T><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, output, pad_mask, pad_id, batch_size, seq_len,
+      hidden_dim);
 }
 
 template <>
-void launch_enc_emb<__half>(int batch_size, int batch_seq_len, int hidden_size,
-                            cudaStream_t stream, const __half *token_emb,
-                            const __half *pos_emb, const int *token_id,
-                            __half *output, int *padding_mask, int padding_id,
-                            int max_thread_per_block) {
-  ker_enc_emb<__half>
-      <<<dim3(batch_size, batch_seq_len), max_thread_per_block, 0, stream>>>(
-          token_emb, pos_emb, token_id, output, padding_mask, padding_id,
-          hidden_size / 2);
+void launch_enc_emb<__half>(const __half *token_emb, const __half *pos_emb,
+                            const int *tokens, __half *output, int *pad_mask,
+                            int pad_id, int batch_size, int seq_len,
+                            int hidden_dim, cudaStream_t stream) {
+  if (hidden_dim % 8 != 0) {
+    throw std::runtime_error("violate hidden_dim % 8 = 0");
+  }
+  hidden_dim >>= 3;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, output, pad_mask, pad_id, batch_size, seq_len,
+      hidden_dim);
 }
 
-template void launch_enc_emb<float>(int batch_size, int batch_seq_len,
-                                    int hidden_size, cudaStream_t stream,
-                                    const float *token_emb,
-                                    const float *pos_emb, const int *token_id,
-                                    float *output, int *padding_mask,
-                                    int padding_id, int max_thread_per_block);
+template void launch_enc_emb<float>(const float *token_emb,
+                                    const float *pos_emb, const int *tokens,
+                                    float *output, int *pad_mask, int pad_id,
+                                    int batch_size, int seq_len, int hidden_dim,
+                                    cudaStream_t stream);
 
-template void launch_enc_emb<__half>(int batch_size, int batch_seq_len,
-                                     int hidden_size, cudaStream_t stream,
-                                     const __half *token_emb,
-                                     const __half *pos_emb, const int *token_id,
-                                     __half *output, int *padding_mask,
-                                     int padding_id, int max_thread_per_block);
+template void launch_enc_emb<__half>(const __half *token_emb,
+                                     const __half *pos_emb, const int *tokens,
+                                     __half *output, int *pad_mask, int pad_id,
+                                     int batch_size, int seq_len,
+                                     int hidden_dim, cudaStream_t stream);
+
+/**
+@brief: ker_enc_emb_multilg_token
+for encoder, look up token embedding, add position embedding
+
+@thread
+gridDim.x = (nele + MAX_THREADS - 1) / MAX_THREADS
+blockDim.x = MAX_THREADS;
+
+@param
+token_emb: [vocab_size, hidden_dim]
+pos_emb: [max_step, hidden_dim]
+token_id: input token id, [batch_size, seq_len]
+output: result, [batch_size, seq_len, hidden_dim]
+pad_mask: record the padding token, [batch_size, seq_len]
+pad_id, the padding token id
+*/
+template <typename T>
+__global__ void ker_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
+                                          const int *tokens, const T *lang_emb,
+                                          const int *lang_id, T *output,
+                                          int *pad_mask, int pad_id,
+                                          int batch_size, int seq_len,
+                                          int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  int token = tokens[tokens_idx];
+  float4 value;
+
+  if (token == pad_id) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
+
+    // add pos emb
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    value.x += pemb.x;
+    value.y += pemb.y;
+    value.z += pemb.z;
+    value.w += pemb.w;
+    // add lang emb
+    pemb = ((float4 *)lang_emb)[lang_id[batch_idx] * hidden_dim + dim_idx];
+    value.x += pemb.x;
+    value.y += pemb.y;
+    value.z += pemb.z;
+    value.w += pemb.w;
+  }
+  ((float4 *)output)[idx] = value;
+}
+
+template <>
+__global__ void ker_enc_emb_multilg_token<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  int token = tokens[tokens_idx];
+  float4 value;
+
+  if (token == pad_id) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
+    __half2 *value_h2 = (__half2 *)(&value);
+
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    __half2 *pemb_h2 = (__half2 *)(&pemb);
+    float4 lemb =
+        ((float4 *)lang_emb)[lang_id[batch_idx] * hidden_dim + dim_idx];
+    __half2 *lemb_h2 = (__half2 *)(&lemb);
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+      float2 value_f2 = __half22float2(value_h2[i]);
+      float2 pemb_f2 = __half22float2(pemb_h2[i]);
+      float2 lemb_f2 = __half22float2(lemb_h2[i]);
+      value_f2.x += pemb_f2.x + lemb_f2.x;
+      value_f2.y += pemb_f2.y + lemb_f2.y;
+      value_h2[i] = __float22half2_rn(value_f2);
+    }
+  }
+  ((float4 *)output)[idx] = value;
+}
+
+template <typename T>
+void launch_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
+                                  const int *tokens, const T *lang_emb,
+                                  const int *lang_id, T *output, int *pad_mask,
+                                  int pad_id, int batch_size, int seq_len,
+                                  int hidden_dim, cudaStream_t stream) {
+  if (hidden_dim % 4 != 0) {
+    throw std::runtime_error("violate hidden_dim % 4 = 0");
+  }
+  hidden_dim >>= 2;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb_multilg_token<T><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, lang_emb, lang_id, output, pad_mask, pad_id,
+      batch_size, seq_len, hidden_dim);
+}
+
+template <>
+void launch_enc_emb_multilg_token<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream) {
+  if (hidden_dim % 8 != 0) {
+    throw std::runtime_error("violate hidden_dim % 8 = 0");
+  }
+  hidden_dim >>= 3;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb_multilg_token<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, lang_emb, lang_id, output, pad_mask, pad_id,
+      batch_size, seq_len, hidden_dim);
+}
+
+template void launch_enc_emb_multilg_token<float>(
+    const float *token_emb, const float *pos_emb, const int *tokens,
+    const float *lang_emb, const int *lang_id, float *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream);
+
+template void launch_enc_emb_multilg_token<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream);
+
+/**
+@brief: ker_enc_emb_multilg_sentence
+for encoder, look up token embedding, add position embedding
+
+@thread
+gridDim.x = (nele + MAX_THREADS - 1) / MAX_THREADS
+blockDim.x = MAX_THREADS;
+
+@param
+token_emb: [vocab_size, hidden_dim]
+pos_emb: [max_step, hidden_dim]
+token_id: input token id, [batch_size, seq_len]
+output: result, [batch_size, seq_len, hidden_dim]
+pad_mask: record the padding token, [batch_size, seq_len]
+pad_id, the padding token id
+*/
+template <typename T>
+__global__ void ker_enc_emb_multilg_sentence(
+    const T *token_emb, const T *pos_emb, const int *tokens, const T *lang_emb,
+    const int *lang_id, T *output, int *pad_mask, int pad_id, int batch_size,
+    int seq_len, int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+
+  bool is_pad;
+  int token_emb_idx;
+  if (seq_idx == 0) {
+    is_pad = false;
+    token_emb = lang_emb;
+    token_emb_idx = lang_id[batch_idx];
+  } else {
+    token_emb_idx = tokens[batch_idx * (seq_len - 1) + seq_idx - 1];
+    is_pad = (token_emb_idx == pad_id);
+  }
+
+  float4 value;
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  if (is_pad) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token_emb_idx * hidden_dim + dim_idx];
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    value.x += pemb.x;
+    value.y += pemb.y;
+    value.z += pemb.z;
+    value.w += pemb.w;
+  }
+  ((float4 *)output)[idx] = value;
+}
+
+template <>
+__global__ void ker_enc_emb_multilg_sentence<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, seq_idx, dim_idx;
+  decompose_3dim(idx, seq_len, hidden_dim, &batch_idx, &seq_idx, &dim_idx);
+
+  bool is_pad;
+  int token_emb_idx;
+  if (seq_idx == 0) {
+    is_pad = false;
+    token_emb = lang_emb;
+    token_emb_idx = lang_id[batch_idx];
+  } else {
+    token_emb_idx = tokens[batch_idx * (seq_len - 1) + seq_idx - 1];
+    is_pad = (token_emb_idx == pad_id);
+  }
+
+  float4 value;
+  int tokens_idx = batch_idx * seq_len + seq_idx;
+  if (is_pad) {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 1;
+    }
+    value.x = 0.f;
+    value.y = 0.f;
+    value.z = 0.f;
+    value.w = 0.f;
+  } else {
+    if (dim_idx == 0) {
+      pad_mask[tokens_idx] = 0;
+    }
+    value = ((float4 *)token_emb)[token_emb_idx * hidden_dim + dim_idx];
+    float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
+    __half2 *value_h2 = (__half2 *)(&value);
+    __half2 *pemb_h2 = (__half2 *)(&pemb);
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+      float2 value_f2 = __half22float2(value_h2[i]);
+      float2 pemb_f2 = __half22float2(pemb_h2[i]);
+      value_f2.x += pemb_f2.x;
+      value_f2.y += pemb_f2.y;
+      value_h2[i] = __float22half2_rn(value_f2);
+    }
+  }
+  ((float4 *)output)[idx] = value;
+}
+
+template <typename T>
+void launch_enc_emb_multilg_sentence(const T *token_emb, const T *pos_emb,
+                                     const int *tokens, const T *lang_emb,
+                                     const int *lang_id, T *output,
+                                     int *pad_mask, int pad_id, int batch_size,
+                                     int seq_len, int hidden_dim,
+                                     cudaStream_t stream) {
+  if (hidden_dim % 4 != 0) {
+    throw std::runtime_error("violate hidden_dim % 4 = 0");
+  }
+  hidden_dim >>= 2;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb_multilg_sentence<T><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, lang_emb, lang_id, output, pad_mask, pad_id,
+      batch_size, seq_len, hidden_dim);
+}
+
+template <>
+void launch_enc_emb_multilg_sentence<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream) {
+  if (hidden_dim % 8 != 0) {
+    throw std::runtime_error("violate hidden_dim % 8 = 0");
+  }
+  hidden_dim >>= 3;
+  int nele = batch_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+
+  ker_enc_emb_multilg_sentence<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, lang_emb, lang_id, output, pad_mask, pad_id,
+      batch_size, seq_len, hidden_dim);
+}
+
+template void launch_enc_emb_multilg_sentence<float>(
+    const float *token_emb, const float *pos_emb, const int *tokens,
+    const float *lang_emb, const int *lang_id, float *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream);
+
+template void launch_enc_emb_multilg_sentence<__half>(
+    const __half *token_emb, const __half *pos_emb, const int *tokens,
+    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
+    int pad_id, int batch_size, int seq_len, int hidden_dim,
+    cudaStream_t stream);

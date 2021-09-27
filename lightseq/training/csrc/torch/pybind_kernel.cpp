@@ -214,15 +214,35 @@ void torch_launch_split_multilg_request(const torch::Tensor &req,
 template <typename T>
 void torch_launch_enc_emb(const torch::Tensor &token_emb,
                           const torch::Tensor &pos_emb,
-                          const torch::Tensor &token_id, torch::Tensor &res,
-                          torch::Tensor &pad_mask, int pad_id) {
+                          const torch::Tensor &token_id,
+                          const torch::Tensor &lang_emb,
+                          const torch::Tensor &lang_id, torch::Tensor &res,
+                          torch::Tensor &pad_mask, int pad_id,
+                          int multilg_type) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  int batch_size = token_id.size(0);
-  int seq_len = token_id.size(1);
-  int hidden_dim = token_emb.size(1);
-  launch_enc_emb(batch_size, seq_len, hidden_dim, stream, rptr<T>(token_emb),
-                 rptr<T>(pos_emb), rptr<int>(token_id), rptr<T>(res),
-                 rptr<int>(pad_mask), pad_id, 1024);
+  int batch_size = res.size(0);
+  int seq_len = res.size(1);
+  int hidden_dim = res.size(2);
+  if (multilg_type == 0) {
+    launch_enc_emb(rptr<T>(token_emb), rptr<T>(pos_emb), rptr<int>(token_id),
+                   rptr<T>(res), rptr<int>(pad_mask), pad_id, batch_size,
+                   seq_len, hidden_dim, stream);
+    return;
+  }
+  if (multilg_type == 1) {
+    launch_enc_emb_multilg_token(
+        rptr<T>(token_emb), rptr<T>(pos_emb), rptr<int>(token_id),
+        rptr<T>(lang_emb), rptr<int>(lang_id), rptr<T>(res),
+        rptr<int>(pad_mask), pad_id, batch_size, seq_len, hidden_dim, stream);
+    return;
+  }
+  if (multilg_type == 2) {
+    launch_enc_emb_multilg_sentence(
+        rptr<T>(token_emb), rptr<T>(pos_emb), rptr<int>(token_id),
+        rptr<T>(lang_emb), rptr<int>(lang_id), rptr<T>(res),
+        rptr<int>(pad_mask), pad_id, batch_size, seq_len, hidden_dim, stream);
+    return;
+  }
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

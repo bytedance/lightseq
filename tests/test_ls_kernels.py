@@ -751,14 +751,18 @@ def test_launch_split_multilg_request():
 def test_launch_enc_emb():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
-    batch_size, seq_len = 15, 15
-    hidden_dim = 2560
-    print("test shape:", (batch_size, seq_len, hidden_dim))
+    multilg_type = random.randint(0, 2)
+    req_len = seq_len + 1 if multilg_type == 2 else seq_len
+    print(
+        f"test shape: ({batch_size}, {seq_len}, {hidden_dim}), multilg_type: {multilg_type}"
+    )
 
-    vocab_size = random.randint(2000, 3000)  # []
+    vocab_size = random.randint(2000, 5000)  # []
+    num_lang = random.randint(10, 30)  # []
     pad_id = random.randint(0, vocab_size - 1)  # []
     token_emb = kt.rand((vocab_size, hidden_dim))
-    pos_emb = kt.rand((seq_len, hidden_dim))
+    pos_emb = kt.rand((req_len, hidden_dim))
+    lang_emb = kt.rand((num_lang, hidden_dim))
 
     token_id = torch.randint(
         0, vocab_size, (batch_size, seq_len), dtype=torch.int32, device=kt.device
@@ -768,22 +772,52 @@ def test_launch_enc_emb():
         == 1
     )  # [)
     token_id[tmp] = pad_id
+    lang_id = torch.randint(
+        0, num_lang, (batch_size,), dtype=torch.int32, device=kt.device
+    )
 
     if kt.dtype == torch.float:
         cus_func = cuda_module.torch_launch_enc_emb_fp32
     else:
         cus_func = cuda_module.torch_launch_enc_emb_fp16
-    cus_res = kt.rand((batch_size, seq_len, hidden_dim))
-    cus_mask = torch.zeros((batch_size, seq_len), dtype=torch.int32, device=kt.device)
+    cus_res = kt.rand((batch_size, req_len, hidden_dim))
+    cus_mask = torch.zeros((batch_size, req_len), dtype=torch.int32, device=kt.device)
 
     def custom():
-        cus_func(token_emb, pos_emb, token_id, cus_res, cus_mask, pad_id)
+        cus_func(
+            token_emb,
+            pos_emb,
+            token_id,
+            lang_emb,
+            lang_id,
+            cus_res,
+            cus_mask,
+            pad_id,
+            multilg_type,
+        )
         return kt.norm_res_list([cus_res, cus_mask])
 
     def baseline():
-        res = token_emb[token_id.flatten().to(torch.long)]
-        res = res.reshape(batch_size, seq_len, -1) + pos_emb
+        res = (
+            token_emb[token_id.flatten().to(torch.long)]
+            .reshape(batch_size, seq_len, -1)
+            .to(torch.float32)
+        )
+        if multilg_type != 0:
+            cur_lang_emb = (
+                lang_emb[lang_id.to(torch.long)].unsqueeze(1).to(torch.float32)
+            )
+            if multilg_type == 1:
+                # token level
+                res += cur_lang_emb
+            else:
+                res = torch.cat([cur_lang_emb, res], 1)
+        res += pos_emb.to(torch.float32)
+
         pad_mask = token_id == pad_id
+        if multilg_type == 2:
+            tmp_zeros = torch.zeros((batch_size, 1), dtype=torch.bool, device=kt.device)
+            pad_mask = torch.cat([tmp_zeros, pad_mask], 1)
         pad_mask_expand = pad_mask.unsqueeze(2).repeat(1, 1, hidden_dim)
         res[pad_mask_expand] = 0
         return kt.norm_res_list([res, pad_mask])
