@@ -90,6 +90,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear_v3.Forward(_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
+                         _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                          _cublasLtHandle, _stream);
 
   launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
@@ -117,6 +118,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                              _hidden_size, _heads, 1, _stream);
 
   _attn_out_linear_v3.Forward(_attn_ow_ptr, _attn_o_inp_ptr, output_ptr,
+                              _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                               _cublasLtHandle, _stream);
 
   _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
@@ -137,14 +139,14 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                     _batch_tokens, _stream);
   }
   _ff1_v3.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
-                  _stream);
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _stream);
 
   _ffn_activation_dropout.bias_act_dropout(
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
   _ff2_v3.Forward(_output_w_ptr, _ff2_inp_ptr, out_ptr, _cublasLtHandle,
-                  _stream);
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _stream);
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
@@ -346,6 +348,10 @@ void TransformerEncoderLayer<T>::SetTrainingMode(bool training) {
 
 template <typename T>
 T *TransformerEncoderLayer<T>::_shared_mem_ptr = nullptr;
+template <typename T>
+int8_t *TransformerEncoderLayer<T>::_shared_ffn_input_ptr = nullptr;
+template <typename T>
+int32_t *TransformerEncoderLayer<T>::_shared_ffn_output_ptr = nullptr;
 
 template class TransformerEncoderLayer<float>;
 template class TransformerEncoderLayer<__half>;

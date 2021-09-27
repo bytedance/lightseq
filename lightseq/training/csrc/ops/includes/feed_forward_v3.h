@@ -72,31 +72,37 @@ class FeedForwardV3 {
     if (_matmulDesc) CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(_matmulDesc));
     if (_transformDesc)
       CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(_transformDesc));
-    cuda_free(_ATransform);
-    cuda_free(_BTransform);
-    cuda_free(_CTransform);
-    cuda_free(_AQuant);
-    cuda_free(_BQuant);
-    cuda_free(_CQuant);
+    // cuda_free(_ATransform);
+    // cuda_free(_BTransform);
+    // cuda_free(_CTransform);
+    // cuda_free(_AQuant);
+    // cuda_free(_BQuant);
+    // cuda_free(_CQuant);
   }
 
-  void Forward(const T *A, const T *B, T *C, cublasLtHandle_t handle,
+  void Forward(const T *A, const T *B, T *C, int8_t *A_buffer,
+               int32_t *C_buffer, cublasLtHandle_t handle,
                cudaStream_t stream) {
-    allocate_memory();
+    // allocate_memory();
     int m = _config.m, n = _config.n, k = _config.k;
     n = (n + 3) / 4 * 4;
+    int size_A = m * k * _config.bsz, size_C = m * n * _config.bsz;
+    int8_t *AT_buffer = A_buffer + size_A;
+    int32_t *CT_buffer = C_buffer + size_C;
+
     float scale_A = 127, scale_B = 127, clip_max_A = 0.5, clip_max_B = 16.0;
-    launch_quantize_tensor(A, _AQuant, _config.bsz * m * k, scale_A, clip_max_A,
-                           stream);
-    launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, scale_B, clip_max_B,
-                           stream);
+    launch_quantize_tensor(A, A_buffer, _config.bsz * m * k, scale_A,
+                           clip_max_A, stream);
+    // launch_quantize_tensor(B, _BQuant, _config.bsz * n * k, scale_B,
+    // clip_max_B,
+    //                        stream);
 
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
         &_ADesc, _AType, _config.transA ? k : m, _config.transA ? m : k,
         _config.transA ? k : m));
-    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
-        &_BDesc, _BType, _config.transB ? k : n, _config.transB ? n : k,
-        _config.transB ? k : n));
+    // CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(
+    //     &_BDesc, _BType, _config.transB ? k : n, _config.transB ? n : k,
+    //     _config.transB ? k : n));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m));
     if (_config.bsz > 1) set_batch_size(_ADesc, _BDesc, _CDesc, m, n, k);
 
@@ -112,9 +118,9 @@ class FeedForwardV3 {
     CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
         _ATransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &_order_COL32,
         sizeof(_order_COL32)));
-    CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
-        _BTransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &_order_COL4_4R2_8C,
-        sizeof(_order_COL4_4R2_8C)));
+    // CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+    //     _BTransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &_order_COL4_4R2_8C,
+    //     sizeof(_order_COL4_4R2_8C)));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
         _CTransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &_order_COL32,
         sizeof(_order_COL32)));
@@ -131,58 +137,64 @@ class FeedForwardV3 {
           _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
           sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
-        handle, _transformDesc, &_config.transform_alpha, _AQuant, _ADesc,
-        &_config.transform_beta, NULL, NULL, _ATransform, _ATransformDesc,
+        handle, _transformDesc, &_config.transform_alpha, A_buffer, _ADesc,
+        &_config.transform_beta, NULL, NULL, AT_buffer, _ATransformDesc,
         stream));
-    if (_config.transB)
-      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
-          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opTrans,
-          sizeof(_opTrans)));
-    else
-      CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
-          _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
-          sizeof(_opNTrans)));
-    CHECK_GPU_ERROR(cublasLtMatrixTransform(
-        handle, _transformDesc, &_config.transform_alpha, _BQuant, _BDesc,
-        &_config.transform_beta, NULL, NULL, _BTransform, _BTransformDesc,
-        stream));
+    // if (_config.transB)
+    //   CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+    //       _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opTrans,
+    //       sizeof(_opTrans)));
+    // else
+    //   CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+    //       _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
+    //       sizeof(_opNTrans)));
+    // CHECK_GPU_ERROR(cublasLtMatrixTransform(
+    //     handle, _transformDesc, &_config.transform_alpha, _BQuant, _BDesc,
+    //     &_config.transform_beta, NULL, NULL, _BTransform, _BTransformDesc,
+    //     stream));
 
     cublas_lt_matmul(handle, _matmulDesc, _ATransformDesc, _BTransformDesc,
-                     _CTransformDesc, _ATransform, _BTransform, _CTransform,
-                     &_config.alpha, &_config.beta, stream);
+                     _CTransformDesc, AT_buffer, B, C_buffer, &_config.alpha,
+                     &_config.beta, stream);
 
     CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
         _transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &_opNTrans,
         sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
-        handle, _transformDesc, &_config.transform_alpha, _CTransform,
-        _CTransformDesc, &_config.transform_beta, NULL, NULL, _CQuant, _CDesc,
+        handle, _transformDesc, &_config.transform_alpha, C_buffer,
+        _CTransformDesc, &_config.transform_beta, NULL, NULL, CT_buffer, _CDesc,
         0));
-    launch_dequantize_tensor(_CQuant, C, _config.bsz * m * _config.n,
+    launch_dequantize_tensor(CT_buffer, C, _config.bsz * m * _config.n,
                              scale_A * scale_B, clip_max_A * clip_max_B,
                              stream);
   }
 
-  void allocate_memory() {
-    if (!_ATransform)
-      _ATransform =
-          cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
-    if (!_BTransform)
-      _BTransform =
-          cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
-    if (!_CTransform)
-      _CTransform =
-          cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
-    if (!_AQuant)
-      _AQuant =
-          cuda_malloc<int8_t>(_config.max_bsz * _config.max_m * _config.max_k);
-    if (!_BQuant)
-      _BQuant =
-          cuda_malloc<int8_t>(_config.max_bsz * _config.max_n * _config.max_k);
-    if (!_CQuant)
-      _CQuant =
-          cuda_malloc<int32_t>(_config.max_bsz * _config.max_m * _config.max_n);
-  }
+  //   void allocate_memory() {
+  //     if (!_ATransform)
+  //       _ATransform =
+  //           cuda_malloc<int8_t>(_config.max_bsz * _config.max_m *
+  //           _config.max_k);
+  //     if (!_BTransform)
+  //       _BTransform =
+  //           cuda_malloc<int8_t>(_config.max_bsz * _config.max_n *
+  //           _config.max_k);
+  //     if (!_CTransform)
+  //       _CTransform =
+  //           cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
+  //           _config.max_n);
+  //     if (!_AQuant)
+  //       _AQuant =
+  //           cuda_malloc<int8_t>(_config.max_bsz * _config.max_m *
+  //           _config.max_k);
+  //     if (!_BQuant)
+  //       _BQuant =
+  //           cuda_malloc<int8_t>(_config.max_bsz * _config.max_n *
+  //           _config.max_k);
+  //     if (!_CQuant)
+  //       _CQuant =
+  //           cuda_malloc<int32_t>(_config.max_bsz * _config.max_m *
+  //           _config.max_n);
+  //   }
 
   void set_batch_size(cublasLtMatrixLayout_t &ADesc,
                       cublasLtMatrixLayout_t &BDesc,

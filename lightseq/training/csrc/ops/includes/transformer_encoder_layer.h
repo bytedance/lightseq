@@ -100,6 +100,7 @@ class TransformerEncoderLayer {
     wptr += _hidden_size;
     _ffn_nb_ptr = wptr;
     wptr += _hidden_size;
+    quantize_weights();
   }
 
   void assign_grad_ptr(T *grads_ptr) {
@@ -156,12 +157,30 @@ class TransformerEncoderLayer {
                         std::max(3 * _max_batch_tokens * _hidden_size,
                                  _max_batch_tokens * _heads * _max_seq_len);
     size_t smem_size = std::max(sz_ffn_bw, sz_attn_bw);
+    size_t sffni_size =
+        std::max(_intermediate_size, _hidden_size) * _max_batch_tokens * 2;
+    size_t sffno_size =
+        std::max(_intermediate_size, 3 * _hidden_size) * _max_batch_tokens * 2;
 
     if (!_shared_mem_ptr) {
       cuda_free(_shared_mem_ptr);
       _shared_mem_ptr = cuda_malloc<T>(smem_size);
       std::cout << "Encoder layer #" << _layer_id
                 << " allocate shared memory size: " << smem_size << std::endl;
+    }
+    if (!_shared_ffn_input_ptr) {
+      cuda_free(_shared_ffn_input_ptr);
+      _shared_ffn_input_ptr = cuda_malloc<int8_t>(sffni_size);
+      std::cout << "Encoder layer #" << _layer_id
+                << " allocate shared ffn input size: " << sffni_size
+                << std::endl;
+    }
+    if (!_shared_ffn_output_ptr) {
+      cuda_free(_shared_ffn_output_ptr);
+      _shared_ffn_output_ptr = cuda_malloc<int32_t>(sffno_size);
+      std::cout << "Encoder layer #" << _layer_id
+                << " allocate shared ffn output size: " << sffno_size
+                << std::endl;
     }
   }
 
@@ -179,6 +198,14 @@ class TransformerEncoderLayer {
     // free shared gpu memory between layers
     cuda_free(_shared_mem_ptr);
     _shared_mem_ptr = nullptr;
+    cuda_free(_shared_ffn_input_ptr);
+    _shared_ffn_input_ptr = nullptr;
+    cuda_free(_shared_ffn_output_ptr);
+    _shared_ffn_output_ptr = nullptr;
+  }
+
+  void quantize_weights() {
+    
   }
 
   // const parameter between batch
@@ -232,6 +259,8 @@ class TransformerEncoderLayer {
   T *_ff2_inp_ptr;
   // shared GPU memory between layer
   static T *_shared_mem_ptr;
+  static int8_t *_shared_ffn_input_ptr;
+  static int32_t *_shared_ffn_output_ptr;
 
   // weights ptr
   const T *_attn_qkvw_ptr;
@@ -247,6 +276,12 @@ class TransformerEncoderLayer {
   const T *_output_b_ptr;
   const T *_ffn_nw_ptr;
   const T *_ffn_nb_ptr;
+
+  // quantized weights ptr
+  int8_t *_quant_attn_qkvw_ptr;
+  int8_t *_quant_attn_ow_ptr;
+  int8_t *_quant_inter_w_ptr;
+  int8_t *_quant_output_w_ptr;
 
   // grads ptr
   T *_grad_attn_qkvw_ptr;
