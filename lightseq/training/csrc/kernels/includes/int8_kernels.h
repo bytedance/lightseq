@@ -1,11 +1,13 @@
 #pragma once
 
+#include <ATen/cuda/CUDAContext.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdexcept>
+#include "cuda_util.h"
 
 template <typename T>
 void launch_quantize_tensor(const T *input, int8_t *output, int total_count,
@@ -16,10 +18,6 @@ void launch_dequantize_tensor(const int32_t *input, T *output, int total_count,
                               float scale, float clip_max,
                               cudaStream_t &stream);
 
-__forceinline__ __host__ __device__ int8_t float2int8(float x,
-                                                      float scale_div_clipmax,
-                                                      float clip_max) {
-  if (x > clip_max) x = clip_max;
-  if (x < -clip_max) x = -clip_max;
-  return int8_t(x * scale_div_clipmax);
-}
+template <typename T>
+void quant_trans_weight(const T *input, int8_t *output, int m, int n,
+                        float scale, float clip_max);

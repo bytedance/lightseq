@@ -22,14 +22,12 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           typename FeedForward<T>::Config(3 * _hidden_size, _hidden_size)),
       _qkv_linear_v2(typename FeedForwardV2<T>::Config(
           1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _qkv_linear_v3(typename FeedForwardV3<T>::Config(
-          1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _qkv_linear_v3(typename FeedForwardV3<T>::Config()),
       _attn_out_linear(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _attn_out_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _attn_out_linear_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _attn_out_linear_v3(typename FeedForwardV3<T>::Config()),
       _attn_ln(typename Normalize_Layer<T>::Config(_hidden_size, false),
                _max_batch_tokens),
       _ffn_ln(typename Normalize_Layer<T>::Config(_hidden_size, false),
@@ -37,13 +35,11 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
       _ff1(typename FeedForward<T>::Config(_intermediate_size, _hidden_size)),
       _ff1_v2(typename FeedForwardV2<T>::Config(
           1, _intermediate_size, _max_batch_tokens, _hidden_size, true, false)),
-      _ff1_v3(typename FeedForwardV3<T>::Config(
-          1, _intermediate_size, _max_batch_tokens, _hidden_size, true, true)),
+      _ff1_v3(typename FeedForwardV3<T>::Config()),
       _ff2(typename FeedForward<T>::Config(_hidden_size, _intermediate_size)),
       _ff2_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _intermediate_size, true, false)),
-      _ff2_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _intermediate_size, true, true)),
+      _ff2_v3(typename FeedForwardV3<T>::Config()),
       _softmax(typename Softmax<T>::Config(num_heads)),
       _attn_prob_dropout(typename Dropout<T>::Config(attn_prob_dropout_ratio),
                          _max_batch_tokens * _heads * _max_seq_len),
@@ -89,7 +85,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   }
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
-  _qkv_linear_v3.Forward(_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
+  _qkv_linear_v3.Forward(_quant_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
                          _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                          _cublasLtHandle, _stream);
 
@@ -117,7 +113,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
                              _hidden_size, _heads, 1, _stream);
 
-  _attn_out_linear_v3.Forward(_attn_ow_ptr, _attn_o_inp_ptr, output_ptr,
+  _attn_out_linear_v3.Forward(_quant_attn_ow_ptr, _attn_o_inp_ptr, output_ptr,
                               _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                               _cublasLtHandle, _stream);
 
@@ -138,15 +134,17 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
-  _ff1_v3.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
-                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _stream);
+  _ff1_v3.Forward(_quant_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr,
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                  _cublasLtHandle, _stream);
 
   _ffn_activation_dropout.bias_act_dropout(
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
-  _ff2_v3.Forward(_output_w_ptr, _ff2_inp_ptr, out_ptr, _cublasLtHandle,
-                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _stream);
+  _ff2_v3.Forward(_quant_output_w_ptr, _ff2_inp_ptr, out_ptr,
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                  _cublasLtHandle, _stream);
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);

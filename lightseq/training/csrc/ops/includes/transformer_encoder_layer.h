@@ -15,6 +15,7 @@
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "int8_kernels.h"
 
 template <typename T>
 class TransformerEncoderLayer {
@@ -63,10 +64,10 @@ class TransformerEncoderLayer {
     _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
     _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
 
-    _qkv_linear_v3.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
-    _attn_out_linear_v3.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
-    _ff1_v3.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
-    _ff2_v3.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
+    _qkv_linear_v3.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
+    _attn_out_linear_v3.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
+    _ff1_v3.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v3.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training);
@@ -205,7 +206,20 @@ class TransformerEncoderLayer {
   }
 
   void quantize_weights() {
-    
+    _quant_attn_qkvw_ptr = cuda_malloc<int8_t>(3 * _hidden_size * _hidden_size);
+    _quant_attn_ow_ptr = cuda_malloc<int8_t>(_hidden_size * _hidden_size);
+    _quant_inter_w_ptr = cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
+    _quant_output_w_ptr =
+        cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
+    float scale = 127, clip_max = 0.5;
+    quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 * _hidden_size,
+                       _hidden_size, scale, clip_max);
+    quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,
+                       _hidden_size, scale, clip_max);
+    quant_trans_weight(_inter_w_ptr, _quant_inter_w_ptr, _intermediate_size,
+                       _hidden_size, scale, clip_max);
+    quant_trans_weight(_output_w_ptr, _quant_output_w_ptr, _hidden_size,
+                       _intermediate_size, scale, clip_max);
   }
 
   // const parameter between batch

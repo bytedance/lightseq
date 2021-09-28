@@ -26,8 +26,8 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(3 * _hidden_size, _hidden_size)),
       _qkv_linear_v2(typename FeedForwardV2<T>::Config(
           1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _qkv_linear_v3(typename FeedForwardV3<T>::Config(
-          1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      // _qkv_linear_v3(typename FeedForwardV3<T>::Config(
+      //     1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
       _attn_scores(typename StridedBatchGemm<T>::Config(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
@@ -47,8 +47,8 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _attn_out_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _attn_out_linear_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      // _attn_out_linear_v3(typename FeedForwardV3<T>::Config(
+      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                     _max_batch_tokens * _hidden_size),
       // >>> decoder enc-dec attn layer
@@ -58,16 +58,16 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _encdec_q_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _encdec_q_linear_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      // _encdec_q_linear_v3(typename FeedForwardV3<T>::Config(
+      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
       _encdec_kv_linear(
           typename FeedForward<T>::Config(2 * _hidden_size, _hidden_size)),
       _encdec_kv_linear_v2(typename FeedForwardV2<T>::Config(
           1, _shared_nlayer * 2 * _hidden_size, _max_batch_tokens, _hidden_size,
           true, false)),
-      _encdec_kv_linear_v3(typename FeedForwardV3<T>::Config(
-          1, _shared_nlayer * 2 * _hidden_size, _max_batch_tokens, _hidden_size,
-          true, true)),
+      // _encdec_kv_linear_v3(typename FeedForwardV3<T>::Config(
+      //     1, _shared_nlayer * 2 * _hidden_size, _max_batch_tokens,
+      //     _hidden_size, true, true)),
       _encdec_attn_scores(typename StridedBatchGemm<T>::Config(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
@@ -88,8 +88,8 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _encdec_attn_out_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      _encdec_attn_out_linear_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      // _encdec_attn_out_linear_v3(typename FeedForwardV3<T>::Config(
+      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
       _encdec_attn_dropout(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
           _max_batch_tokens * _hidden_size),
@@ -99,16 +99,18 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _ff1(typename FeedForward<T>::Config(_intermediate_size, _hidden_size)),
       _ff1_v2(typename FeedForwardV2<T>::Config(
           1, _intermediate_size, _max_batch_tokens, _hidden_size, true, false)),
-      _ff1_v3(typename FeedForwardV3<T>::Config(
-          1, _intermediate_size, _max_batch_tokens, _hidden_size, true, true)),
+      // _ff1_v3(typename FeedForwardV3<T>::Config(
+      //     1, _intermediate_size, _max_batch_tokens, _hidden_size, true,
+      //     true)),
       _ffn_activation_dropout(
           typename Dropout<T>::Config(activation_dropout_ratio),
           _max_batch_tokens * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(_hidden_size, _intermediate_size)),
       _ff2_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _intermediate_size, true, false)),
-      _ff2_v3(typename FeedForwardV3<T>::Config(
-          1, _hidden_size, _max_batch_tokens, _intermediate_size, true, true)),
+      // _ff2_v3(typename FeedForwardV3<T>::Config(
+      //     1, _hidden_size, _max_batch_tokens, _intermediate_size, true,
+      //     true)),
       _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                    _max_batch_tokens * _hidden_size) {
   assert(_hidden_size % _heads == 0);

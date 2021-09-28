@@ -3,6 +3,14 @@
 
 #include "int8_kernels.h"
 
+__forceinline__ __host__ __device__ int8_t float2int8(float x,
+                                                      float scale_div_clipmax,
+                                                      float clip_max) {
+  if (x > clip_max) x = clip_max;
+  if (x < -clip_max) x = -clip_max;
+  return int8_t(x * scale_div_clipmax);
+}
+
 template <typename T>
 __global__ void quantize_tensor_kernel(const T *input, int8_t *output,
                                        int total_count, float scale,
@@ -127,4 +135,59 @@ void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
   int grid_dim = total_count >> 12;
   dequantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
       input, output, total_count, scale, clip_max);
+}
+
+void trans_weight(int8_t *input, int8_t *output, int m, int n,
+                  cudaStream_t &stream) {
+  cublasLtHandle_t handle;
+  cublasLtCreate(&handle);
+  // cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
+  cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL;
+  cublasLtMatrixLayout_t input_desc, output_desc;
+  cublasLtMatrixTransformDesc_t transform_desc;
+  cublasOperation_t opTrans = CUBLAS_OP_T;
+  // int ld_input = n, ld_output = 32 * m;
+  int ld_input = n, ld_output = m;
+  float alpha = 1.0, beta = 0.0;
+  CHECK_GPU_ERROR(
+      cublasLtMatrixLayoutCreate(&input_desc, CUDA_R_8I, n, m, ld_input));
+  CHECK_GPU_ERROR(
+      cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, m, n, ld_output));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+      output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL32,
+      sizeof(order_COL32)));
+
+  CHECK_GPU_ERROR(
+      cublasLtMatrixTransformDescCreate(&transform_desc, CUDA_R_32F));
+  CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+      transform_desc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTrans,
+      sizeof(opTrans)));
+  CHECK_GPU_ERROR(cublasLtMatrixTransform(handle, transform_desc, &alpha, input,
+                                          input_desc, &beta, NULL, NULL, output,
+                                          output_desc, stream));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(input_desc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(output_desc));
+  CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transform_desc));
+}
+
+template <typename T>
+void quant_trans_weight(const T *input, int8_t *output, int m, int n,
+                        float scale, float clip_max);
+
+template <>
+void quant_trans_weight<float>(const float *input, int8_t *output, int m, int n,
+                               float scale, float clip_max) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  int8_t *buffer = cuda_malloc<int8_t>(m * n);
+  launch_quantize_tensor(input, buffer, m * n, scale, clip_max, stream);
+  trans_weight(buffer, output, m, n, stream);
+}
+
+template <>
+void quant_trans_weight<__half>(const __half *input, int8_t *output, int m,
+                                int n, float scale, float clip_max) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  int8_t *buffer = cuda_malloc<int8_t>(m * n);
+  launch_quantize_tensor(input, buffer, m * n, scale, clip_max, stream);
+  trans_weight(buffer, output, m, n, stream);
 }
