@@ -104,7 +104,7 @@ class FeedForwardV3 {
         sizeof(_opNTrans)));
     CHECK_GPU_ERROR(cublasLtMatrixTransform(
         handle, _transformDesc, &transform_alpha, C_buffer, _CTransformDesc,
-        &transform_beta, NULL, NULL, CT_buffer, _CDesc, 0));
+        &transform_beta, NULL, NULL, CT_buffer, _CDesc, stream));
     launch_dequantize_tensor(CT_buffer, C, m * _config.n, scale_A * scale_B,
                              clip_max_A * clip_max_B, stream);
   }
