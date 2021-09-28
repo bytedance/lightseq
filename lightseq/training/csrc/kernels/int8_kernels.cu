@@ -172,22 +172,17 @@ void trans_weight(int8_t *input, int8_t *output, int m, int n,
 
 template <typename T>
 void quant_trans_weight(const T *input, int8_t *output, int m, int n,
-                        float scale, float clip_max);
-
-template <>
-void quant_trans_weight<float>(const float *input, int8_t *output, int m, int n,
-                               float scale, float clip_max) {
+                        float scale, float clip_max) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   int8_t *buffer = cuda_malloc<int8_t>(m * n);
   launch_quantize_tensor(input, buffer, m * n, scale, clip_max, stream);
   trans_weight(buffer, output, m, n, stream);
+  cuda_free(buffer);
 }
 
-template <>
-void quant_trans_weight<__half>(const __half *input, int8_t *output, int m,
-                                int n, float scale, float clip_max) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  int8_t *buffer = cuda_malloc<int8_t>(m * n);
-  launch_quantize_tensor(input, buffer, m * n, scale, clip_max, stream);
-  trans_weight(buffer, output, m, n, stream);
-}
+template void quant_trans_weight<float>(const float *input, int8_t *output,
+                                        int m, int n, float scale,
+                                        float clip_max);
+template void quant_trans_weight<__half>(const __half *input, int8_t *output,
+                                         int m, int n, float scale,
+                                         float clip_max);

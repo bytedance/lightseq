@@ -26,8 +26,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(3 * _hidden_size, _hidden_size)),
       _qkv_linear_v2(typename FeedForwardV2<T>::Config(
           1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      // _qkv_linear_v3(typename FeedForwardV3<T>::Config(
-      //     1, 3 * _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _qkv_linear_v3(typename FeedForwardV3<T>::Config()),
       _attn_scores(typename StridedBatchGemm<T>::Config(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
@@ -47,8 +46,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _attn_out_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      // _attn_out_linear_v3(typename FeedForwardV3<T>::Config(
-      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _attn_out_linear_v3(typename FeedForwardV3<T>::Config()),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                     _max_batch_tokens * _hidden_size),
       // >>> decoder enc-dec attn layer
@@ -58,16 +56,13 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _encdec_q_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      // _encdec_q_linear_v3(typename FeedForwardV3<T>::Config(
-      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _encdec_q_linear_v3(typename FeedForwardV3<T>::Config()),
       _encdec_kv_linear(
           typename FeedForward<T>::Config(2 * _hidden_size, _hidden_size)),
       _encdec_kv_linear_v2(typename FeedForwardV2<T>::Config(
           1, _shared_nlayer * 2 * _hidden_size, _max_batch_tokens, _hidden_size,
           true, false)),
-      // _encdec_kv_linear_v3(typename FeedForwardV3<T>::Config(
-      //     1, _shared_nlayer * 2 * _hidden_size, _max_batch_tokens,
-      //     _hidden_size, true, true)),
+      _encdec_kv_linear_v3(typename FeedForwardV3<T>::Config()),
       _encdec_attn_scores(typename StridedBatchGemm<T>::Config(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
@@ -88,8 +83,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(_hidden_size, _hidden_size)),
       _encdec_attn_out_linear_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _hidden_size, true, false)),
-      // _encdec_attn_out_linear_v3(typename FeedForwardV3<T>::Config(
-      //     1, _hidden_size, _max_batch_tokens, _hidden_size, true, true)),
+      _encdec_attn_out_linear_v3(typename FeedForwardV3<T>::Config()),
       _encdec_attn_dropout(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
           _max_batch_tokens * _hidden_size),
@@ -99,18 +93,14 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _ff1(typename FeedForward<T>::Config(_intermediate_size, _hidden_size)),
       _ff1_v2(typename FeedForwardV2<T>::Config(
           1, _intermediate_size, _max_batch_tokens, _hidden_size, true, false)),
-      // _ff1_v3(typename FeedForwardV3<T>::Config(
-      //     1, _intermediate_size, _max_batch_tokens, _hidden_size, true,
-      //     true)),
+      _ff1_v3(typename FeedForwardV3<T>::Config()),
       _ffn_activation_dropout(
           typename Dropout<T>::Config(activation_dropout_ratio),
           _max_batch_tokens * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(_hidden_size, _intermediate_size)),
       _ff2_v2(typename FeedForwardV2<T>::Config(
           1, _hidden_size, _max_batch_tokens, _intermediate_size, true, false)),
-      // _ff2_v3(typename FeedForwardV3<T>::Config(
-      //     1, _hidden_size, _max_batch_tokens, _intermediate_size, true,
-      //     true)),
+      _ff2_v3(typename FeedForwardV3<T>::Config()),
       _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
                    _max_batch_tokens * _hidden_size) {
   assert(_hidden_size % _heads == 0);
@@ -143,7 +133,8 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
-  _qkv_linear_v2.Forward(_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
+  _qkv_linear_v3.Forward(_quant_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
+                         _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                          _cublasLtHandle, _stream);
   launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
                                      batch_size, from_len, 3, _heads,
@@ -178,7 +169,8 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
                              _hidden_size, _heads, 1, _stream);
 
-  _attn_out_linear_v2.Forward(_attn_ow_ptr, _attn_output_ptr, output_ptr,
+  _attn_out_linear_v3.Forward(_quant_attn_ow_ptr, _attn_output_ptr, output_ptr,
+                              _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                               _cublasLtHandle, _stream);
   _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
                                       _attn_ob_ptr, _batch_tokens, _hidden_size,
@@ -193,9 +185,9 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 template <typename T>
 void TransformerDecoderLayer<T>::encdec_kv_fw(const T *enc_output_ptr) {
   allocate_encdec_kv_memory();
-  _encdec_kv_linear_v2.Forward(_encdec_attn_kvw_ptr, enc_output_ptr,
-                               _shared_grad_encdec_kv_ptr, _cublasLtHandle,
-                               _stream);
+  _encdec_kv_linear_v3.Forward(
+      _quant_encdec_attn_kvw_ptr, enc_output_ptr, _shared_grad_encdec_kv_ptr,
+      _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasLtHandle, _stream);
   // [batch_size, src_seq_len, n_dec_layer * 2, hidden_size] ->
   // [n_dec_layer * 2, batch_size, nhead, src_seq_len, head_dim]
   launch_bias_add_transform_20314<T>(
@@ -228,7 +220,8 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
     _encdec_attn_ln.Forward(_gemmQ_inp_ptr, input_ptr, _encdec_attn_nw_ptr,
                             _encdec_attn_nb_ptr, _batch_tokens, _stream);
   }
-  _encdec_q_linear_v2.Forward(_encdec_attn_qw_ptr, _gemmQ_inp_ptr, buffer,
+  _encdec_q_linear_v3.Forward(_quant_encdec_attn_qw_ptr, _gemmQ_inp_ptr, buffer,
+                              _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                               _cublasLtHandle, _stream);
   // query: [batch_size, trg_seq_len, hidden_size] ->
   // [batch_size, nhead, trg_seq_len, head_dim]
@@ -268,9 +261,9 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
                              _trg_seq_len, _hidden_size, _heads, 1, _stream);
 
-  _encdec_attn_out_linear_v2.Forward(_encdec_attn_ow_ptr,
-                                     _encdec_attn_output_ptr, output_ptr,
-                                     _cublasLtHandle, _stream);
+  _encdec_attn_out_linear_v3.Forward(
+      _quant_encdec_attn_ow_ptr, _encdec_attn_output_ptr, output_ptr,
+      _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasLtHandle, _stream);
 
   _encdec_attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
                                              _encdec_attn_ob_ptr, _batch_tokens,
@@ -289,15 +282,17 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
-  _ff1_v2.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
-                  _stream);
+  _ff1_v3.Forward(_quant_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr,
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                  _cublasLtHandle, _stream);
 
   _ffn_activation_dropout.bias_act_dropout(
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
-  _ff2_v2.Forward(_output_w_ptr, _ff2_inp_ptr, out_ptr, _cublasLtHandle,
-                  _stream);
+  _ff2_v3.Forward(_quant_output_w_ptr, _ff2_inp_ptr, out_ptr,
+                  _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                  _cublasLtHandle, _stream);
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
@@ -621,6 +616,10 @@ template <typename T>
 T *TransformerDecoderLayer<T>::_shared_grad_encdec_kv_ptr = nullptr;
 template <typename T>
 T *TransformerDecoderLayer<T>::_shared_infer_encdec_kv_ptr = nullptr;
+template <typename T>
+int8_t *TransformerDecoderLayer<T>::_shared_ffn_input_ptr = nullptr;
+template <typename T>
+int32_t *TransformerDecoderLayer<T>::_shared_ffn_output_ptr = nullptr;
 
 template class TransformerDecoderLayer<float>;
 template class TransformerDecoderLayer<__half>;
