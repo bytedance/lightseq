@@ -245,11 +245,6 @@ void torch_launch_enc_emb(const torch::Tensor &token_emb,
   }
 }
 /*
-template void ker_dec_embedding_launcher<float>(
-    int step_token_num, int hidden_size, cudaStream_t stream,
-    const float *token_emb, const float *pos_emb, const int *token_id,
-    float *output, int step, int max_step, int vocab_size,
-    int max_thread_per_block);
 token_emb: [hidden_size, vocab_size], note, it is different with encoder
 pos_emb: [max_step, hidden_size]
 tokens: input token id, [batch_size, beam_size, max_step]
@@ -259,8 +254,7 @@ res: result, [batch_size, beam_size, hidden_size]
 */
 template <typename T>
 void torch_launch_dec_emb(const torch::Tensor &token_emb,
-                          const torch::Tensor &pos_emb,
-                          const torch::Tensor &tokens,
+                          const torch::Tensor &pos_emb, torch::Tensor &tokens,
                           const torch::Tensor &lang_emb,
                           const torch::Tensor &lang_id, torch::Tensor &res,
                           int step, int multilg_type) {
@@ -270,11 +264,18 @@ void torch_launch_dec_emb(const torch::Tensor &token_emb,
   int batch_size = tokens.size(0);
   int beam_size = tokens.size(1);
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  ker_dec_embedding_launcher(batch_size * beam_size, hidden_dim, stream,
-                             rptr<T>(token_emb), rptr<T>(pos_emb),
-                             rptr<int>(tokens), rptr<T>(res), step, max_step,
-                             vocab_size, 1024);
+  launch_dec_emb(rptr<T>(token_emb), rptr<T>(pos_emb), rptr<int>(tokens),
+                 rptr<T>(lang_emb), rptr<int>(lang_id), rptr<T>(res),
+                 batch_size, beam_size, hidden_dim, vocab_size, step, max_step,
+                 multilg_type, stream);
 }
+/*
+void launch_dec_emb(const T *token_emb, const T *pos_emb, const int *tokens,
+                    const T *lang_emb, const int *lang_id, T *output,
+                    int batch_size, int beam_size, int hidden_dim,
+                    int vocab_size, int step, int max_step, int multilg_type,
+                    cudaStream_t stream)
+*/
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,

@@ -234,19 +234,21 @@ void launch_concat3_dim1<__half>(const __half *inp1, const __half *inp2,
 
 /**
 @brief: ker_split_multilg_request
-request = numpy.concatenate((src_lang_id, trg_lang_id, src_token_id), axis=1)
+the format of request in multilingual:
+  e.g. <en> <de> <hello> <world> <.>
+  request shape: [batch_size, src_seq_len + 2]
+  request = numpy.concatenate((src_lang_id, trg_lang_id, src_token_id), axis=1)
 
 @thread
 gridDim.x = (nele + MAX_THREADS - 1) / MAX_THREADS
 blockDim.x = MAX_THREADS
 
 @param
-inp1: [batch_size, seq_len, hidden_dim]
-inp2: [batch_size, seq_len, hidden_dim]
-out: [batch_size, seq_len, hidden_dim]
-batch_size: the size of the current batch
-seq_len: the sequence length of the current batch
-hidden_dim: dim of the hidden tensor
+req: [batch_size, src_seq_len + 2, hidden_dim]
+src_lang_id: [batch_size]
+trg_lang_id: [batch_size]
+src_token_id: [batch_size, src_seq_len, hidden_dim]
+req_len: src_seq_len + 2
 */
 __global__ void ker_split_multilg_request(const int *req, int *src_lang_id,
                                           int *trg_lang_id, int *src_token_id,
@@ -292,7 +294,7 @@ blockDim.x = MAX_THREADS;
 @param
 token_emb: [vocab_size, hidden_dim]
 pos_emb: [max_step, hidden_dim]
-token_id: input token id, [batch_size, seq_len]
+tokens: input token id, [batch_size, seq_len]
 output: result, [batch_size, seq_len, hidden_dim]
 pad_mask: record the padding token, [batch_size, seq_len]
 pad_id, the padding token id
@@ -434,7 +436,9 @@ blockDim.x = MAX_THREADS;
 @param
 token_emb: [vocab_size, hidden_dim]
 pos_emb: [max_step, hidden_dim]
-token_id: input token id, [batch_size, seq_len]
+tokens: input token id, [batch_size, seq_len]
+lang_emb: language embedding, [num_lang, hidden_dim]
+lang_id: language index, [batch_size]
 output: result, [batch_size, seq_len, hidden_dim]
 pad_mask: record the padding token, [batch_size, seq_len]
 pad_id, the padding token id
@@ -593,7 +597,9 @@ blockDim.x = MAX_THREADS;
 @param
 token_emb: [vocab_size, hidden_dim]
 pos_emb: [max_step, hidden_dim]
-token_id: input token id, [batch_size, seq_len]
+tokens: input token id, [batch_size, seq_len]
+lang_emb: language embedding, [num_lang, hidden_dim]
+lang_id: language index, [batch_size]
 output: result, [batch_size, seq_len, hidden_dim]
 pad_mask: record the padding token, [batch_size, seq_len]
 pad_id, the padding token id
@@ -752,50 +758,83 @@ template void launch_enc_emb_multilg_sentence<__half>(
 for decoder, look up token embedding, add position embedding
 
 @thread
-gridDim.x = batch_size * beam_size
-blockDim.x = max_thread_per_block
+gridDim.x = (nele + MAX_THREADS - 1) / MAX_THREADS;
+blockDim.x = MAX_THREADS
 
 @param
-token_emb: [hidden_size, vocab_size], note, it is different with encoder
-pos_emb: [max_step, hidden_size]
-token_id: input token id, [batch_size, beam_size, max_step]
-output: result, [batch_size, beam_size, hidden_size]
-step: current step
+token_emb: [hidden_dim, vocab_size], note, it is different with encoder
+pos_emb: [max_step, hidden_dim]
+tokens: input token id, [batch_size, beam_size, max_step]
+lang_emb: language embedding, [num_lang, hidden_dim]
+lang_id: language index, [batch_size]
+output: result, [batch_size, beam_size, hidden_dim]
+step: current decoder step
 max_step: max decoder steps
-vocab_size: vocabulary size
+multilg_type: 0 for no multilg, 1 for token level multilg,
+  2 for sentence level multilg
 */
 template <typename T>
-__global__ void ker_dec_embedding(const T *token_emb, const T *pos_emb,
-                                  const int *token_id, T *output, int step,
-                                  int max_step, int vocab_size,
-                                  int hidden_size) {
-  for (uint offset = threadIdx.x; offset < hidden_size; offset += blockDim.x) {
-    int token_idx = token_id[blockIdx.x * max_step + step];
-    output[blockIdx.x * hidden_size + offset] =
-        token_emb[offset * vocab_size + token_idx] +
-        pos_emb[step * hidden_size + offset];
+__global__ void ker_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
+                            const T *lang_emb, const int *lang_id, T *output,
+                            int batch_size, int beam_size, int hidden_dim,
+                            int vocab_size, int step, int max_step,
+                            int multilg_type) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * hidden_dim) {
+    return;
   }
+  int batch_idx, beam_idx, dim_idx;
+  decompose_3dim(idx, beam_size, hidden_dim, &batch_idx, &beam_idx, &dim_idx);
+
+  T emb;
+  if (multilg_type == 2 && step == 0) {
+    // the bos of sentense level multilg is target lang id
+    int lid = lang_id[batch_idx];
+    emb = lang_emb[flat_2dim(lid, dim_idx, hidden_dim)];
+    tokens[flat_3dim(batch_idx, beam_idx, 0, beam_size, max_step)] = lid;
+  } else {
+    int token =
+        tokens[flat_3dim(batch_idx, beam_idx, step, beam_size, max_step)];
+    emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
+  }
+  float value =
+      float(emb) + float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
+  if (multilg_type == 1) {
+    // token level multilg, add lang_emb
+    value +=
+        float(lang_emb[flat_2dim(lang_id[batch_idx], dim_idx, hidden_dim)]);
+  }
+  output[idx] = T(value);
 }
 
 template <typename T>
-void ker_dec_embedding_launcher(int step_token_num, int hidden_size,
-                                cudaStream_t stream, const T *token_emb,
-                                const T *pos_emb, const int *token_id,
-                                T *output, int step, int max_step,
-                                int vocab_size, int max_thread_per_block) {
-  ker_dec_embedding<T><<<step_token_num, max_thread_per_block, 0, stream>>>(
-      token_emb, pos_emb, token_id, output, step, max_step, vocab_size,
-      hidden_size);
+void launch_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
+                    const T *lang_emb, const int *lang_id, T *output,
+                    int batch_size, int beam_size, int hidden_dim,
+                    int vocab_size, int step, int max_step, int multilg_type,
+                    cudaStream_t stream) {
+  if (step >= max_step) {
+    throw std::runtime_error("violate step < max_step");
+  }
+  int nele = batch_size * beam_size * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  ker_dec_emb<T><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, lang_emb, lang_id, output, batch_size,
+      beam_size, hidden_dim, vocab_size, step, max_step, multilg_type);
 }
 
-template void ker_dec_embedding_launcher<float>(
-    int step_token_num, int hidden_size, cudaStream_t stream,
-    const float *token_emb, const float *pos_emb, const int *token_id,
-    float *output, int step, int max_step, int vocab_size,
-    int max_thread_per_block);
+template void launch_dec_emb<float>(const float *token_emb,
+                                    const float *pos_emb, int *tokens,
+                                    const float *lang_emb, const int *lang_id,
+                                    float *output, int batch_size,
+                                    int beam_size, int hidden_dim,
+                                    int vocab_size, int step, int max_step,
+                                    int multilg_type, cudaStream_t stream);
 
-template void ker_dec_embedding_launcher<__half>(
-    int step_token_num, int hidden_size, cudaStream_t stream,
-    const __half *token_emb, const __half *pos_emb, const int *token_id,
-    __half *output, int step, int max_step, int vocab_size,
-    int max_thread_per_block);
+template void launch_dec_emb<__half>(const __half *token_emb,
+                                     const __half *pos_emb, int *tokens,
+                                     const __half *lang_emb, const int *lang_id,
+                                     __half *output, int batch_size,
+                                     int beam_size, int hidden_dim,
+                                     int vocab_size, int step, int max_step,
+                                     int multilg_type, cudaStream_t stream);

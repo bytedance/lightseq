@@ -146,11 +146,11 @@ void launch_enc_emb_multilg_sentence(const T *token_emb, const T *pos_emb,
                                      cudaStream_t stream);
 
 template <typename T>
-void ker_dec_embedding_launcher(int step_token_num, int hidden_size,
-                                cudaStream_t stream, const T *token_emb,
-                                const T *pos_emb, const int *token_id,
-                                T *output, int step, int max_step,
-                                int vocab_size, int max_thread_per_block);
+void launch_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
+                    const T *lang_emb, const int *lang_id, T *output,
+                    int batch_size, int beam_size, int hidden_dim,
+                    int vocab_size, int step, int max_step, int multilg_type,
+                    cudaStream_t stream);
 
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
