@@ -206,12 +206,14 @@ class TransformerEncoderLayer {
   }
 
   void quantize_weights() {
+    std::cout << "TransformerEncoderLayer #" << _layer_id
+              << " quantize weights." << std::endl;
     _quant_attn_qkvw_ptr = cuda_malloc<int8_t>(3 * _hidden_size * _hidden_size);
     _quant_attn_ow_ptr = cuda_malloc<int8_t>(_hidden_size * _hidden_size);
     _quant_inter_w_ptr = cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
     _quant_output_w_ptr =
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
-    float scale = 127, clip_max = 0.5;
+    float scale = 127, clip_max = 0.3;
     quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 * _hidden_size,
                        _hidden_size, scale, clip_max);
     quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,

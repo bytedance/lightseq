@@ -64,7 +64,7 @@ class FeedForwardV3 {
     int8_t *BT_buffer = B_buffer + size_B;
     int32_t *CT_buffer = C_buffer + size_C;
 
-    float scale_A = 127, scale_B = 127, clip_max_A = 0.5, clip_max_B = 16.0;
+    float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
     launch_quantize_tensor(B, B_buffer, n * k, scale_B, clip_max_B, stream);
 
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_ADesc, _AType, m, k, m));

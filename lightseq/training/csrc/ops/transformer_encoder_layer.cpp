@@ -85,6 +85,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   }
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+  // _qkv_linear_v2.Forward(_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
+  //                        _cublasLtHandle, _stream);
   _qkv_linear_v3.Forward(_quant_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
                          _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                          _cublasLtHandle, _stream);
@@ -113,6 +115,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
                              _hidden_size, _heads, 1, _stream);
 
+  // _attn_out_linear_v2.Forward(_attn_ow_ptr, _attn_o_inp_ptr, output_ptr,
+  //                             _cublasLtHandle, _stream);
   _attn_out_linear_v3.Forward(_quant_attn_ow_ptr, _attn_o_inp_ptr, output_ptr,
                               _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                               _cublasLtHandle, _stream);
@@ -134,6 +138,8 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
+  // _ff1_v2.Forward(_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr, _cublasLtHandle,
+  //                 _stream);
   _ff1_v3.Forward(_quant_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr,
                   _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                   _cublasLtHandle, _stream);
@@ -142,6 +148,8 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
+  // _ff2_v2.Forward(_output_w_ptr, _ff2_inp_ptr, out_ptr, _cublasLtHandle,
+  //                 _stream);
   _ff2_v3.Forward(_quant_output_w_ptr, _ff2_inp_ptr, out_ptr,
                   _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                   _cublasLtHandle, _stream);
