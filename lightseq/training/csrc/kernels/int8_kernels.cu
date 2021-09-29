@@ -141,13 +141,11 @@ void trans_weight(int8_t *input, int8_t *output, int m, int n,
                   cudaStream_t &stream) {
   cublasLtHandle_t handle;
   cublasLtCreate(&handle);
-  // cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
-  cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL;
+  cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
   cublasLtMatrixLayout_t input_desc, output_desc;
   cublasLtMatrixTransformDesc_t transform_desc;
   cublasOperation_t opTrans = CUBLAS_OP_T;
-  // int ld_input = n, ld_output = 32 * m;
-  int ld_input = n, ld_output = m;
+  int ld_input = n, ld_output = 32 * m;
   float alpha = 1.0, beta = 0.0;
   CHECK_GPU_ERROR(
       cublasLtMatrixLayoutCreate(&input_desc, CUDA_R_8I, n, m, ld_input));

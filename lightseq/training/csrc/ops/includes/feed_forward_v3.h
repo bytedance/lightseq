@@ -59,7 +59,8 @@ class FeedForwardV3 {
                int32_t *C_buffer, cublasLtHandle_t handle,
                cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    n = (n + 3) / 4 * 4;
+    int align = 16;
+    n = (n + align - 1) / align * align;
     int size_B = n * k, size_C = m * n;
     int8_t *BT_buffer = B_buffer + size_B;
     int32_t *CT_buffer = C_buffer + size_C;
@@ -67,16 +68,15 @@ class FeedForwardV3 {
     float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
     launch_quantize_tensor(B, B_buffer, n * k, scale_B, clip_max_B, stream);
 
-    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_ADesc, _AType, m, k, m));
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_ADesc, _AType, m, k, 32 * m));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_BDesc, _BType, k, n, k));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_CDesc, _CType, m, n, m));
 
-    // int ldBTransform = 256 * ((n + 7) / 8), ldCTransform = 32 * m;
-    int ldBTransform = n, ldCTransform = m;
+    int ldBTransform = 256 * ((n + 7) / 8);
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_BTransformDesc, _BType, n, k,
                                                ldBTransform));
-    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&_CTransformDesc, _CType, m, n,
-                                               ldCTransform));
+    CHECK_GPU_ERROR(
+        cublasLtMatrixLayoutCreate(&_CTransformDesc, _CType, m, n, 32 * m));
     CHECK_GPU_ERROR(
         cublasLtMatrixLayoutSetAttribute(_ADesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
                                          &_order_COL32, sizeof(_order_COL32)));
@@ -123,10 +123,8 @@ class FeedForwardV3 {
   cudaDataType_t _ComputeType = CUDA_R_32I;
 #endif
   cublasOperation_t _opTrans = CUBLAS_OP_T, _opNTrans = CUBLAS_OP_N;
-  //   cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL32;
-  //   cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
-  cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL;
-  cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL;
+  cublasLtOrder_t _order_COL32 = CUBLASLT_ORDER_COL32;
+  cublasLtOrder_t _order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
   cublasLtMatrixLayout_t _ADesc = NULL, _BDesc = NULL, _CDesc = NULL;
   cublasLtMatrixLayout_t _BTransformDesc = NULL, _CTransformDesc = NULL;
   cublasLtMatmulDesc_t _matmulDesc = NULL;
