@@ -156,7 +156,7 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
-    _weight_offset = _layer_id * _tw._weight_per_enc_layer;
+    _weight_offset = (size_t)_layer_id * _tw._weight_per_enc_layer;
     self_attention();
     ffn_add_norm();
   }
@@ -211,7 +211,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
 #endif
 
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
-    _weight_offset = _layer_id * _tw._weight_per_enc_layer;
+    _weight_offset = (size_t)_layer_id * _tw._weight_per_enc_layer;
     self_attention(true);
     ffn_add_norm();
   }
@@ -245,7 +245,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
               _batch_size * _tw._hidden_size);
 #endif
     for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
-      _weight_offset = _layer_id * _tw._weight_per_enc_layer;
+      _weight_offset = (size_t)_layer_id * _tw._weight_per_enc_layer;
       self_attention_with_cache();
       ffn_add_norm_with_cache();
     }

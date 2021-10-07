@@ -55,7 +55,7 @@ class GptEncoder {
   std::vector<int> _h_sample_id;
   int _h_unfinished;
 
-  // gpu memeory buffer
+  // gpu memory buffer
   _DataType *_p_d_query;
   _DataType *_p_d_k_cache;
   _DataType *_p_d_v_cache;
@@ -85,7 +85,7 @@ class GptEncoder {
   int _batch_size;
   int _batch_token_num;
   int _layer_id;
-  int _weight_offset;
+  size_t _weight_offset;
 
  public:
   int _batch_seq_len;

@@ -69,9 +69,9 @@ Load the weights of embedding layer into GPU memory.
 template <OperationType OpType_>
 std::string GptWeight<OpType_>::proto_parse_emb_wei(
     const GptEmbeddingLayer &layer) {
-  std::vector<int> offset;
+  std::vector<size_t> offset;
   std::vector<float> value;
-  int idx = 0;
+  size_t idx = 0;
 
   offset.push_back(idx);
   if (layer.token_embedding_size() != _src_vocab_size * _hidden_size)
@@ -98,7 +98,7 @@ std::string GptWeight<OpType_>::proto_parse_emb_wei(
   std::vector<_DataType> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset)
+  for (size_t e : offset)
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
 
@@ -111,9 +111,9 @@ Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
 std::string GptWeight<OpType_>::proto_parse_enc_wei(const Gpt &gpt) {
-  std::vector<int> offset;
+  std::vector<size_t> offset;
   std::vector<float> value;
-  int idx = 0;
+  size_t idx = 0;
 
   for (auto enc_layer : gpt.encoder_stack()) {
     offset.push_back(idx);
@@ -200,7 +200,7 @@ std::string GptWeight<OpType_>::proto_parse_enc_wei(const Gpt &gpt) {
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
+  for (size_t e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
   return "";
@@ -280,14 +280,14 @@ Load the weights of embedding layer into GPU memory.
 template <OperationType OpType_>
 void GptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
-  size_t value_size = _src_vocab_size * _hidden_size +
+  size_t value_size = (size_t)_src_vocab_size * _hidden_size +
                       _max_step * _hidden_size + _hidden_size * 2;
 
-  std::vector<int> offset;
+  std::vector<size_t> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
-  int idx = 0;
+  size_t idx = 0;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
@@ -323,7 +323,7 @@ void GptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset)
+  for (size_t e : offset)
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
 
@@ -341,7 +341,7 @@ void GptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
        _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
        _hidden_size) *
       _n_enc_layer;
-  std::vector<int> offset;
+  std::vector<size_t> offset;
   std::vector<float> value(value_size);
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
@@ -446,7 +446,7 @@ void GptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
+  for (size_t e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
 }
