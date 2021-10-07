@@ -336,7 +336,7 @@ Load the weights of encoder into GPU memory.
 template <OperationType OpType_>
 void GptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
-      (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
+      ((size_t)_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
        _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
        _hidden_size) *
@@ -346,8 +346,8 @@ void GptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
 
-  int idx = 0;
-  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
+  size_t idx = 0;
+  for (size_t layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
