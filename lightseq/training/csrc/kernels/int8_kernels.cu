@@ -6,8 +6,7 @@
 __forceinline__ __host__ __device__ int8_t float2int8(float x,
                                                       float scale_div_clipmax,
                                                       float clip_max) {
-  if (x > clip_max) x = clip_max;
-  if (x < -clip_max) x = -clip_max;
+  x = x > clip_max ? clip_max : (x < -clip_max ? -clip_max : x);
   return int8_t(x * scale_div_clipmax);
 }
 
@@ -77,13 +76,15 @@ void launch_quantize_tensor<__half>(const __half *input, int8_t *output,
 
 template <typename T>
 __global__ void dequantize_tensor_kernel(const int32_t *input, T *output,
-                                         int total_count, float scale,
+                                         int total_count,
+                                         float scale_div_clipmax,
                                          float clip_max);
 
 template <>
 __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
                                                 float *output, int total_count,
-                                                float scale, float clip_max) {
+                                                float scale_div_clipmax,
+                                                float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 4 >= total_count) return;
 
@@ -91,30 +92,31 @@ __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
   float4 *output4 = reinterpret_cast<float4 *>(output);
   int4 inp4 = input4[i];
   float4 out4;
-  out4.x = float(inp4.x) / scale * clip_max;
-  out4.y = float(inp4.y) / scale * clip_max;
-  out4.z = float(inp4.z) / scale * clip_max;
-  out4.w = float(inp4.w) / scale * clip_max;
+  out4.x = float(inp4.x) / scale_div_clipmax;
+  out4.y = float(inp4.y) / scale_div_clipmax;
+  out4.z = float(inp4.z) / scale_div_clipmax;
+  out4.w = float(inp4.w) / scale_div_clipmax;
   output4[i] = out4;
 }
 
 template <>
 __global__ void dequantize_tensor_kernel<__half>(const int32_t *input,
                                                  __half *output,
-                                                 int total_count, float scale,
+                                                 int total_count,
+                                                 float scale_div_clipmax,
                                                  float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i * 4 >= total_count) return;
+  if (i * 8 >= total_count) return;
 
-  const int4 *input4 = reinterpret_cast<const int4 *>(input);
-  float2 *output4 = reinterpret_cast<float2 *>(output);
-  int4 inp4 = input4[i];
-  float2 out4;
+  const long4 *input4 = reinterpret_cast<const long4 *>(input);
+  float4 *output4 = reinterpret_cast<float4 *>(output);
+  long4 inp4 = input4[i];
+  float4 out4;
   int32_t *inp1 = reinterpret_cast<int32_t *>(&inp4);
   __half *out1 = reinterpret_cast<__half *>(&out4);
 #pragma unroll
-  for (uint j = 0; j < 4; ++j) {
-    out1[j] = __float2half(float(inp1[j]) / scale * clip_max);
+  for (uint j = 0; j < 8; ++j) {
+    out1[j] = __float2half(float(inp1[j]) / scale_div_clipmax);
   }
   output4[i] = out4;
 }
@@ -125,16 +127,16 @@ void launch_dequantize_tensor<float>(const int32_t *input, float *output,
                                      float clip_max, cudaStream_t &stream) {
   int grid_dim = total_count >> 12;
   dequantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, total_count, scale, clip_max);
+      input, output, total_count, scale / clip_max, clip_max);
 }
 
 template <>
 void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
                                       int total_count, float scale,
                                       float clip_max, cudaStream_t &stream) {
-  int grid_dim = total_count >> 12;
+  int grid_dim = total_count >> 13;
   dequantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, total_count, scale, clip_max);
+      input, output, total_count, scale / clip_max, clip_max);
 }
 
 void trans_weight(int8_t *input, int8_t *output, int m, int n,
