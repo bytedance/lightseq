@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass
+from typing import Dict
 
 import torch
 from torch import nn
@@ -15,8 +16,8 @@ from lightseq.training.ops.pytorch.util import (
     calc_offset,
 )
 
-transformer_cuda_module = None
-_all_layer_grads = dict()
+transformer_cuda_module = TransformerBuilder().load()
+# _all_layer_grads = dict()
 
 
 class LSTransformerEncoderFunc(Function):
@@ -26,58 +27,66 @@ class LSTransformerEncoderFunc(Function):
         input,
         input_mask,
         parameters,
-        config,
+        layer_id,
+        fp16,
+        training,
+        pre_layer_norm,
+        is_grad_enabled,
+        grad,
     ):
         cuda_module = transformer_cuda_module
         forward_func = (
             cuda_module.transformer_encoder_layer_fw_fp16
-            if config.fp16
+            if fp16
             else cuda_module.transformer_encoder_layer_fw_fp32
         )
-        if config.fp16:
+        if fp16:
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
 
-        (output,) = forward_func(
-            config.layer_id, input, input_mask, config.training, config.pre_layer_norm
-        )
+        (output,) = forward_func(layer_id, input, input_mask, training, pre_layer_norm)
 
-        if config.is_grad_enabled and config.training:
+        if is_grad_enabled and training:
             ctx.save_for_backward(output, input, input_mask)
-            ctx.config = config
+            ctx.training = training
+            ctx.fp16 = fp16
+            ctx.layer_id = layer_id
+            ctx.grad = grad
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        assert ctx.config.training
+        assert ctx.training
 
         cuda_module = transformer_cuda_module
         backward_func = (
             cuda_module.transformer_encoder_layer_bw_fp16
-            if ctx.config.fp16
+            if ctx.fp16
             else cuda_module.transformer_encoder_layer_bw_fp32
         )
 
         output, input, input_mask = ctx.saved_tensors
-        if ctx.config.fp16:
+        if ctx.fp16:
             grad_output = grad_output.to(torch.half)
             output = output.to(torch.half)
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
         (grad_input,) = backward_func(
-            ctx.config.layer_id, grad_output, output, input, input_mask
+            ctx.layer_id, grad_output, output, input, input_mask
         )
 
-        grad = _all_layer_grads[ctx.config.layer_id]
+        # grad = _all_layer_grads[ctx.layer_id]
+        grad = ctx.grad
 
-        return (grad_input, None, grad, None)
+        return (grad_input, None, grad, None, None, None, None, None, None)
 
 
 class LSTransformerEncoderLayer(nn.Module):
     """Initialize the Lightseq Transformer Encoder Layer.
 
     Static variable:
-        layer_id: The layer-index counter starting from 0 and incrementing by 1 every time a layer object is instantiated,
+        layer_id: The layer-index counter starting from 0 and incrementing
+        by 1 every time a layer object is instantiated,
         e.g. if a model has 24 transformer layers, layer_id goes from 0 to 23.
     Arguments:
         config: An object of LSTransformerEncoderLayer config, see get_config
@@ -88,12 +97,18 @@ class LSTransformerEncoderLayer(nn.Module):
     """
 
     layer_id = 0
+    __all_layer_grads: Dict[int, torch.Tensor] = dict()
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSTransformerEncoderLayer, self).__init__()
 
         self.config = config
-        self.config.layer_id = LSTransformerEncoderLayer.layer_id
+        self._layer_id = LSTransformerEncoderLayer.layer_id
+        self.fp16 = config.fp16
+        self.max_batch_tokens = config.max_batch_tokens
+        self.max_seq_len = config.max_seq_len
+        self._all_layer_grads = LSTransformerEncoderLayer.__all_layer_grads
+        self.pre_layer_norm = config.pre_layer_norm
         LSTransformerEncoderLayer.layer_id = LSTransformerEncoderLayer.layer_id + 1
 
         print("Lightseq Transformer config is ", self.config.__dict__)
@@ -102,9 +117,9 @@ class LSTransformerEncoderLayer(nn.Module):
             torch.cuda.set_device(self.config.local_rank)
 
         # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
+        # global transformer_cuda_module
+        # if transformer_cuda_module is None:
+        #     transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -115,7 +130,7 @@ class LSTransformerEncoderLayer(nn.Module):
         )
 
         create_layer_func(
-            self.config.layer_id,
+            self._layer_id,
             self.config.max_batch_tokens,
             self.config.max_seq_len,
             self.config.hidden_size,
@@ -132,6 +147,9 @@ class LSTransformerEncoderLayer(nn.Module):
         ims = self.config.intermediate_size
         self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+
+        if self.fp16 and self.para.dtype != torch.half:
+            self.register_buffer("para_16", self.para.clone().detach().half())
 
         if initial_weights is None and initial_biases is None:
             self.init_transformer_weights()
@@ -242,22 +260,24 @@ class LSTransformerEncoderLayer(nn.Module):
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
 
-    def __assign_layer_weight_grad(self):
+    def _assign_layer_weight_grad(self):
         param = (
-            self.para_16
-            if self.config.fp16 and self.para.dtype != torch.half
-            else self.para
+            self.para_16 if self.fp16 and self.para.dtype != torch.half else self.para
         )
-        if self.config.layer_id in _all_layer_grads:
+        if self._layer_id in self._all_layer_grads:
             return
-        cuda_module = transformer_cuda_module
-        if self.config.fp16:
-            func = cuda_module.assign_layer_weight_grad_fp16
-        else:
-            func = cuda_module.assign_layer_weight_grad_fp32
+        # cuda_module = transformer_cuda_module
         grad = torch.empty_like(param)
-        func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
-        _all_layer_grads[self.config.layer_id] = grad
+        if self.fp16:
+            torch.ops.lightseq_ops.assign_layer_weight_grad_fp16(
+                param, grad, "TransformerEncoderLayer", self._layer_id
+            )
+        else:
+            torch.ops.lightseq_ops.assign_layer_weight_grad_fp32(
+                param, grad, "TransformerEncoderLayer", self._layer_id
+            )
+        # func(param, grad, "TransformerEncoderLayer", self._layer_id)
+        self._all_layer_grads[self._layer_id] = grad
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         destination = state_dict(
@@ -266,34 +286,39 @@ class LSTransformerEncoderLayer(nn.Module):
         return destination
 
     def forward(self, hidden_states, encoder_padding_mask):
-        self.config.training = self.training
-        self.config.is_grad_enabled = torch.is_grad_enabled()
+        # self.config.training = self.training
+        # self.config.is_grad_enabled = torch.is_grad_enabled()
+        if hasattr(self, "para_16"):
+            self.para_16.copy_(self.para.to(torch.half))
+
         hidden_states = hidden_states.contiguous()
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
-        if self.config.fp16 and self.para.dtype != torch.half:
-            if hasattr(self, "para_16"):
-                self.para_16.copy_(self.para.to(torch.half))
-            else:
-                self.register_buffer("para_16", self.para.clone().detach().half())
 
-        self.__assign_layer_weight_grad()
+        self._assign_layer_weight_grad()
         bs, sl, dim = hidden_states.size()
-        if bs * sl > self.config.max_batch_tokens:
+        if bs * sl > self.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.max_batch_tokens}."
             )
-        if sl > self.config.max_seq_len:
+        if sl > self.max_seq_len:
             raise ValueError(
-                f"Sequence length {sl} exceeds the limit {self.config.max_seq_len}."
+                f"Sequence length {sl} exceeds the limit {self.max_seq_len}."
             )
         assert bs == encoder_padding_mask.size(0) and sl == encoder_padding_mask.size(1)
+
         output = LSTransformerEncoderFunc.apply(
             hidden_states,
             encoder_padding_mask,
             self.para,
-            self.config,
+            self._layer_id,
+            self.fp16,
+            self.training,
+            self.pre_layer_norm,
+            torch.is_grad_enabled(),
+            self._all_layer_grads[self._layer_id],
         )
 
         return output.to(self.para)

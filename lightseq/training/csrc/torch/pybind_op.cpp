@@ -562,6 +562,11 @@ TORCH_LIBRARY(lightseq_ops, m) {
       "transformer_embedding(Tensor input, Tensor embedding, int layer_id, int "
       "step, bool training, bool "
       "is_grad_enabled, bool fp16) -> Tensor");
+  m.def(
+      "transformer_encoder_layer(Tensor input, Tensor embedding, int layer_id, "
+      "int "
+      "step, bool training, bool "
+      "is_grad_enabled, bool fp16) -> Tensor");
 }
 
 TORCH_LIBRARY_IMPL(lightseq_ops, Autograd, m) {
