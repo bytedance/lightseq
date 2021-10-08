@@ -12,6 +12,7 @@
 #include "feed_forward.h"
 #include "feed_forward_v2.h"
 #include "feed_forward_v3.h"
+#include "feed_forward_v4.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
@@ -68,6 +69,11 @@ class TransformerEncoderLayer {
     _attn_out_linear_v3.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
     _ff1_v3.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
     _ff2_v3.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
+
+    _qkv_linear_v4.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
+    _attn_out_linear_v4.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
+    _ff1_v4.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
+    _ff2_v4.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
   }
 
   void SetTrainingMode(bool training);
@@ -214,14 +220,28 @@ class TransformerEncoderLayer {
     _quant_output_w_ptr =
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
     float scale = 127, clip_max = 0.3;
-    quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 * _hidden_size,
-                       _hidden_size, scale, clip_max);
-    quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,
-                       _hidden_size, scale, clip_max);
-    quant_trans_weight(_inter_w_ptr, _quant_inter_w_ptr, _intermediate_size,
-                       _hidden_size, scale, clip_max);
-    quant_trans_weight(_output_w_ptr, _quant_output_w_ptr, _hidden_size,
-                       _intermediate_size, scale, clip_max);
+    // quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 *
+    // _hidden_size,
+    //                    _hidden_size, scale, clip_max);
+    // quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,
+    //                    _hidden_size, scale, clip_max);
+    // quant_trans_weight(_inter_w_ptr, _quant_inter_w_ptr, _intermediate_size,
+    //                    _hidden_size, scale, clip_max);
+    // quant_trans_weight(_output_w_ptr, _quant_output_w_ptr, _hidden_size,
+    //                    _intermediate_size, scale, clip_max);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    launch_quantize_tensor(_attn_qkvw_ptr, _quant_attn_qkvw_ptr,
+                           3 * _hidden_size * _hidden_size, scale, clip_max,
+                           stream);
+    launch_quantize_tensor(_attn_ow_ptr, _quant_attn_ow_ptr,
+                           _hidden_size * _hidden_size, scale, clip_max,
+                           stream);
+    launch_quantize_tensor(_inter_w_ptr, _quant_inter_w_ptr,
+                           _intermediate_size * _hidden_size, scale, clip_max,
+                           stream);
+    launch_quantize_tensor(_output_w_ptr, _quant_output_w_ptr,
+                           _intermediate_size * _hidden_size, scale, clip_max,
+                           stream);
   }
 
   // const parameter between batch
@@ -250,11 +270,13 @@ class TransformerEncoderLayer {
   FeedForward<T> _attn_out_linear;
   FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2;
   FeedForwardV3<T> _qkv_linear_v3, _attn_out_linear_v3;
+  FeedForwardV4<T> _qkv_linear_v4, _attn_out_linear_v4;
   Normalize_Layer<T> _attn_ln;
   Normalize_Layer<T> _ffn_ln;
   FeedForward<T> _ff1, _ff2;
   FeedForwardV2<T> _ff1_v2, _ff2_v2;
   FeedForwardV3<T> _ff1_v3, _ff2_v3;
+  FeedForwardV4<T> _ff1_v4, _ff2_v4;
   Softmax<T> _softmax;
   Dropout<T> _attn_prob_dropout;
   Dropout<T> _attn_dropout;

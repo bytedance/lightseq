@@ -42,6 +42,25 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
   return 0;
 }
 
+int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
+                   cublasOperation_t transb, int m, int n, int k,
+                   const int32_t *alpha, const int32_t *beta, const int8_t *A,
+                   const int8_t *B, int32_t *C, cublasGemmAlgo_t algo) {
+  cublasStatus_t status =
+      cublasGemmEx(handle, transa, transb, m, n, k, (const void *)alpha,
+                   (const void *)A, CUDA_R_8I, (transa == CUBLAS_OP_N) ? m : k,
+                   (const void *)B, CUDA_R_8I, (transb == CUBLAS_OP_N) ? k : n,
+                   (const void *)beta, C, CUDA_R_32I, m, CUDA_R_32I, algo);
+
+  if (status != CUBLAS_STATUS_SUCCESS) {
+    fprintf(stderr,
+            "!!!! kernel execution error. (m: %d, n: %d, k: %d, error: %d) \n",
+            m, n, k, (int)status);
+    return EXIT_FAILURE;
+  }
+  return 0;
+}
+
 int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
                                 const float *alpha, const float *beta,
                                 const float *A, const float *B, float *C,
