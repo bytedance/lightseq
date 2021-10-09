@@ -65,15 +65,15 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   T *v_tf_ptr = k_tf_ptr + _batch_dim;
 
   if (_pre_or_postLayerNorm) {
-    _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
-                     _batch_tokens, _stream);
+    _attn_ln.ForwardV2(_shared_ffn_input_ptr, input_ptr, _attn_nw_ptr,
+                       _attn_nb_ptr, _batch_tokens, 127, 16, _stream);
   }
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-  _qkv_linear_v4.Forward(_quant_attn_qkvw_ptr, gemmQKV_inp_ptr, buffer,
-                         _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                         _cublasHandle, _stream);
+  _qkv_linear_v4.ForwardV2(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr, buffer,
+                           _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                           _cublasHandle, _stream);
 
   launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
                                      _batch_size, _seq_len, 3, _heads,
@@ -117,13 +117,13 @@ template <typename T>
 void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   // save _ff1_inp_ptr, _relu_inp_ptr, _ff2_inp_ptr for backward
   if (_pre_or_postLayerNorm) {
-    _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
-                    _batch_tokens, _stream);
+    _ffn_ln.ForwardV2(_shared_ffn_input_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
+                      _batch_tokens, 127, 16, _stream);
   }
 
-  _ff1_v4.Forward(_quant_inter_w_ptr, _ff1_inp_ptr, _relu_inp_ptr,
-                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle,
-                  _stream);
+  _ff1_v4.ForwardV2(_quant_inter_w_ptr, _shared_ffn_input_ptr, _relu_inp_ptr,
+                    _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+                    _cublasHandle, _stream);
 
   _ffn_activation_dropout.bias_act_dropout(
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,

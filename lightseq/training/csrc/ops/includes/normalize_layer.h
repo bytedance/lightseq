@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "kernels.h"
+#include "int8_kernels.h"
 
 using namespace std;
 
@@ -37,6 +38,14 @@ class Normalize_Layer {
                int batch_size, cudaStream_t stream) {
     launch_layer_norm(ln_res, vars_, means_, inp, gamma, betta, batch_size,
                       config_.hidden_dim, stream);
+  }
+
+  void ForwardV2(int8_t *ln_res, const T *inp, const T *gamma, const T *betta,
+                 int batch_size, float quant_scale, float clip_max,
+                 cudaStream_t stream) {
+    launch_layer_norm_int8O(ln_res, vars_, means_, inp, gamma, betta,
+                            batch_size, config_.hidden_dim, quant_scale,
+                            clip_max, stream);
   }
 
   /*
