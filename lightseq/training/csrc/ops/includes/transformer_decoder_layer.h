@@ -10,8 +10,6 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
-#include "feed_forward_v2.h"
-#include "feed_forward_v3.h"
 #include "feed_forward_v4.h"
 #include "normalize_layer.h"
 #include "softmax.h"
@@ -87,41 +85,6 @@ class TransformerDecoderLayer {
       _attn_context.SetConfig(_hidden_size / _heads, _trg_seq_len,
                               _trg_seq_len);
     }
-
-    _qkv_linear_v2.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
-    if (step >= 0) {
-      _attn_scores_v2.SetConfig(batch_heads, step + 1, 1,
-                                _hidden_size / _heads);
-      _attn_context_v2.SetConfig(batch_heads, _hidden_size / _heads, 1,
-                                 step + 1);
-    } else {
-      _attn_scores_v2.SetConfig(batch_heads, _trg_seq_len, _trg_seq_len,
-                                _hidden_size / _heads);
-      _attn_context_v2.SetConfig(batch_heads, _hidden_size / _heads,
-                                 _trg_seq_len, _trg_seq_len);
-    }
-    _attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
-    _encdec_q_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
-    _encdec_kv_linear_v2.SetConfig(1, _shared_nlayer * 2 * _hidden_size,
-                                   batch_size * src_seq_len, _hidden_size);
-    _encdec_attn_scores_v2.SetConfig(_batch_heads, _src_seq_len, _trg_seq_len,
-                                     _hidden_size / _heads);
-    _encdec_attn_context_v2.SetConfig(_batch_heads, _hidden_size / _heads,
-                                      _trg_seq_len, _src_seq_len);
-    _encdec_attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens,
-                                         _hidden_size);
-    _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
-    _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
-
-    _qkv_linear_v3.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
-    _attn_out_linear_v3.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
-    _encdec_q_linear_v3.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
-    _encdec_kv_linear_v3.SetConfig(_shared_nlayer * 2 * _hidden_size,
-                                   batch_size * src_seq_len, _hidden_size);
-    _encdec_attn_out_linear_v3.SetConfig(_hidden_size, _batch_tokens,
-                                         _hidden_size);
-    _ff1_v3.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
-    _ff2_v3.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
 
     _qkv_linear_v4.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
     _attn_out_linear_v4.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
@@ -302,17 +265,15 @@ class TransformerDecoderLayer {
     _shared_grad_encdec_kv_ptr = cuda_malloc<T>(smem_size);
     _encdec_kv_linear.reset_size(_shared_nlayer * 2 * _hidden_size,
                                  _hidden_size);
-    _encdec_kv_linear_v2.reset_max_shape(1, _shared_nlayer * 2 * _hidden_size,
-                                         _max_batch_tokens, _hidden_size);
     std::cout << "Decoder layer #" << _layer_id << " allocate encdec_kv memory"
               << std::endl;
 
     size_t sffni_size =
-        std::max(_intermediate_size, _hidden_size) * _max_batch_tokens * 2;
+        std::max(_intermediate_size, _hidden_size) * _max_batch_tokens;
     size_t sffno_size =
         std::max(_shared_nlayer * 2 * _hidden_size,
                  std::max(_intermediate_size, 3 * _hidden_size)) *
-        _max_batch_tokens * 2;
+        _max_batch_tokens;
     if (!_shared_ffn_input_ptr) {
       cuda_free(_shared_ffn_input_ptr);
       _shared_ffn_input_ptr = cuda_malloc<int8_t>(sffni_size);
@@ -381,24 +342,6 @@ class TransformerDecoderLayer {
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
 
     float scale = 127, clip_max = 0.3;
-    // quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 *
-    // _hidden_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_encdec_attn_qw_ptr, _quant_encdec_attn_qw_ptr,
-    //                    _hidden_size, _hidden_size, scale, clip_max);
-    // quant_trans_weight(_encdec_attn_ow_ptr, _quant_encdec_attn_ow_ptr,
-    //                    _hidden_size, _hidden_size, scale, clip_max);
-    // if (_layer_id == 0)
-    //   quant_trans_weight(_encdec_attn_kvw_ptr, _quant_encdec_attn_kvw_ptr,
-    //                      _shared_nlayer * 2 * _hidden_size, _hidden_size,
-    //                      scale, clip_max);
-    // quant_trans_weight(_inter_w_ptr, _quant_inter_w_ptr, _intermediate_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_output_w_ptr, _quant_output_w_ptr, _hidden_size,
-    //                    _intermediate_size, scale, clip_max);
-
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
     launch_quantize_tensor(_attn_qkvw_ptr, _quant_attn_qkvw_ptr,
                            3 * _hidden_size * _hidden_size, scale, clip_max,
@@ -452,10 +395,6 @@ class TransformerDecoderLayer {
   Normalize_Layer<T> _attn_ln, _encdec_attn_ln, _ffn_ln;
   FeedForward<T> _qkv_linear, _attn_out_linear, _encdec_q_linear,
       _encdec_kv_linear, _encdec_attn_out_linear, _ff1, _ff2;
-  FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2, _encdec_q_linear_v2,
-      _encdec_kv_linear_v2, _encdec_attn_out_linear_v2, _ff1_v2, _ff2_v2;
-  FeedForwardV3<T> _qkv_linear_v3, _attn_out_linear_v3, _encdec_q_linear_v3,
-      _encdec_kv_linear_v3, _encdec_attn_out_linear_v3, _ff1_v3, _ff2_v3;
   FeedForwardV4<T> _qkv_linear_v4, _attn_out_linear_v4, _encdec_q_linear_v4,
       _encdec_kv_linear_v4, _encdec_attn_out_linear_v4, _ff1_v4, _ff2_v4;
   Softmax<T> _softmax, _encdec_softmax;
@@ -463,8 +402,6 @@ class TransformerDecoderLayer {
       _encdec_attn_dropout, _ffn_activation_dropout, _ffn_dropout;
   StridedBatchGemm<T> _attn_scores, _attn_context, _encdec_attn_scores,
       _encdec_attn_context;
-  FeedForwardV2<T> _attn_scores_v2, _attn_context_v2, _encdec_attn_scores_v2,
-      _encdec_attn_context_v2;
 
   // layer's local GPU memory
   T *_gemmQKV_inp_ptr;

@@ -10,8 +10,6 @@
 #include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
-#include "feed_forward_v2.h"
-#include "feed_forward_v3.h"
 #include "feed_forward_v4.h"
 #include "normalize_layer.h"
 #include "softmax.h"
@@ -55,20 +53,6 @@ class TransformerEncoderLayer {
     _batch_dim = _batch_tokens * _hidden_size;
     _attn_scores.SetConfig(_seq_len, _seq_len, _hidden_size / _heads);
     _attn_context.SetConfig(_hidden_size / _heads, _seq_len, _seq_len);
-
-    _qkv_linear_v2.SetConfig(1, 3 * _hidden_size, _batch_tokens, _hidden_size);
-    _attn_scores_v2.SetConfig(_batch_heads, _seq_len, _seq_len,
-                              _hidden_size / _heads);
-    _attn_context_v2.SetConfig(_batch_heads, _hidden_size / _heads, _seq_len,
-                               _seq_len);
-    _attn_out_linear_v2.SetConfig(1, _hidden_size, _batch_tokens, _hidden_size);
-    _ff1_v2.SetConfig(1, _intermediate_size, _batch_tokens, _hidden_size);
-    _ff2_v2.SetConfig(1, _hidden_size, _batch_tokens, _intermediate_size);
-
-    _qkv_linear_v3.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
-    _attn_out_linear_v3.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
-    _ff1_v3.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
-    _ff2_v3.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
 
     _qkv_linear_v4.SetConfig(3 * _hidden_size, _batch_tokens, _hidden_size);
     _attn_out_linear_v4.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
@@ -165,9 +149,9 @@ class TransformerEncoderLayer {
                                  _max_batch_tokens * _heads * _max_seq_len);
     size_t smem_size = std::max(sz_ffn_bw, sz_attn_bw);
     size_t sffni_size =
-        std::max(_intermediate_size, _hidden_size) * _max_batch_tokens * 2;
+        std::max(_intermediate_size, _hidden_size) * _max_batch_tokens;
     size_t sffno_size =
-        std::max(_intermediate_size, 3 * _hidden_size) * _max_batch_tokens * 2;
+        std::max(_intermediate_size, 3 * _hidden_size) * _max_batch_tokens;
 
     if (!_shared_mem_ptr) {
       cuda_free(_shared_mem_ptr);
@@ -220,15 +204,6 @@ class TransformerEncoderLayer {
     _quant_output_w_ptr =
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
     float scale = 127, clip_max = 0.3;
-    // quant_trans_weight(_attn_qkvw_ptr, _quant_attn_qkvw_ptr, 3 *
-    // _hidden_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_attn_ow_ptr, _quant_attn_ow_ptr, _hidden_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_inter_w_ptr, _quant_inter_w_ptr, _intermediate_size,
-    //                    _hidden_size, scale, clip_max);
-    // quant_trans_weight(_output_w_ptr, _quant_output_w_ptr, _hidden_size,
-    //                    _intermediate_size, scale, clip_max);
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
     launch_quantize_tensor(_attn_qkvw_ptr, _quant_attn_qkvw_ptr,
                            3 * _hidden_size * _hidden_size, scale, clip_max,
@@ -268,14 +243,10 @@ class TransformerEncoderLayer {
   // layers
   FeedForward<T> _qkv_linear;
   FeedForward<T> _attn_out_linear;
-  FeedForwardV2<T> _qkv_linear_v2, _attn_out_linear_v2;
-  FeedForwardV3<T> _qkv_linear_v3, _attn_out_linear_v3;
   FeedForwardV4<T> _qkv_linear_v4, _attn_out_linear_v4;
   Normalize_Layer<T> _attn_ln;
   Normalize_Layer<T> _ffn_ln;
   FeedForward<T> _ff1, _ff2;
-  FeedForwardV2<T> _ff1_v2, _ff2_v2;
-  FeedForwardV3<T> _ff1_v3, _ff2_v3;
   FeedForwardV4<T> _ff1_v4, _ff2_v4;
   Softmax<T> _softmax;
   Dropout<T> _attn_prob_dropout;
@@ -284,7 +255,6 @@ class TransformerEncoderLayer {
   Dropout<T> _ffn_dropout;
   StridedBatchGemm<T> _attn_scores;
   StridedBatchGemm<T> _attn_context;
-  FeedForwardV2<T> _attn_scores_v2, _attn_context_v2;
 
   // local GPU memory
   T *_gemmQKV_inp_ptr;
