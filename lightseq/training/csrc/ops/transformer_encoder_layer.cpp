@@ -121,17 +121,18 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                       _batch_tokens, 127, 16, _stream);
   }
 
-  _ff1_v4.ForwardV2(_quant_inter_w_ptr, _shared_ffn_input_ptr, _relu_inp_ptr,
+  _ff1_v4.ForwardV3(_quant_inter_w_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _cublasHandle, _stream);
+
+  _ffn_activation_dropout.bias_act_dropout_int32I_int8O(
+      _shared_ffn_input_ptr, _shared_ffn_output_ptr, _inter_b_ptr,
+      _batch_tokens, _intermediate_size, _activation_fn, 127 * 127, 0.3 * 16,
+      127, 16, _stream);
+
+  _ff2_v4.ForwardV2(_quant_output_w_ptr, _shared_ffn_input_ptr, out_ptr,
                     _shared_ffn_input_ptr, _shared_ffn_output_ptr,
                     _cublasHandle, _stream);
-
-  _ffn_activation_dropout.bias_act_dropout(
-      _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
-      _intermediate_size, _activation_fn, _stream);
-
-  _ff2_v4.Forward(_quant_output_w_ptr, _ff2_inp_ptr, out_ptr,
-                  _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle,
-                  _stream);
 
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);

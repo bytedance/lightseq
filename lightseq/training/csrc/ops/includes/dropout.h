@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "kernels.h"
+#include "int8_kernels.h"
 
 template <typename T>
 class Dropout {
@@ -64,6 +65,24 @@ class Dropout {
       launch_ls_dropout_act_bias<ActivationType::kGelu, T>(
           output, input, _mask, bias, rows * cols, cols, _config.RATIO(),
           stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
+  }
+
+  void bias_act_dropout_int32I_int8O(int8_t *output, const int32_t *input,
+                                     const T *bias, int rows, int cols,
+                                     std::string activation_fn, float in_scale,
+                                     float in_clip_max, float out_scale,
+                                     float out_clip_max, cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, T>(
+          output, input, _mask, bias, rows * cols, cols, _config.RATIO(),
+          in_scale, in_clip_max, out_scale, out_clip_max, stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kGelu, T>(
+          output, input, _mask, bias, rows * cols, cols, _config.RATIO(),
+          in_scale, in_clip_max, out_scale, out_clip_max, stream);
     } else {
       throw std::runtime_error("not supported activation: " + activation_fn);
     }

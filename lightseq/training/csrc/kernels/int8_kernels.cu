@@ -362,3 +362,236 @@ void launch_layer_norm_int8O<__half>(int8_t *ln_res, __half *vars,
   ker_layer_norm_int8O<__half><<<grid_dim, block_dim, 0, stream>>>(
       ln_res, vars, means, inp, scale, bias, hidden_dim, quant_scale, clip_max);
 }
+
+/**
+ * @brief element-wise activation function on device, like Relu, Gelu
+ *
+ * @tparam enum class ActivationType, kRelu, kGelu
+ * @tparam input type
+ * @param any shape of float and __half2
+ * @return same shape and type with input
+ */
+template <ActivationType, typename T>
+__forceinline__ __device__ T activation_kernel_int8(T x);
+
+template <>
+__device__ float activation_kernel_int8<ActivationType::kGelu, float>(float x) {
+  float cdf =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (x + 0.044715f * x * x * x))));
+  return x * cdf;
+}
+
+template <>
+__device__ __half2
+activation_kernel_int8<ActivationType::kGelu, __half2>(__half2 val) {
+  __half2 val_pow3 = __hmul2(val, __hmul2(val, val));
+  float2 tmp_pow = __half22float2(val_pow3);
+  float2 tmp = __half22float2(val);
+
+  tmp.x =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (tmp.x + 0.044715f * tmp_pow.x))));
+  tmp.y =
+      0.5f *
+      (1.0f + tanhf((0.7978845608028654f * (tmp.y + 0.044715f * tmp_pow.y))));
+  return __hmul2(val, __float22half2_rn(tmp));
+}
+
+template <>
+__device__ float activation_kernel_int8<ActivationType::kRelu, float>(float x) {
+  return fmaxf(x, 0);
+}
+
+template <>
+__device__ __half2
+activation_kernel_int8<ActivationType::kRelu, __half2>(__half2 x) {
+  return __floats2half2_rn(fmaxf(0.f, __half2float(x.x)),
+                           fmaxf(0.f, __half2float(x.y)));
+}
+
+/**
+ * @brief fused bias, activation, and dropout at the end of first ffn
+ *
+ * @thread
+ * gridDim.x = hidden_size / 8
+ * blockDim.x = 8
+ * blockDim.y = 1024 / 8 = 128
+ *
+ * @tparam act_type activation function, like kRelu, kGelu
+ * @param total_count total elements
+ * @param ratio drop ratio
+ * @param out [batch_size, seq_len, hidden_size], float and __half
+ * @param in [batch_size, seq_len, hidden_size], float and __half
+ * @param mask [batch_size, seq_len, hidden_size], uint8 type
+ * @param bias [hidden_size], ffn bias
+ * @param seed seed to curand
+ * @param hidden_size
+ * @return void
+ */
+template <ActivationType act_type>
+__global__ void ls_dropout_act_bias_kernel_int32I_int8O(
+    const int total_count, const float ratio, int8_t *__restrict__ out,
+    const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
+    const float *__restrict__ bias, const int seed, const int hidden_size,
+    float in_scale, float in_clip_max, float out_scale, float out_clip_max) {
+  const float scale = 1.f / (1.f - ratio);
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+  uint8_t m[4];
+
+  char4 *out4 = reinterpret_cast<char4 *>(out);
+  const int4 *data4 = reinterpret_cast<const int4 *>(in);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
+  float4 rand = curand_uniform4(&state);
+
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+
+  int bias_i = i % (hidden_size >> 2);
+  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
+  mask4[i] = m4[0];
+  const int4 input4 = data4[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  float4 output4;
+
+  output4.x = activation_kernel_int8<act_type, float>(
+                  float(input4.x) / in_scale * in_clip_max + b4.x) *
+              scale * m[0];
+  output4.y = activation_kernel_int8<act_type, float>(
+                  float(input4.y) / in_scale * in_clip_max + b4.y) *
+              scale * m[1];
+  output4.z = activation_kernel_int8<act_type, float>(
+                  float(input4.z) / in_scale * in_clip_max + b4.z) *
+              scale * m[2];
+  output4.w = activation_kernel_int8<act_type, float>(
+                  float(input4.w) / in_scale * in_clip_max + b4.w) *
+              scale * m[3];
+
+  char4 out_i4;
+  out_i4.x = float2int8(output4.x, out_scale / out_clip_max, out_clip_max);
+  out_i4.y = float2int8(output4.y, out_scale / out_clip_max, out_clip_max);
+  out_i4.z = float2int8(output4.z, out_scale / out_clip_max, out_clip_max);
+  out_i4.w = float2int8(output4.w, out_scale / out_clip_max, out_clip_max);
+  out4[i] = out_i4;
+}
+
+template <ActivationType act_type>
+__global__ void ls_dropout_act_bias_kernel_int32I_int8O(
+    const int total_count, const float ratio, int8_t *__restrict__ out,
+    const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
+    const __half *__restrict__ bias, const int seed, const int hidden_size,
+    float in_scale, float in_clip_max, float out_scale, float out_clip_max) {
+  const float scale = 1.f / (1.f - ratio);
+
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+
+  const long4 *vals_long4 = reinterpret_cast<const long4 *>(in);
+  int64_t *outs_i8 = reinterpret_cast<int64_t *>(out);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
+
+  uint8_t m[8];
+  float4 rand = curand_uniform4(&state);
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+  rand = curand_uniform4(&state);
+  m[4] = (uint8_t)(rand.x > ratio);
+  m[5] = (uint8_t)(rand.y > ratio);
+  m[6] = (uint8_t)(rand.z > ratio);
+  m[7] = (uint8_t)(rand.w > ratio);
+  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
+  mask8[i] = *m8;
+
+  int bias_i = i % (hidden_size >> 3);
+  long4 val_long4 = vals_long4[i];
+  int32_t *val1 = reinterpret_cast<int32_t *>(&val_long4);
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  const __half *b_half = reinterpret_cast<const __half *>(&b4);
+  int64_t out_i8;
+  int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
+
+  for (uint j = 0; j < 8; ++j) {
+    float out_f;
+    out_f =
+        scale * m[j] *
+        activation_kernel_int8<act_type, float>(
+            float(val1[j]) / in_scale * in_clip_max + __half2float(b_half[j]));
+    out_i1[j] = float2int8(out_f, out_scale / out_clip_max, out_clip_max);
+  }
+  outs_i8[i] = out_i8;
+}
+
+template <>
+void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kGelu, float>(
+    int8_t *out, const int32_t *vals, uint8_t *mask, const float *bias,
+    int total_count, int dim, float ratio, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 10;
+  ls_dropout_act_bias_kernel_int32I_int8O<ActivationType::kGelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, vals, mask, bias,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+}
+
+template <>
+void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kGelu, __half>(
+    int8_t *out, const int32_t *vals, uint8_t *mask, const __half *bias,
+    int total_count, int dim, float ratio, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 11;
+  ls_dropout_act_bias_kernel_int32I_int8O<ActivationType::kGelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, vals, mask, bias,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+}
+
+template <>
+void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, float>(
+    int8_t *out, const int32_t *vals, uint8_t *mask, const float *bias,
+    int total_count, int dim, float ratio, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 10;
+  ls_dropout_act_bias_kernel_int32I_int8O<ActivationType::kRelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, vals, mask, bias,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+}
+
+template <>
+void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, __half>(
+    int8_t *out, const int32_t *vals, uint8_t *mask, const __half *bias,
+    int total_count, int dim, float ratio, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 11;
+  ls_dropout_act_bias_kernel_int32I_int8O<ActivationType::kRelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, vals, mask, bias,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+}

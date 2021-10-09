@@ -64,6 +64,17 @@ class FeedForwardV4 {
                              clip_max_A * clip_max_B, stream);
   }
 
+  void ForwardV3(const int8_t *A, const int8_t *B, int32_t *C, int8_t *B_buffer,
+                 int32_t *C_buffer, cublasHandle_t handle,
+                 cudaStream_t stream) {
+    int m = _config.m, n = _config.n, k = _config.k;
+    int align = 16;
+    n = (n + align - 1) / align * align;
+
+    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
+                   &alpha, &beta, A, B, C, cublasGemmAlgo_t(99));
+  }
+
   inline void SetConfig(int m, int n, int k) { _config.SetConfig(m, n, k); }
 
  private:
