@@ -53,7 +53,8 @@ class CMakeBuild(build_ext):
             extdir += os.path.sep
 
         cmake_args = [
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
+            # fixed for lightseq.inference
+            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + os.path.join(extdir, "lightseq"),
             "-DPYTHON_EXECUTABLE=" + sys.executable,
         ]
 
@@ -96,10 +97,14 @@ setup_kwargs = dict(
     name="lightseq",
     version=__version__,
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
-    author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
-    ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
-    description="LightSeq is a high performance inference library "
-    "for sequence processing and generation implemented in CUDA",
+    author_email=(
+        "wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
+        ", qian.xian@bytedance.com, weiyang.god@bytedance.com"
+    ),
+    description=(
+        "LightSeq is a high performance inference library "
+        "for sequence processing and generation implemented in CUDA"
+    ),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/bytedance/lightseq",
