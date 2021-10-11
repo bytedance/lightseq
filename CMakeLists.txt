@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(LightSeq LANGUAGES C CXX CUDA)
 
-set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
+set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75)
 find_package(CUDA 10.1 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
@@ -46,11 +46,19 @@ if(DEBUG_MODE)
     message(STATUS "Debug computation result")
 endif()
 
+if(BUILD_PYTHON)
+    add_definitions(-DENABLE_PYTHON)
+    message(STATUS "Build for python wrapper")
+endif()
+
+add_subdirectory(3rdparty/pybind11)
 add_subdirectory(lightseq/inference/kernels)
 add_subdirectory(lightseq/inference/tools)
 add_subdirectory(lightseq/inference/proto)
 add_subdirectory(lightseq/inference/model)
-add_subdirectory(examples/inference/cpp)
-add_subdirectory(3rdparty/pybind11)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
+
+if(NOT BUILD_PYTHON)
+    add_subdirectory(examples/inference/cpp)
+endif()

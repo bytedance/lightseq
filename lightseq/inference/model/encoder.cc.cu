@@ -12,7 +12,7 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-Encoder<OpType_>::Encoder(int max_batch_size, const int *p_d_token_id,
+Encoder<OpType_>::Encoder(int max_batch_size, int *p_d_token_id,
                           int *p_d_padding_mask, _DataType *p_d_output,
                           const TransformerWeight<OpType_> &tw,
                           cudaStream_t stream, cublasHandle_t hd)
@@ -126,6 +126,8 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                 "emb out", 10);
     }
   }  // not normal
+  print_vec(_p_d_src_emb_wei[0], "token embedding weight", 10);
+  print_vec(_p_d_src_emb_wei[1], "position embedding weight", 10);
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;

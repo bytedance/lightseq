@@ -58,7 +58,6 @@ class Decoder {
 
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
-  int* _p_d_result;
   int* _p_d_sample_unfinished;
   curandState* _p_d_curandstate;  //[batch_size]
   const int* _p_d_token_id;       // source token id
@@ -123,6 +122,8 @@ class Decoder {
                               // after decoder
   const long _layer_size_encdec_k;
   const long _layer_size_self_k;
+  const std::set<std::string> _available_sampling_methods = {
+      "beam_search", "topk", "topp", "topk_greedy"};
 
  public:
   Decoder(int max_batch_size, const int* p_d_padding_mask,
@@ -137,6 +138,7 @@ class Decoder {
   int _cur_step;
   float* _p_d_alive_seq_score;
   bool _output_topk;
+  int* _p_d_result;
 };
 
 }  // namespace cuda

@@ -202,7 +202,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
 
-  CHECK_GPU_ERROR(cudaGetLastError());
+  // CHECK_GPU_ERROR(cudaGetLastError());
   std::cout << "decoder buffer init succeed" << std::endl;
   return;
 }
@@ -243,6 +243,19 @@ std::string Decoder<OpType_>::check() {
   if (!btmp) {
     return "wrong beam_size, should be 1, 2, 4, 8, 16 or 32";
   }
+
+  std::string sampling_method = _tw._sampling_method;
+  if (_available_sampling_methods.find(sampling_method) ==
+      _available_sampling_methods.end()) {
+    return std::string("unsupported sampling_method: ") + sampling_method;
+  }
+  if (sampling_method == "topk" || sampling_method == "topp") {
+    _output_topk = false;
+  }
+  if (sampling_method == "topk_greedy") {
+    _output_topk = true;
+  }
+
   return "";
 }
 
