@@ -44,3 +44,10 @@ int cublas_strided_batched_gemm(
     cublasOperation_t op_A, cublasOperation_t op_B, int stride_A, int stride_B,
     int stride_C, int batch,
     cublasGemmAlgo_t algo = CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+int cublas_strided_batched_gemm(
+    cublasHandle_t handle, int m, int n, int k, const int32_t *alpha,
+    const int32_t *beta, const int8_t *A, const int8_t *B, int32_t *C,
+    cublasOperation_t op_A, cublasOperation_t op_B, int stride_A, int stride_B,
+    int stride_C, int batch,
+    cublasGemmAlgo_t algo = CUBLAS_GEMM_DEFAULT_TENSOR_OP);

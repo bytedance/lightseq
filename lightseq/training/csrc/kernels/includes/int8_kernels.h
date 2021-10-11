@@ -51,3 +51,25 @@ void launch_ls_dropout_res_bias_int32I(T *out, const int32_t *vals,
                                        const T *residual, int total_count,
                                        int dim, float ratio, float scale,
                                        float clip_max, cudaStream_t stream);
+
+// [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
+void launch_transform4d_0213_int32I_int8O(int8_t *output, const int32_t *vals,
+                                          int batch_size, int seq_len,
+                                          int hidden_dim, int nhead,
+                                          int trans_count, float in_scale,
+                                          float in_clip_max, float out_scale,
+                                          float out_clip_max,
+                                          cudaStream_t stream);
+
+// [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
+template <typename T>
+void launch_transform4d_0213_int8O(int8_t *output, const T *vals,
+                                   int batch_size, int seq_len, int hidden_dim,
+                                   int nhead, int trans_count, float scale,
+                                   float clip_max, cudaStream_t stream);
+
+template <typename T>
+void launch_ls_dropout_int8O(int8_t *out, const T *vals, uint8_t *mask,
+                             int total_count, float ratio, float scale,
+                             float clip_max, cudaStream_t stream,
+                             bool backward = false);

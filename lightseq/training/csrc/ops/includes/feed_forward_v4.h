@@ -35,7 +35,7 @@ class FeedForwardV4 {
   void Forward(const int8_t *A, const T *B, T *C, int8_t *B_buffer,
                int32_t *C_buffer, cublasHandle_t handle, cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 16;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
@@ -52,7 +52,7 @@ class FeedForwardV4 {
                  int32_t *C_buffer, cublasHandle_t handle,
                  cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 16;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
@@ -68,7 +68,7 @@ class FeedForwardV4 {
                  int32_t *C_buffer, cublasHandle_t handle,
                  cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 16;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
@@ -79,7 +79,7 @@ class FeedForwardV4 {
                  int32_t *C_buffer, cublasHandle_t handle,
                  cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 16;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;

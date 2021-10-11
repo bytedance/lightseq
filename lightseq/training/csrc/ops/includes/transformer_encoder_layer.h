@@ -7,13 +7,13 @@
 
 #include <type_traits>
 
-#include "cuda_util.h"
 #include "dropout.h"
 #include "feed_forward.h"
 #include "feed_forward_v4.h"
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "strided_batch_gemm_v2.h"
 #include "int8_kernels.h"
 
 template <typename T>
@@ -58,6 +58,7 @@ class TransformerEncoderLayer {
     _attn_out_linear_v4.SetConfig(_hidden_size, _batch_tokens, _hidden_size);
     _ff1_v4.SetConfig(_intermediate_size, _batch_tokens, _hidden_size);
     _ff2_v4.SetConfig(_hidden_size, _batch_tokens, _intermediate_size);
+    _attn_context_v2.SetConfig(_hidden_size / _heads, _seq_len, _seq_len);
   }
 
   void SetTrainingMode(bool training);
@@ -255,6 +256,7 @@ class TransformerEncoderLayer {
   Dropout<T> _ffn_dropout;
   StridedBatchGemm<T> _attn_scores;
   StridedBatchGemm<T> _attn_context;
+  StridedBatchGemmV2<T> _attn_context_v2;
 
   // local GPU memory
   T *_gemmQKV_inp_ptr;

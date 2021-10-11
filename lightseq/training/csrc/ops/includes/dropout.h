@@ -33,6 +33,12 @@ class Dropout {
                          bwd);
   }
 
+  void dropout_int8O(int8_t *output, const T *input, int count, float scale,
+                     float clip_max, cudaStream_t stream, bool bwd = false) {
+    launch_ls_dropout_int8O<T>(output, input, _mask, count, _config.RATIO(),
+                               scale, clip_max, stream, bwd);
+  }
+
   void d_dropout(T *d_inp_out, int count, cudaStream_t stream) {
     launch_ls_dropout<T>(d_inp_out, d_inp_out, _mask, count, _config.RATIO(),
                          stream, true);

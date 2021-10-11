@@ -899,3 +899,294 @@ void launch_ls_dropout_res_bias_int32I<__half>(
           .count(),
       dim, scale, clip_max);
 }
+
+__global__ void transform4d_0213_int32I_int8O(
+    int8_t *output, const int32_t *input, int batch_size, int seq_len,
+    int trans_count, int nhead, int head_dim, int num_all, float in_scale,
+    float in_clip_max, float out_scale, float out_clip_max) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int trans_id, batch_id, head_id, token_id, dim_id;
+  decompose_5dim(offset, batch_size, nhead, seq_len, head_dim, &trans_id,
+                 &batch_id, &head_id, &token_id, &dim_id);
+  // [b, s, tc, nh, ad]
+  int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
+                             seq_len, trans_count, nhead, head_dim);
+
+  const long4 *input8 = reinterpret_cast<const long4 *>(input);
+  int64_t *res64 = reinterpret_cast<int64_t *>(output);
+  long4 i8 = input8[offset];
+  int32_t *i8s = reinterpret_cast<int32_t *>(&i8);
+  int64_t res;
+  int8_t *res8 = reinterpret_cast<int8_t *>(&res);
+#pragma unroll
+  for (std::size_t j = 0; j < 8; ++j) {
+    res8[j] = float2int8(float(i8s[j]) / in_scale * in_clip_max,
+                         out_scale / out_clip_max, out_clip_max);
+  }
+  res64[trg_offset] = res;
+}
+
+// [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
+void launch_transform4d_0213_int32I_int8O(int8_t *output, const int32_t *input,
+                                          int batch_size, int seq_len,
+                                          int hidden_dim, int nhead,
+                                          int trans_count, float in_scale,
+                                          float in_clip_max, float out_scale,
+                                          float out_clip_max,
+                                          cudaStream_t stream) {
+  hidden_dim >>= 3;
+  int head_dim = hidden_dim / nhead;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+
+  transform4d_0213_int32I_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
+      in_scale, in_clip_max, out_scale, out_clip_max);
+}
+
+/**
+ * @brief element-wise dropout, store dropped position in mask, it's not
+ * in-place
+ *
+ * @thread
+ * gridDim.x = total_count / 1024
+ * blockDim.x = 1024
+ *
+ * @param total_count total elements
+ * @param ratio drop ratio
+ * @param out any size of float and __half
+ * @param in same with out
+ * @param mask uint8 type, same size with out
+ * @param seed seed to curand
+ * @return void
+ */
+__global__ void ls_dropout_kernel_int8O(
+    const int total_count, const float ratio, int8_t *__restrict__ out,
+    const float *__restrict__ in, uint8_t *__restrict__ mask, const int seed,
+    float scale_div_clip_max, float clip_max) {
+  const float scale = 1.f / (1.f - ratio);
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+  uint8_t m[4];
+
+  char4 *out4 = reinterpret_cast<char4 *>(out);
+  const float4 *data4 = reinterpret_cast<const float4 *>(in);
+  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
+  float4 rand = curand_uniform4(&state);
+
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+
+  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
+  mask4[i] = m4[0];
+
+  float4 input4 = data4[i];
+  char4 res4;
+  res4.x = float2int8(input4.x * scale * m[0], scale_div_clip_max, clip_max);
+  res4.y = float2int8(input4.y * scale * m[1], scale_div_clip_max, clip_max);
+  res4.z = float2int8(input4.z * scale * m[2], scale_div_clip_max, clip_max);
+  res4.w = float2int8(input4.w * scale * m[3], scale_div_clip_max, clip_max);
+  out4[i] = res4;
+}
+
+__global__ void ls_dropout_kernel_int8O(
+    const int total_count, const float ratio, int8_t *__restrict__ out,
+    const __half *__restrict__ in, uint8_t *__restrict__ mask, const int seed,
+    float scale_div_clip_max, float clip_max) {
+  const float scale = 1.f / (1.f - ratio);
+
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+
+  const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
+  int64_t *outs_i64 = reinterpret_cast<int64_t *>(out);
+  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
+
+  uint8_t m[8];
+  float4 rand = curand_uniform4(&state);
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+  rand = curand_uniform4(&state);
+  m[4] = (uint8_t)(rand.x > ratio);
+  m[5] = (uint8_t)(rand.y > ratio);
+  m[6] = (uint8_t)(rand.z > ratio);
+  m[7] = (uint8_t)(rand.w > ratio);
+  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
+  mask8[i] = *m8;
+
+  float4 val_float4 = vals_float4[i];
+  int64_t out_i64;
+  __half2 *val_half2 = reinterpret_cast<__half2 *>(&val_float4);
+  int8_t *out_i8 = reinterpret_cast<int8_t *>(&out_i64);
+  __half2 scale_mask_1 = __floats2half2_rn(scale * m[0], scale * m[1]);
+  __half2 scale_mask_2 = __floats2half2_rn(scale * m[2], scale * m[3]);
+  __half2 scale_mask_3 = __floats2half2_rn(scale * m[4], scale * m[5]);
+  __half2 scale_mask_4 = __floats2half2_rn(scale * m[6], scale * m[7]);
+
+  __half2 tmp;
+  tmp = __hmul2(val_half2[0], scale_mask_1);
+  out_i8[0] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
+  out_i8[1] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
+  tmp = __hmul2(val_half2[1], scale_mask_2);
+  out_i8[2] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
+  out_i8[3] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
+  tmp = __hmul2(val_half2[2], scale_mask_3);
+  out_i8[4] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
+  out_i8[5] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
+  tmp = __hmul2(val_half2[3], scale_mask_4);
+  out_i8[6] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
+  out_i8[7] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
+  outs_i64[i] = out_i64;
+}
+
+template <>
+void launch_ls_dropout_int8O<float>(int8_t *out, const float *vals,
+                                    uint8_t *mask, int total_count, float ratio,
+                                    float scale, float clip_max,
+                                    cudaStream_t stream, bool backward) {
+  int grid_dim = total_count >> 12;
+
+  ls_dropout_kernel_int8O<<<grid_dim + 1, 1024, 0, stream>>>(
+      total_count, ratio, out, vals, mask,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      scale / clip_max, clip_max);
+}
+
+template <>
+void launch_ls_dropout_int8O<__half>(int8_t *out, const __half *vals,
+                                     uint8_t *mask, int total_count,
+                                     float ratio, float scale, float clip_max,
+                                     cudaStream_t stream, bool backward) {
+  int grid_dim = total_count >> 13;
+
+  ls_dropout_kernel_int8O<<<grid_dim + 1, 1024, 0, stream>>>(
+      total_count, ratio, out, vals, mask,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      scale / clip_max, clip_max);
+}
+
+/**
+@brief: transform4d_0213
+Reshape the input matrix to merge the heads
+
+@thread
+gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
+blockDim.x = max_block_thread
+
+@param
+input: [trans_count, batch_size, nhead, seq_len, head_dim]
+output: [batch_size, seq_len, trans_count, nhead, head_dim]
+batch_size: the size of the current batch
+seq_len: the sequence length of the current batch
+hidden_dim: dim of the hidden tensor
+nhead: number of attention heads
+trans_count: 1 or 3, the count of matrice need to be transformed
+*/
+__global__ void transform4d_0213_int8O(int8_t *output, const float *input,
+                                       int batch_size, int seq_len,
+                                       int trans_count, int nhead, int head_dim,
+                                       int num_all, float scale,
+                                       float clip_max) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int trans_id, batch_id, head_id, token_id, dim_id;
+  decompose_5dim(offset, batch_size, nhead, seq_len, head_dim, &trans_id,
+                 &batch_id, &head_id, &token_id, &dim_id);
+  // [b, s, tc, nh, ad]
+  int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
+                             seq_len, trans_count, nhead, head_dim);
+
+  const float4 *input4 = reinterpret_cast<const float4 *>(input);
+  char4 *res32 = reinterpret_cast<char4 *>(output);
+  float4 f4 = input4[offset];
+  char4 res;
+  res.x = float2int8(f4.x, scale / clip_max, clip_max);
+  res.y = float2int8(f4.y, scale / clip_max, clip_max);
+  res.z = float2int8(f4.z, scale / clip_max, clip_max);
+  res.w = float2int8(f4.w, scale / clip_max, clip_max);
+  res32[trg_offset] = res;
+}
+
+__global__ void transform4d_0213_int8O(int8_t *output, const __half *input,
+                                       int batch_size, int seq_len,
+                                       int trans_count, int nhead, int head_dim,
+                                       int num_all, float scale,
+                                       float clip_max) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int trans_id, batch_id, head_id, token_id, dim_id;
+  decompose_5dim(offset, batch_size, nhead, seq_len, head_dim, &trans_id,
+                 &batch_id, &head_id, &token_id, &dim_id);
+  // [b, s, tc, nh, ad]
+  int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
+                             seq_len, trans_count, nhead, head_dim);
+
+  const float4 *input4 = reinterpret_cast<const float4 *>(input);
+  int64_t *res64 = reinterpret_cast<int64_t *>(output);
+  float4 f4 = input4[offset];
+  __half *h8 = reinterpret_cast<__half *>(&f4);
+  int64_t res;
+  int8_t *res8 = reinterpret_cast<int8_t *>(&res);
+#pragma unroll
+  for (std::size_t j = 0; j < 8; ++j) {
+    res8[j] = float2int8(__half2float(h8[j]), scale / clip_max, clip_max);
+  }
+  res64[trg_offset] = res;
+}
+
+// [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
+template <>
+void launch_transform4d_0213_int8O<float>(int8_t *output, const float *input,
+                                          int batch_size, int seq_len,
+                                          int hidden_dim, int nhead,
+                                          int trans_count, float scale,
+                                          float clip_max, cudaStream_t stream) {
+  hidden_dim >>= 2;
+  int head_dim = hidden_dim / nhead;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+
+  transform4d_0213_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
+      scale, clip_max);
+}
+
+template <>
+void launch_transform4d_0213_int8O<__half>(int8_t *output, const __half *input,
+                                           int batch_size, int seq_len,
+                                           int hidden_dim, int nhead,
+                                           int trans_count, float scale,
+                                           float clip_max,
+                                           cudaStream_t stream) {
+  hidden_dim >>= 3;
+  int head_dim = hidden_dim / nhead;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+
+  transform4d_0213_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
+      scale, clip_max);
+}

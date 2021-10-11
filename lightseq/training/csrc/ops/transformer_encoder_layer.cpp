@@ -46,7 +46,8 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
       _attn_context(typename StridedBatchGemm<T>::Config(
-          T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)) {
+          T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
+      _attn_context_v2(typename StridedBatchGemmV2<T>::Config()) {
   assert(_hidden_size % _heads == 0);
   allocate_mem_buffer();
 }
@@ -96,10 +97,11 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                         _cublasHandle);
 
   // [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
-                             _hidden_size, _heads, 1, _stream);
+  launch_transform4d_0213_int8O<T>(_shared_ffn_input_ptr, buffer, _batch_size,
+                                   _seq_len, _hidden_size, _heads, 1, 127, 16,
+                                   _stream);
 
-  _attn_out_linear_v4.ForwardV4(_quant_attn_ow_ptr, _attn_o_inp_ptr,
+  _attn_out_linear_v4.ForwardV3(_quant_attn_ow_ptr, _shared_ffn_input_ptr,
                                 _shared_ffn_output_ptr, _shared_ffn_input_ptr,
                                 _shared_ffn_output_ptr, _cublasHandle, _stream);
 
