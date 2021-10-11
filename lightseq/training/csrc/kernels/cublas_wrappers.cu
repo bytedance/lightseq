@@ -101,6 +101,27 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
             m, n, k, (int)status);
     return EXIT_FAILURE;
   }
+  return 0;
+}
+
+int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
+                                const int32_t *alpha, const int32_t *beta,
+                                const int8_t *A, const int8_t *B, int32_t *C,
+                                cublasOperation_t op_A, cublasOperation_t op_B,
+                                int stride_A, int stride_B, int stride_C,
+                                int batch, cublasGemmAlgo_t algo) {
+  cublasStatus_t status = cublasGemmStridedBatchedEx(
+      handle, op_A, op_B, m, n, k, alpha, A, CUDA_R_8I,
+      (op_A == CUBLAS_OP_N) ? m : k, stride_A, B, CUDA_R_8I,
+      (op_B == CUBLAS_OP_N) ? k : n, stride_B, beta, C, CUDA_R_32I, m, stride_C,
+      batch, CUDA_R_32I, algo);
+
+  if (status != CUBLAS_STATUS_SUCCESS) {
+    fprintf(stderr,
+            "!!!! kernel execution error. (m: %d, n: %d, k: %d, error: %d) \n",
+            m, n, k, (int)status);
+    return EXIT_FAILURE;
+  }
 
   return 0;
 }

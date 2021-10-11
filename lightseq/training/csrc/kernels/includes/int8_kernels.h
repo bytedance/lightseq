@@ -36,3 +36,11 @@ void launch_ls_dropout_act_bias_int32I_int8O(
     int8_t *out, const int32_t *vals, uint8_t *mask, const T *bias,
     int total_count, int dim, float ratio, float in_scale, float in_clip_max,
     float out_scale, float out_clip_max, cudaStream_t stream);
+
+// [b, s, 3, h] -> [3, b, nh, s, ad]
+template <typename T>
+void launch_bias_add_transform_20314_int32I(T *output, const int32_t *input,
+                                            const T *bias, int dim_0, int dim_1,
+                                            int dim_2, int dim_3, int dim_4,
+                                            float scale, float clip_max,
+                                            cudaStream_t stream);

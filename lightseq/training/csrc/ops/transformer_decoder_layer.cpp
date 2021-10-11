@@ -104,12 +104,12 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
-  _qkv_linear_v4.ForwardV2(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr, buffer,
-                           _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                           _cublasHandle, _stream);
-  launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
-                                     batch_size, from_len, 3, _heads,
-                                     _hidden_size / _heads, _stream);
+  _qkv_linear_v4.ForwardV3(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr,
+                           _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                           _shared_ffn_output_ptr, _cublasHandle, _stream);
+  launch_bias_add_transform_20314_int32I<T>(
+      q_tf_ptr, _shared_ffn_output_ptr, _attn_qkvb_ptr, batch_size, from_len, 3,
+      _heads, _hidden_size / _heads, 127 * 127, 0.3 * 16, _stream);
   if (_predict) {
     launch_concat3_dim1(cache[2], k_tf_ptr, cache[0], batch_heads,
                         _hidden_size / _heads, _step, 1, _stream);
@@ -152,15 +152,16 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 template <typename T>
 void TransformerDecoderLayer<T>::encdec_kv_fw(const T *enc_output_ptr) {
   allocate_encdec_kv_memory();
-  _encdec_kv_linear_v4.Forward(
-      _quant_encdec_attn_kvw_ptr, enc_output_ptr, _shared_grad_encdec_kv_ptr,
+  _encdec_kv_linear_v4.ForwardV4(
+      _quant_encdec_attn_kvw_ptr, enc_output_ptr, _shared_ffn_output_ptr,
       _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle, _stream);
   // [batch_size, src_seq_len, n_dec_layer * 2, hidden_size] ->
   // [n_dec_layer * 2, batch_size, nhead, src_seq_len, head_dim]
-  launch_bias_add_transform_20314<T>(
+  launch_bias_add_transform_20314_int32I<T>(
       _predict ? _shared_infer_encdec_kv_ptr : _shared_encdec_kv_ptr,
-      _shared_grad_encdec_kv_ptr, _encdec_attn_kvb_ptr, _batch_size,
-      _src_seq_len, _shared_nlayer * 2, _heads, _hidden_size / _heads, _stream);
+      _shared_ffn_output_ptr, _encdec_attn_kvb_ptr, _batch_size, _src_seq_len,
+      _shared_nlayer * 2, _heads, _hidden_size / _heads, 127 * 127, 0.3 * 16,
+      _stream);
 }
 
 template <typename T>
@@ -188,14 +189,15 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
                               _encdec_attn_nw_ptr, _encdec_attn_nb_ptr,
                               _batch_tokens, 127, 16, _stream);
   }
-  _encdec_q_linear_v4.ForwardV2(
-      _quant_encdec_attn_qw_ptr, _shared_ffn_input_ptr, buffer,
+  _encdec_q_linear_v4.ForwardV3(
+      _quant_encdec_attn_qw_ptr, _shared_ffn_input_ptr, _shared_ffn_output_ptr,
       _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle, _stream);
   // query: [batch_size, trg_seq_len, hidden_size] ->
   // [batch_size, nhead, trg_seq_len, head_dim]
-  launch_bias_add_transform_20314<T>(_encdec_q_ptr, buffer, _encdec_attn_qb_ptr,
-                                     _batch_size, _trg_seq_len, 1, _heads,
-                                     _hidden_size / _heads, _stream);
+  launch_bias_add_transform_20314_int32I<T>(
+      _encdec_q_ptr, _shared_ffn_output_ptr, _encdec_attn_qb_ptr, _batch_size,
+      _trg_seq_len, 1, _heads, _hidden_size / _heads, 127 * 127, 0.3 * 16,
+      _stream);
 
   // attention scores, q*k
   // key: [batch_size, nhead, src_seq_len, head_dim]

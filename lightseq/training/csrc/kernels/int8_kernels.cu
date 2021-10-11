@@ -525,6 +525,7 @@ __global__ void ls_dropout_act_bias_kernel_int32I_int8O(
   int64_t out_i8;
   int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
 
+#pragma unroll
   for (uint j = 0; j < 8; ++j) {
     float out_f;
     out_f =
@@ -594,4 +595,140 @@ void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, __half>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
           dim, in_scale, in_clip_max, out_scale, out_clip_max);
+}
+
+/**
+@brief: bias_add_transform_20314
+Add bias to input, transform from
+[0, 1, 2, 3, 4] to [2, 0, 3, 1, 4]
+
+@thread
+gridDim.x = dim_0
+gridDim.y = dim_1
+gridDim.z = dim_2
+blockDim.x = min(dim_3 * dim_4, MAX_THREADS)
+
+@param
+input: [dim_0, dim_1, dim_2, dim_3, dim_4]
+bias: [dim_2, dim_3, dim_4]
+output: [dim_2, dim_0, dim_3, dim_1, dim_4]
+*/
+template <typename T>
+__global__ void bias_add_transform_20314_int32I(T *output, const int32_t *input,
+                                                const T *bias, int dim_3,
+                                                int dim_4,
+                                                float scale_div_clip_max);
+
+template <>
+__global__ void bias_add_transform_20314_int32I<float>(
+    float *output, const int32_t *input, const float *bias, int dim_3,
+    int dim_4, float scale_div_clip_max) {
+  int id0 = blockIdx.x;
+  int id1 = blockIdx.y;
+  int id2 = blockIdx.z;
+  int dim_0 = gridDim.x;
+  int dim_1 = gridDim.y;
+  int dim_2 = gridDim.z;
+  int dim_34 = dim_3 * dim_4;
+
+  int src_offset = flat_4dim(id0, id1, id2, 0, dim_1, dim_2, dim_34);
+  int trg_offset = flat_5dim(id2, id0, 0, id1, 0, dim_0, dim_3, dim_1, dim_4);
+  int bias_offset = flat_2dim(id2, 0, dim_34);
+
+  const int4 *qkv4 = reinterpret_cast<const int4 *>(input);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  float4 *res4 = reinterpret_cast<float4 *>(output);
+  int4 vqkv4;
+  float4 vbias4;
+  float4 vres4;
+
+#pragma unroll
+  for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
+    vqkv4 = qkv4[src_offset + i];
+    vbias4 = __ldg(bias4 + bias_offset + i);
+    vres4.x = float(vqkv4.x) / scale_div_clip_max + vbias4.x;
+    vres4.y = float(vqkv4.y) / scale_div_clip_max + vbias4.y;
+    vres4.z = float(vqkv4.z) / scale_div_clip_max + vbias4.z;
+    vres4.w = float(vqkv4.w) / scale_div_clip_max + vbias4.w;
+
+    int id3 = i / dim_4;
+    int id4 = i % dim_4;
+    int cur_trg_offset = flat_3dim(id3, 0, id4, dim_1, dim_4);
+    res4[trg_offset + cur_trg_offset] = vres4;
+  }
+}
+
+template <>
+__global__ void bias_add_transform_20314_int32I<__half>(
+    __half *output, const int32_t *input, const __half *bias, int dim_3,
+    int dim_4, float scale_div_clip_max) {
+  int id0 = blockIdx.x;
+  int id1 = blockIdx.y;
+  int id2 = blockIdx.z;
+  int dim_0 = gridDim.x;
+  int dim_1 = gridDim.y;
+  int dim_2 = gridDim.z;
+  int dim_34 = dim_3 * dim_4;
+
+  int src_offset = flat_4dim(id0, id1, id2, 0, dim_1, dim_2, dim_34);
+  int trg_offset = flat_5dim(id2, id0, 0, id1, 0, dim_0, dim_3, dim_1, dim_4);
+  int bias_offset = flat_2dim(id2, 0, dim_34);
+
+  const long4 *qkv4 = reinterpret_cast<const long4 *>(input);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  float4 *res4 = reinterpret_cast<float4 *>(output);
+  long4 vqkv4;
+  float4 vbias4;
+  float4 vres4;
+  int32_t *vqkv1 = reinterpret_cast<int32_t *>(&vqkv4);
+  __half2 *h2_qkv = reinterpret_cast<__half2 *>(&vqkv4);
+  __half2 *h2_bias = reinterpret_cast<__half2 *>(&vbias4);
+  __half2 *h2_res = reinterpret_cast<__half2 *>(&vres4);
+  float tmp1, tmp2;
+
+#pragma unroll
+  for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
+    vqkv4 = qkv4[src_offset + i];
+    vbias4 = __ldg(bias4 + bias_offset + i);
+#pragma unroll
+    for (std::size_t j = 0; j < 4; ++j) {
+      tmp1 = float(vqkv1[j * 2]) / scale_div_clip_max;
+      tmp2 = float(vqkv1[j * 2 + 1]) / scale_div_clip_max;
+      h2_res[j] = __hadd2(__floats2half2_rn(tmp1, tmp2), h2_bias[j]);
+    }
+
+    int id3 = i / dim_4;
+    int id4 = i % dim_4;
+    int cur_trg_offset = flat_3dim(id3, 0, id4, dim_1, dim_4);
+    res4[trg_offset + cur_trg_offset] = vres4;
+  }
+}
+
+// [b, s, 3, h] -> [3, b, nh, s, ad]
+template <>
+void launch_bias_add_transform_20314_int32I<float>(
+    float *output, const int32_t *input, const float *bias, int dim_0,
+    int dim_1, int dim_2, int dim_3, int dim_4, float scale, float clip_max,
+    cudaStream_t stream) {
+  dim_4 >>= 2;
+
+  dim3 grid_dim(dim_0, dim_1, dim_2);
+  dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
+
+  bias_add_transform_20314_int32I<float><<<grid_dim, block_dim, 0, stream>>>(
+      output, input, bias, dim_3, dim_4, scale / clip_max);
+}
+
+template <>
+void launch_bias_add_transform_20314_int32I<__half>(
+    __half *output, const int32_t *input, const __half *bias, int dim_0,
+    int dim_1, int dim_2, int dim_3, int dim_4, float scale, float clip_max,
+    cudaStream_t stream) {
+  dim_4 >>= 3;
+
+  dim3 grid_dim(dim_0, dim_1, dim_2);
+  dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
+
+  bias_add_transform_20314_int32I<__half><<<grid_dim, block_dim, 0, stream>>>(
+      output, input, bias, dim_3, dim_4, scale / clip_max);
 }

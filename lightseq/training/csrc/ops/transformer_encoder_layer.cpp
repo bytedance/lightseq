@@ -71,13 +71,13 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-  _qkv_linear_v4.ForwardV2(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr, buffer,
-                           _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                           _cublasHandle, _stream);
+  _qkv_linear_v4.ForwardV3(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr,
+                           _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                           _shared_ffn_output_ptr, _cublasHandle, _stream);
 
-  launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
-                                     _batch_size, _seq_len, 3, _heads,
-                                     _hidden_size / _heads, _stream);
+  launch_bias_add_transform_20314_int32I<T>(
+      q_tf_ptr, _shared_ffn_output_ptr, _attn_qkvb_ptr, _batch_size, _seq_len,
+      3, _heads, _hidden_size / _heads, 127 * 127, 0.3 * 16, _stream);
 
   // attention scores, q*k
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
