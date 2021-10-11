@@ -133,10 +133,11 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
                         _cublasHandle);
 
   // [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
-                             _hidden_size, _heads, 1, _stream);
+  launch_transform4d_0213_int8O<T>(_shared_ffn_input_ptr, buffer, batch_size,
+                                   from_len, _hidden_size, _heads, 1, 127, 16,
+                                   _stream);
 
-  _attn_out_linear_v4.ForwardV4(_quant_attn_ow_ptr, _attn_output_ptr,
+  _attn_out_linear_v4.ForwardV3(_quant_attn_ow_ptr, _shared_ffn_input_ptr,
                                 _shared_ffn_output_ptr, _shared_ffn_input_ptr,
                                 _shared_ffn_output_ptr, _cublasHandle, _stream);
   _attn_dropout.bias_dropout_residual_int32I(
@@ -227,13 +228,13 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
 
   // [batch_size, nhead, trg_seq_len, head_dim] ->
   // [batch_size, trg_seq_len, hidden_size]
-  launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
-                             _trg_seq_len, _hidden_size, _heads, 1, _stream);
+  launch_transform4d_0213_int8O<T>(_shared_ffn_input_ptr, buffer, _batch_size,
+                                   _trg_seq_len, _hidden_size, _heads, 1, 127,
+                                   16, _stream);
 
-  _encdec_attn_out_linear_v4.ForwardV4(
-      _quant_encdec_attn_ow_ptr, _encdec_attn_output_ptr,
-      _shared_ffn_output_ptr, _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-      _cublasHandle, _stream);
+  _encdec_attn_out_linear_v4.ForwardV3(
+      _quant_encdec_attn_ow_ptr, _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+      _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _encdec_attn_dropout.bias_dropout_residual_int32I(
       output_ptr, _shared_ffn_output_ptr, input_ptr, _encdec_attn_ob_ptr,
