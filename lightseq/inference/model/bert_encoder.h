@@ -43,6 +43,7 @@ class BertEncoder {
   int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
   _DataType
       *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
+  const int *_p_d_lang_id;
   const BertWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -79,7 +80,7 @@ class BertEncoder {
   BertEncoder(int max_batch_size, const int *p_d_token_id,
               int *p_d_padding_mask, _DataType *p_d_output,
               const BertWeight<OpType_> &tw, cudaStream_t stream,
-              cublasHandle_t hd);
+              cublasHandle_t hd, const int *p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
