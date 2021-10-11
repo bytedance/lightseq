@@ -130,12 +130,13 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _batch_tokens, _intermediate_size, _activation_fn, 127 * 127, 0.3 * 16,
       127, 16, _stream);
 
-  _ff2_v4.ForwardV2(_quant_output_w_ptr, _shared_ffn_input_ptr, out_ptr,
-                    _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                    _cublasHandle, _stream);
+  _ff2_v4.ForwardV3(_quant_output_w_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _cublasHandle, _stream);
 
-  _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
-                                     _batch_tokens, _hidden_size, _stream);
+  _ffn_dropout.bias_dropout_residual_int32I(
+      out_ptr, _shared_ffn_output_ptr, inp_ptr, _output_b_ptr, _batch_tokens,
+      _hidden_size, 127 * 127, 0.3 * 16, _stream);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
