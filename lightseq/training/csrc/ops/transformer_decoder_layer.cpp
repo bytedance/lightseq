@@ -136,12 +136,12 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
                              _hidden_size, _heads, 1, _stream);
 
-  _attn_out_linear_v4.Forward(_quant_attn_ow_ptr, _attn_output_ptr, output_ptr,
-                              _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                              _cublasHandle, _stream);
-  _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
-                                      _attn_ob_ptr, _batch_tokens, _hidden_size,
-                                      _stream);
+  _attn_out_linear_v4.ForwardV4(_quant_attn_ow_ptr, _attn_output_ptr,
+                                _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                                _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _attn_dropout.bias_dropout_residual_int32I(
+      output_ptr, _shared_ffn_output_ptr, input_ptr, _attn_ob_ptr,
+      _batch_tokens, _hidden_size, 127 * 127, 0.3 * 16, _stream);
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
@@ -230,13 +230,14 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
   launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
                              _trg_seq_len, _hidden_size, _heads, 1, _stream);
 
-  _encdec_attn_out_linear_v4.Forward(
-      _quant_encdec_attn_ow_ptr, _encdec_attn_output_ptr, output_ptr,
-      _shared_ffn_input_ptr, _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _encdec_attn_out_linear_v4.ForwardV4(
+      _quant_encdec_attn_ow_ptr, _encdec_attn_output_ptr,
+      _shared_ffn_output_ptr, _shared_ffn_input_ptr, _shared_ffn_output_ptr,
+      _cublasHandle, _stream);
 
-  _encdec_attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
-                                             _encdec_attn_ob_ptr, _batch_tokens,
-                                             _hidden_size, _stream);
+  _encdec_attn_dropout.bias_dropout_residual_int32I(
+      output_ptr, _shared_ffn_output_ptr, input_ptr, _encdec_attn_ob_ptr,
+      _batch_tokens, _hidden_size, 127 * 127, 0.3 * 16, _stream);
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _encdec_attn_ln.Forward(output_ptr, output_ptr, _encdec_attn_nw_ptr,
@@ -261,12 +262,13 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _batch_tokens, _intermediate_size, _activation_fn, 127 * 127, 0.3 * 16,
       127, 16, _stream);
 
-  _ff2_v4.ForwardV2(_quant_output_w_ptr, _shared_ffn_input_ptr, out_ptr,
-                    _shared_ffn_input_ptr, _shared_ffn_output_ptr,
-                    _cublasHandle, _stream);
+  _ff2_v4.ForwardV3(_quant_output_w_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _shared_ffn_input_ptr,
+                    _shared_ffn_output_ptr, _cublasHandle, _stream);
 
-  _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
-                                     _batch_tokens, _hidden_size, _stream);
+  _ffn_dropout.bias_dropout_residual_int32I(
+      out_ptr, _shared_ffn_output_ptr, inp_ptr, _output_b_ptr, _batch_tokens,
+      _hidden_size, 127 * 127, 0.3 * 16, _stream);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode

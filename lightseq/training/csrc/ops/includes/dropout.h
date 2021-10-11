@@ -47,6 +47,15 @@ class Dropout {
                                   rows * cols, cols, _config.RATIO(), stream);
   }
 
+  void bias_dropout_residual_int32I(T *output, const int32_t *input,
+                                    const T *residual, const T *bias, int rows,
+                                    int cols, float scale, float clip_max,
+                                    cudaStream_t stream) {
+    launch_ls_dropout_res_bias_int32I<T>(output, input, _mask, bias, residual,
+                                         rows * cols, cols, _config.RATIO(),
+                                         scale, clip_max, stream);
+  }
+
   void d_bias_dropout_residual(T *d_input, T *d_bias, const T *d_output,
                                int rows, int cols, cudaStream_t stream) {
     launch_ls_dropout_bias_bwd<T>(d_input, d_bias, d_output, _mask, rows, cols,

@@ -681,7 +681,6 @@ __global__ void bias_add_transform_20314_int32I<__half>(
   float4 vbias4;
   float4 vres4;
   int32_t *vqkv1 = reinterpret_cast<int32_t *>(&vqkv4);
-  __half2 *h2_qkv = reinterpret_cast<__half2 *>(&vqkv4);
   __half2 *h2_bias = reinterpret_cast<__half2 *>(&vbias4);
   __half2 *h2_res = reinterpret_cast<__half2 *>(&vres4);
   float tmp1, tmp2;
@@ -731,4 +730,172 @@ void launch_bias_add_transform_20314_int32I<__half>(
 
   bias_add_transform_20314_int32I<__half><<<grid_dim, block_dim, 0, stream>>>(
       output, input, bias, dim_3, dim_4, scale / clip_max);
+}
+
+/**
+ * @brief fused bias, dropout, and residual at the end of Attention and FFN,
+ * store dropped position in mask, it's not in-place
+ *
+ * @thread
+ * gridDim.x = total_count / 1024
+ * blockDim.x = 1024
+ *
+ * @param total_count total elements
+ * @param ratio drop ratio
+ * @param out [batch_size, seq_len, hidden_size], float and __half
+ * @param in [batch_size, seq_len, hidden_size], float and __half
+ * @param mask [batch_size, seq_len, hidden_size], uint8 type
+ * @param bias [hidden_size], ffn bias
+ * @param residual [batch_size, seq_len, hidden_size], float and __half
+ * @param seed seed to curand
+ * @param hidden_size hidden size
+ * @return void
+ */
+__global__ void ls_dropout_res_bias_kernel_int32I(
+    const int total_count, const float ratio, float *__restrict__ out,
+    const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
+    const float *__restrict__ bias, const float *__restrict__ residual,
+    const int seed, const int hidden_size, float quant_scale, float clip_max) {
+  const float scale = 1.f / (1.f - ratio);
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+  uint8_t m[4];
+
+  float4 *out4 = reinterpret_cast<float4 *>(out);
+  const int4 *data4 = reinterpret_cast<const int4 *>(in);
+  const float4 *residual4 = reinterpret_cast<const float4 *>(residual);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
+  float4 rand = curand_uniform4(&state);
+
+  m[0] = static_cast<uint8_t>(rand.x > ratio);
+  m[1] = static_cast<uint8_t>(rand.y > ratio);
+  m[2] = static_cast<uint8_t>(rand.z > ratio);
+  m[3] = static_cast<uint8_t>(rand.w > ratio);
+
+  int bias_i = i % (hidden_size >> 2);
+  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
+  mask4[i] = m4[0];
+  const int4 input4 = data4[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  const float4 res4 = residual4[i];
+  float4 output4;
+
+  output4.x =
+      (float(input4.x) / quant_scale * clip_max + b4.x) * scale * m[0] + res4.x;
+  output4.y =
+      (float(input4.y) / quant_scale * clip_max + b4.y) * scale * m[1] + res4.y;
+  output4.z =
+      (float(input4.z) / quant_scale * clip_max + b4.z) * scale * m[2] + res4.z;
+  output4.w =
+      (float(input4.w) / quant_scale * clip_max + b4.w) * scale * m[3] + res4.w;
+
+  out4[i] = output4;
+}
+
+__global__ void ls_dropout_res_bias_kernel_int32I(
+    const int total_count, const float ratio, __half *__restrict__ out,
+    const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
+    const __half *__restrict__ bias, const __half *__restrict__ residual,
+    const int seed, const int hidden_size, float quant_scale, float clip_max) {
+  const __half scale = 1. / (1. - ratio);
+
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+
+  const long4 *vals_long4 = reinterpret_cast<const long4 *>(in);
+  float4 *outs_float4 = reinterpret_cast<float4 *>(out);
+  const float4 *residual4 = reinterpret_cast<const float4 *>(residual);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
+
+  uint8_t m[8];
+  float4 rand = curand_uniform4(&state);
+  m[0] = static_cast<uint8_t>(rand.x > ratio);
+  m[1] = static_cast<uint8_t>(rand.y > ratio);
+  m[2] = static_cast<uint8_t>(rand.z > ratio);
+  m[3] = static_cast<uint8_t>(rand.w > ratio);
+  rand = curand_uniform4(&state);
+  m[4] = static_cast<uint8_t>(rand.x > ratio);
+  m[5] = static_cast<uint8_t>(rand.y > ratio);
+  m[6] = static_cast<uint8_t>(rand.z > ratio);
+  m[7] = static_cast<uint8_t>(rand.w > ratio);
+  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
+  mask8[i] = m8[0];
+
+  int bias_i = i % (hidden_size >> 3);
+  long4 val_long4 = vals_long4[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  const float4 res4 = residual4[i];
+  float4 out_float4;
+
+  int32_t *val_i1 = reinterpret_cast<int32_t *>(&val_long4);
+  __half2 *out_half2 = reinterpret_cast<__half2 *>(&out_float4);
+  const __half2 *b_half2 = reinterpret_cast<const __half2 *>(&b4);
+  const __half2 *res_half2 = reinterpret_cast<const __half2 *>(&res4);
+  __half2 scale_mask_1 =
+      __halves2half2(scale * __float2half(m[0]), scale * __float2half(m[1]));
+  __half2 scale_mask_2 =
+      __halves2half2(scale * __float2half(m[2]), scale * __float2half(m[3]));
+  __half2 scale_mask_3 =
+      __halves2half2(scale * __float2half(m[4]), scale * __float2half(m[5]));
+  __half2 scale_mask_4 =
+      __halves2half2(scale * __float2half(m[6]), scale * __float2half(m[7]));
+  out_half2[0] = __hfma2(
+      __hadd2(__floats2half2_rn(float(val_i1[0]) / quant_scale * clip_max,
+                                float(val_i1[1]) / quant_scale * clip_max),
+              b_half2[0]),
+      scale_mask_1, res_half2[0]);
+  out_half2[1] = __hfma2(
+      __hadd2(__floats2half2_rn(float(val_i1[2]) / quant_scale * clip_max,
+                                float(val_i1[3]) / quant_scale * clip_max),
+              b_half2[1]),
+      scale_mask_2, res_half2[1]);
+  out_half2[2] = __hfma2(
+      __hadd2(__floats2half2_rn(float(val_i1[4]) / quant_scale * clip_max,
+                                float(val_i1[5]) / quant_scale * clip_max),
+              b_half2[2]),
+      scale_mask_3, res_half2[2]);
+  out_half2[3] = __hfma2(
+      __hadd2(__floats2half2_rn(float(val_i1[6]) / quant_scale * clip_max,
+                                float(val_i1[7]) / quant_scale * clip_max),
+              b_half2[3]),
+      scale_mask_4, res_half2[3]);
+  outs_float4[i] = out_float4;
+}
+
+template <>
+void launch_ls_dropout_res_bias_int32I<float>(
+    float *out, const int32_t *vals, uint8_t *mask, const float *bias,
+    const float *residual, int total_count, int dim, float ratio, float scale,
+    float clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 12;
+  ls_dropout_res_bias_kernel_int32I<<<grid_dim + 1, 1024, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias, residual,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim, scale, clip_max);
+}
+
+template <>
+void launch_ls_dropout_res_bias_int32I<__half>(
+    __half *out, const int32_t *vals, uint8_t *mask, const __half *bias,
+    const __half *residual, int total_count, int dim, float ratio, float scale,
+    float clip_max, cudaStream_t stream) {
+  int grid_dim = total_count >> 13;
+  ls_dropout_res_bias_kernel_int32I<<<grid_dim + 1, 1024, 0, stream>>>(
+      total_count, ratio, out, vals, mask, bias, residual,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count(),
+      dim, scale, clip_max);
 }

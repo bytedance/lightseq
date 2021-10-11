@@ -44,3 +44,10 @@ void launch_bias_add_transform_20314_int32I(T *output, const int32_t *input,
                                             int dim_2, int dim_3, int dim_4,
                                             float scale, float clip_max,
                                             cudaStream_t stream);
+
+template <typename T>
+void launch_ls_dropout_res_bias_int32I(T *out, const int32_t *vals,
+                                       uint8_t *mask, const T *bias,
+                                       const T *residual, int total_count,
+                                       int dim, float ratio, float scale,
+                                       float clip_max, cudaStream_t stream);
