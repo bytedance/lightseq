@@ -3,7 +3,7 @@
 #include "3rdparty/cub/cub/cub.cuh"
 #include "decoder.h"
 #include "../kernels/transformerKernels.h"
-#include "../kernels/multilgKernels.h"
+#include "../kernels/embKernels.h"
 
 /**
 @file
@@ -19,7 +19,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
                           const _DataType* p_d_encoder_output, int* p_d_result,
                           TransformerWeight<OpType_>& tw, cudaStream_t stream,
                           cublasHandle_t hd, bool output_topk,
-                          const int* p_d_token_id)
+                          const int* p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -34,7 +34,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _stream(stream),
       _hd(hd),
       _output_topk(output_topk),
-      _p_d_token_id(p_d_token_id),  // source token id
+      _p_d_lang_id(p_d_lang_id),  // source token id
       _layer_size_encdec_k(max_batch_size * tw._max_step * tw._hidden_size),
       _layer_size_self_k(max_batch_size * tw._max_step * tw._hidden_size *
                          tw._beam_size),
@@ -396,19 +396,12 @@ template <OperationType OpType_>
 void Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
-  if (_tw._is_multilingual) {
-    ker_multilg_dec_emb_launcher<_DataType>(
-        _step_token_num, _tw._hidden_size, _stream, _p_d_trg_emb_wei[0],
-        _p_d_trg_emb_wei[1], _tw.get_src_emb_wei()[4], _p_d_trg_emb_wei[7],
-        _p_d_token_id, _p_d_alive_seq, _p_d_cur_step_query, _cur_step,
-        _tw._max_step, _tw._trg_vocab_size, _tw._beam_size, _batch_seq_len,
-        _max_thread_per_block);
-  } else {
-    ker_dec_embedding_launcher<_DataType>(
-        _step_token_num, _tw._hidden_size, _stream, _p_d_trg_emb_wei[0],
-        _p_d_trg_emb_wei[1], _p_d_alive_seq, _p_d_cur_step_query, _cur_step,
-        _tw._max_step, _tw._trg_vocab_size, _max_thread_per_block);
-  }
+  int multilg_type = 0;
+  launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_trg_emb_wei[1],
+                            _p_d_alive_seq, _p_d_trg_emb_wei[7], _p_d_lang_id,
+                            _p_d_cur_step_query, _batch_size, _tw._beam_size,
+                            _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
+                            _tw._max_step, multilg_type, _stream);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
@@ -814,23 +807,13 @@ template <OperationType OpType_>
 void Decoder<OpType_>::update_new_seq_probs() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
 
-  if (_tw._is_multilingual) {
-    select_beam_rough_topk_multilg_launcher(
-        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _p_d_alive_seq_score, _p_d_alive_seq, _tw._p_d_trg_vocab_mask,
-        _p_d_token_id, _p_d_can_idx, _p_d_can_score, _p_d_can_num,
-        _tw._trg_vocab_size, _tw._max_step, _h_length_norm[_cur_step],
-        _cur_step, _step_token_num, _max_thread_per_block, _stream,
-        _tw._beam_size, _tw._diverse_lambda, _tw._end_id, _batch_seq_len);
-  } else {
-    select_beam_rough_topk_launcher(
-        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-        _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
-        _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
-        _h_length_norm[_cur_step], _cur_step, _step_token_num,
-        _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-        _tw._end_id);
-  }
+  select_beam_rough_topk_launcher(
+      _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+      _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
+      _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
+      _h_length_norm[_cur_step], _cur_step, _step_token_num,
+      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
+      _tw._end_id);
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
   return;
