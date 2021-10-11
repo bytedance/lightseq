@@ -1,0 +1,41 @@
+#pragma once
+#include <cuda.h>
+#include <cuda_fp16.h>
+
+namespace lightseq {
+namespace cuda {
+
+void launch_split_multilg_request(const int *req, int *src_lang_id,
+                                  int *trg_lang_id, int *src_token_id,
+                                  int batch_size, int req_len,
+                                  cudaStream_t &stream);
+
+template <typename T>
+void launch_enc_emb(const T *token_emb, const T *pos_emb, const int *tokens,
+                    T *output, int *pad_mask, int pad_id, int batch_size,
+                    int seq_len, int hidden_dim, cudaStream_t stream);
+
+template <typename T>
+void launch_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
+                                  const int *tokens, const T *lang_emb,
+                                  const int *lang_id, T *output, int *pad_mask,
+                                  int pad_id, int batch_size, int seq_len,
+                                  int hidden_dim, cudaStream_t stream);
+
+template <typename T>
+void launch_enc_emb_multilg_sentence(const T *token_emb, const T *pos_emb,
+                                     const int *tokens, const T *lang_emb,
+                                     const int *lang_id, T *output,
+                                     int *pad_mask, int pad_id, int batch_size,
+                                     int seq_len, int hidden_dim,
+                                     cudaStream_t stream);
+
+template <typename T>
+void launch_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
+                    const T *lang_emb, const int *lang_id, T *output,
+                    int batch_size, int beam_size, int hidden_dim,
+                    int vocab_size, int step, int max_step, int multilg_type,
+                    cudaStream_t stream);
+
+}  // namespace cuda
+}  // namespace lightseq
