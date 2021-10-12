@@ -20,9 +20,11 @@ namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
-    : stream_(nullptr), hd_(nullptr), decoder_(nullptr) {
+    : stream_(nullptr),
+      hd_(nullptr),
+      decoder_(nullptr),
+      _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
-  _max_batch_size = max_batch_size;
   CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
   CHECK_GPU_ERROR(cublasCreate(&hd_));
@@ -60,7 +62,7 @@ Transformer::Transformer(const std::string weight_path,
                                              tw_._max_step * sizeof(int)));
 
   encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
-      max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
+      _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
       stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {

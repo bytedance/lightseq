@@ -9,6 +9,7 @@ if(BUILD_PYTHON)
 else()
     add_library(lightseq SHARED transformer.cc.cu)
     target_link_libraries(lightseq PUBLIC transformer_model)
-    target_include_directories(lightseq INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+    target_link_options(lightseq PUBLIC $<DEVICE_LINK:-Xcompiler -fvisibility=hidden>)
+    target_include_directories(lightseq PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
     )
 endif()

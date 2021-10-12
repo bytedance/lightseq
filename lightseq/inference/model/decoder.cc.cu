@@ -201,8 +201,8 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
-
-  // CHECK_GPU_ERROR(cudaGetLastError());
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  CHECK_GPU_ERROR(cudaGetLastError());
   std::cout << "decoder buffer init succeed" << std::endl;
   return;
 }
