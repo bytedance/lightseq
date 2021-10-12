@@ -204,20 +204,19 @@ class TransformerEncoderLayer {
     _quant_inter_w_ptr = cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
     _quant_output_w_ptr =
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
-    float scale = 127, clip_max = 0.3;
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
     launch_quantize_tensor(_attn_qkvw_ptr, _quant_attn_qkvw_ptr,
-                           3 * _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           3 * _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_attn_ow_ptr, _quant_attn_ow_ptr,
-                           _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_inter_w_ptr, _quant_inter_w_ptr,
-                           _intermediate_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _intermediate_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_output_w_ptr, _quant_output_w_ptr,
-                           _intermediate_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _intermediate_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
   }
 
   // const parameter between batch
@@ -236,6 +235,11 @@ class TransformerEncoderLayer {
   size_t _batch_heads;
   size_t _batch_dim;
   bool _training;
+
+  // quantize parameters
+  float _quant_scale = 127;
+  float _weight_clip_max = 0.5;
+  float _act_clip_max = 10;
 
   cublasHandle_t _cublasHandle;
   cublasLtHandle_t _cublasLtHandle;

@@ -341,30 +341,29 @@ class TransformerDecoderLayer {
     _quant_output_w_ptr =
         cuda_malloc<int8_t>(_intermediate_size * _hidden_size);
 
-    float scale = 127, clip_max = 0.3;
     cudaStream_t stream = at::cuda::getCurrentCUDAStream();
     launch_quantize_tensor(_attn_qkvw_ptr, _quant_attn_qkvw_ptr,
-                           3 * _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           3 * _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_attn_ow_ptr, _quant_attn_ow_ptr,
-                           _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_encdec_attn_qw_ptr, _quant_encdec_attn_qw_ptr,
-                           _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_encdec_attn_ow_ptr, _quant_encdec_attn_ow_ptr,
-                           _hidden_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _hidden_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     if (_layer_id == 0)
       launch_quantize_tensor(_encdec_attn_kvw_ptr, _quant_encdec_attn_kvw_ptr,
                              _shared_nlayer * 2 * _hidden_size * _hidden_size,
-                             scale, clip_max, stream);
+                             _quant_scale, _weight_clip_max, stream);
     launch_quantize_tensor(_inter_w_ptr, _quant_inter_w_ptr,
-                           _intermediate_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _intermediate_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
     launch_quantize_tensor(_output_w_ptr, _quant_output_w_ptr,
-                           _intermediate_size * _hidden_size, scale, clip_max,
-                           stream);
+                           _intermediate_size * _hidden_size, _quant_scale,
+                           _weight_clip_max, stream);
   }
 
   // const parameter between batch
@@ -386,6 +385,11 @@ class TransformerDecoderLayer {
   int _step;
   bool _training;
   bool _predict;
+
+  // quantize parameters
+  float _quant_scale = 127;
+  float _weight_clip_max = 0.5;
+  float _act_clip_max = 10;
 
   cublasHandle_t _cublasHandle;
   cublasLtHandle_t _cublasLtHandle;

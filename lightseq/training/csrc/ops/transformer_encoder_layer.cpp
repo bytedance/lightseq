@@ -67,7 +67,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
 
   if (_pre_or_postLayerNorm) {
     _attn_ln.ForwardV2(_shared_ffn_input_ptr, input_ptr, _attn_nw_ptr,
-                       _attn_nb_ptr, _batch_tokens, 127, 16, _stream);
+                       _attn_nb_ptr, _batch_tokens, _quant_scale, _act_clip_max,
+                       _stream);
   }
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
@@ -77,7 +78,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
 
   launch_bias_add_transform_20314_int32I<T>(
       q_tf_ptr, _shared_ffn_output_ptr, _attn_qkvb_ptr, _batch_size, _seq_len,
-      3, _heads, _hidden_size / _heads, 127 * 127, 0.3 * 16, _stream);
+      3, _heads, _hidden_size / _heads, _quant_scale * _quant_scale,
+      _weight_clip_max * _act_clip_max, _stream);
 
   // attention scores, q*k
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
@@ -97,15 +99,16 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
 
   // [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213_int8O<T>(_shared_ffn_input_ptr, buffer, _batch_size,
-                                   _seq_len, _hidden_size, _heads, 1, 127, 16,
-                                   _stream);
+                                   _seq_len, _hidden_size, _heads, 1,
+                                   _quant_scale, _act_clip_max, _stream);
 
   _attn_out_linear_v4.Forward(_quant_attn_ow_ptr, _shared_ffn_input_ptr,
                               _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _attn_dropout.bias_dropout_residual_int32I(
       output_ptr, _shared_ffn_output_ptr, input_ptr, _attn_ob_ptr,
-      _batch_tokens, _hidden_size, 127 * 127, 0.3 * 16, _stream);
+      _batch_tokens, _hidden_size, _quant_scale * _quant_scale,
+      _weight_clip_max * _act_clip_max, _stream);
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
@@ -118,7 +121,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   // save _ff1_inp_ptr, _relu_inp_ptr, _ff2_inp_ptr for backward
   if (_pre_or_postLayerNorm) {
     _ffn_ln.ForwardV2(_shared_ffn_input_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
-                      _batch_tokens, 127, 16, _stream);
+                      _batch_tokens, _quant_scale, _act_clip_max, _stream);
   }
 
   _ff1_v4.Forward(_quant_inter_w_ptr, _shared_ffn_input_ptr,
@@ -126,15 +129,17 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
 
   _ffn_activation_dropout.bias_act_dropout_int32I_int8O(
       _shared_ffn_input_ptr, _shared_ffn_output_ptr, _inter_b_ptr,
-      _batch_tokens, _intermediate_size, _activation_fn, 127 * 127, 0.3 * 16,
-      127, 16, _stream);
+      _batch_tokens, _intermediate_size, _activation_fn,
+      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max,
+      _quant_scale, _act_clip_max, _stream);
 
   _ff2_v4.Forward(_quant_output_w_ptr, _shared_ffn_input_ptr,
                   _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _ffn_dropout.bias_dropout_residual_int32I(
       out_ptr, _shared_ffn_output_ptr, inp_ptr, _output_b_ptr, _batch_tokens,
-      _hidden_size, 127 * 127, 0.3 * 16, _stream);
+      _hidden_size, _quant_scale * _quant_scale,
+      _weight_clip_max * _act_clip_max, _stream);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode

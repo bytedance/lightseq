@@ -35,7 +35,7 @@ class FeedForwardV4 {
   void Forward(const int8_t *A, const int8_t *B, int32_t *C,
                cublasHandle_t handle, cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 8;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, k, &alpha, &beta, A,
@@ -46,7 +46,7 @@ class FeedForwardV4 {
                  float scale, float clip_max, cublasHandle_t handle,
                  cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 8;
+    int align = 4;
     n = (n + align - 1) / align * align;
 
     launch_quantize_tensor(B, B_buffer, n * k, scale, clip_max, stream);
