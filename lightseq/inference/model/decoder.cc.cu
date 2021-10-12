@@ -396,12 +396,11 @@ template <OperationType OpType_>
 void Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
-  int multilg_type = 0;
   launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_trg_emb_wei[1],
                             _p_d_alive_seq, _p_d_trg_emb_wei[7], _p_d_lang_id,
                             _p_d_cur_step_query, _batch_size, _tw._beam_size,
                             _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
-                            _tw._max_step, multilg_type, _stream);
+                            _tw._max_step, _tw._multilg_type, _stream);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id

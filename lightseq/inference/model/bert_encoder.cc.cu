@@ -97,11 +97,6 @@ template <OperationType OpType_>
 void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   /* ---step1. init--- */
   _batch_size = batch_size;
-  int multilg_type = 0;
-  if (multilg_type == 2) {
-    // sentense level multi lingual
-    batch_seq_len += 1;
-  }
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
 #ifdef DEBUG_RESULT
@@ -115,7 +110,7 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                             _p_d_token_id, _p_d_output, _p_d_padding_mask,
                             _tw._padding_id, batch_size, batch_seq_len,
                             _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
-                            _p_d_lang_id, multilg_type);
+                            _p_d_lang_id, _tw._multilg_type);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
