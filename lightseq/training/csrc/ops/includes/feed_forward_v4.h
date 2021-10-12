@@ -32,61 +32,26 @@ class FeedForwardV4 {
 
   ~FeedForwardV4() {}
 
-  void Forward(const int8_t *A, const T *B, T *C, int8_t *B_buffer,
-               int32_t *C_buffer, cublasHandle_t handle, cudaStream_t stream) {
+  void Forward(const int8_t *A, const int8_t *B, int32_t *C,
+               cublasHandle_t handle, cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 4;
+    int align = 8;
     n = (n + align - 1) / align * align;
 
-    float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
-    launch_quantize_tensor(B, B_buffer, n * k, scale_B, clip_max_B, stream);
-
-    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
-                   &alpha, &beta, A, B_buffer, C_buffer, cublasGemmAlgo_t(99));
-
-    launch_dequantize_tensor(C_buffer, C, m * _config.n, scale_A * scale_B,
-                             clip_max_A * clip_max_B, stream);
+    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, k, &alpha, &beta, A,
+                   B, C, cublasGemmAlgo_t(99));
   }
 
-  void ForwardV2(const int8_t *A, const int8_t *B, T *C, int8_t *B_buffer,
-                 int32_t *C_buffer, cublasHandle_t handle,
+  void ForwardV2(const int8_t *A, const T *B, int32_t *C, int8_t *B_buffer,
+                 float scale, float clip_max, cublasHandle_t handle,
                  cudaStream_t stream) {
     int m = _config.m, n = _config.n, k = _config.k;
-    int align = 4;
+    int align = 8;
     n = (n + align - 1) / align * align;
 
-    float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
-
-    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
-                   &alpha, &beta, A, B, C_buffer, cublasGemmAlgo_t(99));
-
-    launch_dequantize_tensor(C_buffer, C, m * _config.n, scale_A * scale_B,
-                             clip_max_A * clip_max_B, stream);
-  }
-
-  void ForwardV3(const int8_t *A, const int8_t *B, int32_t *C, int8_t *B_buffer,
-                 int32_t *C_buffer, cublasHandle_t handle,
-                 cudaStream_t stream) {
-    int m = _config.m, n = _config.n, k = _config.k;
-    int align = 4;
-    n = (n + align - 1) / align * align;
-
-    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
-                   &alpha, &beta, A, B, C, cublasGemmAlgo_t(99));
-  }
-
-  void ForwardV4(const int8_t *A, const T *B, int32_t *C, int8_t *B_buffer,
-                 int32_t *C_buffer, cublasHandle_t handle,
-                 cudaStream_t stream) {
-    int m = _config.m, n = _config.n, k = _config.k;
-    int align = 4;
-    n = (n + align - 1) / align * align;
-
-    float scale_A = 127, scale_B = 127, clip_max_A = 0.3, clip_max_B = 16.0;
-    launch_quantize_tensor(B, B_buffer, n * k, scale_B, clip_max_B, stream);
-
-    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, _config.m, n, _config.k,
-                   &alpha, &beta, A, B_buffer, C, cublasGemmAlgo_t(99));
+    launch_quantize_tensor(B, B_buffer, n * k, scale, clip_max, stream);
+    cublas_gemm_ex(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, k, &alpha, &beta, A,
+                   B_buffer, C, cublasGemmAlgo_t(99));
   }
 
   inline void SetConfig(int m, int n, int k) { _config.SetConfig(m, n, k); }

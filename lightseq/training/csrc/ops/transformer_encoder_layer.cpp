@@ -72,9 +72,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-  _qkv_linear_v4.ForwardV3(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr,
-                           _shared_ffn_output_ptr, _shared_ffn_input_ptr,
-                           _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _qkv_linear_v4.Forward(_quant_attn_qkvw_ptr, _shared_ffn_input_ptr,
+                         _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   launch_bias_add_transform_20314_int32I<T>(
       q_tf_ptr, _shared_ffn_output_ptr, _attn_qkvb_ptr, _batch_size, _seq_len,
@@ -101,9 +100,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                                    _seq_len, _hidden_size, _heads, 1, 127, 16,
                                    _stream);
 
-  _attn_out_linear_v4.ForwardV3(_quant_attn_ow_ptr, _shared_ffn_input_ptr,
-                                _shared_ffn_output_ptr, _shared_ffn_input_ptr,
-                                _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _attn_out_linear_v4.Forward(_quant_attn_ow_ptr, _shared_ffn_input_ptr,
+                              _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _attn_dropout.bias_dropout_residual_int32I(
       output_ptr, _shared_ffn_output_ptr, input_ptr, _attn_ob_ptr,
@@ -123,18 +121,16 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                       _batch_tokens, 127, 16, _stream);
   }
 
-  _ff1_v4.ForwardV3(_quant_inter_w_ptr, _shared_ffn_input_ptr,
-                    _shared_ffn_output_ptr, _shared_ffn_input_ptr,
-                    _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _ff1_v4.Forward(_quant_inter_w_ptr, _shared_ffn_input_ptr,
+                  _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _ffn_activation_dropout.bias_act_dropout_int32I_int8O(
       _shared_ffn_input_ptr, _shared_ffn_output_ptr, _inter_b_ptr,
       _batch_tokens, _intermediate_size, _activation_fn, 127 * 127, 0.3 * 16,
       127, 16, _stream);
 
-  _ff2_v4.ForwardV3(_quant_output_w_ptr, _shared_ffn_input_ptr,
-                    _shared_ffn_output_ptr, _shared_ffn_input_ptr,
-                    _shared_ffn_output_ptr, _cublasHandle, _stream);
+  _ff2_v4.Forward(_quant_output_w_ptr, _shared_ffn_input_ptr,
+                  _shared_ffn_output_ptr, _cublasHandle, _stream);
 
   _ffn_dropout.bias_dropout_residual_int32I(
       out_ptr, _shared_ffn_output_ptr, inp_ptr, _output_b_ptr, _batch_tokens,
