@@ -13,6 +13,7 @@
 #include "../server/model_config.h"
 #include "../server/model_config_cuda.h"
 #include "../tools/util.h"
+#include "../kernels/embKernels.h"
 
 /**
 @file
@@ -104,10 +105,13 @@ class Context {
 
   // CUDA memory buffers for input and output tensors.
   void* d_input_;
+  void* d_input_copy_;
   void* d_padding_mask_;
   void* d_encoder_output_;
   void* d_buf_;
   void* d_output_;
+  void* d_src_lang_id_;
+  void* d_trg_lang_id_;
 
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
@@ -126,10 +130,13 @@ Context::Context(const std::string& instance_name,
       gpu_device_(gpu_device),
       datatype_(DataType::TYPE_INVALID),
       d_input_(nullptr),
+      d_input_copy_(nullptr),
       d_padding_mask_(nullptr),
       d_encoder_output_(nullptr),
       d_buf_(nullptr),
       d_output_(nullptr),
+      d_src_lang_id_(nullptr),
+      d_trg_lang_id_(nullptr),
       stream_(nullptr),
       hd_(nullptr) {}
 
@@ -163,6 +170,14 @@ int Context::FreeCudaBuffers() {
     d_input_ = nullptr;
   }
 
+  if (d_input_copy_ != nullptr) {
+    cudaError_t cuerr = cudaFree(d_input_copy_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+    d_input_copy_ = nullptr;
+  }
+
   if (d_padding_mask_ != nullptr) {
     cudaError_t cuerr = cudaFree(d_padding_mask_);
     if (cuerr != cudaSuccess) {
@@ -193,6 +208,22 @@ int Context::FreeCudaBuffers() {
       LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
     }
     d_output_ = nullptr;
+  }
+
+  if (d_src_lang_id_ != nullptr) {
+    cudaError_t cuerr = cudaFree(d_src_lang_id_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+    d_src_lang_id_ = nullptr;
+  }
+
+  if (d_trg_lang_id_ != nullptr) {
+    cudaError_t cuerr = cudaFree(d_trg_lang_id_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+    d_trg_lang_id_ = nullptr;
   }
 
   return kSuccess;
@@ -304,6 +335,11 @@ int Context::Init() {
     return err;
   }
   err = AllocateCudaBuffers(
+      &d_input_copy_, max_batch_size * tw_._max_step * datatype_bytesize_);
+  if (err != kSuccess) {
+    return err;
+  }
+  err = AllocateCudaBuffers(
       &d_padding_mask_, max_batch_size * tw_._max_step * datatype_bytesize_);
   if (err != kSuccess) {
     return err;
@@ -320,12 +356,22 @@ int Context::Init() {
   if (err != kSuccess) {
     return err;
   }
+  err =
+      AllocateCudaBuffers(&d_src_lang_id_, max_batch_size * datatype_bytesize_);
+  if (err != kSuccess) {
+    return err;
+  }
+  err =
+      AllocateCudaBuffers(&d_trg_lang_id_, max_batch_size * datatype_bytesize_);
+  if (err != kSuccess) {
+    return err;
+  }
 
   encoder_ = std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
       max_batch_size, reinterpret_cast<int*>(d_input_),
       reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_), tw_, stream_,
-      hd_);
+      hd_, reinterpret_cast<int*>(d_src_lang_id_));
   res = encoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -335,7 +381,7 @@ int Context::Init() {
       max_batch_size, reinterpret_cast<int*>(d_padding_mask_),
       reinterpret_cast<_optraits::DataType*>(d_encoder_output_),
       reinterpret_cast<int*>(d_output_), tw_, stream_, hd_, false,
-      reinterpret_cast<int*>(d_input_));
+      reinterpret_cast<int*>(d_trg_lang_id_));
   res = decoder_->check();
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
@@ -433,7 +479,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
-    const uint64_t batch_seq_len = payload.input_shape_dims[0][0];
+    uint64_t batch_seq_len = payload.input_shape_dims[0][0];
     if (batch_seq_len > tw_._max_step) {
       LOG_ERROR << "too long seq_len: " << batch_seq_len
                 << ", skip this request" << std::endl;
@@ -444,10 +490,25 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
 
     // Copy the input tensors into the appropriate CUDA memory buffer.
     err = GetInputTensorGPU(input_fn, payload.input_context, "src_ids:0",
-                            batchn_byte_size, d_input_);
+                            batchn_byte_size,
+                            tw_._multilg_type == 0 ? d_input_ : d_input_copy_);
     if (err != kSuccess) {
       payload.error_code = err;
       continue;
+    }
+
+    // for multilg
+    if (tw_._multilg_type != 0) {
+      // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
+      lightseq::cuda::launch_split_multilg_request(
+          (int*)d_input_copy_, (int*)d_src_lang_id_, (int*)d_trg_lang_id_,
+          (int*)d_input_, payload.batch_size, batch_seq_len, stream_);
+    }
+    if (tw_._multilg_type == 1) {
+      batch_seq_len -= 2;
+    }
+    if (tw_._multilg_type == 2) {
+      batch_seq_len -= 1;
     }
 
     encoder_->run_one_infer(payload.batch_size, batch_seq_len);
