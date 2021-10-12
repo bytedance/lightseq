@@ -7,10 +7,10 @@
 const float LN_EPSILON = 1e-8f;
 
 __forceinline__ __host__ __device__ int8_t float2int8(float x,
-                                                      float scale_div_clipmax,
+                                                      float scale_div_clip_max,
                                                       float clip_max) {
   x = x > clip_max ? clip_max : (x < -clip_max ? -clip_max : x);
-  return int8_t(x * scale_div_clipmax);
+  return int8_t(x * scale_div_clip_max);
 }
 
 template <typename T>
@@ -21,7 +21,7 @@ __global__ void quantize_tensor_kernel(const T *input, int8_t *output,
 template <>
 __global__ void quantize_tensor_kernel<float>(const float *input,
                                               int8_t *output, int total_count,
-                                              float scale_div_clipmax,
+                                              float scale_div_clip_max,
                                               float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 4 >= total_count) return;
@@ -31,17 +31,17 @@ __global__ void quantize_tensor_kernel<float>(const float *input,
   float4 inp4 = input4[i];
   int32_t out4;
   int8_t *out1 = reinterpret_cast<int8_t *>(&out4);
-  out1[0] = float2int8(inp4.x, scale_div_clipmax, clip_max);
-  out1[1] = float2int8(inp4.y, scale_div_clipmax, clip_max);
-  out1[2] = float2int8(inp4.z, scale_div_clipmax, clip_max);
-  out1[3] = float2int8(inp4.w, scale_div_clipmax, clip_max);
+  out1[0] = float2int8(inp4.x, scale_div_clip_max, clip_max);
+  out1[1] = float2int8(inp4.y, scale_div_clip_max, clip_max);
+  out1[2] = float2int8(inp4.z, scale_div_clip_max, clip_max);
+  out1[3] = float2int8(inp4.w, scale_div_clip_max, clip_max);
   output4[i] = out4;
 }
 
 template <>
 __global__ void quantize_tensor_kernel<__half>(const __half *input,
                                                int8_t *output, int total_count,
-                                               float scale_div_clipmax,
+                                               float scale_div_clip_max,
                                                float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 8 >= total_count) return;
@@ -54,7 +54,7 @@ __global__ void quantize_tensor_kernel<__half>(const __half *input,
   int8_t *out1 = reinterpret_cast<int8_t *>(&out8);
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
-    out1[j] = float2int8(__half2float(inp_h[j]), scale_div_clipmax, clip_max);
+    out1[j] = float2int8(__half2float(inp_h[j]), scale_div_clip_max, clip_max);
   }
   output4[i] = out8;
 }
@@ -80,13 +80,13 @@ void launch_quantize_tensor<__half>(const __half *input, int8_t *output,
 template <typename T>
 __global__ void dequantize_tensor_kernel(const int32_t *input, T *output,
                                          int total_count,
-                                         float scale_div_clipmax,
+                                         float scale_div_clip_max,
                                          float clip_max);
 
 template <>
 __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
                                                 float *output, int total_count,
-                                                float scale_div_clipmax,
+                                                float scale_div_clip_max,
                                                 float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 4 >= total_count) return;
@@ -95,10 +95,10 @@ __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
   float4 *output4 = reinterpret_cast<float4 *>(output);
   int4 inp4 = input4[i];
   float4 out4;
-  out4.x = float(inp4.x) / scale_div_clipmax;
-  out4.y = float(inp4.y) / scale_div_clipmax;
-  out4.z = float(inp4.z) / scale_div_clipmax;
-  out4.w = float(inp4.w) / scale_div_clipmax;
+  out4.x = float(inp4.x) / scale_div_clip_max;
+  out4.y = float(inp4.y) / scale_div_clip_max;
+  out4.z = float(inp4.z) / scale_div_clip_max;
+  out4.w = float(inp4.w) / scale_div_clip_max;
   output4[i] = out4;
 }
 
@@ -106,7 +106,7 @@ template <>
 __global__ void dequantize_tensor_kernel<__half>(const int32_t *input,
                                                  __half *output,
                                                  int total_count,
-                                                 float scale_div_clipmax,
+                                                 float scale_div_clip_max,
                                                  float clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i * 8 >= total_count) return;
@@ -119,7 +119,7 @@ __global__ void dequantize_tensor_kernel<__half>(const int32_t *input,
   __half *out1 = reinterpret_cast<__half *>(&out4);
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
-    out1[j] = __float2half(float(inp1[j]) / scale_div_clipmax);
+    out1[j] = __float2half(float(inp1[j]) / scale_div_clip_max);
   }
   output4[i] = out4;
 }
@@ -214,7 +214,7 @@ template <typename T>
 __global__ void ker_layer_norm_int8O(int8_t *ln_res, T *vars, T *means,
                                      const T *inp, const T *scale,
                                      const T *bias, int hidden_size,
-                                     float quant_scale, float clip_max) {
+                                     float scale_div_clip_max, float clip_max) {
   // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
@@ -233,11 +233,7 @@ __global__ void ker_layer_norm_int8O(int8_t *ln_res, T *vars, T *means,
   __shared__ float s_mean, s_var;
   if (threadIdx.x == 0) {
     s_mean = reduce_val[0] / mean_dim;
-    if (means != nullptr) {
-      means[blockIdx.x] = s_mean;
-    }
     s_var = reduce_val[1] / mean_dim - s_mean * s_mean + LN_EPSILON;
-    vars[blockIdx.x] = s_var;
     s_var = rsqrtf(s_var);
   }
   __syncthreads();
@@ -253,21 +249,19 @@ __global__ void ker_layer_norm_int8O(int8_t *ln_res, T *vars, T *means,
     val.y = (val.y - s_mean) * s_var * vscale.y + vbias.y;
     val.z = (val.z - s_mean) * s_var * vscale.z + vbias.z;
     val.w = (val.w - s_mean) * s_var * vscale.w + vbias.w;
-    val_i4.x = float2int8(val.x, quant_scale / clip_max, clip_max);
-    val_i4.y = float2int8(val.y, quant_scale / clip_max, clip_max);
-    val_i4.z = float2int8(val.z, quant_scale / clip_max, clip_max);
-    val_i4.w = float2int8(val.w, quant_scale / clip_max, clip_max);
+    val_i4.x = float2int8(val.x, scale_div_clip_max, clip_max);
+    val_i4.y = float2int8(val.y, scale_div_clip_max, clip_max);
+    val_i4.z = float2int8(val.z, scale_div_clip_max, clip_max);
+    val_i4.w = float2int8(val.w, scale_div_clip_max, clip_max);
     output_i4[idx] = val_i4;
   }
 }
 
 template <>
-__global__ void ker_layer_norm_int8O<__half>(int8_t *ln_res, __half *vars,
-                                             __half *means, const __half *inp,
-                                             const __half *scale,
-                                             const __half *bias,
-                                             int hidden_size, float quant_scale,
-                                             float clip_max) {
+__global__ void ker_layer_norm_int8O<__half>(
+    int8_t *ln_res, __half *vars, __half *means, const __half *inp,
+    const __half *scale, const __half *bias, int hidden_size,
+    float scale_div_clip_max, float clip_max) {
   // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
@@ -290,11 +284,7 @@ __global__ void ker_layer_norm_int8O<__half>(int8_t *ln_res, __half *vars,
   __shared__ float s_mean, s_var;
   if (threadIdx.x == 0) {
     s_mean = reduce_val[0] / mean_dim;
-    if (means != nullptr) {
-      means[blockIdx.x] = s_mean;
-    }
     s_var = reduce_val[1] / mean_dim - s_mean * s_mean + LN_EPSILON;
-    vars[blockIdx.x] = s_var;
     s_var = rsqrtf(s_var);
   }
   __syncthreads();
@@ -319,8 +309,8 @@ __global__ void ker_layer_norm_int8O<__half>(int8_t *ln_res, __half *vars,
       float2 val_f2 = __half22float2(val_h2[i]);
       val_f2.x = (val_f2.x - s_mean) * s_var * scale_f2.x + bias_f2.x;
       val_f2.y = (val_f2.y - s_mean) * s_var * scale_f2.y + bias_f2.y;
-      out1[i * 2] = float2int8(val_f2.x, quant_scale / clip_max, clip_max);
-      out1[i * 2 + 1] = float2int8(val_f2.y, quant_scale / clip_max, clip_max);
+      out1[i * 2] = float2int8(val_f2.x, scale_div_clip_max, clip_max);
+      out1[i * 2 + 1] = float2int8(val_f2.y, scale_div_clip_max, clip_max);
     }
     output_i4[idx] = out8;
   }
@@ -341,7 +331,8 @@ void launch_layer_norm_int8O<float>(int8_t *ln_res, float *vars, float *means,
   dim3 block_dim(nthread);
 
   ker_layer_norm_int8O<float><<<grid_dim, block_dim, 0, stream>>>(
-      ln_res, vars, means, inp, scale, bias, hidden_dim, quant_scale, clip_max);
+      ln_res, vars, means, inp, scale, bias, hidden_dim, quant_scale / clip_max,
+      clip_max);
 }
 
 template <>
@@ -360,7 +351,8 @@ void launch_layer_norm_int8O<__half>(int8_t *ln_res, __half *vars,
   dim3 block_dim(nthread);
 
   ker_layer_norm_int8O<__half><<<grid_dim, block_dim, 0, stream>>>(
-      ln_res, vars, means, inp, scale, bias, hidden_dim, quant_scale, clip_max);
+      ln_res, vars, means, inp, scale, bias, hidden_dim, quant_scale / clip_max,
+      clip_max);
 }
 
 /**
@@ -434,52 +426,35 @@ __global__ void ls_dropout_act_bias_kernel_int32I_int8O(
     const int total_count, const float ratio, int8_t *__restrict__ out,
     const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
     const float *__restrict__ bias, const int seed, const int hidden_size,
-    float in_scale, float in_clip_max, float out_scale, float out_clip_max) {
-  const float scale = 1.f / (1.f - ratio);
+    float in_scale_div_clip_max, float out_scale_div_clip_max,
+    float out_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
 
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
-  uint8_t m[4];
-
   char4 *out4 = reinterpret_cast<char4 *>(out);
   const int4 *data4 = reinterpret_cast<const int4 *>(in);
   const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
-  float4 rand = curand_uniform4(&state);
-
-  m[0] = (uint8_t)(rand.x > ratio);
-  m[1] = (uint8_t)(rand.y > ratio);
-  m[2] = (uint8_t)(rand.z > ratio);
-  m[3] = (uint8_t)(rand.w > ratio);
-
   int bias_i = i % (hidden_size >> 2);
-  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  mask4[i] = m4[0];
+
   const int4 input4 = data4[i];
   const float4 b4 = __ldg(&bias4[bias_i]);
   float4 output4;
 
   output4.x = activation_kernel_int8<act_type, float>(
-                  float(input4.x) / in_scale * in_clip_max + b4.x) *
-              scale * m[0];
+      float(input4.x) / in_scale_div_clip_max + b4.x);
   output4.y = activation_kernel_int8<act_type, float>(
-                  float(input4.y) / in_scale * in_clip_max + b4.y) *
-              scale * m[1];
+      float(input4.y) / in_scale_div_clip_max + b4.y);
   output4.z = activation_kernel_int8<act_type, float>(
-                  float(input4.z) / in_scale * in_clip_max + b4.z) *
-              scale * m[2];
+      float(input4.z) / in_scale_div_clip_max + b4.z);
   output4.w = activation_kernel_int8<act_type, float>(
-                  float(input4.w) / in_scale * in_clip_max + b4.w) *
-              scale * m[3];
+      float(input4.w) / in_scale_div_clip_max + b4.w);
 
   char4 out_i4;
-  out_i4.x = float2int8(output4.x, out_scale / out_clip_max, out_clip_max);
-  out_i4.y = float2int8(output4.y, out_scale / out_clip_max, out_clip_max);
-  out_i4.z = float2int8(output4.z, out_scale / out_clip_max, out_clip_max);
-  out_i4.w = float2int8(output4.w, out_scale / out_clip_max, out_clip_max);
+  out_i4.x = float2int8(output4.x, out_scale_div_clip_max, out_clip_max);
+  out_i4.y = float2int8(output4.y, out_scale_div_clip_max, out_clip_max);
+  out_i4.z = float2int8(output4.z, out_scale_div_clip_max, out_clip_max);
+  out_i4.w = float2int8(output4.w, out_scale_div_clip_max, out_clip_max);
   out4[i] = out_i4;
 }
 
@@ -488,34 +463,15 @@ __global__ void ls_dropout_act_bias_kernel_int32I_int8O(
     const int total_count, const float ratio, int8_t *__restrict__ out,
     const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
     const __half *__restrict__ bias, const int seed, const int hidden_size,
-    float in_scale, float in_clip_max, float out_scale, float out_clip_max) {
-  const float scale = 1.f / (1.f - ratio);
-
+    float in_scale_div_clip_max, float out_scale_div_clip_max,
+    float out_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
 
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
-
   const long4 *vals_long4 = reinterpret_cast<const long4 *>(in);
   int64_t *outs_i8 = reinterpret_cast<int64_t *>(out);
   const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
-
-  uint8_t m[8];
-  float4 rand = curand_uniform4(&state);
-  m[0] = (uint8_t)(rand.x > ratio);
-  m[1] = (uint8_t)(rand.y > ratio);
-  m[2] = (uint8_t)(rand.z > ratio);
-  m[3] = (uint8_t)(rand.w > ratio);
-  rand = curand_uniform4(&state);
-  m[4] = (uint8_t)(rand.x > ratio);
-  m[5] = (uint8_t)(rand.y > ratio);
-  m[6] = (uint8_t)(rand.z > ratio);
-  m[7] = (uint8_t)(rand.w > ratio);
-  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  mask8[i] = *m8;
 
   int bias_i = i % (hidden_size >> 3);
   long4 val_long4 = vals_long4[i];
@@ -528,11 +484,9 @@ __global__ void ls_dropout_act_bias_kernel_int32I_int8O(
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
     float out_f;
-    out_f =
-        scale * m[j] *
-        activation_kernel_int8<act_type, float>(
-            float(val1[j]) / in_scale * in_clip_max + __half2float(b_half[j]));
-    out_i1[j] = float2int8(out_f, out_scale / out_clip_max, out_clip_max);
+    out_f = activation_kernel_int8<act_type, float>(
+        float(val1[j]) / in_scale_div_clip_max + __half2float(b_half[j]));
+    out_i1[j] = float2int8(out_f, out_scale_div_clip_max, out_clip_max);
   }
   outs_i8[i] = out_i8;
 }
@@ -549,7 +503,7 @@ void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kGelu, float>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+          dim, in_scale / in_clip_max, out_scale / out_clip_max, out_clip_max);
 }
 
 template <>
@@ -564,7 +518,7 @@ void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kGelu, __half>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+          dim, in_scale / in_clip_max, out_scale / out_clip_max, out_clip_max);
 }
 
 template <>
@@ -579,7 +533,7 @@ void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, float>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+          dim, in_scale / in_clip_max, out_scale / out_clip_max, out_clip_max);
 }
 
 template <>
@@ -594,7 +548,7 @@ void launch_ls_dropout_act_bias_int32I_int8O<ActivationType::kRelu, __half>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_scale, in_clip_max, out_scale, out_clip_max);
+          dim, in_scale / in_clip_max, out_scale / out_clip_max, out_clip_max);
 }
 
 /**
@@ -755,44 +709,27 @@ __global__ void ls_dropout_res_bias_kernel_int32I(
     const int total_count, const float ratio, float *__restrict__ out,
     const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
     const float *__restrict__ bias, const float *__restrict__ residual,
-    const int seed, const int hidden_size, float quant_scale, float clip_max) {
-  const float scale = 1.f / (1.f - ratio);
+    const int seed, const int hidden_size, float scale_div_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
-
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
-  uint8_t m[4];
 
   float4 *out4 = reinterpret_cast<float4 *>(out);
   const int4 *data4 = reinterpret_cast<const int4 *>(in);
   const float4 *residual4 = reinterpret_cast<const float4 *>(residual);
   const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
-  float4 rand = curand_uniform4(&state);
-
-  m[0] = static_cast<uint8_t>(rand.x > ratio);
-  m[1] = static_cast<uint8_t>(rand.y > ratio);
-  m[2] = static_cast<uint8_t>(rand.z > ratio);
-  m[3] = static_cast<uint8_t>(rand.w > ratio);
 
   int bias_i = i % (hidden_size >> 2);
-  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  mask4[i] = m4[0];
+
   const int4 input4 = data4[i];
   const float4 b4 = __ldg(&bias4[bias_i]);
   const float4 res4 = residual4[i];
   float4 output4;
 
-  output4.x =
-      (float(input4.x) / quant_scale * clip_max + b4.x) * scale * m[0] + res4.x;
-  output4.y =
-      (float(input4.y) / quant_scale * clip_max + b4.y) * scale * m[1] + res4.y;
-  output4.z =
-      (float(input4.z) / quant_scale * clip_max + b4.z) * scale * m[2] + res4.z;
-  output4.w =
-      (float(input4.w) / quant_scale * clip_max + b4.w) * scale * m[3] + res4.w;
+  output4.x = (float(input4.x) / scale_div_clip_max + b4.x) + res4.x;
+  output4.y = (float(input4.y) / scale_div_clip_max + b4.y) + res4.y;
+  output4.z = (float(input4.z) / scale_div_clip_max + b4.z) + res4.z;
+  output4.w = (float(input4.w) / scale_div_clip_max + b4.w) + res4.w;
 
   out4[i] = output4;
 }
@@ -801,35 +738,15 @@ __global__ void ls_dropout_res_bias_kernel_int32I(
     const int total_count, const float ratio, __half *__restrict__ out,
     const int32_t *__restrict__ in, uint8_t *__restrict__ mask,
     const __half *__restrict__ bias, const __half *__restrict__ residual,
-    const int seed, const int hidden_size, float quant_scale, float clip_max) {
-  const __half scale = 1. / (1. - ratio);
-
+    const int seed, const int hidden_size, float scale_div_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
-
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
 
   const long4 *vals_long4 = reinterpret_cast<const long4 *>(in);
   float4 *outs_float4 = reinterpret_cast<float4 *>(out);
   const float4 *residual4 = reinterpret_cast<const float4 *>(residual);
   const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
-
-  uint8_t m[8];
-  float4 rand = curand_uniform4(&state);
-  m[0] = static_cast<uint8_t>(rand.x > ratio);
-  m[1] = static_cast<uint8_t>(rand.y > ratio);
-  m[2] = static_cast<uint8_t>(rand.z > ratio);
-  m[3] = static_cast<uint8_t>(rand.w > ratio);
-  rand = curand_uniform4(&state);
-  m[4] = static_cast<uint8_t>(rand.x > ratio);
-  m[5] = static_cast<uint8_t>(rand.y > ratio);
-  m[6] = static_cast<uint8_t>(rand.z > ratio);
-  m[7] = static_cast<uint8_t>(rand.w > ratio);
-  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  mask8[i] = m8[0];
 
   int bias_i = i % (hidden_size >> 3);
   long4 val_long4 = vals_long4[i];
@@ -841,34 +758,27 @@ __global__ void ls_dropout_res_bias_kernel_int32I(
   __half2 *out_half2 = reinterpret_cast<__half2 *>(&out_float4);
   const __half2 *b_half2 = reinterpret_cast<const __half2 *>(&b4);
   const __half2 *res_half2 = reinterpret_cast<const __half2 *>(&res4);
-  __half2 scale_mask_1 =
-      __halves2half2(scale * __float2half(m[0]), scale * __float2half(m[1]));
-  __half2 scale_mask_2 =
-      __halves2half2(scale * __float2half(m[2]), scale * __float2half(m[3]));
-  __half2 scale_mask_3 =
-      __halves2half2(scale * __float2half(m[4]), scale * __float2half(m[5]));
-  __half2 scale_mask_4 =
-      __halves2half2(scale * __float2half(m[6]), scale * __float2half(m[7]));
-  out_half2[0] = __hfma2(
-      __hadd2(__floats2half2_rn(float(val_i1[0]) / quant_scale * clip_max,
-                                float(val_i1[1]) / quant_scale * clip_max),
-              b_half2[0]),
-      scale_mask_1, res_half2[0]);
-  out_half2[1] = __hfma2(
-      __hadd2(__floats2half2_rn(float(val_i1[2]) / quant_scale * clip_max,
-                                float(val_i1[3]) / quant_scale * clip_max),
-              b_half2[1]),
-      scale_mask_2, res_half2[1]);
-  out_half2[2] = __hfma2(
-      __hadd2(__floats2half2_rn(float(val_i1[4]) / quant_scale * clip_max,
-                                float(val_i1[5]) / quant_scale * clip_max),
-              b_half2[2]),
-      scale_mask_3, res_half2[2]);
-  out_half2[3] = __hfma2(
-      __hadd2(__floats2half2_rn(float(val_i1[6]) / quant_scale * clip_max,
-                                float(val_i1[7]) / quant_scale * clip_max),
-              b_half2[3]),
-      scale_mask_4, res_half2[3]);
+
+  out_half2[0] =
+      __hadd2(__hadd2(__floats2half2_rn(float(val_i1[0]) / scale_div_clip_max,
+                                        float(val_i1[1]) / scale_div_clip_max),
+                      b_half2[0]),
+              res_half2[0]);
+  out_half2[1] =
+      __hadd2(__hadd2(__floats2half2_rn(float(val_i1[2]) / scale_div_clip_max,
+                                        float(val_i1[3]) / scale_div_clip_max),
+                      b_half2[1]),
+              res_half2[1]);
+  out_half2[2] =
+      __hadd2(__hadd2(__floats2half2_rn(float(val_i1[4]) / scale_div_clip_max,
+                                        float(val_i1[5]) / scale_div_clip_max),
+                      b_half2[2]),
+              res_half2[2]);
+  out_half2[3] =
+      __hadd2(__hadd2(__floats2half2_rn(float(val_i1[6]) / scale_div_clip_max,
+                                        float(val_i1[7]) / scale_div_clip_max),
+                      b_half2[3]),
+              res_half2[3]);
   outs_float4[i] = out_float4;
 }
 
@@ -883,7 +793,7 @@ void launch_ls_dropout_res_bias_int32I<float>(
       std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::system_clock::now().time_since_epoch())
           .count(),
-      dim, scale, clip_max);
+      dim, scale / clip_max);
 }
 
 template <>
@@ -897,13 +807,14 @@ void launch_ls_dropout_res_bias_int32I<__half>(
       std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::system_clock::now().time_since_epoch())
           .count(),
-      dim, scale, clip_max);
+      dim, scale / clip_max);
 }
 
 __global__ void transform4d_0213_int32I_int8O(
     int8_t *output, const int32_t *input, int batch_size, int seq_len,
-    int trans_count, int nhead, int head_dim, int num_all, float in_scale,
-    float in_clip_max, float out_scale, float out_clip_max) {
+    int trans_count, int nhead, int head_dim, int num_all,
+    float in_scale_div_clip_max, float out_scale_div_clip_max,
+    float out_clip_max) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
     return;
@@ -923,8 +834,8 @@ __global__ void transform4d_0213_int32I_int8O(
   int8_t *res8 = reinterpret_cast<int8_t *>(&res);
 #pragma unroll
   for (std::size_t j = 0; j < 8; ++j) {
-    res8[j] = float2int8(float(i8s[j]) / in_scale * in_clip_max,
-                         out_scale / out_clip_max, out_clip_max);
+    res8[j] = float2int8(float(i8s[j]) / in_scale_div_clip_max,
+                         out_scale_div_clip_max, out_clip_max);
   }
   res64[trg_offset] = res;
 }
@@ -944,7 +855,7 @@ void launch_transform4d_0213_int32I_int8O(int8_t *output, const int32_t *input,
 
   transform4d_0213_int32I_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
       output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
-      in_scale, in_clip_max, out_scale, out_clip_max);
+      in_scale / in_clip_max, out_scale / out_clip_max, out_clip_max);
 }
 
 /**
@@ -967,34 +878,19 @@ __global__ void ls_dropout_kernel_int8O(
     const int total_count, const float ratio, int8_t *__restrict__ out,
     const float *__restrict__ in, uint8_t *__restrict__ mask, const int seed,
     float scale_div_clip_max, float clip_max) {
-  const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
 
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
-  uint8_t m[4];
-
   char4 *out4 = reinterpret_cast<char4 *>(out);
   const float4 *data4 = reinterpret_cast<const float4 *>(in);
-  uint32_t *mask4 = reinterpret_cast<uint32_t *>(mask);
-  float4 rand = curand_uniform4(&state);
-
-  m[0] = (uint8_t)(rand.x > ratio);
-  m[1] = (uint8_t)(rand.y > ratio);
-  m[2] = (uint8_t)(rand.z > ratio);
-  m[3] = (uint8_t)(rand.w > ratio);
-
-  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  mask4[i] = m4[0];
 
   float4 input4 = data4[i];
   char4 res4;
-  res4.x = float2int8(input4.x * scale * m[0], scale_div_clip_max, clip_max);
-  res4.y = float2int8(input4.y * scale * m[1], scale_div_clip_max, clip_max);
-  res4.z = float2int8(input4.z * scale * m[2], scale_div_clip_max, clip_max);
-  res4.w = float2int8(input4.w * scale * m[3], scale_div_clip_max, clip_max);
+  res4.x = float2int8(input4.x, scale_div_clip_max, clip_max);
+  res4.y = float2int8(input4.y, scale_div_clip_max, clip_max);
+  res4.z = float2int8(input4.z, scale_div_clip_max, clip_max);
+  res4.w = float2int8(input4.w, scale_div_clip_max, clip_max);
   out4[i] = res4;
 }
 
@@ -1002,53 +898,29 @@ __global__ void ls_dropout_kernel_int8O(
     const int total_count, const float ratio, int8_t *__restrict__ out,
     const __half *__restrict__ in, uint8_t *__restrict__ mask, const int seed,
     float scale_div_clip_max, float clip_max) {
-  const float scale = 1.f / (1.f - ratio);
-
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
 
-  curandStatePhilox4_32_10_t state;
-  curand_init(seed, i, 0, &state);
-
   const float4 *vals_float4 = reinterpret_cast<const float4 *>(in);
   int64_t *outs_i64 = reinterpret_cast<int64_t *>(out);
-  uint64_t *mask8 = reinterpret_cast<uint64_t *>(mask);
-
-  uint8_t m[8];
-  float4 rand = curand_uniform4(&state);
-  m[0] = (uint8_t)(rand.x > ratio);
-  m[1] = (uint8_t)(rand.y > ratio);
-  m[2] = (uint8_t)(rand.z > ratio);
-  m[3] = (uint8_t)(rand.w > ratio);
-  rand = curand_uniform4(&state);
-  m[4] = (uint8_t)(rand.x > ratio);
-  m[5] = (uint8_t)(rand.y > ratio);
-  m[6] = (uint8_t)(rand.z > ratio);
-  m[7] = (uint8_t)(rand.w > ratio);
-  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  mask8[i] = *m8;
 
   float4 val_float4 = vals_float4[i];
   int64_t out_i64;
   __half2 *val_half2 = reinterpret_cast<__half2 *>(&val_float4);
   int8_t *out_i8 = reinterpret_cast<int8_t *>(&out_i64);
-  __half2 scale_mask_1 = __floats2half2_rn(scale * m[0], scale * m[1]);
-  __half2 scale_mask_2 = __floats2half2_rn(scale * m[2], scale * m[3]);
-  __half2 scale_mask_3 = __floats2half2_rn(scale * m[4], scale * m[5]);
-  __half2 scale_mask_4 = __floats2half2_rn(scale * m[6], scale * m[7]);
 
   __half2 tmp;
-  tmp = __hmul2(val_half2[0], scale_mask_1);
+  tmp = val_half2[0];
   out_i8[0] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
   out_i8[1] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
-  tmp = __hmul2(val_half2[1], scale_mask_2);
+  tmp = val_half2[1];
   out_i8[2] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
   out_i8[3] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
-  tmp = __hmul2(val_half2[2], scale_mask_3);
+  tmp = val_half2[2];
   out_i8[4] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
   out_i8[5] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
-  tmp = __hmul2(val_half2[3], scale_mask_4);
+  tmp = val_half2[3];
   out_i8[6] = float2int8(__half2float(tmp.x), scale_div_clip_max, clip_max);
   out_i8[7] = float2int8(__half2float(tmp.y), scale_div_clip_max, clip_max);
   outs_i64[i] = out_i64;
@@ -1104,7 +976,7 @@ trans_count: 1 or 3, the count of matrice need to be transformed
 __global__ void transform4d_0213_int8O(int8_t *output, const float *input,
                                        int batch_size, int seq_len,
                                        int trans_count, int nhead, int head_dim,
-                                       int num_all, float scale,
+                                       int num_all, float scale_div_clip_max,
                                        float clip_max) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
@@ -1121,17 +993,17 @@ __global__ void transform4d_0213_int8O(int8_t *output, const float *input,
   char4 *res32 = reinterpret_cast<char4 *>(output);
   float4 f4 = input4[offset];
   char4 res;
-  res.x = float2int8(f4.x, scale / clip_max, clip_max);
-  res.y = float2int8(f4.y, scale / clip_max, clip_max);
-  res.z = float2int8(f4.z, scale / clip_max, clip_max);
-  res.w = float2int8(f4.w, scale / clip_max, clip_max);
+  res.x = float2int8(f4.x, scale_div_clip_max, clip_max);
+  res.y = float2int8(f4.y, scale_div_clip_max, clip_max);
+  res.z = float2int8(f4.z, scale_div_clip_max, clip_max);
+  res.w = float2int8(f4.w, scale_div_clip_max, clip_max);
   res32[trg_offset] = res;
 }
 
 __global__ void transform4d_0213_int8O(int8_t *output, const __half *input,
                                        int batch_size, int seq_len,
                                        int trans_count, int nhead, int head_dim,
-                                       int num_all, float scale,
+                                       int num_all, float scale_div_clip_max,
                                        float clip_max) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
@@ -1152,7 +1024,7 @@ __global__ void transform4d_0213_int8O(int8_t *output, const __half *input,
   int8_t *res8 = reinterpret_cast<int8_t *>(&res);
 #pragma unroll
   for (std::size_t j = 0; j < 8; ++j) {
-    res8[j] = float2int8(__half2float(h8[j]), scale / clip_max, clip_max);
+    res8[j] = float2int8(__half2float(h8[j]), scale_div_clip_max, clip_max);
   }
   res64[trg_offset] = res;
 }
@@ -1171,7 +1043,7 @@ void launch_transform4d_0213_int8O<float>(int8_t *output, const float *input,
 
   transform4d_0213_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
       output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
-      scale, clip_max);
+      scale / clip_max, clip_max);
 }
 
 template <>
@@ -1188,5 +1060,5 @@ void launch_transform4d_0213_int8O<__half>(int8_t *output, const __half *input,
 
   transform4d_0213_int8O<<<nblock, MAX_THREADS, 0, stream>>>(
       output, input, batch_size, seq_len, trans_count, nhead, head_dim, num_all,
-      scale, clip_max);
+      scale / clip_max, clip_max);
 }
