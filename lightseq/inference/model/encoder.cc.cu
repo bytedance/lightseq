@@ -78,10 +78,10 @@ std::string Encoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_tw._is_multilingual == false && _p_d_src_emb_wei.size() != 4) {
+  if (_tw._multilg_type == 0 && _p_d_src_emb_wei.size() != 4) {
     return "violate p_d_src_emb_wei.size() = 4";
   }
-  if (_tw._is_multilingual && _p_d_src_emb_wei.size() != 5) {
+  if (_tw._multilg_type != 0 && _p_d_src_emb_wei.size() != 5) {
     return "violate p_d_src_emb_wei.size() = 5";
   }
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {

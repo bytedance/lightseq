@@ -46,7 +46,7 @@ void BertWeight<OpType_>::proto_get_model_config(const Bert &bert) {
   _padding_id = bert.model_conf().src_padding_id();
   _is_post_ln = bert.model_conf().is_post_ln();
   _use_gelu = bert.model_conf().use_gelu();
-  _is_multilingual = bert.model_conf().is_multilingual();
+  _multilg_type = bert.model_conf().multilg_type();
 }
 
 /**
@@ -230,11 +230,11 @@ void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
                            &_use_gelu);
 
   try {
-    read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
-                             H5T_NATIVE_HBOOL, &_is_multilingual);
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/multilg_type",
+                             H5T_NATIVE_INT, &_multilg_type);
   } catch (HDF5DatasetNotFoundError &e) {
-    // if this attribute is not found, default initialize it to false
-    _is_multilingual = false;
+    // default value
+    _multilg_type = 0;
   }
 }
 

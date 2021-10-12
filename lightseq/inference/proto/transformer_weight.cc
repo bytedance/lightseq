@@ -76,7 +76,7 @@ void TransformerWeight<OpType_>::proto_get_model_config(
   _is_post_ln = transformer.model_conf().is_post_ln();
   _no_scale_embedding = transformer.model_conf().no_scale_embedding();
   _use_gelu = transformer.model_conf().use_gelu();
-  _is_multilingual = transformer.model_conf().is_multilingual();
+  _multilg_type = transformer.model_conf().multilg_type();
 }
 
 /**
@@ -158,7 +158,7 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
     }
   }  // trg
 
-  if (_is_multilingual) {
+  if (_multilg_type != 0) {
     // fill in language embedding
     std::vector<_DataType> raw_value;
     for (float e : layer.lang_emb()) {
@@ -170,18 +170,9 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
     } else {
-      if (layer.lang_emb_size() / _hidden_size !=
-          layer.trg_vocab_mask_size() / _trg_vocab_size) {
-        return "Wrong trg_lang_emb_size or trg_vocab_mask_size !";
-      }
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
-      // fill in target vocab mask
-      std::vector<int> h_mask;
-      for (int ele : layer.trg_vocab_mask()) h_mask.push_back(ele);
-      _d_trg_vocab_mask = h_mask;
-      _p_d_trg_vocab_mask = thrust::raw_pointer_cast(_d_trg_vocab_mask.data());
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"
@@ -527,11 +518,11 @@ void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
                            &_use_gelu);
 
   try {
-    read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_multilingual",
-                             H5T_NATIVE_HBOOL, &_is_multilingual);
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/multilg_type",
+                             H5T_NATIVE_INT, &_multilg_type);
   } catch (HDF5DatasetNotFoundError &e) {
-    // if this attribute is not found, default initialize it to false
-    _is_multilingual = false;
+    // default value
+    _multilg_type = 0;
   }
 }
 
@@ -638,9 +629,8 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     }
   }  // trg
 
-  if (_is_multilingual) {
+  if (_multilg_type) {
     // fill in language embedding
-
     std::vector<float> raw_value_float = read_hdf5_dataset_data_float(
         hdf5_file, dataset_prefix + "/lang_emb", H5T_NATIVE_FLOAT);
     std::vector<_DataType> raw_value;
@@ -652,23 +642,10 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
     } else {
       size_t lang_emb_size = raw_value.size();
-      size_t trg_vocab_mask_size =
-          get_hdf5_dataset_size(hdf5_file, dataset_prefix + "trg_vocab_mask");
-      if (lang_emb_size / _hidden_size !=
-          trg_vocab_mask_size / _trg_vocab_size) {
-        throw std::runtime_error(
-            "Wrong trg_lang_emb_size or trg_vocab_mask_size !");
-      }
 
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
-      // fill in target vocab mask
-      std::vector<int> h_mask = read_hdf5_dataset_data_int(
-          hdf5_file, dataset_prefix + "/trg_vocab_mask", H5T_NATIVE_INT);
-
-      _d_trg_vocab_mask = h_mask;
-      _p_d_trg_vocab_mask = thrust::raw_pointer_cast(_d_trg_vocab_mask.data());
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"

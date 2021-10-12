@@ -221,11 +221,11 @@ std::string Decoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_tw._is_multilingual && _p_d_trg_emb_wei.size() != 8) {
-    return "violate p_d_trg_emb_wei.size() = 8";
-  }
-  if (_tw._is_multilingual == false && _p_d_trg_emb_wei.size() != 7) {
+  if (_tw._multilg_type == 0 && _p_d_trg_emb_wei.size() != 7) {
     return "violate p_d_trg_emb_wei.size() = 7";
+  }
+  if (_tw._multilg_type != 0 && _p_d_trg_emb_wei.size() != 8) {
+    return "violate p_d_trg_emb_wei.size() = 8";
   }
   if (_p_d_dec_wei.size() != _tw._weight_per_dec_layer * _tw._n_dec_layer) {
     return "violate p_d_dec_wei.size() = weight_per_dec_layer * n_dec_layer";
