@@ -87,6 +87,9 @@ std::string BertEncoder<OpType_>::check() {
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
   }
+  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
+    return "lang id should not be null when multilg";
+  }
   return "";
 }
 

@@ -243,6 +243,9 @@ std::string Decoder<OpType_>::check() {
   if (!btmp) {
     return "wrong beam_size, should be 1, 2, 4, 8, 16 or 32";
   }
+  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
+    return "lang id should not be null when multilg";
+  }
   return "";
 }
 
