@@ -38,6 +38,7 @@ int main(int argc, char *argv[]) {
     std::cout << res << std::endl;
     return 0;
   }
+  tw_.print_model_config();
 
   /*
     step3. instantiate encoder and decoder, init the gpu memory buffer.
