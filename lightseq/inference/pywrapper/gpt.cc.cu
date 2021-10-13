@@ -132,16 +132,17 @@ class Gpt {
 
   py::array_t<int> sample(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-      std::string sampling_method = "topk", const int topk = 1,
-      const float topp = 0.75) {
-    if (available_sampling_methods.find(sampling_method) !=
-        available_sampling_methods.end()) {
-      tw_._sampling_method = sampling_method;
+      std::string sampling_method = "", const int topk = -1,
+      const float topp = -1.0f) {
+    if (sampling_method.empty()) {
+      if (available_sampling_methods.find(sampling_method) !=
+          available_sampling_methods.end()) {
+        tw_._sampling_method = sampling_method;
+      }
     }
-    assert(topk >= 0);
-    tw_._topk = topk;
-    assert(topp >= 0.0 && topp <= 1.0);
-    tw_._topp = topp;
+
+    if (topk >= 0) tw_._topk = topk;
+    if (topp >= 0.0 && topp <= 1.0) tw_._topp = topp;
 
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int* input_seq_data = input_seq_out.data(0, 0);
