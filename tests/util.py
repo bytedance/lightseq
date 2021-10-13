@@ -1,25 +1,51 @@
 import random
 import time
 from collections import OrderedDict
+from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 import torch
 
 
-def cast_fp32_tensor(tlist):
-    return [ele.to(torch.float32) for ele in tlist]
+@dataclass
+class Config:
+    max_batch_tokens: int
+    max_seq_len: int
+    vocab_size: int
+    padding_idx: int
+    hidden_size: int
+    intermediate_size: int
+    nhead: int
+    attn_prob_dropout_ratio: float
+    activation_dropout_ratio: float
+    hidden_dropout_ratio: float
+    pre_layer_norm: bool
+    fp16: bool
+    local_rank: int
+    activation_fn: str
+    num_layers: int
+    label_smooth: float
 
 
-def is_nan(x):
-    return x.isnan().any().item()
-
-
-def is_inf(x):
-    return x.isinf().any().item()
-
-
-max_batch_tokens = 9216
-max_seq_len = 256
+default_config = Config(
+    max_batch_tokens=9216,
+    max_seq_len=256,
+    vocab_size=32000,
+    padding_idx=0,
+    hidden_size=1024,
+    intermediate_size=1024 * 4,
+    nhead=16,
+    attn_prob_dropout_ratio=0.0,
+    activation_dropout_ratio=0.0,
+    hidden_dropout_ratio=0.0,
+    pre_layer_norm=True,
+    fp16=True,
+    local_rank=0,
+    activation_fn="relu",
+    num_layers=2,
+    label_smooth=0.1,
+)
 
 
 class TestDecorator(object):
@@ -27,31 +53,47 @@ class TestDecorator(object):
         self.all_case = OrderedDict()
         self.dtypes = [torch.float, torch.half]
         self.dtype = None
-        self.max_batch_tokens = max_batch_tokens
-        self.max_seq_len = max_seq_len
+        self.device = torch.device("cuda:{}".format(default_config.local_rank))
 
-    def init(self, device, nhead):
-        # device: str. e.g. "cuda:0"
-        self.device = torch.device(device)
-        assert nhead % 4 == 0
-        self.nhead = nhead
+    def generate_config(self, use_default=False):
+        if use_default:
+            return deepcopy(default_config)
+        config = deepcopy(default_config)
+        config.vocab_size = random.randint(1000, 42000)
+        hidden_size, nhead = self.h_nh
+        config.hidden_size = hidden_size
+        config.intermediate_size = hidden_size * 4
+        config.nhead = nhead
+        config.pre_layer_norm = random.choice([True, False])
+        config.activation_fn = self.act_fn
+        config.num_layers = random.randint(1, 2)
+        return config
 
     def bs_sl(self, batch_size=None):
         if batch_size is None:
-            seq_len = random.randint(1, self.max_seq_len)
-            max_batch_size = self.max_batch_tokens // seq_len
+            seq_len = random.randint(1, default_config.max_seq_len)
+            max_batch_size = default_config.max_batch_tokens // seq_len
             batch_size = random.randint(1, max_batch_size)
         else:
-            max_seq_len = min(self.max_batch_tokens // batch_size, self.max_seq_len)
+            max_seq_len = min(
+                default_config.max_batch_tokens // batch_size,
+                default_config.max_seq_len,
+            )
             seq_len = random.randint(1, max_seq_len)
         return batch_size, seq_len
 
     @property
-    def hidden_dim(self):
-        upbound = 1024 // self.nhead
+    def h_nh(self):
+        nhead = random.choice([8, 12, 16])
+        upbound = 1024 // nhead
         head_dim = random.choice(range(1, upbound + 1))
-        hs = head_dim * self.nhead * self.io_factor
-        return hs
+        hs = head_dim * nhead * self.io_factor
+        return hs, nhead
+
+    @property
+    def act_fn(self):
+        act = random.choice(["relu", "gelu"])
+        return act
 
     @property
     def io_factor(self):
@@ -103,7 +145,7 @@ class TestDecorator(object):
         mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
         return mask.to(self.device, dtype=dtype)
 
-    def case(self, dtypes=list(), ntest=5, nrepeat=5, rtol=1e-5, atol=1e-5):
+    def case(self, dtypes=list(), ntest=10, nrepeat=5, rtol=1e-5, atol=1e-5):
         if not dtypes:
             dtypes = self.dtypes
 
@@ -191,6 +233,18 @@ class TestDecorator(object):
                     self.test(custom, baseline, nrepeat, rtol, atol)
 
 
+def cast_fp32_tensor(tlist):
+    return [ele.to(torch.float32) for ele in tlist]
+
+
+def is_nan(x):
+    return x.isnan().any().item()
+
+
+def is_inf(x):
+    return x.isinf().any().item()
+
+
 def flat_dim(idxs, dims):
     assert len(idxs) == len(dims) or len(idxs) == len(dims) + 1
     base = 1
@@ -215,67 +269,6 @@ def expand_dim(idx, dims):
             break
         assert idx == 0
     return res[::-1]
-
-
-def get_fairseq_enc_params(fairseq_layer):
-    initial_weights = []
-    initial_biases = []
-
-    initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.out_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.out_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn_layer_norm.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn_layer_norm.bias.detach().clone())
-
-    initial_weights.append(fairseq_layer.fc1.weight.detach().clone())
-    initial_biases.append(fairseq_layer.fc1.bias.detach().clone())
-    initial_weights.append(fairseq_layer.fc2.weight.detach().clone())
-    initial_biases.append(fairseq_layer.fc2.bias.detach().clone())
-    initial_weights.append(fairseq_layer.final_layer_norm.weight.detach().clone())
-    initial_biases.append(fairseq_layer.final_layer_norm.bias.detach().clone())
-    return initial_weights, initial_biases
-
-
-def get_fairseq_dec_params(fairseq_layer):
-    initial_weights = []
-    initial_biases = []
-
-    initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.out_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.out_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn_layer_norm.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn_layer_norm.bias.detach().clone())
-
-    initial_weights.append(fairseq_layer.encodec_attn.q_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.encodec_attn.q_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.encodec_attn.k_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.encodec_attn.k_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.encodec_attn.v_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.encodec_attn.v_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.encodec_attn.out_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.encodec_attn.out_proj.bias.detach().clone())
-    initial_weights.append(
-        fairseq_layer.encodec_attn_layer_norm.weight.detach().clone()
-    )
-    initial_biases.append(fairseq_layer.encodec_attn_layer_norm.bias.detach().clone())
-
-    initial_weights.append(fairseq_layer.fc1.weight.detach().clone())
-    initial_biases.append(fairseq_layer.fc1.bias.detach().clone())
-    initial_weights.append(fairseq_layer.fc2.weight.detach().clone())
-    initial_biases.append(fairseq_layer.fc2.bias.detach().clone())
-    initial_weights.append(fairseq_layer.final_layer_norm.weight.detach().clone())
-    initial_biases.append(fairseq_layer.final_layer_norm.bias.detach().clone())
-    return initial_weights, initial_biases
 
 
 def split_custom_layer_grad(layer):
