@@ -30,8 +30,8 @@ PYBIND11_MODULE(inference, m) {
            py::return_value_policy::reference_internal, py::arg("input_seq"))
       .def("sample", &lightseq::cuda::Gpt::sample,
            py::return_value_policy::reference_internal, py::arg("input_seq"),
-           py::arg("sampling_method") = "topk", py::arg("topk") = 1,
-           py::arg("topp") = 0.75);
+           py::arg("sampling_method") = "", py::arg("topk") = -1,
+           py::arg("topp") = -1.0f);
 
   py::class_<lightseq::cuda::Bert>(m, "Bert")
       .def(py::init<const std::string, const int>())

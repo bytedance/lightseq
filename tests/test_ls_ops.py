@@ -902,6 +902,8 @@ def test_cross_entropy_layer_forward():
 
     def custom():
         res, cus_nll_loss = custom_layer(inputs, targets_32)
+        res = res.to(inputs)
+        cus_nll_loss = cus_nll_loss.to(inputs)
         return [
             res.contiguous().detach(),
             cus_nll_loss.contiguous().detach(),
