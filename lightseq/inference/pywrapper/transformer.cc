@@ -97,8 +97,10 @@ Transformer::~Transformer() {
   CHECK_GPU_ERROR(cudaFree(d_output_));
 }
 
-std::tuple<int *, float *> Transformer::get_output_ptr() {
-  return std::make_tuple(d_output_, decoder_->_p_d_alive_seq_score);
+const int *Transformer::get_result_ptr() { return d_output_; }
+
+const float *Transformer::get_score_ptr() {
+  return decoder_->_p_d_alive_seq_score;
 }
 
 int Transformer::get_output_seq_len() { return decoder_->_cur_step + 1; };
@@ -107,7 +109,7 @@ int Transformer::get_output_seq_len() { return decoder_->_cur_step + 1; };
 
 std::tuple<py::array_t<int>, py::array_t<float>> Transformer::infer(
     py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-    bool multiple_output = false) {
+    bool multiple_output) {
   auto input_seq_out = input_seq.mutable_unchecked<2>();
   const int *input_seq_data = input_seq_out.data(0, 0);
   int batch_size = input_seq_out.shape(0);

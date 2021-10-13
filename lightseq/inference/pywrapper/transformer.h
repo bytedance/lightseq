@@ -44,7 +44,8 @@ class Transformer {
 
   ~Transformer();
 
-  std::tuple<int *, float *> get_output_ptr();
+  const int *get_result_ptr();
+  const float *get_score_ptr();
 
 #ifdef ENABLE_PYTHON
   std::tuple<py::array_t<int>, py::array_t<float>> infer(

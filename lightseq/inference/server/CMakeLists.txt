@@ -19,8 +19,10 @@ set_target_properties(
   transformer_server PROPERTIES LINK_DEPENDS
                                 ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
 set_target_properties(
-  transformer_server PROPERTIES LINK_FLAGS
-                                "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+  transformer_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
 
 add_library(
   transformer_generate_server SHARED generate_server.cc.cu custom.h
@@ -35,7 +37,9 @@ set_target_properties(
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
 set_target_properties(
   transformer_generate_server
-  PROPERTIES LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
 
 add_library(gpt_lm_server SHARED gptlm_server.cc.cu custom.h
                                  ${CONFIG_PROTO_SRC} ${CONFIG_PROTO_HEADER})
@@ -46,7 +50,10 @@ set_target_properties(
   gpt_lm_server PROPERTIES LINK_DEPENDS
                            ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
 set_target_properties(
-  gpt_lm_server PROPERTIES LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+  gpt_lm_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
 
 add_library(
   gpt_generate_server SHARED gpt_generate_server.cc.cu custom.h
@@ -60,8 +67,10 @@ set_target_properties(
   gpt_generate_server PROPERTIES LINK_DEPENDS
                                  ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
 set_target_properties(
-  gpt_generate_server PROPERTIES LINK_FLAGS
-                                 "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+  gpt_generate_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
 
 add_library(
   decoder_generate_server SHARED decoder_generate_server.cc.cu custom.h
@@ -75,5 +84,7 @@ set_target_properties(
   decoder_generate_server
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
 set_target_properties(
-  decoder_generate_server PROPERTIES LINK_FLAGS
-                                     "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+  decoder_generate_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")

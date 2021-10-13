@@ -90,6 +90,7 @@ def main():
         print("tokenizing the sentences...")
         inputs = tokenizer(sentences, return_tensors="pt", padding=True)
         inputs_id = inputs["input_ids"]
+        print(inputs_id)
 
         ls_generate(ls_model, tokenizer, inputs_id)
         hf_generate(hf_model, tokenizer, inputs_id)
