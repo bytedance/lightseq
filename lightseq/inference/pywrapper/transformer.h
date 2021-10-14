@@ -32,6 +32,7 @@ class Transformer {
   int *d_input_;
   int *d_output_;
   int *d_padding_mask_;
+  void *d_buf_;
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;

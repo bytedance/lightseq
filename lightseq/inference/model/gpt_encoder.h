@@ -38,9 +38,7 @@ class GptEncoder {
   int sample_one_token_with_cache();
 
   const int _max_batch_size;
-  const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
-  float *_p_d_ppl;           // ppl for every seq, [batch_size]
-  int *_p_d_sample_id;
+
   const GptWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cudaStream_t _cache_stream;
@@ -87,8 +85,13 @@ class GptEncoder {
   int _layer_id;
   int _weight_offset;
 
+  const std::set<std::string> _available_sampling_methods = {"topk", "topp"};
+
  public:
   int _batch_seq_len;
+  const int *_p_d_token_id;  // input token id, [batch_size, batch_seq_len]
+  float *_p_d_ppl;           // ppl for every seq, [batch_size]
+  int *_p_d_sample_id;
 
   GptEncoder(int max_batch_size, const int *p_d_token_id, float *p_d_ppl,
              int *p_d_sample_id, const GptWeight<OpType_> &tw,

@@ -1,14 +1,16 @@
 cmake_minimum_required(VERSION 3.18)
 
 if(BUILD_PYTHON)
-  pybind11_add_module(lightseq MODULE wrapper.cc transformer.cc)
+  pybind11_add_module(lightseq MODULE wrapper.cc transformer.cc gpt.cc bert.cc)
   target_link_libraries(lightseq PUBLIC gpt_model)
   target_link_libraries(lightseq PUBLIC bert_model)
   target_link_libraries(lightseq PUBLIC transformer_model)
   set_target_properties(lightseq PROPERTIES OUTPUT_NAME lightseq/inference)
 else()
-  add_library(lightseq SHARED transformer.cc)
+  add_library(lightseq SHARED transformer.cc gpt.cc bert.cc)
   target_link_libraries(lightseq PUBLIC transformer_model)
+  target_link_libraries(lightseq PUBLIC gpt_model)
+  target_link_libraries(lightseq PUBLIC bert_model)
   target_link_options(lightseq PUBLIC $<DEVICE_LINK:-Xcompiler
                       -fvisibility=hidden>)
   target_include_directories(lightseq PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

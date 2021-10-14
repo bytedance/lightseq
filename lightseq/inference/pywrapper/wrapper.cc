@@ -1,8 +1,5 @@
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-
-#include "bert.cc.cu"
-#include "gpt.cc.cu"
+#include "bert.h"
+#include "gpt.h"
 #include "transformer.h"
 #include "transformer_decoder.cc.cu"
 
@@ -33,6 +30,5 @@ PYBIND11_MODULE(inference, m) {
   py::class_<lightseq::cuda::Bert>(m, "Bert")
       .def(py::init<const std::string, const int>())
       .def("infer", &lightseq::cuda::Bert::infer,
-           py::return_value_policy::reference_internal, py::arg("input_seq"),
-           py::arg("attn_mask"));
+           py::return_value_policy::reference_internal, py::arg("input_seq"));
 }

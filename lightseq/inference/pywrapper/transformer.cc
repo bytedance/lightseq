@@ -82,7 +82,6 @@ Transformer::Transformer(const std::string weight_path,
   std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
             << "MB GPU buffer for transformer" << std::endl;
 
-  void *d_buf_;
   // encoder and decoder use the same buffer to save gpu memory useage
   CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
   encoder_->init_buffer(d_buf_);
@@ -95,6 +94,8 @@ Transformer::~Transformer() {
   CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
   CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
   CHECK_GPU_ERROR(cudaFree(d_output_));
+  CHECK_GPU_ERROR(cudaFree(d_buf_));
+  CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
 }
 
 const int *Transformer::get_result_ptr() { return d_output_; }
@@ -114,12 +115,7 @@ std::tuple<py::array_t<int>, py::array_t<float>> Transformer::infer(
   const int *input_seq_data = input_seq_out.data(0, 0);
   int batch_size = input_seq_out.shape(0);
   int batch_seq_len = input_seq_out.shape(1);
-  if (batch_size > _max_batch_size) {
-    throw std::runtime_error("batch size of input greater than max_batch_size");
-  }
-  if (batch_seq_len > tw_._max_step) {
-    throw std::runtime_error("seq len of input greater than max_step");
-  }
+
   lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
       d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
       cudaMemcpyHostToDevice, stream_));
@@ -147,13 +143,6 @@ std::tuple<int, int, int> Transformer::infer(int *input_seq, int batch_size,
                                              int batch_seq_len, int *result_seq,
                                              float *scores,
                                              bool multiple_output) {
-  if (batch_size > _max_batch_size) {
-    throw std::runtime_error("batch size of input greater than max_batch_size");
-  }
-  if (batch_seq_len > tw_._max_step) {
-    throw std::runtime_error("seq len of input greater than max_step");
-  }
-
   if (multiple_output) {
     if (tw_._sampling_method == "beam_search") {
       decoder_->_output_topk = multiple_output;
@@ -179,10 +168,12 @@ std::tuple<int, int, int> Transformer::infer(int *input_seq, int batch_size,
 
   encoder_->run_one_infer(batch_size, batch_seq_len);
   decoder_->run_one_infer(batch_size, batch_seq_len);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+
   int output_seq_len = get_output_seq_len();
   int beam_size = tw_._beam_size;
   int output_k = decoder_->_output_topk ? beam_size : 1;
-  return std::make_tuple(batch_size, output_k, output_seq_len);
 
   if (old_result_ptr != nullptr) {
     decoder_->_p_d_result = old_result_ptr;
@@ -191,6 +182,8 @@ std::tuple<int, int, int> Transformer::infer(int *input_seq, int batch_size,
     decoder_->_p_d_alive_seq_score = old_score_ptr;
   }
   encoder_->_p_d_token_id = old_input_ptr;
+
+  return std::make_tuple(batch_size, output_k, output_seq_len);
 }
 #endif
 }  // namespace cuda
