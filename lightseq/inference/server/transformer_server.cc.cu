@@ -336,6 +336,7 @@ int Context::Init() {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
   }
+  tw_.print_model_config();
 
   int max_batch_size = model_config_.max_batch_size();
   int err;
