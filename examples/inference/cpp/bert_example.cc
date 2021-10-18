@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
     model.infer(d_input, batch_size, batch_seq_len);
     lightseq::cuda::print_time_duration(start, "one infer time", 0);
   }
-  const float* res = model.get_result_ptr();
+  const lightseq::cuda::OperationTypeTraits<bert_optype>::DataType* res = model.get_result_ptr();
   lightseq::cuda::print_vec(res, "res token", 5);
   return 0;
 }
