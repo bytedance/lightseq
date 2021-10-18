@@ -318,10 +318,20 @@ int Context::Init() {
   }
   std::string model_path = mz;
   model_path += "/" + model_config_.name();
-  std::string res =
-      "load model weight from " + model_path + "/transformer.pb\n";
-  LOG_INFO << res;
-  res = tw_.initializing(model_path + "/transformer.pb");
+
+  std::string weight_path = model_path + "/" + "transformer.pb";
+  std::ifstream fproto(weight_path.c_str());
+  if (!fproto.good()) {
+    weight_path = model_path + "/" + "transformer.hdf5";
+    std::ifstream fhdf5(weight_path.c_str());
+    if (!fhdf5.good()) {
+      LOG_ERROR << "Neither transformer.pb nor transformer.hdf5 "
+                << "exists under " << model_path << std::endl;
+      return kWeightLoad;
+    }
+  }
+  LOG_INFO << "Load model weight from " << weight_path << std::endl;
+  std::string res = tw_.initializing(weight_path);
   if (!res.empty()) {
     LOG_ERROR << res << std::endl;
     return kWeightLoad;
