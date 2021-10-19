@@ -653,7 +653,7 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     } else {
       size_t lang_emb_size = raw_value.size();
       size_t trg_vocab_mask_size =
-          get_hdf5_dataset_size(hdf5_file, dataset_prefix + "trg_vocab_mask");
+          get_hdf5_dataset_size(hdf5_file, dataset_prefix + "/trg_vocab_mask");
       if (lang_emb_size / _hidden_size !=
           trg_vocab_mask_size / _trg_vocab_size) {
         throw std::runtime_error(
@@ -820,7 +820,7 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
             << " MB of decoder weight." << std::endl;
   int idx = 0;
 
-  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
+  for (int layer_id = 0; layer_id < _n_dec_layer; ++layer_id) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
