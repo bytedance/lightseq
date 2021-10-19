@@ -376,3 +376,31 @@ float test_lt_matmul_int8(cublasLtHandle_t handle, int C, int B, int O, int H,
 
   return total_time > 0 ? total_time / (iteration - 1) : -1;
 }
+
+void launch_tvm_gemm(const int8_t *A, const int8_t *B, int32_t *C,
+                     cudaStream_t &stream);
+
+float test_tvm_gemm(int8_t *A, int8_t *B, int32_t *C, int iteration) {
+  float total_time = 0;
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+  for (int i = 0; i < iteration; ++i) {
+    cudaEvent_t start, stop;
+    float time;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start, 0);
+    launch_tvm_gemm(A, B, C, stream);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+
+    cudaEventElapsedTime(&time, start, stop);
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    if (i >= 1) total_time += time;
+  }
+
+  return total_time > 0 ? total_time / (iteration - 1) : -1;
+}

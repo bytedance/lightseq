@@ -49,6 +49,17 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
                            iteration);
   print_res(Y, fY, hY, iY, C, B, O, H, ft, ht, it, debug);
 
+  printf(">>>>> test tvm gemm >>>>>\n");
+  it = test_tvm_gemm(iX, iW, iY, iteration);
+  if (debug)
+    for (int i = 0; i < 10; ++i)
+      printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+  float ie = 0;
+  for (int i = 0; i < C * B * O; ++i)
+    ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
+  printf("  diff: %.5f\n", ie / C / B / O);
+  printf("  time: %.3f ms\n", it);
+
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
   free_memory(iX, iW, iY);
@@ -57,11 +68,11 @@ void _main(int C, int B, int O, int H, int iteration, bool debug) {
 
 int main() {
   int iteration = 10;
-  bool debug = false;
-  std::vector<int> Cs = {1, 8, 32};
-  std::vector<int> Bs = {8, 16, 4096};
-  std::vector<int> Os = {1024, 3072, 4096};
-  std::vector<int> Hs = {1024, 4096};
+  bool debug = true;
+  std::vector<int> Cs = {1};
+  std::vector<int> Bs = {32};
+  std::vector<int> Os = {1024};
+  std::vector<int> Hs = {4096};
   for (int l = 0; l < Cs.size(); ++l)
     for (int i = 0; i < Bs.size(); ++i)
       for (int j = 0; j < Os.size(); ++j)

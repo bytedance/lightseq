@@ -6,7 +6,7 @@ import tvm
 import tvm.testing
 from tvm import te
 from tvm import autotvm
-from tvm.contrib import nvcc
+from tvm.contrib import nvcc, cc
 
 # check whether the gpu has tensorcore
 if not tvm.gpu(0).exist or not tvm.runtime.enabled("cuda"):
@@ -339,6 +339,10 @@ def tune_and_evaluate(M, N, L, dtype, layout):
 
     evaluator = func.time_evaluator(func.entry_name, ctx, number=100)
     print("Time cost of this operator: %f" % evaluator(a_tvm, b_tvm, c_tvm).mean)
+
+    func.save("gemm.o")
+    func.imported_modules[0].save("gemm.ptx")
+    cc.create_shared("gemm.so", ["gemm.o"])
 
 
 if __name__ == "__main__":
