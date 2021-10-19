@@ -642,7 +642,6 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
     } else {
       size_t lang_emb_size = raw_value.size();
-
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
@@ -797,7 +796,7 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
             << " MB of decoder weight." << std::endl;
   int idx = 0;
 
-  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
+  for (int layer_id = 0; layer_id < _n_dec_layer; ++layer_id) {
     std::string dataset_prefix = "decoder_stack/" + std::to_string(layer_id);
 
     offset.push_back(idx);
