@@ -1,6 +1,6 @@
 #include "encoder.h"
 #include "../kernels/transformerKernels.h"
-#include "../kernels/multilgKernels.h"
+#include "../kernels/embKernels.h"
 
 /**
 @file
@@ -15,11 +15,13 @@ template <OperationType OpType_>
 Encoder<OpType_>::Encoder(int max_batch_size, const int *p_d_token_id,
                           int *p_d_padding_mask, _DataType *p_d_output,
                           const TransformerWeight<OpType_> &tw,
-                          cudaStream_t stream, cublasHandle_t hd)
+                          cudaStream_t stream, cublasHandle_t hd,
+                          const int *p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _p_d_token_id(p_d_token_id),
       _p_d_padding_mask(p_d_padding_mask),
       _p_d_output(p_d_output),
+      _p_d_lang_id(p_d_lang_id),
       _tw(tw),
       _stream(stream),
       _hd(hd),
@@ -76,14 +78,17 @@ std::string Encoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_tw._is_multilingual == false && _p_d_src_emb_wei.size() != 4) {
+  if (_tw._multilg_type == 0 && _p_d_src_emb_wei.size() != 4) {
     return "violate p_d_src_emb_wei.size() = 4";
   }
-  if (_tw._is_multilingual && _p_d_src_emb_wei.size() != 5) {
+  if (_tw._multilg_type != 0 && _p_d_src_emb_wei.size() != 5) {
     return "violate p_d_src_emb_wei.size() = 5";
   }
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
+  }
+  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
+    return "lang id should not be null when multilg";
   }
   return "";
 }
@@ -104,19 +109,11 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
   /* ---step2. encoder feedforward--- */
-  if (_tw._is_multilingual) {
-    ker_multilg_enc_emb_launcher<_DataType>(
-        batch_size, batch_seq_len, _tw._hidden_size, _stream,
-        _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_src_emb_wei[4],
-        //_p_d_src_emb_wei[1], _p_d_src_emb_wei[1],
-        _p_d_token_id, _p_d_output, _p_d_padding_mask, _tw._padding_id,
-        _max_thread_per_block);
-  } else {
-    ker_enc_embedding_launcher<_DataType>(
-        batch_size, batch_seq_len, _tw._hidden_size, _stream,
-        _p_d_src_emb_wei[0], _p_d_src_emb_wei[1], _p_d_token_id, _p_d_output,
-        _p_d_padding_mask, _tw._padding_id, _max_thread_per_block);
-  }
+  launch_enc_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_src_emb_wei[1],
+                            _p_d_token_id, _p_d_output, _p_d_padding_mask,
+                            _tw._padding_id, batch_size, batch_seq_len,
+                            _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
+                            _p_d_lang_id, _tw._multilg_type);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id

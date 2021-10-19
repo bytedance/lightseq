@@ -91,9 +91,6 @@ message EmbeddingLayer {
 
   // For multi lingual model, [num_lang, hidden_size]
   repeated float lang_emb = 8;
-  // only for trg, not in src
-  // For multi lingual model, [num_lang, target_vocab_size]
-  repeated int32 trg_vocab_mask = 9;
 }
 
 message ModelConf {
@@ -112,9 +109,10 @@ message ModelConf {
   bool is_post_ln = 12; // Pre-LN or Post-LN
   bool no_scale_embedding = 13; // whether to scale embedding by sqrt(emb_dim)
   bool use_gelu = 14; // use gelu for activation otherwise relu
-  // Whether it is a multilingual model.
-  // If it is set to true, lang_emb and trg_vocab_mask should be non-empty.
-  bool is_multilingual = 15;
+  // Multilingual model type, 0 for bilingual
+  // 1 for token level multilingual,
+  // 2 for sentence level multilingual
+  int32 multilg_type = 15;
 }
 
 message Transformer {
