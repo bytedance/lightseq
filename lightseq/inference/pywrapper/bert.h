@@ -40,15 +40,17 @@ class Bert {
   ~Bert();
 
   const optraits::DataType *get_result_ptr();
+  const int get_max_step() { return tw_._max_step; }
+};
 
 #ifdef ENABLE_PYTHON
-  py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq);
+py::array_t<float> infer(
+    py::array_t<int, py::array::c_style | py::array::forcecast> input_seq);
 #else
-  std::tuple<int, int, int> infer(const int *input_seq, int batch_size,
-                                  int batch_seq_len,
-                                  optraits::DataType *result_seq = nullptr);
+std::tuple<int, int, int> infer(const int *input_seq, int batch_size,
+                                int batch_seq_len,
+                                optraits::DataType *result_seq = nullptr);
 #endif
-};
-}  // namespace cuda
+};  // namespace cuda
+}  // namespace lightseq
 }  // namespace lightseq

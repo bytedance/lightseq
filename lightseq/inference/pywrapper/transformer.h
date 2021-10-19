@@ -47,6 +47,7 @@ class Transformer {
 
   const int *get_result_ptr();
   const float *get_score_ptr();
+  const int get_max_step() { return tw_._max_step; }
 
 #ifdef ENABLE_PYTHON
   std::tuple<py::array_t<int>, py::array_t<float>> infer(

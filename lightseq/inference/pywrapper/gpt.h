@@ -45,6 +45,7 @@ class Gpt {
 
   const int* get_result_ptr();
   const float* get_score_ptr();
+  const int get_max_step() { return tw_._max_step; }
 
 #ifdef ENABLE_PYTHON
   py::array_t<float> ppl(
