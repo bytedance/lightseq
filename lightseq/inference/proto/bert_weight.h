@@ -72,7 +72,7 @@ class BertWeight {
   int _padding_id;  // for src
   bool _is_post_ln;
   bool _use_gelu;
-  bool _is_multilingual;
+  int _multilg_type;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;

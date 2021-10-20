@@ -1,4 +1,5 @@
 #pragma once
+#include <stdexcept>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
@@ -11,6 +12,7 @@ const unsigned int WARP_SIZE = 32;
 const float CUDA_FLOAT_INF_NEG = -100000000.f;  // FIXME later
 const float CUDA_FLOAT_INF_POS = 100000000.f;   // FIXME later
 const int CUDA_INT_INF = 2147483647;
+const int MAX_THREADS = 1024;
 
 template <typename T>
 __forceinline__ __device__ T gelu(T x) {
@@ -217,6 +219,160 @@ __forceinline__ __host__ __device__ float2 safe_half2_to_float2(half2 vhalf2) {
   vfloat2.x = fmax(fmin(100000.f, vfloat2.x), -100000.f);
   vfloat2.y = fmax(fmin(100000.f, vfloat2.y), -100000.f);
   return vfloat2;
+}
+
+/* flat_ndim and decompose_ndim. index transform copy from training */
+/* Convert 2-dim tensor index into vector index */
+__forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
+  return id1 * dim2 + id2;
+}
+
+/* Convert 3-dim tensor index into vector index */
+__forceinline__ __host__ __device__ int flat_3dim(int id1, int id2, int id3,
+                                                  int dim2, int dim3) {
+  return id1 * dim2 * dim3 + id2 * dim3 + id3;
+}
+
+/* Convert 4-dim tensor index into vector index */
+__forceinline__ __host__ __device__ int flat_4dim(int id1, int id2, int id3,
+                                                  int id4, int dim2, int dim3,
+                                                  int dim4) {
+  // return id1*(dim2*dim3*dim4) + id2*(dim3*dim4) + id3*dim4 + id4;
+  int res = id4;
+
+  int ld = dim4;
+  res += id3 * ld;
+
+  ld *= dim3;
+  res += id2 * ld;
+
+  ld *= dim2;
+  res += id1 * ld;
+
+  return res;
+}
+
+/* Convert 5-dim tensor index into vector index */
+__forceinline__ __host__ __device__ int flat_5dim(int id1, int id2, int id3,
+                                                  int id4, int id5, int dim2,
+                                                  int dim3, int dim4,
+                                                  int dim5) {
+  // return id1*(dim2*dim3*dim4*dim5) + id2*(dim3*dim4*dim5) + id3*(dim4*dim5) +
+  // id4*dim5 + dim5;
+  int res = id5;
+
+  int ld = dim5;
+  res += id4 * ld;
+
+  ld *= dim4;
+  res += id3 * ld;
+
+  ld *= dim3;
+  res += id2 * ld;
+
+  ld *= dim2;
+  res += id1 * ld;
+
+  return res;
+}
+
+/* Convert 6-dim tensor index into vector index */
+__forceinline__ __host__ __device__ int flat_6dim(int id1, int id2, int id3,
+                                                  int id4, int id5, int id6,
+                                                  int dim2, int dim3, int dim4,
+                                                  int dim5, int dim6) {
+  // return id1*(dim2*dim3*dim4*dim5*dim6) + id2*(dim3*dim4*dim5*dim6) +
+  // id3*(dim4*dim5*dim6) + id4*(dim5*dim6) + id5*dim6 + id6;
+  int res = id6;
+
+  int ld = dim6;
+  res += id5 * ld;
+
+  ld *= dim5;
+  res += id4 * ld;
+
+  ld *= dim4;
+  res += id3 * ld;
+
+  ld *= dim3;
+  res += id2 * ld;
+
+  ld *= dim2;
+  res += id1 * ld;
+
+  return res;
+}
+
+/* Convert vector index to 6-dim tensor index */
+__forceinline__ __host__ __device__ void decompose_6dim(
+    int src, int dim1, int dim2, int dim3, int dim4, int dim5, int *id0,
+    int *id1, int *id2, int *id3, int *id4, int *id5) {
+  *id5 = src % dim5;
+  src /= dim5;
+
+  *id4 = src % dim4;
+  src /= dim4;
+
+  *id3 = src % dim3;
+  src /= dim3;
+
+  *id2 = src % dim2;
+  src /= dim2;
+
+  *id1 = src % dim1;
+  *id0 = src / dim1;
+}
+
+/* Convert vector index to 5-dim tensor index */
+__forceinline__ __host__ __device__ void decompose_5dim(int src, int dim1,
+                                                        int dim2, int dim3,
+                                                        int dim4, int *id0,
+                                                        int *id1, int *id2,
+                                                        int *id3, int *id4) {
+  *id4 = src % dim4;
+  src /= dim4;
+
+  *id3 = src % dim3;
+  src /= dim3;
+
+  *id2 = src % dim2;
+  src /= dim2;
+
+  *id1 = src % dim1;
+  *id0 = src / dim1;
+}
+
+/* Convert vector index to 4-dim tensor index */
+__forceinline__ __host__ __device__ void decompose_4dim(int src, int dim1,
+                                                        int dim2, int dim3,
+                                                        int *id0, int *id1,
+                                                        int *id2, int *id3) {
+  *id3 = src % dim3;
+  src /= dim3;
+
+  *id2 = src % dim2;
+  src /= dim2;
+
+  *id1 = src % dim1;
+  *id0 = src / dim1;
+}
+
+/* Convert vector index to 3-dim tensor index */
+__forceinline__ __host__ __device__ void decompose_3dim(int src, int dim1,
+                                                        int dim2, int *id0,
+                                                        int *id1, int *id2) {
+  *id2 = src % dim2;
+  src /= dim2;
+
+  *id1 = src % dim1;
+  *id0 = src / dim1;
+}
+
+/* Convert vector index to 2-dim tensor index */
+__forceinline__ __host__ __device__ void decompose_2dim(int src, int dim1,
+                                                        int *id0, int *id1) {
+  *id1 = src % dim1;
+  *id0 = src / dim1;
 }
 
 }  // namespace cuda

@@ -3,6 +3,7 @@
 #include "decoder.h"
 #include "encoder.h"
 #include "util.h"
+#include "../kernels/embKernels.h"
 
 /**
 @file
@@ -37,6 +38,7 @@ int main(int argc, char *argv[]) {
     std::cout << res << std::endl;
     return 0;
   }
+  tw_.print_model_config();
 
   /*
     step3. instantiate encoder and decoder, init the gpu memory buffer.
@@ -46,42 +48,55 @@ int main(int argc, char *argv[]) {
   int max_batch_size = 8;
   thrust::device_vector<int> d_input_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
+  thrust::device_vector<int> d_input_copy_ =
+      std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_padding_mask_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
   thrust::device_vector<int> d_encoder_output_ =
       std::vector<int>(max_batch_size * tw_._max_step * tw_._hidden_size, 0);
   thrust::device_vector<int> d_output_ =
       std::vector<int>(max_batch_size * tw_._max_step, 0);
+  thrust::device_vector<int> d_src_lang_id_ =
+      std::vector<int>(max_batch_size, 0);
+  thrust::device_vector<int> d_trg_lang_id_ =
+      std::vector<int>(max_batch_size, 0);
+
+  int *p_d_input_ = (int *)(thrust::raw_pointer_cast(d_input_.data()));
+  int *p_d_input_copy_ =
+      (int *)(thrust::raw_pointer_cast(d_input_copy_.data()));
+  int *p_d_padding_mask_ =
+      (int *)(thrust::raw_pointer_cast(d_padding_mask_.data()));
+  optraits::DataType *p_d_encoder_output_ =
+      (optraits::DataType *)(thrust::raw_pointer_cast(
+          d_encoder_output_.data()));
+  int *p_d_output_ = (int *)(thrust::raw_pointer_cast(d_output_.data()));
+  int *p_d_src_lang_id_ =
+      (int *)(thrust::raw_pointer_cast(d_src_lang_id_.data()));
+  int *p_d_trg_lang_id_ =
+      (int *)(thrust::raw_pointer_cast(d_trg_lang_id_.data()));
+
+  // instantiate encoder
   std::shared_ptr<lightseq::cuda::Encoder<OPTYPE>> encoder_ =
       std::make_shared<lightseq::cuda::Encoder<OPTYPE>>(
-          max_batch_size,
-          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
-          reinterpret_cast<int *>(
-              thrust::raw_pointer_cast(d_padding_mask_.data())),
-          reinterpret_cast<optraits::DataType *>(
-              thrust::raw_pointer_cast(d_encoder_output_.data())),
-          tw_, stream_, hd_);
+          max_batch_size, p_d_input_, p_d_padding_mask_, p_d_encoder_output_,
+          tw_, stream_, hd_, p_d_src_lang_id_);
   res = encoder_->check();
   if (!res.empty()) {
     std::cout << res << std::endl;
     return 1;
   }
+
   // instantiate decoder
   std::shared_ptr<lightseq::cuda::Decoder<OPTYPE>> decoder_ =
       std::make_shared<lightseq::cuda::Decoder<OPTYPE>>(
-          max_batch_size,
-          reinterpret_cast<int *>(
-              thrust::raw_pointer_cast(d_padding_mask_.data())),
-          reinterpret_cast<optraits::DataType *>(
-              thrust::raw_pointer_cast(d_encoder_output_.data())),
-          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_output_.data())),
-          tw_, stream_, hd_, false,
-          reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())));
+          max_batch_size, p_d_padding_mask_, p_d_encoder_output_, p_d_output_,
+          tw_, stream_, hd_, false, p_d_trg_lang_id_);
   res = decoder_->check();
   if (!res.empty()) {
     std::cout << res << std::endl;
     return 1;
   }
+
   // init gpu memory buffer
   long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
                                decoder_->compute_buffer_bytesize());
@@ -113,10 +128,22 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     // copy inputs from cpu memory to gpu memory
-    cudaMemcpyAsync(
-        reinterpret_cast<int *>(thrust::raw_pointer_cast(d_input_.data())),
-        host_input.data(), sizeof(int) * batch_size * batch_seq_len,
-        cudaMemcpyHostToDevice, stream_);
+    cudaMemcpyAsync(tw_._multilg_type == 0 ? p_d_input_ : p_d_input_copy_,
+                    host_input.data(), sizeof(int) * batch_size * batch_seq_len,
+                    cudaMemcpyHostToDevice, stream_);
+    if (tw_._multilg_type != 0) {
+      // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
+      lightseq::cuda::launch_split_multilg_request(
+          p_d_input_copy_, p_d_src_lang_id_, p_d_trg_lang_id_, p_d_input_,
+          batch_size, batch_seq_len, stream_);
+    }
+    if (tw_._multilg_type == 1) {
+      batch_seq_len -= 2;
+    }
+    if (tw_._multilg_type == 2) {
+      batch_seq_len -= 1;
+    }
+
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);
     lightseq::cuda::print_time_duration(start, "one infer time", stream_);

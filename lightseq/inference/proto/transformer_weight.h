@@ -54,7 +54,6 @@ class TransformerWeight {
   thrust::device_vector<_DataType> _d_trg_emb_wei;
   thrust::device_vector<_DataType> _d_enc_wei;
   thrust::device_vector<_DataType> _d_dec_wei;
-  thrust::device_vector<int> _d_trg_vocab_mask;
   thrust::device_vector<_DataType> _d_src_lang_emb;
   thrust::device_vector<_DataType> _d_trg_lang_emb;
 
@@ -116,8 +115,7 @@ class TransformerWeight {
   bool _is_post_ln;
   bool _no_scale_embedding;
   bool _use_gelu;
-  bool _is_multilingual;
-  const int *_p_d_trg_vocab_mask;
+  int _multilg_type;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
@@ -135,7 +133,7 @@ class TransformerWeight {
     std::cout << "start_id: " << _start_id << std::endl;
     std::cout << "end_id: " << _end_id << std::endl;
     std::cout << "padding_id: " << _padding_id << std::endl;
-    std::cout << "is_multilingual: " << _is_multilingual << std::endl;
+    std::cout << "multilg_type: " << _multilg_type << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
