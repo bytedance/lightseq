@@ -102,8 +102,7 @@ setup_kwargs = dict(
         ", qian.xian@bytedance.com, weiyang.god@bytedance.com"
     ),
     description=(
-        "LightSeq is a high performance inference library "
-        "for sequence processing and generation implemented in CUDA"
+        "LightSeq is a high performance library for sequence processing and generation"
     ),
     long_description=long_description,
     long_description_content_type="text/markdown",
