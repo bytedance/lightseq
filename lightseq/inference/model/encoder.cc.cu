@@ -1,6 +1,7 @@
 #include "encoder.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
+#include "../kernels/transformerKernels_int8.h"
 
 /**
 @file
@@ -29,6 +30,8 @@ Encoder<OpType_>::Encoder(int max_batch_size, const int *p_d_token_id,
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
+      _ione((int32_t)1),
+      _izero((int32_t)0),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {}
@@ -61,6 +64,16 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_c = _p_d_v + _max_batch_dim;
   _p_d_ffn_buf1 = p_d_buf;
   _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
+  // encoder and decoder use the same buffer to save gpu memory useage
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int8_t **)&_int8_ffn_in_buf1,
+                 (size_t)(_tw._inner_size * _tw._hidden_size)));
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int8_t **)&_int8_ffn_in_buf2,
+                 (size_t)(_tw._max_step * _max_batch_size * _tw._hidden_size)));
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int32_t **)&_int32_ffn_out_buf,
+                 (size_t)(_tw._max_step * _max_batch_size * _tw._inner_size)));
   return;
 }
 
@@ -220,12 +233,25 @@ void Encoder<OpType_>::ffn_add_norm() {
       _tw._is_post_ln);
 
   /* ---step 1. first ffn layer--- */
+  // CHECK_GPU_ERROR(cublasGemmEx(
+  //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
+  //     _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 8], _AType,
+  //     _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
+  //     _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
+  //     CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 8], _int8_ffn_in_buf1,
+                         _tw._inner_size * _tw._hidden_size, 127, 0.3, _stream);
+  launch_quantize_tensor(_p_d_ffn_buf1, _int8_ffn_in_buf2,
+                         _batch_token_num * _tw._hidden_size, 127, 16, _stream);
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
-      _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 8], _AType,
-      _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
-      _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
+      _tw._hidden_size, &_ione, _int8_ffn_in_buf1, CUDA_R_8I, _tw._inner_size,
+      _int8_ffn_in_buf2, CUDA_R_8I, _tw._hidden_size, &_izero,
+      _int32_ffn_out_buf, CUDA_R_32I, _tw._inner_size, CUDA_R_32I,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  launch_dequantize_tensor(_int32_ffn_out_buf, _p_d_ffn_buf2,
+                           _batch_token_num * _tw._inner_size, 127 * 127,
+                           0.3 * 16, _stream);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_launcher<_DataType>(
