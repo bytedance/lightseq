@@ -5,6 +5,7 @@ set(CMAKE_CUDA_ARCHITECTURES 61 70 75)
 find_package(CUDA 10.1 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
+option(INT8_MODE "inference with int8" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
 
 set(Protobuf_USE_STATIC_LIBS ON)
@@ -39,6 +40,13 @@ if(FP16_MODE)
     message(STATUS "Build using fp16 precision")
 else()
     message(STATUS "Build using fp32 precision")
+endif()
+
+if(INT8_MODE)
+    add_definitions(-DINT8_MODE)
+    message(STATUS "Build using int8 precision")
+else()
+    message(STATUS "Build using float precision")
 endif()
 
 if(DEBUG_MODE)

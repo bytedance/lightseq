@@ -49,8 +49,10 @@ class Encoder {
   cublasHandle_t _hd;
   const _DataType _fone;
   const _DataType _fzero;
+#ifdef INT8_MODE
   const int32_t _ione;
   const int32_t _izero;
+#endif
   const _DataType _atten_scaler;
   const int _max_batch_dim;
   const int _max_thread_per_block;
@@ -62,8 +64,10 @@ class Encoder {
   _DataType *_p_d_c;
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
+#ifdef INT8_MODE
   int8_t *_int8_ffn_in_buf;
   int32_t *_int32_ffn_out_buf;
+#endif
 
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
@@ -73,10 +77,12 @@ class Encoder {
   // ffn_first_kernel, ffn_first_bias, ffn_second_kernel, ffn_second_bias} *
   // encoder_layer_num
   const std::vector<const _DataType *> &_p_d_enc_wei;
+#ifdef INT8_MODE
   std::vector<int8_t *> _int8_p_d_enc_wei;
   const float _quant_scale = 127;
   const float _weight_clip_max = 0.5;
   const float _act_clip_max = 10;
+#endif
 
   int _batch_size;
   int _batch_seq_len;
