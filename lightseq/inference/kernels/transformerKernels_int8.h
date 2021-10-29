@@ -26,5 +26,26 @@ void ker_norm_layer_resual_int8O_launcher(int token_num, int hidden_size,
                                           float quant_scale, float clip_max,
                                           bool is_post_ln = false);
 
+template <typename T>
+void ker_bias_gelu_int32I_int8O_launcher(int batch_token_num,
+                                         cudaStream_t stream, int32_t *input,
+                                         int8_t *output, const T *bias,
+                                         int feature_dim, float in_scale,
+                                         float in_clip_max, float out_scale,
+                                         float out_clip_max);
+
+template <typename T>
+void ker_bias_relu_int32I_int8O_launcher(int batch_token_num,
+                                         cudaStream_t stream, int32_t *input,
+                                         int8_t *output, const T *bias,
+                                         int feature_dim, float in_scale,
+                                         float in_clip_max, float out_scale,
+                                         float out_clip_max);
+
+template <typename T>
+void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
+                                  float quant_scale, float clip_max,
+                                  cudaStream_t stream);
+
 }  // namespace cuda
 }  // namespace lightseq

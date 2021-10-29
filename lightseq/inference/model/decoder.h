@@ -101,6 +101,10 @@ class Decoder {
   _DataType* _p_d_c;
   _DataType* _p_d_encoder_out_buf;
   _DataType* _p_d_logit_buf;
+#ifdef INT8_MODE
+  int8_t* _int8_ffn_in_buf;
+  int32_t* _int32_ffn_out_buf;
+#endif
 
   int _batch_size;
   int _batch_seq_len;
@@ -114,8 +118,18 @@ class Decoder {
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
   const std::vector<const _DataType*>&
       _p_d_dec_wei;  // size: 18 * dec_layer_num
+#ifdef INT8_MODE
+  std::vector<int8_t*> _int8_p_d_dec_wei;
+  const float _quant_scale = 127;
+  const float _weight_clip_max = 0.3;
+  const float _act_clip_max = 16;
+#endif
   const _DataType _type_one;
   const _DataType _type_zero;
+#ifdef INT8_MODE
+  const int32_t _ione;
+  const int32_t _izero;
+#endif
   const float _fzero;
   const _DataType
       _atten_scaler;          // scaling factor of Scaled Dot-Product Attention

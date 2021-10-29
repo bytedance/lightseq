@@ -3,6 +3,7 @@
 #include "3rdparty/cub/cub/cub.cuh"
 #include "decoder.h"
 #include "../kernels/transformerKernels.h"
+#include "../kernels/transformerKernels_int8.h"
 #include "../kernels/embKernels.h"
 
 /**
@@ -41,6 +42,10 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _type_one(1.f),
       _type_zero(0.f),
       _fzero(0.f),
+#ifdef INT8_MODE
+      _ione((int32_t)1),
+      _izero((int32_t)0),
+#endif
       _atten_scaler(sqrt(1.f / tw._dim_per_head)),
       _logit_scaler(_tw._no_scale_embedding ? 1.f
                                             : sqrt(1.f / tw._hidden_size)),
@@ -201,6 +206,63 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
+
+#ifdef INT8_MODE
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int8_t**)&_int8_ffn_in_buf,
+                 (size_t)(_max_batch_size * _tw._beam_size *
+                          max(_tw._hidden_size, _tw._inner_size))));
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int32_t**)&_int32_ffn_out_buf,
+                 (size_t)(_max_batch_size * _tw._beam_size *
+                          max(_tw._hidden_size, _tw._inner_size))));
+  _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
+  for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
+    _weight_offset = _layer_id * _tw._weight_per_dec_layer;
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6],
+                   (size_t)(_tw._hidden_size * 3 * _tw._hidden_size)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 1],
+                   (size_t)(_tw._hidden_size * _tw._hidden_size)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 2],
+                   (size_t)(_tw._hidden_size * 3 * _tw._hidden_size)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 3],
+                   (size_t)(_tw._hidden_size * _tw._hidden_size)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 4],
+                   (size_t)(_tw._hidden_size * _tw._inner_size)));
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 5],
+                   (size_t)(_tw._inner_size * _tw._hidden_size)));
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 2],
+                           _int8_p_d_dec_wei[_layer_id * 6],
+                           _tw._hidden_size * 3 * _tw._hidden_size,
+                           _quant_scale, _weight_clip_max, _stream);
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 4],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 1],
+                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
+                           _weight_clip_max, _stream);
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 8],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 2],
+                           _tw._hidden_size * 3 * _tw._hidden_size,
+                           _quant_scale, _weight_clip_max, _stream);
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 10],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 3],
+                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
+                           _weight_clip_max, _stream);
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 14],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 4],
+                           _tw._hidden_size * _tw._inner_size, _quant_scale,
+                           _weight_clip_max, _stream);
+    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 16],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 5],
+                           _tw._inner_size * _tw._hidden_size, _quant_scale,
+                           _weight_clip_max, _stream);
+  }
+#endif
 
   CHECK_GPU_ERROR(cudaGetLastError());
   std::cout << "decoder buffer init succeed" << std::endl;
@@ -628,6 +690,24 @@ void Decoder<OpType_>::encdec_attention() {
 
 template <OperationType OpType_>
 void Decoder<OpType_>::ffn_add_norm() {
+  // #ifdef INT8_MODE
+  //   ker_norm_layer_resual_int8O_launcher<_DataType>(
+  //       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //       _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset + 12],
+  //       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
+  //       _max_thread_per_block, _quant_scale, _act_clip_max, _tw._is_post_ln);
+  //   CHECK_GPU_ERROR(cublasGemmEx(
+  //       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _step_token_num,
+  //       _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 4],
+  //       CUDA_R_8I, _tw._inner_size, _int8_ffn_in_buf, CUDA_R_8I,
+  //       _tw._hidden_size, &_izero, _int32_ffn_out_buf, CUDA_R_32I,
+  //       _tw._inner_size, CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  //   launch_dequantize_tensor(
+  //       _int32_ffn_out_buf, _p_d_query_buf2, _step_token_num *
+  //       _tw._inner_size, _quant_scale * _quant_scale, _weight_clip_max *
+  //       _act_clip_max, _stream);
+  // #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -648,6 +728,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_type_zero,
       _p_d_query_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  // #endif
 
   if (_tw._use_gelu) {
     ker_bias_gelu_launcher<_DataType>(

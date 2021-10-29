@@ -17,6 +17,12 @@ __forceinline__ __host__ __device__ int8_t float2int8(float x,
   return int8_t(x * scale_div_clip_max);
 }
 
+__forceinline__ __host__ __device__ int8_t posfloat2int8(float x, float scale,
+                                                         float clip_max) {
+  x = x > clip_max ? clip_max : (x < -clip_max ? -clip_max : x);
+  return int8_t(x * 2 * scale / clip_max - scale);
+}
+
 template <typename T>
 __global__ void quantize_tensor_kernel(const T *input, int8_t *output,
                                        int total_count, float scale,
@@ -295,6 +301,281 @@ template void ker_norm_layer_resual_int8O_launcher<__half>(
     int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int max_thread_per_block,
     float quant_scale, float clip_max, bool is_post_ln);
+
+template <typename T>
+__global__ void ker_bias_gelu_int32I_int8O(int32_t *input, int8_t *output,
+                                           const T *bias, int total_count,
+                                           int feature_dim,
+                                           float in_scale_div_clip_max,
+                                           float out_scale_div_clip_max,
+                                           float out_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  char4 *out4 = reinterpret_cast<char4 *>(output);
+  const int4 *data4 = reinterpret_cast<const int4 *>(input);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  int bias_i = i % (feature_dim >> 2);
+
+  const int4 input4 = data4[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  float4 output4;
+
+  output4.x = gelu<float>(float(input4.x) / in_scale_div_clip_max + b4.x);
+  output4.y = gelu<float>(float(input4.y) / in_scale_div_clip_max + b4.y);
+  output4.z = gelu<float>(float(input4.z) / in_scale_div_clip_max + b4.z);
+  output4.w = gelu<float>(float(input4.w) / in_scale_div_clip_max + b4.w);
+
+  char4 out_i4;
+  out_i4.x = float2int8(output4.x, out_scale_div_clip_max, out_clip_max);
+  out_i4.y = float2int8(output4.y, out_scale_div_clip_max, out_clip_max);
+  out_i4.z = float2int8(output4.z, out_scale_div_clip_max, out_clip_max);
+  out_i4.w = float2int8(output4.w, out_scale_div_clip_max, out_clip_max);
+  out4[i] = out_i4;
+}
+
+/* fp16 version */
+template <>
+__global__ void ker_bias_gelu_int32I_int8O<__half>(
+    int32_t *input, int8_t *output, const __half *bias, int total_count,
+    int feature_dim, float in_scale_div_clip_max, float out_scale_div_clip_max,
+    float out_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  const long4 *vals_long4 = reinterpret_cast<const long4 *>(input);
+  int64_t *outs_i8 = reinterpret_cast<int64_t *>(output);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+
+  int bias_i = i % (feature_dim >> 3);
+  long4 val_long4 = vals_long4[i];
+  int32_t *val1 = reinterpret_cast<int32_t *>(&val_long4);
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  const __half *b_half = reinterpret_cast<const __half *>(&b4);
+  int64_t out_i8;
+  int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
+
+#pragma unroll
+  for (uint j = 0; j < 8; ++j) {
+    float out_f;
+    out_f = gelu<float>(float(val1[j]) / in_scale_div_clip_max +
+                        __half2float(b_half[j]));
+    out_i1[j] = float2int8(out_f, out_scale_div_clip_max, out_clip_max);
+  }
+  outs_i8[i] = out_i8;
+}
+
+template <typename T>
+void ker_bias_gelu_int32I_int8O_launcher(int batch_token_num,
+                                         cudaStream_t stream, int32_t *input,
+                                         int8_t *output, const T *bias,
+                                         int feature_dim, float in_scale,
+                                         float in_clip_max, float out_scale,
+                                         float out_clip_max) {
+  int total_count = batch_token_num * feature_dim;
+  int grid_dim = total_count >> 10;
+  ker_bias_gelu_int32I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
+      out_scale / out_clip_max, out_clip_max);
+}
+
+template <>
+void ker_bias_gelu_int32I_int8O_launcher<__half>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const __half *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max) {
+  int total_count = batch_token_num * feature_dim;
+  int grid_dim = total_count >> 11;
+  ker_bias_gelu_int32I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
+      out_scale / out_clip_max, out_clip_max);
+}
+
+template void ker_bias_gelu_int32I_int8O_launcher<float>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const float *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max);
+
+template void ker_bias_gelu_int32I_int8O_launcher<__half>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const __half *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max);
+
+template <typename T>
+__global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
+                                           const T *bias, int total_count,
+                                           int feature_dim,
+                                           float in_scale_div_clip_max,
+                                           float out_scale,
+                                           float out_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  char4 *out4 = reinterpret_cast<char4 *>(output);
+  const int4 *data4 = reinterpret_cast<const int4 *>(input);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  int bias_i = i % (feature_dim >> 2);
+
+  const int4 input4 = data4[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  float4 output4;
+
+  output4.x = max(float(input4.x) / in_scale_div_clip_max + b4.x, (T)0.f);
+  output4.y = max(float(input4.y) / in_scale_div_clip_max + b4.y, (T)0.f);
+  output4.z = max(float(input4.z) / in_scale_div_clip_max + b4.z, (T)0.f);
+  output4.w = max(float(input4.w) / in_scale_div_clip_max + b4.w, (T)0.f);
+
+  char4 out_i4;
+  out_i4.x = float2int8(output4.x, out_scale, out_clip_max);
+  out_i4.y = float2int8(output4.y, out_scale, out_clip_max);
+  out_i4.z = float2int8(output4.z, out_scale, out_clip_max);
+  out_i4.w = float2int8(output4.w, out_scale, out_clip_max);
+  out4[i] = out_i4;
+}
+
+/* fp16 version */
+template <>
+__global__ void ker_bias_relu_int32I_int8O<__half>(
+    int32_t *input, int8_t *output, const __half *bias, int total_count,
+    int feature_dim, float in_scale_div_clip_max, float out_scale,
+    float out_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  const long4 *vals_long4 = reinterpret_cast<const long4 *>(input);
+  int64_t *outs_i8 = reinterpret_cast<int64_t *>(output);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+
+  int bias_i = i % (feature_dim >> 3);
+  long4 val_long4 = vals_long4[i];
+  int32_t *val1 = reinterpret_cast<int32_t *>(&val_long4);
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  const __half *b_half = reinterpret_cast<const __half *>(&b4);
+  int64_t out_i8;
+  int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
+
+#pragma unroll
+  for (uint j = 0; j < 8; ++j) {
+    float out_f;
+    out_f =
+        max(float(val1[j]) / in_scale_div_clip_max + __half2float(b_half[j]),
+            (float)0.f);
+    out_i1[j] = float2int8(out_f, out_scale, out_clip_max);
+  }
+  outs_i8[i] = out_i8;
+}
+
+template <typename T>
+void ker_bias_relu_int32I_int8O_launcher(int batch_token_num,
+                                         cudaStream_t stream, int32_t *input,
+                                         int8_t *output, const T *bias,
+                                         int feature_dim, float in_scale,
+                                         float in_clip_max, float out_scale,
+                                         float out_clip_max) {
+  int total_count = batch_token_num * feature_dim;
+  int grid_dim = total_count >> 10;
+  ker_bias_relu_int32I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
+      out_scale, out_clip_max);
+}
+
+template <>
+void ker_bias_relu_int32I_int8O_launcher<__half>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const __half *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max) {
+  int total_count = batch_token_num * feature_dim;
+  int grid_dim = total_count >> 11;
+  ker_bias_relu_int32I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
+      out_scale, out_clip_max);
+}
+
+template void ker_bias_relu_int32I_int8O_launcher<float>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const float *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max);
+
+template void ker_bias_relu_int32I_int8O_launcher<__half>(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const __half *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max);
+
+template <typename T>
+__global__ void ker_residual_int32I(int32_t *input, T *output, int total_count,
+                                    float scale_div_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  float4 *out4 = reinterpret_cast<float4 *>(output);
+  const int4 *data4 = reinterpret_cast<const int4 *>(input);
+  const int4 input4 = data4[i];
+  float4 output4 = out4[i];
+
+  output4.x += float(input4.x) / scale_div_clip_max;
+  output4.y += float(input4.y) / scale_div_clip_max;
+  output4.z += float(input4.z) / scale_div_clip_max;
+  output4.w += float(input4.w) / scale_div_clip_max;
+
+  out4[i] = output4;
+}
+
+/* fp16 version */
+template <>
+__global__ void ker_residual_int32I<__half>(int32_t *input, __half *output,
+                                            int total_count,
+                                            float scale_div_clip_max) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  const long4 *vals_long4 = reinterpret_cast<const long4 *>(input);
+  float4 *outs_h8 = reinterpret_cast<float4 *>(output);
+  long4 val_long4 = vals_long4[i];
+  int32_t *val1 = reinterpret_cast<int32_t *>(&val_long4);
+  float4 out_h8 = outs_h8[i];
+  __half *out_h1 = reinterpret_cast<__half *>(&out_h8);
+
+#pragma unroll
+  for (uint j = 0; j < 8; ++j) {
+    out_h1[j] =
+        __hadd(out_h1[j], __float2half(float(val1[j]) / scale_div_clip_max));
+  }
+  outs_h8[i] = out_h8;
+}
+
+template <typename T>
+void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
+                                  float quant_scale, float clip_max,
+                                  cudaStream_t stream) {
+  int grid_dim = total_ele_num >> 10;
+  ker_residual_int32I<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, total_ele_num, quant_scale / clip_max);
+}
+
+template <>
+void ker_residual_int32I_launcher<__half>(int32_t *input, __half *output,
+                                          int total_ele_num, float quant_scale,
+                                          float clip_max, cudaStream_t stream) {
+  int grid_dim = total_ele_num >> 11;
+  ker_residual_int32I<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, total_ele_num, quant_scale / clip_max);
+}
+
+template void ker_residual_int32I_launcher<float>(int32_t *input, float *output,
+                                                  int total_ele_num,
+                                                  float quant_scale,
+                                                  float clip_max,
+                                                  cudaStream_t stream);
+
+template void ker_residual_int32I_launcher<__half>(
+    int32_t *input, __half *output, int total_ele_num, float quant_scale,
+    float clip_max, cudaStream_t stream);
 
 }  // namespace cuda
 }  // namespace lightseq
