@@ -577,5 +577,93 @@ template void ker_residual_int32I_launcher<__half>(
     int32_t *input, __half *output, int total_ele_num, float quant_scale,
     float clip_max, cudaStream_t stream);
 
+template <typename T>
+__global__ void ker_arrange_encself_qkv_int32I(const int32_t *ori_qkv,
+                                               const T *qkv_bias, T *new_qkv,
+                                               int max_batch_dim,
+                                               int batch_seq_len,
+                                               int dim_per_head, int head_num,
+                                               float scale_div_clip_max) {
+  int hidden_size = dim_per_head * head_num;
+  int batch_id = blockIdx.x / batch_seq_len;
+  int token_id = blockIdx.x % batch_seq_len;
+  int qkv_offset = max_batch_dim * blockIdx.y;
+  for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
+    int head_id = i / dim_per_head;
+    int dim_id = i % dim_per_head;
+    int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
+                                  batch_seq_len, dim_per_head);
+    new_qkv[qkv_offset + target_id] =
+        float(
+            ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i]) /
+            scale_div_clip_max +
+        __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
+  }
+}
+
+template <>
+__global__ void ker_arrange_encself_qkv_int32I<__half>(
+    const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
+    int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
+    float scale_div_clip_max) {
+  int hidden_size = dim_per_head * head_num;
+  int batch_id = blockIdx.x / batch_seq_len;
+  int token_id = blockIdx.x % batch_seq_len;
+  for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
+    int head_id = i / dim_per_head;
+    int dim_id = i % dim_per_head;
+    int qkv_offset = max_batch_dim * blockIdx.y;
+    int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
+                                  batch_seq_len, dim_per_head);
+
+    const int2 *p_ori_qkv = (const int2 *)ori_qkv;
+    const half2 *p_bias = (const half2 *)qkv_bias;
+    half2 *p_new_qkv = (half2 *)new_qkv;
+    int2 ori_qkv_i2 =
+        p_ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i];
+    half2 ori_qkv_h2;
+    ori_qkv_h2.x = float(ori_qkv_i2.x) / scale_div_clip_max;
+    ori_qkv_h2.y = float(ori_qkv_i2.y) / scale_div_clip_max;
+    p_new_qkv[qkv_offset + target_id] =
+        __hadd2(ori_qkv_h2, __ldg(&p_bias[blockIdx.y * hidden_size + i]));
+  }
+}
+
+template <typename T>
+void ker_arrange_encself_qkv_int32I_launcher(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
+    int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
+    float quant_scale, float clip_max) {
+  ker_arrange_encself_qkv_int32I<T>
+      <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len,
+          dim_per_head, head_num, quant_scale / clip_max);
+}
+
+template <>
+void ker_arrange_encself_qkv_int32I_launcher<__half>(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
+    int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
+    int max_thread_per_block, float quant_scale, float clip_max) {
+  ker_arrange_encself_qkv_int32I<__half>
+      <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
+          dim_per_head / 2, head_num, quant_scale / clip_max);
+}
+
+template void ker_arrange_encself_qkv_int32I_launcher<float>(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_qkv, const float *qkv_bias, float *new_qkv,
+    int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
+template void ker_arrange_encself_qkv_int32I_launcher<__half>(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
+    int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
 }  // namespace cuda
 }  // namespace lightseq

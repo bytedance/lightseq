@@ -197,6 +197,25 @@ Encoder self attention
 */
 template <OperationType OpType_>
 void Encoder<OpType_>::self_attention() {
+#ifdef INT8_MODE
+  ker_norm_layer_resual_int8O_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+      _int8_ffn_in_buf, _p_d_enc_wei[_weight_offset],
+      _p_d_enc_wei[_weight_offset + 1], _p_d_enc_wei[_weight_offset + 5],
+      _max_thread_per_block, _quant_scale, _act_clip_max, _tw._is_post_ln);
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _batch_token_num,
+      _tw._hidden_size, &_ione, _int8_p_d_enc_wei[_layer_id * 4], CUDA_R_8I,
+      _tw._hidden_size * 3, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size,
+      &_izero, _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size * 3, CUDA_R_32I,
+      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  // get q, k, v by split and reshape qkv
+  ker_arrange_encself_qkv_int32I_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+      _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
+      _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
+      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max);
+#else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -211,12 +230,12 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
+#endif
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(

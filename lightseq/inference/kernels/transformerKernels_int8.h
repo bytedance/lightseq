@@ -47,5 +47,18 @@ void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
                                   float quant_scale, float clip_max,
                                   cudaStream_t stream);
 
+template <typename T>
+void ker_arrange_encself_qkv_int32I_launcher(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
+    int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
+    float quant_scale, float clip_max);
+
+template <typename T>
+void ker_arrange_atten_output_int8O_launcher(
+    int batch_token_num, int hidden_size, cudaStream_t stream, const T *ori_q,
+    int8_t *new_q, int beam_size, int dim_per_head, int head_num,
+    int max_thread_per_block, float quant_scale, float clip_max, );
+
 }  // namespace cuda
 }  // namespace lightseq
