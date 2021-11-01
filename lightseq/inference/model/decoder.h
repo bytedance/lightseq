@@ -121,7 +121,7 @@ class Decoder {
 #ifdef INT8_MODE
   std::vector<int8_t*> _int8_p_d_dec_wei;
   const float _quant_scale = 127;
-  const float _weight_clip_max = 0.3;
+  const float _weight_clip_max = 0.8;
   const float _act_clip_max = 16;
 #endif
   const _DataType _type_one;

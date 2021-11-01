@@ -259,6 +259,25 @@ void Encoder<OpType_>::self_attention() {
       _tw._dim_per_head, _batch_seq_len * _tw._dim_per_head,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+#ifdef INT8_MODE
+  // use v to save reshaped q, since they are in same size and v
+  // will not be use again before the next multi-head-attention
+  ker_arrange_atten_output_int8O_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _int8_ffn_in_buf,
+      _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
+      _quant_scale, _act_clip_max);
+
+  /* ---step 4. new_q = ori_q + new_q * output_wei--- */
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
+      _tw._hidden_size, &_ione, _int8_p_d_enc_wei[_layer_id * 4 + 1], CUDA_R_8I,
+      _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size, &_izero,
+      _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size, CUDA_R_32I,
+      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  ker_residual_int32I_launcher<_DataType>(
+      _int32_ffn_out_buf, _p_d_output, _tw._hidden_size * _batch_token_num,
+      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max, _stream);
+#else
   // use v to save reshaped q, since they are in same size and v
   // will not be use again before the next multi-head-attention
   ker_arrange_atten_output_launcher<_DataType>(
@@ -271,6 +290,7 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 4], _AType,
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+#endif
   return;
 }
 
