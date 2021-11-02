@@ -20,7 +20,8 @@ namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
-    : stream_(nullptr),
+    : LSModel({"token_ids"}, {"token_ids", "scores"}),
+      stream_(nullptr),
       hd_(nullptr),
       decoder_(nullptr),
       _max_batch_size(max_batch_size) {
@@ -186,5 +187,83 @@ std::tuple<int, int, int> Transformer::infer(int *input_seq, int batch_size,
   return std::make_tuple(batch_size, output_k, output_seq_len);
 }
 #endif
+
+void set_output_shape(int index, std::vector<int> shape) {}
+
+void Transformer::Infer() {
+  int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
+
+  encoder_->run_one_infer(batch_size, seq_len);
+  decoder_->run_one_infer(batch_size, seq_len);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+
+  int output_seq_len = get_output_seq_len();
+  int beam_size = tw_._beam_size;
+  int output_k = decoder_->_output_topk ? beam_size : 1;
+
+  set_output_shape(0, {input_shapes_[0][0], output_k, output_seq_len});
+  set_output_shape(1, {input_shapes_[0][0], output_k});
+}
+
+void Transformer::set_input_ptr(int index, void *input_ptr) {
+  switch (index) {
+    case 0:
+      encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+void Transformer::set_output_ptr(int index, void *output_ptr) {
+  switch (index) {
+    case 0:
+      decoder_->_p_d_result = static_cast<int *>(output_ptr);
+      break;
+
+    case 1:
+      decoder_->_p_d_alive_seq_score = static_cast<float *>(output_ptr);
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+const void *Transformer::get_output_ptr(int index) {
+  switch (index) {
+    case 0:
+      return static_cast<void *>(decoder_->_p_d_result);
+      break;
+
+    case 1:
+      return static_cast<void *>(decoder_->_p_d_alive_seq_score);
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+std::vector<int> Transformer::get_output_max_shape(int index) {
+  switch (index) {
+    case 0:
+      return {_max_batch_size, tw_._beam_size, tw_._max_step};
+      break;
+
+    case 1:
+      return {_max_batch_size, tw_._beam_size};
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
 }  // namespace cuda
 }  // namespace lightseq

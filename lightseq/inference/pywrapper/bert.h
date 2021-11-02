@@ -2,6 +2,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #endif
+#include "model_base.h"
 #include "../model/bert_encoder.h"
 #include "../proto/bert_weight.h"
 #include "../tools/util.h"
@@ -20,7 +21,7 @@ namespace py = pybind11;
 
 namespace lightseq {
 namespace cuda {
-class Bert {
+class Bert : public LSModelBase {
  private:
   typedef OperationTypeTraits<bert_optype> optraits;
   BertEncoder<bert_optype> *encoder_;
@@ -51,5 +52,8 @@ class Bert {
                                   optraits::DataType *result_seq = nullptr);
 #endif
 };
+
+LSMODEL_REGISTER(Bert);
+
 }  // namespace cuda
 }  // namespace lightseq

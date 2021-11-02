@@ -2,7 +2,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #endif
-
+#include "model_base.h"
 #include "../model/decoder.h"
 #include "../model/encoder.h"
 #include "../proto/transformer_weight.h"
@@ -22,7 +22,7 @@ namespace py = pybind11;
 
 namespace lightseq {
 namespace cuda {
-class Transformer {
+class Transformer : public LSModel {
  private:
   typedef OperationTypeTraits<transformer_optytpe> optraits;
   std::shared_ptr<Encoder<transformer_optytpe>> encoder_;
@@ -50,6 +50,12 @@ class Transformer {
   const int get_max_step() { return tw_._max_step; }
   const int get_beam_size() { return tw_._beam_size; }
 
+  void Infer() override;
+  void set_input_ptr(int index, void *input_ptr) override;
+  void set_output_ptr(int index, void *output_ptr) override;
+  const void *get_output_ptr(int index) override;
+  std::vector<int> get_output_max_shape(int index) override;
+
 #ifdef ENABLE_PYTHON
   std::tuple<py::array_t<int>, py::array_t<float>> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
@@ -61,5 +67,7 @@ class Transformer {
                                   bool multiple_output = false);
 #endif
 };
+
+LSMODEL_REGISTER(Transformer);
 }  // namespace cuda
 }  // namespace lightseq

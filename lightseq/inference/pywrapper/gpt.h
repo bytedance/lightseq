@@ -2,6 +2,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #endif
+#include "model_base.h"
 #include "../model/gpt_encoder.h"
 #include "../proto/gpt_weight.h"
 #include "../tools/util.h"
@@ -21,7 +22,7 @@ namespace py = pybind11;
 
 namespace lightseq {
 namespace cuda {
-class Gpt {
+class Gpt : public LSModelBase {
  private:
   typedef lightseq::cuda::OperationTypeTraits<gpt_optype> optraits;
   lightseq::cuda::GptEncoder<gpt_optype>* encoder_;
@@ -63,5 +64,8 @@ class Gpt {
                               int batch_seq_len, int* result_seq = nullptr);
 #endif
 };
+
+LSMODEL_REGISTER(Gpt);
+
 }  // namespace cuda
 }  // namespace lightseq
