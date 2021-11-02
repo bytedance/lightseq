@@ -51,16 +51,16 @@ Transformer::Transformer(const std::string weight_path,
   */
 
   // register device memory for inputs and outputs
-  CHECK_GPU_ERROR(
-      cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int)));
+  // CHECK_GPU_ERROR(
+  //     cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int)));
   CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_,
                              _max_batch_size * tw_._max_step * sizeof(int)));
 
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
-  CHECK_GPU_ERROR(cudaMalloc(&d_output_, _max_batch_size * tw_._beam_size *
-                                             tw_._max_step * sizeof(int)));
+  // CHECK_GPU_ERROR(cudaMalloc(&d_output_, _max_batch_size * tw_._beam_size *
+  //                                            tw_._max_step * sizeof(int)));
 
   encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
       _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,

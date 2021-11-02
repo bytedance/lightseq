@@ -12,7 +12,6 @@ int main(int argc, char* argv[]) {
 
   auto model = lightseq::cuda::LSModelFactory::get_instance().CreateModel(
       "Transformer", model_weights_path, max_batch_size);
-  std::cout << "Transformer model init finished" << std::endl;
 
   int batch_size = 1;
   int batch_seq_len = 14;
@@ -26,7 +25,6 @@ int main(int argc, char* argv[]) {
       d_input, host_input.data(), sizeof(int) * batch_size * batch_seq_len,
       cudaMemcpyHostToDevice));
 
-  std::cout << model->get_output_size() << std::endl;
   model->set_input_ptr(0, d_input);
   model->set_input_shape(0, {batch_size, batch_seq_len});
 
