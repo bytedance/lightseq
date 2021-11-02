@@ -38,15 +38,14 @@ set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -g -G -Xcompiler -Wall")
 if(DYNAMIC_API)
   # dynamic link to cuda libraries and protobuf
   set(CMAKE_CUDA_RUNTIME_LIBRARY "Shared")
-  set(Protobuf_USE_STATIC_LIBS OFF)
   set(HDF5_USE_STATIC_LIBRARIES OFF)
 else()
   # static link to cuda libraries and protobuf
   set(CMAKE_CUDA_RUNTIME_LIBRARY "Static")
-  set(Protobuf_USE_STATIC_LIBS ON)
   set(HDF5_USE_STATIC_LIBRARIES ON)
 endif()
 
+set(Protobuf_USE_STATIC_LIBS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
