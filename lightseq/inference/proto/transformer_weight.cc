@@ -34,16 +34,28 @@ template <OperationType OpType_>
 void TransformerWeight<OpType_>::proto_get_model_config(
     const Transformer &transformer, bool only_decoder) {
   _hidden_size = transformer.trg_embedding().norm_scale_size();
-  _inner_size =
-      transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step =
       transformer.trg_embedding().position_embedding_size() / _hidden_size;
+#ifdef INT8_MODE
+  _inner_size =
+      transformer.decoder_stack()[0].ffn_first_kernel().size() / _hidden_size;
+  if (!only_decoder) {
+    _src_vocab_size =
+        transformer.src_embedding().token_embedding().size() / _hidden_size;
+  }
+  _trg_vocab_size =
+      transformer.trg_embedding().token_embedding().size() / _hidden_size;
+  std::cout << _inner_size << " " << _src_vocab_size << " " << _trg_vocab_size << std::endl;
+#else
+  _inner_size =
+      transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   if (!only_decoder) {
     _src_vocab_size =
         transformer.src_embedding().token_embedding_size() / _hidden_size;
   }
   _trg_vocab_size =
       transformer.trg_embedding().token_embedding_size() / _hidden_size;
+#endif
   if (!only_decoder) {
     _n_enc_layer = transformer.encoder_stack_size();
   }
@@ -96,6 +108,7 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
   int idx = 0;
 
   offset.push_back(idx);
+
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (float ele : layer.token_embedding()) value.push_back(ele);

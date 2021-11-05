@@ -10,10 +10,20 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+option(INT8_MODE "inference with int8" OFF)
+if(INT8_MODE)
+    add_definitions(-DINT8_MODE)
+endif()
+
 protobuf_generate_cpp(GPT_PROTO_SRC GPT_PROTO_HEADER gpt.proto)
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
-protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
-                      transformer.proto)
+if(INT8_MODE)
+    protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
+                        transformer_quant.proto)
+else()
+    protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
+                        transformer.proto)
+endif()
 
 add_library(gpt_weight STATIC gpt_weight.cc ${GPT_PROTO_SRC} ${GPT_PROTO_HEADER})
 target_link_libraries(gpt_weight PUBLIC utils ${Protobuf_LIBRARIES} ${HDF5_LIBRARIES})

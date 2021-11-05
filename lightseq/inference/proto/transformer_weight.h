@@ -14,7 +14,11 @@
 #include <vector>
 
 #include "../tools/util.h"
+#ifdef INT8_MODE
+#include "transformer_quant.pb.h"
+#else
 #include "transformer.pb.h"
+#endif
 
 namespace lightseq {
 namespace cuda {
