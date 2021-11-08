@@ -52,6 +52,11 @@ class TransformerWeight {
   std::vector<const _DataType *> _p_d_trg_emb_wei;  // size: 4
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
   std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
+  float _src_scaled_emb_clip_max;
+  float _trg_scaled_emb_clip_max;
+  std::vector<float> _encode_output_project_kernel_kv_clip_max;
+  std::vector<float> _enc_clip_max;  // size: 8 * enc_layer_num
+  std::vector<float> _dec_clip_max;  // size: 12 * dec_layer_num
 
   // store the weights on gpu memo
   thrust::device_vector<_DataType> _d_src_emb_wei;
@@ -120,6 +125,10 @@ class TransformerWeight {
   bool _no_scale_embedding;
   bool _use_gelu;
   int _multilg_type;
+
+#ifdef INT8_MODE
+  const float _quant_scale = 127;
+#endif
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
