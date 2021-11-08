@@ -80,8 +80,8 @@ class Encoder {
 #ifdef INT8_MODE
   std::vector<int8_t *> _int8_p_d_enc_wei;
   const float _quant_scale = 127;
-  const float _weight_clip_max = 0.5;
-  const float _act_clip_max = 10;
+  const float _src_scaled_emb_clip_max;
+  const std::vector<float> _enc_clip_max;  // size: 8 * enc_layer_num
 #endif
 
   int _batch_size;

@@ -99,6 +99,20 @@ class TransformerWeight {
     return _p_d_dec_wei;
   }
 
+#ifdef INT8_MODE
+  float get_src_scaled_emb_clip_max() const { return _src_scaled_emb_clip_max; }
+
+  float get_trg_scaled_emb_clip_max() const { return _trg_scaled_emb_clip_max; }
+
+  std::vector<float> get_enc_clip_max() const { return _enc_clip_max; }
+
+  std::vector<float> get_dec_clip_max() const { return _dec_clip_max; }
+
+  std::vector<float> get_encode_output_project_kernel_kv_clip_max() const {
+    return _encode_output_project_kernel_kv_clip_max;
+  }
+#endif
+
   int _hidden_size;
   int _inner_size;
   int _max_step;

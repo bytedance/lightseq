@@ -31,6 +31,8 @@ Encoder<OpType_>::Encoder(int max_batch_size, const int *p_d_token_id,
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
 #ifdef INT8_MODE
+      _src_scaled_emb_clip_max(tw.get_src_scaled_emb_clip_max()),
+      _enc_clip_max(tw.get_enc_clip_max()),
       _ione((int32_t)1),
       _izero((int32_t)0),
 #endif
@@ -91,19 +93,19 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 2],
                            _int8_p_d_enc_wei[_layer_id * 4],
                            _tw._hidden_size * 3 * _tw._hidden_size,
-                           _quant_scale, _weight_clip_max, _stream);
+                           _quant_scale, _enc_clip_max[_layer_id * 8], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 4],
                            _int8_p_d_enc_wei[_layer_id * 4 + 1],
                            _tw._hidden_size * _tw._hidden_size, _quant_scale,
-                           _weight_clip_max, _stream);
+                           _enc_clip_max[_layer_id * 8 + 1], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 8],
                            _int8_p_d_enc_wei[_layer_id * 4 + 2],
                            _tw._hidden_size * _tw._inner_size, _quant_scale,
-                           _weight_clip_max, _stream);
+                           _enc_clip_max[_layer_id * 8 + 2], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 10],
                            _int8_p_d_enc_wei[_layer_id * 4 + 3],
                            _tw._inner_size * _tw._hidden_size, _quant_scale,
-                           _weight_clip_max, _stream);
+                           _enc_clip_max[_layer_id * 8 + 3], _stream);
   }
 #endif
   return;
@@ -202,7 +204,8 @@ void Encoder<OpType_>::self_attention() {
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
       _int8_ffn_in_buf, _p_d_enc_wei[_weight_offset],
       _p_d_enc_wei[_weight_offset + 1], _p_d_enc_wei[_weight_offset + 5],
-      _max_thread_per_block, _quant_scale, _act_clip_max, _tw._is_post_ln);
+      _max_thread_per_block, _quant_scale, _enc_clip_max[_layer_id * 8 + 4],
+      _tw._is_post_ln);
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _batch_token_num,
       _tw._hidden_size, &_ione, _int8_p_d_enc_wei[_layer_id * 4], CUDA_R_8I,
@@ -214,7 +217,8 @@ void Encoder<OpType_>::self_attention() {
       _batch_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max);
+      _quant_scale * _quant_scale,
+      _enc_clip_max[_layer_id * 8] * _enc_clip_max[_layer_id * 8 + 4]);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
@@ -265,7 +269,7 @@ void Encoder<OpType_>::self_attention() {
   ker_arrange_atten_output_int8O_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _int8_ffn_in_buf,
       _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_scale, _act_clip_max);
+      _quant_scale, _enc_clip_max[_layer_id * 8 + 5]);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -276,7 +280,9 @@ void Encoder<OpType_>::self_attention() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   ker_residual_int32I_launcher<_DataType>(
       _int32_ffn_out_buf, _p_d_output, _tw._hidden_size * _batch_token_num,
-      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max, _stream);
+      _quant_scale * _quant_scale,
+      _enc_clip_max[_layer_id * 8 + 1] * _enc_clip_max[_layer_id * 8 + 5],
+      _stream);
 #else
   // use v to save reshaped q, since they are in same size and v
   // will not be use again before the next multi-head-attention
@@ -301,7 +307,8 @@ void Encoder<OpType_>::ffn_add_norm() {
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
       _int8_ffn_in_buf, _p_d_enc_wei[_weight_offset + 6],
       _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11],
-      _max_thread_per_block, _quant_scale, _act_clip_max, _tw._is_post_ln);
+      _max_thread_per_block, _quant_scale, _enc_clip_max[_layer_id * 8 + 6],
+      _tw._is_post_ln);
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
       _tw._hidden_size, &_ione, _int8_p_d_enc_wei[_layer_id * 4 + 2], CUDA_R_8I,
@@ -313,14 +320,16 @@ void Encoder<OpType_>::ffn_add_norm() {
     ker_bias_gelu_int32I_int8O_launcher<_DataType>(
         _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max,
-        _quant_scale, _act_clip_max);
+        _quant_scale * _quant_scale,
+        _enc_clip_max[_layer_id * 8 + 2] * _enc_clip_max[_layer_id * 8 + 6],
+        _quant_scale, _enc_clip_max[_layer_id * 8 + 7]);
   } else {
     ker_bias_relu_int32I_int8O_launcher<_DataType>(
         _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max,
-        _quant_scale, _act_clip_max);
+        _quant_scale * _quant_scale,
+        _enc_clip_max[_layer_id * 8 + 2] * _enc_clip_max[_layer_id * 8 + 6],
+        _quant_scale, _enc_clip_max[_layer_id * 8 + 7]);
   }
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -331,7 +340,9 @@ void Encoder<OpType_>::ffn_add_norm() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   ker_residual_int32I_launcher<_DataType>(
       _int32_ffn_out_buf, _p_d_output, _tw._hidden_size * _batch_token_num,
-      _quant_scale * _quant_scale, _weight_clip_max * _act_clip_max, _stream);
+      _quant_scale * _quant_scale,
+      _enc_clip_max[_layer_id * 8 + 3] * _enc_clip_max[_layer_id * 8 + 7],
+      _stream);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
