@@ -26,6 +26,7 @@ class Transformer {
 
   optraits::DataType *d_encoder_output_;
   int *d_input_;
+  int *d_lang_id_;
   int *d_output_;
   int *d_padding_mask_;
   int _max_batch_size;
@@ -89,9 +90,16 @@ class Transformer {
         &d_output_,
         _max_batch_size * tw_._beam_size * tw_._max_step * sizeof(int)));
 
+    if (tw_._multilg_type != 0) {
+      lightseq::cuda::CHECK_GPU_ERROR(
+          cudaMalloc(&d_lang_id_, _max_batch_size * sizeof(int)));
+    } else {
+      d_lang_id_ = nullptr;
+    }
+
     encoder_ = new lightseq::cuda::Encoder<transformer_optytpe>(
         max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-        stream_, hd_);
+        stream_, hd_, d_lang_id_);
     res = encoder_->check();
     if (!res.empty()) {
       throw std::runtime_error(res);
@@ -99,7 +107,7 @@ class Transformer {
 
     decoder_ = new lightseq::cuda::Decoder<transformer_optytpe>(
         _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
-        stream_, hd_, true);
+        stream_, hd_, true, d_lang_id_);
     res = decoder_->check();
     if (!res.empty()) {
       throw std::runtime_error(res);
@@ -125,6 +133,7 @@ class Transformer {
 
   std::tuple<py::array_t<int>, py::array_t<float>> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
+      py::array_t<int, py::array::c_style | py::array::forcecast> lang_ids,
       bool multiple_output = false, std::string sampling_method = "",
       int beam_size = -1, float length_penalty = -1, float topp = -1,
       float topk = -1, float diverse_lambda = -1) {
@@ -150,9 +159,15 @@ class Transformer {
     if (batch_seq_len > tw_._max_step) {
       throw std::runtime_error("seq len of input greater than max_step");
     }
+    if (lang_ids.size() != batch_size) {
+      throw std::runtime_error("lang_ids size not equal to batch_size");
+    }
     lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
         d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
         cudaMemcpyHostToDevice, stream_));
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
+        d_lang_id_, lang_ids.mutable_unchecked<2>().data(0, 0),
+        sizeof(int) * lang_ids.size(), cudaMemcpyHostToDevice, stream_));
 
     encoder_->run_one_infer(batch_size, batch_seq_len);
     decoder_->run_one_infer(batch_size, batch_seq_len);

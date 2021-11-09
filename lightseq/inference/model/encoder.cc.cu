@@ -158,6 +158,12 @@ void Encoder<OpType_>::self_attention() {
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
       _p_d_enc_wei[_weight_offset + 5], _max_thread_per_block, _tw._is_post_ln);
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_q, "self attn ln(head): ", 5);
+  print_vec(_p_d_q + _batch_token_num * _tw._hidden_size - 5,
+            "self attn ln(tail): ", 5);
+#endif
+
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -167,11 +173,26 @@ void Encoder<OpType_>::self_attention() {
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_qkv_projected, "self qkv(head): ", 5);
+  print_vec(_p_d_qkv_projected + _batch_token_num * _tw._hidden_size * 3 - 5,
+            "self qkv(tail): ", 5);
+#endif
+
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_q, "self attn q(head): ", 5);
+  print_vec(_p_d_q + _batch_token_num * _tw._hidden_size - 5,
+            "self attn q(tail): ", 5);
+  print_vec(_p_d_k, "self attn k(head): ", 5);
+  print_vec(_p_d_k + _batch_token_num * _tw._hidden_size - 5,
+            "self attn k(tail): ", 5);
+#endif
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -182,9 +203,22 @@ void Encoder<OpType_>::self_attention() {
       _batch_seq_len, _batch_seq_len * _batch_seq_len,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_c, "self attn logits(head): ", 5);
+  print_vec(_p_d_c + _batch_token_num * _tw._head_num * _batch_seq_len - 5,
+            "self attn logits(tail): ", 5);
+#endif
+
   ker_correlation_softmax_encself_launcher<_DataType>(
       _batch_size, _batch_seq_len, _tw._head_num, _stream, _p_d_c,
       _p_d_padding_mask);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_c, "self attn corr(head): ", 5);
+  print_vec(_p_d_c + _batch_token_num * _tw._head_num * _batch_seq_len - 5,
+            "self attn corr(tail): ", 5);
+#endif
 
   /* ---step 3. new_q = correlation * v--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -201,12 +235,25 @@ void Encoder<OpType_>::self_attention() {
       _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _p_d_v,
       _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
 
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_v, "self attn new value(head): ", 5);
+  print_vec(_p_d_v + _batch_token_num * _tw._hidden_size - 5,
+            "self attn new value(tail): ", 5);
+#endif
+
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 4], _AType,
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_output, "self attn out(head): ", 5);
+  print_vec(_p_d_output + _batch_token_num * _tw._hidden_size - 5,
+            "self attn out(tail): ", 5);
+  print_vec(_p_d_enc_wei[_weight_offset + 4], "self attn ffn(head)", 5);
+#endif
   return;
 }
 
@@ -218,6 +265,12 @@ void Encoder<OpType_>::ffn_add_norm() {
       _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
       _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block,
       _tw._is_post_ln);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_ffn_buf1, "layer norm(head): ", 5);
+  print_vec(_p_d_ffn_buf1 + _batch_token_num * _tw._hidden_size - 5,
+            "layer norm(tail): ", 5);
+#endif
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -236,6 +289,12 @@ void Encoder<OpType_>::ffn_add_norm() {
         _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
   }
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_ffn_buf2, "ffn activation(head): ", 5);
+  print_vec(_p_d_ffn_buf2 + _batch_token_num * _tw._hidden_size - 5,
+            "ffn activation(tail): ", 5);
+#endif
 
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
