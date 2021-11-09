@@ -231,7 +231,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                    (size_t)(_tw._hidden_size * _tw._hidden_size)));
     lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 2],
-                   (size_t)(_tw._hidden_size * 3 * _tw._hidden_size)));
+                   (size_t)(_tw._hidden_size * _tw._hidden_size)));
     lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 3],
                    (size_t)(_tw._hidden_size * _tw._hidden_size)));
