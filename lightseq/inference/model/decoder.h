@@ -7,13 +7,13 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <unistd.h>
-#include <cub/cub.cuh>
 
 #include "../proto/transformer_weight.h"
 #include "../tools/util.h"
