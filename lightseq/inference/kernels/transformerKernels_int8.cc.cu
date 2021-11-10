@@ -408,7 +408,7 @@ __global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
                                            const T *bias, int total_count,
                                            int feature_dim,
                                            float in_scale_div_clip_max,
-                                           float out_scale,
+                                           float out_scale_div_clip_max,
                                            float out_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -429,10 +429,10 @@ __global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
   output4.w = max(float(input4.w) / in_scale_div_clip_max + b4.w, (T)0.f);
 
   char4 out_i4;
-  out_i4.x = float2int8(output4.x, out_scale, out_clip_max);
-  out_i4.y = float2int8(output4.y, out_scale, out_clip_max);
-  out_i4.z = float2int8(output4.z, out_scale, out_clip_max);
-  out_i4.w = float2int8(output4.w, out_scale, out_clip_max);
+  out_i4.x = float2int8(output4.x, out_scale_div_clip_max, out_clip_max);
+  out_i4.y = float2int8(output4.y, out_scale_div_clip_max, out_clip_max);
+  out_i4.z = float2int8(output4.z, out_scale_div_clip_max, out_clip_max);
+  out_i4.w = float2int8(output4.w, out_scale_div_clip_max, out_clip_max);
   out4[i] = out_i4;
 }
 
@@ -440,7 +440,7 @@ __global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
 template <>
 __global__ void ker_bias_relu_int32I_int8O<__half>(
     int32_t *input, int8_t *output, const __half *bias, int total_count,
-    int feature_dim, float in_scale_div_clip_max, float out_scale,
+    int feature_dim, float in_scale_div_clip_max, float out_scale_div_clip_max,
     float out_clip_max) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -464,7 +464,7 @@ __global__ void ker_bias_relu_int32I_int8O<__half>(
     out_f =
         max(float(val1[j]) / in_scale_div_clip_max + __half2float(b_half[j]),
             (float)0.f);
-    out_i1[j] = float2int8(out_f, out_scale, out_clip_max);
+    out_i1[j] = float2int8(out_f, out_scale_div_clip_max, out_clip_max);
   }
   outs_i8[i] = out_i8;
 }
@@ -480,7 +480,7 @@ void ker_bias_relu_int32I_int8O_launcher(int batch_token_num,
   int grid_dim = total_count >> 10;
   ker_bias_relu_int32I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
       input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
-      out_scale, out_clip_max);
+      out_scale / out_clip_max, out_clip_max);
 }
 
 template <>
@@ -492,7 +492,7 @@ void ker_bias_relu_int32I_int8O_launcher<__half>(
   int grid_dim = total_count >> 11;
   ker_bias_relu_int32I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
       input, output, bias, total_count, feature_dim, in_scale / in_clip_max,
-      out_scale, out_clip_max);
+      out_scale / out_clip_max, out_clip_max);
 }
 
 template void ker_bias_relu_int32I_int8O_launcher<float>(

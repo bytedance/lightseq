@@ -25,6 +25,9 @@ template void print_vec<float>(const thrust::device_vector<float>& outv,
 template void print_vec<int>(const thrust::device_vector<int>& outv,
                              std::string outn, int num_output_ele);
 
+template void print_vec<int8_t>(const thrust::device_vector<int8_t>& outv,
+                                std::string outn, int num_output_ele);
+
 template <typename T>
 void print_vec(thrust::device_ptr<T> outv, std::string outn,
                int num_output_ele) {
@@ -39,6 +42,9 @@ template void print_vec<float>(thrust::device_ptr<float> outv, std::string outn,
 
 template void print_vec<int>(thrust::device_ptr<int> outv, std::string outn,
                              int num_output_ele);
+
+template void print_vec<int8_t>(thrust::device_ptr<int8_t> outv,
+                                std::string outn, int num_output_ele);
 
 template <typename T>
 void print_vec(const T* outv, std::string outn, int num_output_ele) {
@@ -65,11 +71,27 @@ void print_vec<__half>(const __half* outv, std::string outn,
   std::cout << std::endl;
 }
 
+template <>
+void print_vec<int8_t>(const int8_t* outv, std::string outn,
+                       int num_output_ele) {
+  std::cout << outn << ": ";
+  std::vector<int8_t> hout(num_output_ele, (int8_t)0);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(int8_t),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_output_ele; i++) {
+    std::cout << int(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
 template void print_vec<float>(const float* outv, std::string outn,
                                int num_output_ele);
 
 template void print_vec<int>(const int* outv, std::string outn,
                              int num_output_ele);
+
+template void print_vec<int8_t>(const int8_t* outv, std::string outn,
+                                int num_output_ele);
 
 template void print_vec<__half>(const __half* outv, std::string outn,
                                 int num_output_ele);

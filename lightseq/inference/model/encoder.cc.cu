@@ -71,10 +71,12 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
   // encoder and decoder use the same buffer to save gpu memory useage
 #ifdef INT8_MODE
+  int max_batch_dim = _max_batch_size * _tw._max_step *
+                      std::max(_tw._inner_size, _tw._hidden_size * 3);
   lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMalloc((int8_t **)&_int8_ffn_in_buf, (size_t)(_max_batch_dim)));
+      cudaMalloc((int8_t **)&_int8_ffn_in_buf, (size_t)(max_batch_dim)));
   lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMalloc((int32_t **)&_int32_ffn_out_buf, (size_t)(_max_batch_dim)));
+      cudaMalloc((int32_t **)&_int32_ffn_out_buf, (size_t)(max_batch_dim)));
   _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
