@@ -5,7 +5,6 @@
 
 #include <cub/cub.cuh>
 
-
 namespace lightseq {
 namespace cuda {
 

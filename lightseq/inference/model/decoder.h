@@ -7,7 +7,6 @@
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
 
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
