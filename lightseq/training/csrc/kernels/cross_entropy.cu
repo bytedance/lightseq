@@ -1,9 +1,10 @@
 #include "block_reduce.h"
 #include "cuda_util.h"
 #include "kernels.h"
-#include "ls_cub.cuh"
+#include "cub/cub.cuh"
+#include "cub/util_allocator.cuh"
 
-ls::cub::CachingDeviceAllocator g_allocator(true);
+cub::CachingDeviceAllocator g_allocator(true);
 
 template <typename T>
 __global__ void ls_cross_entropy_fw_kernel(
@@ -140,17 +141,17 @@ void launch_cross_entropy_fw(const T *inputs_ptr, const int *targets_ptr,
   int num_items = grid_dim;
   void *d_temp_storage = NULL;
   size_t temp_storage_bytes = 0;
-  CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
-                                             loss_buffer, outputs_ptr,
-                                             num_items, stream));
+  CHECK_GPU_ERROR(cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                         loss_buffer, outputs_ptr, num_items,
+                                         stream));
   CHECK_GPU_ERROR(
       g_allocator.DeviceAllocate(&d_temp_storage, temp_storage_bytes));
-  CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
-                                             loss_buffer, outputs_ptr,
-                                             num_items, stream));
-  CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
-                                             nll_loss_buffer, nll_loss_ptr,
-                                             num_items, stream));
+  CHECK_GPU_ERROR(cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                         loss_buffer, outputs_ptr, num_items,
+                                         stream));
+  CHECK_GPU_ERROR(cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                         nll_loss_buffer, nll_loss_ptr,
+                                         num_items, stream));
   CHECK_GPU_ERROR(g_allocator.DeviceFree(d_temp_storage));
 }
 
