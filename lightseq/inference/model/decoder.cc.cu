@@ -1,6 +1,5 @@
-#include <unistd.h>
 
-#include "3rdparty/cub/cub/cub.cuh"
+
 #include "decoder.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"

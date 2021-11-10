@@ -3,7 +3,8 @@
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 
-#include "3rdparty/cub/cub/cub.cuh"
+#include <cub/cub.cuh>
+
 
 namespace lightseq {
 namespace cuda {
