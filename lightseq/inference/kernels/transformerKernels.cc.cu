@@ -1,5 +1,6 @@
-#include "common.h"
 #include "transformerKernels.h"
+
+#include "common.h"
 
 /**
 @file

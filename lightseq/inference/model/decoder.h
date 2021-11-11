@@ -6,6 +6,7 @@
 #include <curand_kernel.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
+#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -56,6 +57,7 @@ class Decoder {
   TransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
+  cublasLtHandle_t _cublas_lt_handle;
 
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
@@ -105,6 +107,7 @@ class Decoder {
 #ifdef INT8_MODE
   int8_t* _int8_ffn_in_buf;
   int32_t* _int32_ffn_out_buf;
+  int8_t* _int8_ffn_out_buf;
 #endif
 
   int _batch_size;

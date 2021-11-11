@@ -1,9 +1,5 @@
 #pragma once
-#include <cuda.h>
-#include <cuda_fp16.h>
-#include <curand_kernel.h>
-
-#include <cub/cub.cuh>
+#include "common.h"
 
 namespace lightseq {
 namespace cuda {
@@ -18,13 +14,11 @@ void launch_dequantize_tensor(const int32_t *input, T *output, int total_count,
                               cudaStream_t &stream);
 
 template <typename T>
-void ker_norm_layer_resual_int8O_launcher(int token_num, int hidden_size,
-                                          cudaStream_t stream, T *input,
-                                          int8_t *output, const T *scale,
-                                          const T *bias, const T *residual_bias,
-                                          const int max_thread_per_block,
-                                          float quant_scale, float clip_max,
-                                          bool is_post_ln = false);
+void ker_norm_layer_resual_int8O_launcher(
+    int token_num, int hidden_size, cudaStream_t stream, T *input,
+    int8_t *output, const T *scale, const T *bias, const T *residual_bias,
+    const int max_thread_per_block, float quant_scale, float clip_max,
+    bool is_post_ln = false, bool output_col32 = false);
 
 template <typename T>
 void ker_bias_gelu_int32I_int8O_launcher(int batch_token_num,
@@ -64,6 +58,13 @@ template <typename T>
 void ker_arrange_decself_qkv_int32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
+    int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
+template <typename T>
+void ker_arrange_decself_qkv_int8I_launcher(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float quant_scale, float clip_max);
 

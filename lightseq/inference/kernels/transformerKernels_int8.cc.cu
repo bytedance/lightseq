@@ -1,6 +1,7 @@
+#include "transformerKernels_int8.h"
+
 #include "common.h"
 #include "transformerKernels.h"
-#include "transformerKernels_int8.h"
 
 /**
 @file
@@ -153,12 +154,10 @@ void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
 }
 
 template <typename T>
-__global__ void ker_norm_layer_resual_int8O(T *input, int8_t *output,
-                                            const T *scale, const T *bias,
-                                            const T *residual_bias,
-                                            const int hidden_size,
-                                            float scale_div_clip_max,
-                                            float clip_max, bool is_post_ln) {
+__global__ void ker_norm_layer_resual_int8O(
+    T *input, int8_t *output, const T *scale, const T *bias,
+    const T *residual_bias, const int hidden_size, float scale_div_clip_max,
+    float clip_max, bool is_post_ln, bool output_col32) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -192,7 +191,16 @@ __global__ void ker_norm_layer_resual_int8O(T *input, int8_t *output,
     val = input[i] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
-    output[i] = float2int8(output_f, scale_div_clip_max, clip_max);
+    int8_t res = float2int8(output_f, scale_div_clip_max, clip_max);
+    if (output_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - start;
+      int col32_index =
+          row_major2flat_col32(row_id, col_id, blockDim.x, hidden_size);
+      output[col32_index] = res;
+    } else {
+      output[i] = res;
+    }
     if (is_post_ln) {
       input[i] = output_f + __ldg(&residual_bias[i - block_start]);
     } else {
@@ -205,7 +213,8 @@ template <>
 __global__ void ker_norm_layer_resual_int8O<__half>(
     __half *input, int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int half_hidden_size,
-    float scale_div_clip_max, float clip_max, bool is_post_ln) {
+    float scale_div_clip_max, float clip_max, bool is_post_ln,
+    bool output_col32) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -251,7 +260,17 @@ __global__ void ker_norm_layer_resual_int8O<__half>(
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
     output_c2.x = float2int8(local_f2.x, scale_div_clip_max, clip_max);
     output_c2.y = float2int8(local_f2.y, scale_div_clip_max, clip_max);
-    poutput[i] = output_c2;
+
+    if (output_col32) {
+      int row_id = blockIdx.x;
+      int col_id = (i - start) * 2;
+      int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
+                                             half_hidden_size * 2);
+      poutput[col32_index >> 1] = output_c2;
+    } else {
+      poutput[i] = output_c2;
+    }
+
     if (!is_post_ln) {
       local_f2 = safe_half2_to_float2(pinput[i]);
     }
@@ -271,11 +290,11 @@ void ker_norm_layer_resual_int8O_launcher(int token_num, int hidden_size,
                                           const T *bias, const T *residual_bias,
                                           const int max_thread_per_block,
                                           float quant_scale, float clip_max,
-                                          bool is_post_ln) {
+                                          bool is_post_ln, bool output_col32) {
   ker_norm_layer_resual_int8O<T>
       <<<token_num, max_thread_per_block, 0, stream>>>(
           input, output, scale, bias, residual_bias, hidden_size,
-          quant_scale / clip_max, clip_max, is_post_ln);
+          quant_scale / clip_max, clip_max, is_post_ln, output_col32);
 }
 
 template <>
@@ -283,24 +302,24 @@ void ker_norm_layer_resual_int8O_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half *input,
     int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln) {
+    float quant_scale, float clip_max, bool is_post_ln, bool output_col32) {
   ker_norm_layer_resual_int8O<__half>
       <<<token_num, max_thread_per_block, 0, stream>>>(
           input, output, scale, bias, residual_bias, hidden_size / 2,
-          quant_scale / clip_max, clip_max, is_post_ln);
+          quant_scale / clip_max, clip_max, is_post_ln, output_col32);
 }
 
 template void ker_norm_layer_resual_int8O_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float *input,
     int8_t *output, const float *scale, const float *bias,
     const float *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln);
+    float quant_scale, float clip_max, bool is_post_ln, bool output_col32);
 
 template void ker_norm_layer_resual_int8O_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half *input,
     int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln);
+    float quant_scale, float clip_max, bool is_post_ln, bool output_col32);
 
 template <typename T>
 __global__ void ker_bias_gelu_int32I_int8O(int32_t *input, int8_t *output,
@@ -849,6 +868,121 @@ template void ker_arrange_decself_qkv_int32I_launcher<__half>(
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
     int step_id, int max_thread_per_block, float quant_scale, float clip_max);
+
+template <typename T>
+__global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
+                                              const T *qkv_bias, T *new_q,
+                                              T *new_k, T *new_v, int head_num,
+                                              int dim_per_head, int max_step,
+                                              int step_id,
+                                              float scale_div_clip_max) {
+  int hidden_size = dim_per_head * head_num;
+  for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
+    // blockdim is equal to hidden_size
+    int row_id = blockIdx.x;
+    int col_id = blockIdx.y * hidden_size + i;
+    int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
+                                           blockDim.y * hidden_size);
+    T val = float(ori_qkv[col32_index]) / scale_div_clip_max +
+            __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
+    int seq_id =
+        blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
+    if (blockIdx.y == 0) {
+      // for query
+      new_q[seq_id * hidden_size + i] = val;
+      return;
+    }
+    int head_id = i / dim_per_head;
+    int dim_id = i % dim_per_head;
+    int target_id = targetid_4dim(seq_id, head_id, step_id, dim_id, head_num,
+                                  max_step, dim_per_head);
+    if (blockIdx.y == 1) {
+      // for key
+      new_k[target_id] = val;
+    } else {
+      // for value
+      new_v[target_id] = val;
+    }
+  }
+}
+
+template <>
+__global__ void ker_arrange_decself_qkv_int8I<__half>(
+    const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
+    __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
+    float scale_div_clip_max) {
+  int half_hidden_size = dim_per_head * head_num;
+  const char2 *p_qkv = reinterpret_cast<const char2 *>(ori_qkv);
+  const half2 *p_bias = reinterpret_cast<const half2 *>(qkv_bias);
+  char2 v_ori_qkv;
+  half2 ori_qkv_h2;
+  for (std::size_t i = threadIdx.x; i < half_hidden_size; i += blockDim.x) {
+    int row_id = blockIdx.x;
+    int col_id = (blockIdx.y * half_hidden_size + i) * 2;
+    int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
+                                           blockDim.y * half_hidden_size) >>
+                      1;
+    v_ori_qkv = p_qkv[col32_index];
+    ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) / scale_div_clip_max);
+    ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) / scale_div_clip_max);
+    half2 val =
+        __hadd2(ori_qkv_h2, __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
+    // obvious，seq_id = batch_id * beam_size + beam_id
+    int seq_id = blockIdx.x;
+    if (blockIdx.y == 0) {
+      // for query
+      ((half2 *)new_q)[seq_id * half_hidden_size + i] = val;
+      return;
+    }
+    int head_id = i / dim_per_head;
+    int dim_id = i % dim_per_head;
+    int target_id = targetid_4dim(seq_id, head_id, step_id, dim_id, head_num,
+                                  max_step, dim_per_head);
+    if (blockIdx.y == 1) {
+      // for key
+      ((half2 *)new_k)[target_id] = val;
+    } else {
+      // for value
+      ((half2 *)new_v)[target_id] = val;
+    }
+  }
+}
+
+template <typename T>
+void ker_arrange_decself_qkv_int8I_launcher(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
+    int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float quant_scale, float clip_max) {
+  ker_arrange_decself_qkv_int8I<T>
+      <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
+          max_step, step_id, quant_scale / clip_max);
+}
+
+template <>
+void ker_arrange_decself_qkv_int8I_launcher<__half>(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
+    __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float quant_scale, float clip_max) {
+  ker_arrange_decself_qkv_int8I<__half>
+      <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
+          ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
+          max_step, step_id, quant_scale / clip_max);
+}
+
+template void ker_arrange_decself_qkv_int8I_launcher<float>(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
+    float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
+template void ker_arrange_decself_qkv_int8I_launcher<__half>(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
+    __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float quant_scale, float clip_max);
 
 template <typename T>
 __global__ void ker_arrange_encdec_q_int32I(const int32_t *ori_q,

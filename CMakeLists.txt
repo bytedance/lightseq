@@ -32,6 +32,7 @@ set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include)
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
 include_directories(${COMMON_HEADER_DIRS})
+include_directories(SYSTEM "3rdparty/cub")
 
 link_directories(${COMMON_LIB_DIRS})
 

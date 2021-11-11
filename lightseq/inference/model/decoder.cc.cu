@@ -64,6 +64,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
       _h_length_norm[i] = length_norm(i + 1, tw._length_penalty);
     }
   }
+  CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
   return;
 }
 
@@ -217,6 +218,8 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
       cudaMalloc((int8_t**)&_int8_ffn_in_buf, (size_t)(max_batch_dim)));
   lightseq::cuda::CHECK_GPU_ERROR(
       cudaMalloc((int32_t**)&_int32_ffn_out_buf, (size_t)(max_batch_dim)));
+  lightseq::cuda::CHECK_GPU_ERROR(
+      cudaMalloc((int8_t**)&_int8_ffn_out_buf, (size_t)(max_batch_dim)));
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_dec_layer;
@@ -520,16 +523,30 @@ void Decoder<OpType_>::self_attention() {
       _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset],
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
       _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 6],
-      _tw._is_post_ln);
-  CHECK_GPU_ERROR(cublasGemmEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _step_token_num,
-      _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6], CUDA_R_8I,
-      _tw._hidden_size * 3, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size,
-      &_izero, _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size * 3, CUDA_R_32I,
-      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+      _tw._is_post_ln, true);
+  // CHECK_GPU_ERROR(cublasGemmEx(
+  //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _step_token_num,
+  //     _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6], CUDA_R_8I,
+  //     _tw._hidden_size * 3, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size,
+  //     &_izero, _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size * 3,
+  //     CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
+                             _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0, 1,
+                             _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6],
+                             _cublas_lt_handle, _stream, false);
+
   // get q, k, v by split and reshape qkv
-  ker_arrange_decself_qkv_int32I_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+  // ker_arrange_decself_qkv_int32I_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+  //     _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
+  //     _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
+  //     _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
+  //     _max_thread_per_block, _quant_scale * _quant_scale,
+  //     _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6]);
+
+  ker_arrange_decself_qkv_int8I_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
       _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
       _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
