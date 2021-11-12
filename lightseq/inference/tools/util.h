@@ -14,6 +14,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
+
 #include "hdf5.h"
 
 /**

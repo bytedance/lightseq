@@ -1,9 +1,11 @@
 
 
 #include "decoder.h"
+
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"
 #include "../kernels/embKernels.h"
+#include "cublas_helper.h"
 
 /**
 @file
@@ -226,6 +228,9 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
     lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6],
                    (size_t)(_tw._hidden_size * 3 * _tw._hidden_size)));
+    int8_t* temp1;
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
+        (int8_t**)&temp1, (size_t)(_tw._hidden_size * 3 * _tw._hidden_size)));
     lightseq::cuda::CHECK_GPU_ERROR(
         cudaMalloc((int8_t**)&_int8_p_d_dec_wei[_layer_id * 6 + 1],
                    (size_t)(_tw._hidden_size * _tw._hidden_size)));
@@ -245,6 +250,17 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
         _tw._hidden_size * 3 * _tw._hidden_size, _quant_scale,
         _dec_clip_max[_layer_id * 12], _stream);
+
+    // const int8_t* intput, int8_t* output,
+    //                                    int row, int col,
+    //                                    cublasLtHandle_t lt_handle,
+    //                                    cudaStream_t stream
+    transform_weight_row_major2col32t(_int8_p_d_dec_wei[_layer_id * 6], temp1,
+                                      _tw._hidden_size, _tw._hidden_size * 3,
+                                      _cublas_lt_handle, _stream);
+    int8_t* temp = _int8_p_d_dec_wei[_layer_id * 6];
+    _int8_p_d_dec_wei[_layer_id * 6] = temp1;
+    CHECK_GPU_ERROR(cudaFree(temp));
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 4],
                            _int8_p_d_dec_wei[_layer_id * 6 + 1],
                            _tw._hidden_size * _tw._hidden_size, _quant_scale,
@@ -524,6 +540,7 @@ void Decoder<OpType_>::self_attention() {
       _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
       _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 6],
       _tw._is_post_ln, true);
+
   // CHECK_GPU_ERROR(cublasGemmEx(
   //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size * 3, _step_token_num,
   //     _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6], CUDA_R_8I,
@@ -531,6 +548,12 @@ void Decoder<OpType_>::self_attention() {
   //     &_izero, _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size * 3,
   //     CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+  // int8_t* res, int batchCount, int m, int n, int k, int64_t stridea,
+  //     int64_t strideb, int64_t stridec, const float alpha,
+  //     const int8_t* ATransform, const T* kernel, cublasLtHandle_t
+  //     cublasLt_handle, cudaStream_t stream,
+  //     // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
+  //     bool use_ORDER_COL32_2R_4R4
   cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
                              _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0, 1,
                              _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6],
