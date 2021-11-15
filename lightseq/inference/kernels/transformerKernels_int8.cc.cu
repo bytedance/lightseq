@@ -760,20 +760,24 @@ template void ker_arrange_atten_output_int8O_launcher<__half>(
     int head_num, int max_thread_per_block, float quant_scale, float clip_max);
 
 template <typename T>
-__global__ void ker_arrange_decself_qkv_int32I(const int32_t *ori_qkv,
-                                               const T *qkv_bias, T *new_q,
-                                               T *new_k, T *new_v, int head_num,
-                                               int dim_per_head, int max_step,
-                                               int step_id,
-                                               float scale_div_clip_max) {
+__global__ void ker_arrange_decself_qkv_int32I(
+    const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
+    int head_num, int dim_per_head, int max_step, int step_id,
+    float scale_div_clip_max, bool input_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
-    T val =
-        float(
-            ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i]) /
-            scale_div_clip_max +
-        __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
+    int qkv_index;
+    if (input_col32) {
+      int row_id = blockIdx.x;
+      int col_id = blockIdx.y * hidden_size + i;
+      qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                       gridDim.y * hidden_size);
+    } else {
+      qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i;
+    }
+    T val = float(ori_qkv[qkv_index]) / scale_div_clip_max +
+            __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
         blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
@@ -799,15 +803,24 @@ template <>
 __global__ void ker_arrange_decself_qkv_int32I<__half>(
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, float scale_div_clip_max) {
+    int step_id, float scale_div_clip_max, bool input_col32) {
   int half_hidden_size = dim_per_head * head_num;
   const int2 *p_qkv = (const int2 *)ori_qkv;
   const half2 *p_bias = (const half2 *)qkv_bias;
   int2 v_ori_qkv;
   half2 ori_qkv_h2;
   for (std::size_t i = threadIdx.x; i < half_hidden_size; i += blockDim.x) {
-    v_ori_qkv =
-        p_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i];
+    int qkv_index;
+    if (input_col32) {
+      int row_id = blockIdx.x;
+      int col_id = (blockIdx.y * half_hidden_size + i) * 2;
+      qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                       gridDim.y * half_hidden_size * 2) >>
+                  1;
+    } else {
+      qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i;
+    }
+    v_ori_qkv = p_qkv[qkv_index];
     ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) / scale_div_clip_max);
     ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) / scale_div_clip_max);
     half2 val =
@@ -838,11 +851,12 @@ void ker_arrange_decself_qkv_int32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max) {
+    int max_thread_per_block, float quant_scale, float clip_max,
+    bool input_col32) {
   ker_arrange_decself_qkv_int32I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
-          max_step, step_id, quant_scale / clip_max);
+          max_step, step_id, quant_scale / clip_max, input_col32);
 }
 
 template <>
@@ -850,24 +864,27 @@ void ker_arrange_decself_qkv_int32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, int max_thread_per_block, float quant_scale, float clip_max) {
+    int step_id, int max_thread_per_block, float quant_scale, float clip_max,
+    bool input_col32) {
   ker_arrange_decself_qkv_int32I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-          max_step, step_id, quant_scale / clip_max);
+          max_step, step_id, quant_scale / clip_max, input_col32);
 }
 
 template void ker_arrange_decself_qkv_int32I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float quant_scale, float clip_max,
+    bool input_col32);
 
 template void ker_arrange_decself_qkv_int32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, int max_thread_per_block, float quant_scale, float clip_max);
+    int step_id, int max_thread_per_block, float quant_scale, float clip_max,
+    bool input_col32);
 
 template <typename T>
 __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,

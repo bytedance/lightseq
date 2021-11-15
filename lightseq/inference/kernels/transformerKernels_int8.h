@@ -59,7 +59,8 @@ void ker_arrange_decself_qkv_int32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float quant_scale, float clip_max,
+    bool input_col32);
 
 template <typename T>
 void ker_arrange_decself_qkv_int8I_launcher(

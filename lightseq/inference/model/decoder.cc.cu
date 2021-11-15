@@ -554,27 +554,32 @@ void Decoder<OpType_>::self_attention() {
   //     cublasLt_handle, cudaStream_t stream,
   //     // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
   //     bool use_ORDER_COL32_2R_4R4
-  cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
-                             _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0, 1,
-                             _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6],
-                             _cublas_lt_handle, _stream, false);
+  // cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
+  //                            _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
+  //                            1, _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id
+  //                            * 6], _cublas_lt_handle, _stream, false);
+
+  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
+                      _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
+                      _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6],
+                      _cublas_lt_handle, _stream, false);
 
   // get q, k, v by split and reshape qkv
-  // ker_arrange_decself_qkv_int32I_launcher<_DataType>(
-  //     _step_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+  ker_arrange_decself_qkv_int32I_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+      _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
+      _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
+      _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
+      _max_thread_per_block, _quant_scale * _quant_scale,
+      _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6], true);
+
+  // ker_arrange_decself_qkv_int8I_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
   //     _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
   //     _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
   //     _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
   //     _max_thread_per_block, _quant_scale * _quant_scale,
   //     _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6]);
-
-  ker_arrange_decself_qkv_int8I_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
-      _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
-      _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
-      _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
-      _max_thread_per_block, _quant_scale * _quant_scale,
-      _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6]);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
