@@ -121,8 +121,10 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
 
   if (source == "src")
     _src_scaled_emb_clip_max = layer.scaled_emb_clip_max();
-  else
+  else {
     _trg_scaled_emb_clip_max = layer.scaled_emb_clip_max();
+    _output_ln_clip_max = layer.output_ln_clip_max();
+  }
 #else
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";

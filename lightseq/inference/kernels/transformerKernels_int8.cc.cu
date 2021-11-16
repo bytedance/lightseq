@@ -154,6 +154,132 @@ void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
 }
 
 template <typename T>
+__global__ void ker_norm_layer_int8O(T *matrix, int8_t *output, const T *scale,
+                                     const T *bias, int hidden_size,
+                                     float scale_div_clip_max, float clip_max) {
+  uint block_start = blockIdx.x * hidden_size;
+  uint start = block_start + threadIdx.x;
+  uint end = block_start + hidden_size;
+  float val = 0.0;
+  for (uint i = start; i < end; i += blockDim.x) {
+    val += matrix[i];
+  }
+
+  // step 0. compute mean
+  __shared__ float s_mean;
+  float reduce_res = blockReduceSum<float>(val);
+  if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
+  __syncthreads();
+
+  // step 1. compute variance
+  val = 0.0;
+  for (uint i = start; i < end; i += blockDim.x) {
+    float tmp = matrix[i] - s_mean;
+    val += tmp * tmp;
+  }
+  __shared__ float s_var;
+  reduce_res = blockReduceSum(val);
+  if (threadIdx.x == 0)
+    s_var = rsqrtf(reduce_res / float(hidden_size) + epsilon);
+  __syncthreads();
+
+  float output_f;
+
+  // step 2. layer norm
+  for (uint i = start; i < end; i += blockDim.x) {
+    val = matrix[i] - s_mean;
+    output_f = val * s_var * __ldg(&scale[i - block_start]) +
+               __ldg(&bias[i - block_start]);
+    matrix[i] = float2int8(output_f, scale_div_clip_max, clip_max);
+  }
+}
+
+template <>
+__global__ void ker_norm_layer_int8O<__half>(
+    __half *matrix, int8_t *output, const __half *scale, const __half *bias,
+    int half_hidden_size, float scale_div_clip_max, float clip_max) {
+  uint block_start = blockIdx.x * half_hidden_size;
+  uint start = block_start + threadIdx.x;
+  uint end = blockIdx.x * half_hidden_size + half_hidden_size;
+  half2 *pmatrix = (half2 *)matrix;
+  char2 *poutput = (char2 *)output;
+  const half2 *pscale = (const half2 *)scale;
+  const half2 *pbias = (const half2 *)bias;
+  float mean_dim = float(half_hidden_size) * 2.f;
+
+  float val = 0.0;
+  // step 0. compute mean
+  for (uint i = start; i < end; i += blockDim.x) {
+    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
+    val += local_f2.x + local_f2.y;
+  }
+  __shared__ float s_mean;
+  float reduce_res = blockReduceSum<float>(val);
+  if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
+  __syncthreads();
+
+  // step 1. compute variance
+  val = 0.0;
+  for (uint i = start; i < end; i += blockDim.x) {
+    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
+    float tmpx = local_f2.x - s_mean;
+    float tmpy = local_f2.y - s_mean;
+    val += tmpx * tmpx + tmpy * tmpy;
+  }
+  __shared__ float s_var;
+  reduce_res = blockReduceSum(val);
+  if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
+  __syncthreads();
+
+  char2 output_c2;
+
+  // step 2. layer norm
+  for (uint i = start; i < end; i += blockDim.x) {
+    float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
+    float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
+    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
+    local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
+    local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
+    output_c2.x = float2int8(local_f2.x, scale_div_clip_max, clip_max);
+    output_c2.y = float2int8(local_f2.y, scale_div_clip_max, clip_max);
+    poutput[i] = output_c2;
+  }
+}
+
+template <typename T>
+void ker_norm_layer_int8O_launcher(int token_num, int hidden_size,
+                                   cudaStream_t stream, T *matrix,
+                                   int8_t *output, const T *scale,
+                                   const T *bias, int max_thread_per_block,
+                                   float quant_scale, float clip_max) {
+  ker_norm_layer_int8O<T><<<token_num, max_thread_per_block, 0, stream>>>(
+      matrix, output, scale, bias, hidden_size, quant_scale / clip_max,
+      clip_max);
+}
+
+template <>
+void ker_norm_layer_int8O_launcher<__half>(int token_num, int hidden_size,
+                                           cudaStream_t stream, __half *matrix,
+                                           int8_t *output, const __half *scale,
+                                           const __half *bias,
+                                           int max_thread_per_block,
+                                           float quant_scale, float clip_max) {
+  ker_norm_layer_int8O<__half><<<token_num, max_thread_per_block, 0, stream>>>(
+      matrix, output, scale, bias, hidden_size / 2, quant_scale / clip_max,
+      clip_max);
+}
+
+template void ker_norm_layer_int8O_launcher<float>(
+    int token_num, int hidden_size, cudaStream_t stream, float *matrix,
+    int8_t *output, const float *scale, const float *bias,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
+template void ker_norm_layer_int8O_launcher<__half>(
+    int token_num, int hidden_size, cudaStream_t stream, __half *matrix,
+    int8_t *output, const __half *scale, const __half *bias,
+    int max_thread_per_block, float quant_scale, float clip_max);
+
+template <typename T>
 __global__ void ker_norm_layer_resual_int8O(
     T *input, int8_t *output, const T *scale, const T *bias,
     const T *residual_bias, const int hidden_size, float scale_div_clip_max,

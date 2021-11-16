@@ -114,6 +114,7 @@ message EmbeddingLayer {
 
   float scaled_emb_clip_max = 9;
   repeated float encode_output_project_kernel_kv_clip_max = 10;
+  float output_ln_clip_max = 11;
 }
 
 message ModelConf {

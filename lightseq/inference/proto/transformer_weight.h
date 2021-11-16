@@ -54,6 +54,7 @@ class TransformerWeight {
   std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
   float _src_scaled_emb_clip_max;
   float _trg_scaled_emb_clip_max;
+  float _output_ln_clip_max;
   std::vector<float> _encode_output_project_kernel_kv_clip_max;
   std::vector<float> _enc_clip_max;  // size: 8 * enc_layer_num
   std::vector<float> _dec_clip_max;  // size: 12 * dec_layer_num
@@ -103,6 +104,8 @@ class TransformerWeight {
   float get_src_scaled_emb_clip_max() const { return _src_scaled_emb_clip_max; }
 
   float get_trg_scaled_emb_clip_max() const { return _trg_scaled_emb_clip_max; }
+
+  float get_output_ln_clip_max() const { return _output_ln_clip_max; }
 
   std::vector<float> get_enc_clip_max() const { return _enc_clip_max; }
 
