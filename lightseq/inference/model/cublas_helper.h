@@ -1,3 +1,5 @@
+#pragma once
+
 namespace lightseq {
 namespace cuda {
 
@@ -420,15 +422,15 @@ void cublasLtMM_withAlgo_int8IO(
 #endif
 
   float beta = 0.0f;
-  cublasLtMatmul(cublasLt_handle, matmulDesc, &alpha, ATransform,
-                 AtransformDesc, kernel, BtransformDesc, &beta, res,
-                 CtransformDesc, res, CtransformDesc,
-                 (findAlgo == 1 ? (&algo) : NULL), NULL, 0, stream);
+  CHECK_GPU_ERROR(cublasLtMatmul(
+      cublasLt_handle, matmulDesc, &alpha, ATransform, AtransformDesc, kernel,
+      BtransformDesc, &beta, res, CtransformDesc, res, CtransformDesc,
+      (findAlgo == 1 ? (&algo) : NULL), NULL, 0, stream));
 
-  cublasLtMatmulDescDestroy(matmulDesc);
-  cublasLtMatrixLayoutDestroy(AtransformDesc);
-  cublasLtMatrixLayoutDestroy(BtransformDesc);
-  cublasLtMatrixLayoutDestroy(CtransformDesc);
+  CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(matmulDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(AtransformDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(BtransformDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
 }
 
 int roundoff(int v, int d) { return (v + d - 1) / d * d; }
@@ -470,5 +472,12 @@ void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(output_desc));
   CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transform_desc));
 }
+
+// void quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 2],
+//                             _int8_p_d_dec_wei[_layer_id * 6],
+//                             _tw._hidden_size, _tw._hidden_size * 3,
+//                             _quant_scale, _dec_clip_max[_layer_id * 12],
+//                             _stream, _cublas_lt_handle);
+
 }  // namespace cuda
 }  // namespace lightseq

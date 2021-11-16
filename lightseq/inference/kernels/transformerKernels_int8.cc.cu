@@ -194,9 +194,9 @@ __global__ void ker_norm_layer_resual_int8O(
     int8_t res = float2int8(output_f, scale_div_clip_max, clip_max);
     if (output_col32) {
       int row_id = blockIdx.x;
-      int col_id = i - start;
+      int col_id = i - block_start;
       int col32_index =
-          row_major2flat_col32(row_id, col_id, blockDim.x, hidden_size);
+          row_major2flat_col32(row_id, col_id, gridDim.x, hidden_size);
       output[col32_index] = res;
     } else {
       output[i] = res;
@@ -263,10 +263,11 @@ __global__ void ker_norm_layer_resual_int8O<__half>(
 
     if (output_col32) {
       int row_id = blockIdx.x;
-      int col_id = (i - start) * 2;
-      int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
-                                             half_hidden_size * 2);
-      poutput[col32_index >> 1] = output_c2;
+      int col_id = (i - block_start) * 2;
+      int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                             half_hidden_size * 2) >>
+                        1;
+      poutput[col32_index] = output_c2;
     } else {
       poutput[i] = output_c2;
     }
@@ -898,8 +899,8 @@ __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
     // blockdim is equal to hidden_size
     int row_id = blockIdx.x;
     int col_id = blockIdx.y * hidden_size + i;
-    int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
-                                           blockDim.y * hidden_size);
+    int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                           gridDim.y * hidden_size);
     T val = float(ori_qkv[col32_index]) / scale_div_clip_max +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
@@ -936,8 +937,8 @@ __global__ void ker_arrange_decself_qkv_int8I<__half>(
   for (std::size_t i = threadIdx.x; i < half_hidden_size; i += blockDim.x) {
     int row_id = blockIdx.x;
     int col_id = (blockIdx.y * half_hidden_size + i) * 2;
-    int col32_index = row_major2flat_col32(row_id, col_id, blockDim.x,
-                                           blockDim.y * half_hidden_size) >>
+    int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                           gridDim.y * half_hidden_size) >>
                       1;
     v_ori_qkv = p_qkv[col32_index];
     ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) / scale_div_clip_max);
