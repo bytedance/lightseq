@@ -11,11 +11,12 @@ Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
 namespace cuda {
-__forceinline__ __host__ __device__ int8_t float2int8(float x,
-                                                      float scale_div_clip_max,
-                                                      float clip_max) {
-  x = x > clip_max ? clip_max : (x < -clip_max ? -clip_max : x);
-  return int8_t(x * scale_div_clip_max);
+__forceinline__ __device__ int8_t float2int8(float x, float scale_div_clip_max,
+                                             float clip_max) {
+  float i8_f = x * scale_div_clip_max;
+  int32_t i8 = __float2int_rn(i8_f);
+  i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
+  return int8_t(i8);
 }
 
 __forceinline__ __host__ __device__ int8_t posfloat2int8(float x, float scale,
