@@ -1,5 +1,11 @@
 #pragma once
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cublasLt.h>
+
+#include "transformerKernels_int8.h"
+
 namespace lightseq {
 namespace cuda {
 
@@ -473,11 +479,23 @@ void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
   CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transform_desc));
 }
 
-// void quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 2],
-//                             _int8_p_d_dec_wei[_layer_id * 6],
-//                             _tw._hidden_size, _tw._hidden_size * 3,
-//                             _quant_scale, _dec_clip_max[_layer_id * 12],
-//                             _stream, _cublas_lt_handle);
+template <typename T>
+void quantize_weight_col32t(const T* origin_weight, int8_t* quantized_weight,
+                            int rows, int cols, int quant_range, float clip_max,
+                            cudaStream_t stream, cublasLtHandle_t handle) {
+  int8_t* temp_weight;
+  CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
+
+  launch_quantize_tensor(origin_weight, temp_weight, rows * cols, quant_range,
+                         clip_max, stream);
+  CHECK_GPU_ERROR(cudaDeviceSynchronize());
+  CHECK_GPU_ERROR(cudaGetLastError());
+
+  transform_weight_row_major2col32t(temp_weight, quantized_weight, rows, cols,
+                                    handle, stream);
+
+  CHECK_GPU_ERROR(cudaFree(temp_weight));
+}
 
 }  // namespace cuda
 }  // namespace lightseq

@@ -77,13 +77,11 @@ void ker_arrange_decself_qkv_int8I_launcher(
     int max_thread_per_block, float quant_scale, float clip_max);
 
 template <typename T>
-void ker_arrange_encdec_q_int32I_launcher(int step_token_num, int hidden_size,
-                                          cudaStream_t stream,
-                                          const int32_t *ori_q, const T *q_bias,
-                                          T *new_q, int beam_size,
-                                          int dim_per_head, int head_num,
-                                          int max_thread_per_block,
-                                          float quant_scale, float clip_max);
+void ker_arrange_encdec_q_int32I_launcher(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_q, const T *q_bias, T *new_q, int beam_size,
+    int dim_per_head, int head_num, int max_thread_per_block, float quant_scale,
+    float clip_max, bool input_col32);
 
 }  // namespace cuda
 }  // namespace lightseq

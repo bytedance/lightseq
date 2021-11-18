@@ -217,70 +217,66 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
 #ifdef INT8_MODE
   int max_batch_dim = _max_batch_size * _tw._beam_size *
                       std::max(_tw._inner_size, _tw._hidden_size * 3);
-  lightseq::cuda::CHECK_GPU_ERROR(
+  CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_in_buf, max_batch_dim * sizeof(int8_t)));
-  lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
+  CHECK_GPU_ERROR(cudaMalloc(
       &_int32_ffn_out_buf,
       std::max(max_batch_dim,
                _tw._trg_vocab_size * _tw._beam_size * _max_batch_size) *
           sizeof(int32_t)));
-  lightseq::cuda::CHECK_GPU_ERROR(
+  CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_out_buf, max_batch_dim * sizeof(int8_t)));
-  lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMalloc((int8_t**)&_int8_p_d_trg_emb_wei,
-                 (size_t)(_tw._trg_vocab_size * _tw._hidden_size)));
+  CHECK_GPU_ERROR(cudaMalloc((int8_t**)&_int8_p_d_trg_emb_wei,
+                             (size_t)(_tw._trg_vocab_size * _tw._hidden_size)));
   launch_quantize_tensor(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei,
                          _tw._trg_vocab_size * _tw._hidden_size, _quant_scale,
                          _trg_scaled_emb_clip_max, _stream);
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_dec_layer;
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6],
                    _tw._hidden_size * 3 * _tw._hidden_size * sizeof(int8_t)));
-    int8_t* temp1;
-    lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(
-        &temp1, _tw._hidden_size * 3 * _tw._hidden_size * sizeof(int8_t)));
-    lightseq::cuda::CHECK_GPU_ERROR(
+
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 1],
                    _tw._hidden_size * _tw._hidden_size * sizeof(int8_t)));
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 2],
                    _tw._hidden_size * _tw._hidden_size * sizeof(int8_t)));
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 3],
                    _tw._hidden_size * _tw._hidden_size * sizeof(int8_t)));
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 4],
                    _tw._hidden_size * _tw._inner_size * sizeof(int8_t)));
-    lightseq::cuda::CHECK_GPU_ERROR(
+    CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 5],
                    _tw._inner_size * _tw._hidden_size * sizeof(int8_t)));
-    launch_quantize_tensor(
-        _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
-        _tw._hidden_size * 3 * _tw._hidden_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12], _stream);
 
-    transform_weight_row_major2col32t(_int8_p_d_dec_wei[_layer_id * 6], temp1,
-                                      _tw._hidden_size, _tw._hidden_size * 3,
-                                      _cublas_lt_handle, _stream);
+    quantize_weight_col32t(
+        _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
+        _tw._hidden_size, _tw._hidden_size * 3, _quant_scale,
+        _dec_clip_max[_layer_id * 12], _stream, _cublas_lt_handle);
 
     // quantize_weight_col32t(
-    //     _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
-    //     _tw._hidden_size, _tw._hidden_size * 3, _quant_scale,
-    //     _dec_clip_max[_layer_id * 12], _stream, _cublas_lt_handle);
+    //     _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 +
+    //     1], _tw._hidden_size, _tw._hidden_size, _quant_scale,
+    //     _dec_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
 
-    int8_t* temp = _int8_p_d_dec_wei[_layer_id * 6];
-    _int8_p_d_dec_wei[_layer_id * 6] = temp1;
-    CHECK_GPU_ERROR(cudaFree(temp));
+    quantize_weight_col32t(
+        _p_d_dec_wei[_weight_offset + 8], _int8_p_d_dec_wei[_layer_id * 6 + 2],
+        _tw._hidden_size, _tw._hidden_size, _quant_scale,
+        _dec_clip_max[_layer_id * 12 + 2], _stream, _cublas_lt_handle);
+
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 4],
                            _int8_p_d_dec_wei[_layer_id * 6 + 1],
                            _tw._hidden_size * _tw._hidden_size, _quant_scale,
                            _dec_clip_max[_layer_id * 12 + 1], _stream);
-    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 8],
-                           _int8_p_d_dec_wei[_layer_id * 6 + 2],
-                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
-                           _dec_clip_max[_layer_id * 12 + 2], _stream);
+    // launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 8],
+    //                        _int8_p_d_dec_wei[_layer_id * 6 + 2],
+    //                        _tw._hidden_size * _tw._hidden_size, _quant_scale,
+    //                        _dec_clip_max[_layer_id * 12 + 2], _stream);
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 10],
                            _int8_p_d_dec_wei[_layer_id * 6 + 3],
                            _tw._hidden_size * _tw._hidden_size, _quant_scale,
@@ -607,13 +603,6 @@ void Decoder<OpType_>::self_attention() {
       _max_thread_per_block, _quant_scale * _quant_scale,
       _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6], true);
 
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
-  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
-            "rearanged q(tail): ", 5);
-  CHECK_GPU_ERROR(cudaGetLastError());
-#endif
-
   // ker_arrange_decself_qkv_int8I_launcher<_DataType>(
   //     _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
   //     _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
@@ -621,6 +610,13 @@ void Decoder<OpType_>::self_attention() {
   //     _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
   //     _max_thread_per_block, _quant_scale * _quant_scale,
   //     _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6]);
+
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
+  print_vec(_p_d_query_buf1 + _step_token_num * _tw._hidden_size - 5,
+            "rearanged q(tail): ", 5);
+  CHECK_GPU_ERROR(cudaGetLastError());
+#endif
 
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
@@ -735,6 +731,12 @@ void Decoder<OpType_>::self_attention() {
       _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size, CUDA_R_32I,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
+  // cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
+  // _tw._hidden_size,
+  //                     _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
+  //                     _int8_p_d_dec_wei[_layer_id * 6 + 1],
+  //                     _cublas_lt_handle, _stream, false);
+
 #ifdef DEBUG_RESULT
   print_vec(_int32_ffn_out_buf, "self attn ffn out w/o bias(head): ", 3);
   print_vec(_int32_ffn_out_buf + _step_token_num * _tw._hidden_size - 3,
@@ -775,7 +777,7 @@ void Decoder<OpType_>::encdec_attention() {
       _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
       _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 8],
-      _tw._is_post_ln);
+      _tw._is_post_ln, true);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "encdec attn ln(head): ", 5);
@@ -784,12 +786,17 @@ void Decoder<OpType_>::encdec_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  CHECK_GPU_ERROR(cublasGemmEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _step_token_num,
-      _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 2], CUDA_R_8I,
-      _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size, &_izero,
-      _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size, CUDA_R_32I,
-      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  // CHECK_GPU_ERROR(cublasGemmEx(
+  //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _step_token_num,
+  //     _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 2],
+  //     CUDA_R_8I, _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I,
+  //     _tw._hidden_size, &_izero, _int32_ffn_out_buf, CUDA_R_32I,
+  //     _tw._hidden_size, CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+                      _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
+                      _int8_p_d_dec_wei[_layer_id * 6 + 2], _cublas_lt_handle,
+                      _stream, false);
 
 #ifdef DEBUG_RESULT
   print_vec(_int32_ffn_out_buf, "encdec q(head): ", 5);
@@ -802,7 +809,8 @@ void Decoder<OpType_>::encdec_attention() {
       _p_d_dec_wei[_weight_offset + 9], _p_d_query_buf1, _tw._beam_size,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
       _quant_scale * _quant_scale,
-      _dec_clip_max[_layer_id * 12 + 2] * _dec_clip_max[_layer_id * 12 + 8]);
+      _dec_clip_max[_layer_id * 12 + 2] * _dec_clip_max[_layer_id * 12 + 8],
+      true);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
