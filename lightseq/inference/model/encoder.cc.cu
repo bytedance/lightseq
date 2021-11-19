@@ -94,20 +94,20 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
         cudaMalloc((int8_t **)&_int8_p_d_enc_wei[_layer_id * 4 + 3],
                    (size_t)(_tw._inner_size * _tw._hidden_size)));
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 2],
-                           _int8_p_d_enc_wei[_layer_id * 4],
-                           _tw._hidden_size * 3 * _tw._hidden_size,
-                           _quant_scale, _enc_clip_max[_layer_id * 8], _stream);
+                           _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
+                           3 * _tw._hidden_size, _quant_scale,
+                           _enc_clip_max[_layer_id * 8], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 4],
                            _int8_p_d_enc_wei[_layer_id * 4 + 1],
-                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
+                           _tw._hidden_size, _tw._hidden_size, _quant_scale,
                            _enc_clip_max[_layer_id * 8 + 1], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 8],
                            _int8_p_d_enc_wei[_layer_id * 4 + 2],
-                           _tw._hidden_size * _tw._inner_size, _quant_scale,
+                           _tw._hidden_size, _tw._inner_size, _quant_scale,
                            _enc_clip_max[_layer_id * 8 + 2], _stream);
     launch_quantize_tensor(_p_d_enc_wei[_weight_offset + 10],
                            _int8_p_d_enc_wei[_layer_id * 4 + 3],
-                           _tw._inner_size * _tw._hidden_size, _quant_scale,
+                           _tw._inner_size, _tw._hidden_size, _quant_scale,
                            _enc_clip_max[_layer_id * 8 + 3], _stream);
   }
 #endif

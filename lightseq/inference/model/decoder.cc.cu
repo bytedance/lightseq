@@ -229,7 +229,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   CHECK_GPU_ERROR(cudaMalloc((int8_t**)&_int8_p_d_trg_emb_wei,
                              (size_t)(_tw._trg_vocab_size * _tw._hidden_size)));
   launch_quantize_tensor(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei,
-                         _tw._trg_vocab_size * _tw._hidden_size, _quant_scale,
+                         _tw._trg_vocab_size, _tw._hidden_size, _quant_scale,
                          _trg_scaled_emb_clip_max, _stream);
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
@@ -237,7 +237,6 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
     CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6],
                    _tw._hidden_size * 3 * _tw._hidden_size * sizeof(int8_t)));
-
     CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 1],
                    _tw._hidden_size * _tw._hidden_size * sizeof(int8_t)));
@@ -259,35 +258,35 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         _tw._hidden_size, _tw._hidden_size * 3, _quant_scale,
         _dec_clip_max[_layer_id * 12], _stream, _cublas_lt_handle);
 
-    // quantize_weight_col32t(
-    //     _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 +
-    //     1], _tw._hidden_size, _tw._hidden_size, _quant_scale,
-    //     _dec_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(
+        _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 + 1],
+        _tw._hidden_size, _tw._hidden_size, _quant_scale,
+        _dec_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
 
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 8], _int8_p_d_dec_wei[_layer_id * 6 + 2],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
         _dec_clip_max[_layer_id * 12 + 2], _stream, _cublas_lt_handle);
 
-    launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 4],
-                           _int8_p_d_dec_wei[_layer_id * 6 + 1],
-                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
-                           _dec_clip_max[_layer_id * 12 + 1], _stream);
+    // launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 4],
+    //                        _int8_p_d_dec_wei[_layer_id * 6 + 1],
+    //                        _tw._hidden_size * _tw._hidden_size, _quant_scale,
+    //                        _dec_clip_max[_layer_id * 12 + 1], _stream);
     // launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 8],
     //                        _int8_p_d_dec_wei[_layer_id * 6 + 2],
     //                        _tw._hidden_size * _tw._hidden_size, _quant_scale,
     //                        _dec_clip_max[_layer_id * 12 + 2], _stream);
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 10],
                            _int8_p_d_dec_wei[_layer_id * 6 + 3],
-                           _tw._hidden_size * _tw._hidden_size, _quant_scale,
+                           _tw._hidden_size, _tw._hidden_size, _quant_scale,
                            _dec_clip_max[_layer_id * 12 + 3], _stream);
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 14],
                            _int8_p_d_dec_wei[_layer_id * 6 + 4],
-                           _tw._hidden_size * _tw._inner_size, _quant_scale,
+                           _tw._hidden_size, _tw._inner_size, _quant_scale,
                            _dec_clip_max[_layer_id * 12 + 4], _stream);
     launch_quantize_tensor(_p_d_dec_wei[_weight_offset + 16],
                            _int8_p_d_dec_wei[_layer_id * 6 + 5],
-                           _tw._inner_size * _tw._hidden_size, _quant_scale,
+                           _tw._inner_size, _tw._hidden_size, _quant_scale,
                            _dec_clip_max[_layer_id * 12 + 5], _stream);
   }
 #endif
@@ -467,7 +466,7 @@ bool Decoder<OpType_>::run_step() {
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
       _tw._hidden_size, &_logit_scaler, _p_d_trg_emb_wei[0], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
-      //&_type_zero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
+      // &_type_zero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, CUDA_R_32F,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 #endif
@@ -713,10 +712,9 @@ void Decoder<OpType_>::self_attention() {
 #endif
 
 #ifdef INT8_MODE
-  launch_quantize_tensor(_p_d_query_buf1, _int8_ffn_in_buf,
-                         _tw._dim_per_head * _step_token_num * _tw._head_num,
-                         _quant_scale, _dec_clip_max[_layer_id * 12 + 7],
-                         _stream);
+  launch_quantize_tensor(_p_d_query_buf1, _int8_ffn_in_buf, _step_token_num,
+                         _tw._hidden_size, _quant_scale,
+                         _dec_clip_max[_layer_id * 12 + 7], _stream, true);
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "self attn ffn in(head): ", 3);
   print_vec(_int8_ffn_in_buf + _step_token_num * _tw._hidden_size - 3,
@@ -724,18 +722,17 @@ void Decoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  CHECK_GPU_ERROR(cublasGemmEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _step_token_num,
-      _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 1], CUDA_R_8I,
-      _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I, _tw._hidden_size, &_izero,
-      _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size, CUDA_R_32I,
-      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+  // CHECK_GPU_ERROR(cublasGemmEx(
+  //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _step_token_num,
+  //     _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 1],
+  //     CUDA_R_8I, _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I,
+  //     _tw._hidden_size, &_izero, _int32_ffn_out_buf, CUDA_R_32I,
+  //     _tw._hidden_size, CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-  // cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
-  // _tw._hidden_size,
-  //                     _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
-  //                     _int8_p_d_dec_wei[_layer_id * 6 + 1],
-  //                     _cublas_lt_handle, _stream, false);
+  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+                      _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
+                      _int8_p_d_dec_wei[_layer_id * 6 + 1], _cublas_lt_handle,
+                      _stream, false);
 
 #ifdef DEBUG_RESULT
   print_vec(_int32_ffn_out_buf, "self attn ffn out w/o bias(head): ", 3);
@@ -743,11 +740,20 @@ void Decoder<OpType_>::self_attention() {
             "self attn ffn out w/o bias(tail): ", 3);
 #endif
 
-  ker_residual_int32I_launcher<_DataType>(
-      _int32_ffn_out_buf, _p_d_cur_step_query,
-      _tw._hidden_size * _step_token_num, _quant_scale * _quant_scale,
-      _dec_clip_max[_layer_id * 12 + 1] * _dec_clip_max[_layer_id * 12 + 7],
-      _stream);
+  // ker_residual_int32I_launcher<_DataType>(
+  //     _int32_ffn_out_buf, _p_d_cur_step_query,
+  //     _tw._hidden_size * _step_token_num, _quant_scale * _quant_scale,
+  //     _dec_clip_max[_layer_id * 12 + 1] * _dec_clip_max[_layer_id * 12 + 7],
+  //     _stream);
+
+  ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
+      _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 6],
+      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
+      _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
+      _dec_clip_max[_layer_id * 12 + 1] * _dec_clip_max[_layer_id * 12 + 7] /
+          (_quant_scale * _quant_scale),
+      _quant_scale, _dec_clip_max[_layer_id * 12 + 8], _max_thread_per_block,
+      _stream, _tw._is_post_ln, true);
 
 #else
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
@@ -757,12 +763,13 @@ void Decoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_type_one,
       _p_d_cur_step_query, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-#endif
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_cur_step_query, "self attn out(head): ", 3);
   print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 3,
             "self attn out(tail): ", 3);
+#endif
+
 #endif
 }
 
@@ -772,12 +779,12 @@ Encode-Decoder attention
 template <OperationType OpType_>
 void Decoder<OpType_>::encdec_attention() {
 #ifdef INT8_MODE
-  ker_norm_layer_resual_int8O_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset + 6],
-      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
-      _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 8],
-      _tw._is_post_ln, true);
+  // ker_norm_layer_resual_int8O_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset + 6],
+  //     _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
+  //     _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 8],
+  //     _tw._is_post_ln, true);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "encdec attn ln(head): ", 5);
@@ -882,6 +889,7 @@ void Decoder<OpType_>::encdec_attention() {
             "encdec attn ffn in(tail): ", 3);
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
+
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _step_token_num,
       _tw._hidden_size, &_ione, _int8_p_d_dec_wei[_layer_id * 6 + 3], CUDA_R_8I,
@@ -900,6 +908,16 @@ void Decoder<OpType_>::encdec_attention() {
       _tw._hidden_size * _step_token_num, _quant_scale * _quant_scale,
       _dec_clip_max[_layer_id * 12 + 3] * _dec_clip_max[_layer_id * 12 + 9],
       _stream);
+
+  // ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
+  //     _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 12],
+  //     _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
+  //     _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num,
+  //     _tw._hidden_size, _dec_clip_max[_layer_id * 12 + 3] *
+  //     _dec_clip_max[_layer_id * 12 + 9] /
+  //         (_quant_scale * _quant_scale),
+  //     _quant_scale / _dec_clip_max[_layer_id * 12 + 10],
+  //     _max_thread_per_block, stream, _tw._is_post_ln, true);
 
 #else
   ker_arrange_atten_output_launcher<_DataType>(
@@ -976,6 +994,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _int8_ffn_in_buf, CUDA_R_8I, _tw._inner_size, &_izero,
       _int32_ffn_out_buf, CUDA_R_32I, _tw._hidden_size, CUDA_R_32I,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
   ker_residual_int32I_launcher<_DataType>(
       _int32_ffn_out_buf, _p_d_cur_step_query,
       _tw._hidden_size * _step_token_num, _quant_scale * _quant_scale,

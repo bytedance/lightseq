@@ -486,7 +486,7 @@ void quantize_weight_col32t(const T* origin_weight, int8_t* quantized_weight,
   int8_t* temp_weight;
   CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
 
-  launch_quantize_tensor(origin_weight, temp_weight, rows * cols, quant_range,
+  launch_quantize_tensor(origin_weight, temp_weight, rows, cols, quant_range,
                          clip_max, stream);
   CHECK_GPU_ERROR(cudaDeviceSynchronize());
   CHECK_GPU_ERROR(cudaGetLastError());

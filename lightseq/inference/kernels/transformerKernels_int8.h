@@ -5,8 +5,9 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
-void launch_quantize_tensor(const T *input, int8_t *output, int total_count,
-                            float scale, float clip_max, cudaStream_t &stream);
+void launch_quantize_tensor(const T *input, int8_t *output, int batch_tokens,
+                            int hidden_size, float scale, float clip_max,
+                            cudaStream_t &stream, bool out_col32 = false);
 
 template <typename T>
 void launch_dequantize_tensor(const int32_t *input, T *output, int total_count,
@@ -47,6 +48,14 @@ template <typename T>
 void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
                                   float quant_scale, float clip_max,
                                   cudaStream_t stream);
+
+template <typename T>
+void ker_residual_bias_ln_i32I_i8O_launcher(
+    const int32_t *input, const T *scale, const T *bias, const T *residual_bias,
+    int8_t *output, T *residual, int batch_tokens, int hidden_size,
+    float dequant_scale, float quant_range, float clip_max,
+    int max_thread_per_block, cudaStream_t stream, bool is_post_ln = false,
+    bool output_col32 = false);
 
 template <typename T>
 void ker_arrange_encself_qkv_int32I_launcher(
