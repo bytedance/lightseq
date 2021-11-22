@@ -2,6 +2,10 @@
 
 #include "common.h"
 
+#include <cooperative_groups.h>
+
+namespace cg = cooperative_groups;
+
 /**
 @file
 Implemented the cuda kernel function and its launcher
@@ -10,6 +14,70 @@ Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
 namespace cuda {
+
+template <typename T>
+__global__ void scaled_colsum_reduce_kernel(const T* __restrict__ inp,
+                                            T* __restrict__ out, int rows,
+                                            int cols, float scale) {
+  __shared__ float tile[WARP_SIZE][WARP_SIZE];
+
+  cg::thread_block b = cg::this_thread_block();
+  cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
+
+  int idx = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
+  int y_stride = cols * WARP_SIZE;
+  float localSum = 0;
+
+  // Loop across matrix row
+  // TODO: optimize to log complexity
+  if (idx < cols) {
+    int offset = flat_2dim(threadIdx.y, idx, cols);
+    for (int r = threadIdx.y; r < rows; r += WARP_SIZE) {
+      localSum += (float)inp[offset];
+      offset += y_stride;
+    }
+  }
+
+  // The sum of a row in tile is equal to the sum of a col in original matrix
+  tile[threadIdx.x][threadIdx.y] = localSum;
+
+  __syncthreads();
+
+  // Sum the shared buffer.
+  // The change of threadIdx.x is continuous
+  float sum = tile[threadIdx.y][threadIdx.x];
+
+  __syncthreads();
+
+  // Calculate the sum of a row in tile
+  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+
+  if (threadIdx.x == 0) {
+    int pos = flat_2dim(blockIdx.x, threadIdx.y, WARP_SIZE);
+    if (pos < cols) out[pos] = sum * scale;
+  }
+}
+
+// [r, c] -> [c]
+template <>
+void launch_scaled_colsum<float>(const float* inp, float* out, int rows,
+                                 int cols, float scale, cudaStream_t stream) {
+  dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
+  dim3 block_dim(WARP_SIZE, WARP_SIZE);
+
+  scaled_colsum_reduce_kernel<float>
+      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols, scale);
+}
+
+template <>
+void launch_scaled_colsum<__half>(const __half* inp, __half* out, int rows,
+                                  int cols, float scale, cudaStream_t stream) {
+  dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
+  dim3 block_dim(WARP_SIZE, WARP_SIZE);
+
+  scaled_colsum_reduce_kernel<__half>
+      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols, scale);
+}
 
 /**
 @brief: select_beam_rough_topk
