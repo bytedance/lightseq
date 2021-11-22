@@ -37,17 +37,16 @@ void ker_bias_gelu_int32I_int8O_launcher(int batch_token_num,
                                          float out_clip_max);
 
 template <typename T>
-void ker_bias_relu_int32I_int8O_launcher(int batch_token_num,
-                                         cudaStream_t stream, int32_t *input,
-                                         int8_t *output, const T *bias,
-                                         int feature_dim, float in_scale,
-                                         float in_clip_max, float out_scale,
-                                         float out_clip_max);
+void ker_bias_relu_int32I_int8O_launcher(
+    int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
+    const T *bias, int feature_dim, float in_scale, float in_clip_max,
+    float out_scale, float out_clip_max, bool narrow_clip = false);
 
 template <typename T>
 void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
                                   float quant_scale, float clip_max,
-                                  cudaStream_t stream);
+                                  cudaStream_t stream, T *colsum = nullptr,
+                                  int cols = 0);
 
 template <typename T>
 void ker_residual_bias_ln_i32I_i8O_launcher(
@@ -55,7 +54,7 @@ void ker_residual_bias_ln_i32I_i8O_launcher(
     int8_t *output, T *residual, int batch_tokens, int hidden_size,
     float dequant_scale, float quant_range, float clip_max,
     int max_thread_per_block, cudaStream_t stream, bool is_post_ln = false,
-    bool output_col32 = false);
+    bool output_col32 = false, T *colsum = nullptr);
 
 template <typename T>
 void ker_arrange_encself_qkv_int32I_launcher(

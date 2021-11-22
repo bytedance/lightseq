@@ -232,7 +232,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                          _tw._trg_vocab_size, _tw._hidden_size, _quant_scale,
                          _trg_scaled_emb_clip_max, _stream);
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
-  scaled_ffn2_colsum = std::vector<_DataType*>(_tw._n_dec_layer);
+  _scaled_ffn2_colsum = std::vector<_DataType*>(_tw._n_dec_layer);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_dec_layer;
     CHECK_GPU_ERROR(
@@ -253,7 +253,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
     CHECK_GPU_ERROR(
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 5],
                    _tw._inner_size * _tw._hidden_size * sizeof(int8_t)));
-    CHECK_GPU_ERROR(cudaMalloc(&scaled_ffn2_colsum[_layer_id],
+    CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
                                _tw._hidden_size * sizeof(_DataType)));
 
     quantize_weight_col32t(
@@ -283,7 +283,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                            _dec_clip_max[_layer_id * 12 + 5], _stream);
 
     launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
-                         scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+                         _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
                          _tw._hidden_size,
                          _dec_clip_max[_layer_id * 12 + 11] / 2, _stream);
   }
@@ -936,7 +936,7 @@ void Decoder<OpType_>::ffn_add_norm() {
         _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
         _quant_scale * _quant_scale,
         _dec_clip_max[_layer_id * 12 + 4] * _dec_clip_max[_layer_id * 12 + 10],
-        _quant_scale, _dec_clip_max[_layer_id * 12 + 11]);
+        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true);
   }
 
 #ifdef DEBUG_RESULT
@@ -955,9 +955,9 @@ void Decoder<OpType_>::ffn_add_norm() {
 
   ker_residual_int32I_launcher<_DataType>(
       _int32_ffn_out_buf, _p_d_cur_step_query,
-      _tw._hidden_size * _step_token_num, _quant_scale * _quant_scale,
+      _tw._hidden_size * _step_token_num, 2 * _quant_scale * _quant_scale,
       _dec_clip_max[_layer_id * 12 + 5] * _dec_clip_max[_layer_id * 12 + 11],
-      _stream);
+      _stream, _scaled_ffn2_colsum[_layer_id], _tw._hidden_size);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
