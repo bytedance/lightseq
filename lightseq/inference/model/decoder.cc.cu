@@ -447,7 +447,7 @@ bool Decoder<OpType_>::run_step() {
   decoder_stack();
   /* --- Project hidden states to vocab logits--- */
 #ifdef INT8_MODE
-  // _step_token_num (beam_size * batch_size) must be 4x
+  // _step_token_num (beam_size * batch_size) and _trg_vocab_size must be 4x
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
       _tw._hidden_size, &_ione, _int8_p_d_trg_emb_wei, CUDA_R_8I,
