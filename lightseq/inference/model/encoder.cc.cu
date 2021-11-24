@@ -76,24 +76,21 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
 #ifdef INT8_MODE
   int max_batch_dim = _max_batch_size * _tw._max_step *
                       std::max(_tw._inner_size, _tw._hidden_size * 3);
-  lightseq::cuda::CHECK_GPU_ERROR(cudaMalloc(&_int8_ffn_in_buf, max_batch_dim));
-  lightseq::cuda::CHECK_GPU_ERROR(
+  CHECK_GPU_ERROR(cudaMalloc(&_int8_ffn_in_buf, max_batch_dim));
+  CHECK_GPU_ERROR(
       cudaMalloc(&_int32_ffn_out_buf, max_batch_dim * sizeof(int32_t)));
   _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
+  _scaled_ffn2_colsum = std::vector<_DataType *>(_tw._n_enc_layer);
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
-    lightseq::cuda::CHECK_GPU_ERROR(
-        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4],
-                   _tw._hidden_size * 3 * _tw._hidden_size));
-    lightseq::cuda::CHECK_GPU_ERROR(
-        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 1],
-                   _tw._hidden_size * _tw._hidden_size));
-    lightseq::cuda::CHECK_GPU_ERROR(
-        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 2],
-                   _tw._hidden_size * _tw._inner_size));
-    lightseq::cuda::CHECK_GPU_ERROR(
-        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
-                   _tw._inner_size * _tw._hidden_size));
+    CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4],
+                               _tw._hidden_size * 3 * _tw._hidden_size));
+    CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 1],
+                               _tw._hidden_size * _tw._hidden_size));
+    CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 2],
+                               _tw._hidden_size * _tw._inner_size));
+    CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
+                               _tw._inner_size * _tw._hidden_size));
 
     quantize_weight_col32t(
         _p_d_enc_wei[_weight_offset + 2], _int8_p_d_enc_wei[_layer_id * 4],
@@ -114,6 +111,18 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
         _p_d_enc_wei[_weight_offset + 10], _int8_p_d_enc_wei[_layer_id * 4 + 3],
         _tw._inner_size, _tw._hidden_size, _quant_scale,
         _enc_clip_max[_layer_id * 8 + 3], _stream, _cublas_lt_handle);
+
+    _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // if (_tw._use_gelu) {
+    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // } else {
+    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+    //                              _tw._hidden_size * sizeof(_DataType)));
+    //   launch_scaled_colsum(_p_d_enc_wei[_weight_offset + 10],
+    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+    //                        _tw._hidden_size,
+    //                        _enc_clip_max[_layer_id * 8 + 7] / 2, _stream);
+    // }
   }
 #endif
   return;
@@ -184,6 +193,13 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     self_attention();
     ffn_add_norm();
   }
+
+#ifndef INT8_MODE
+  // last layer norm
+  ker_norm_layer_launcher<_DataType>(
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
+      _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
+#endif
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -331,7 +347,7 @@ void Encoder<OpType_>::ffn_add_norm() {
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
         _quant_scale * _quant_scale,
         _enc_clip_max[_layer_id * 8 + 2] * _enc_clip_max[_layer_id * 8 + 6],
-        _quant_scale, _enc_clip_max[_layer_id * 8 + 7], true);
+        _quant_scale, _enc_clip_max[_layer_id * 8 + 7], true, false);
   }
   /* ---step 2. second ffn layer--- */
   cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
@@ -350,7 +366,7 @@ void Encoder<OpType_>::ffn_add_norm() {
         _batch_token_num, _tw._hidden_size,
         _enc_clip_max[_layer_id * 8 + 3] * _enc_clip_max[_layer_id * 8 + 7] /
             (_quant_scale * _quant_scale),
-        _max_thread_per_block, _stream, true);
+        _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
   } else {
     scale_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
     bias_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 1];
@@ -364,7 +380,7 @@ void Encoder<OpType_>::ffn_add_norm() {
         _enc_clip_max[_layer_id * 8 + 3] * _enc_clip_max[_layer_id * 8 + 7] /
             (_quant_scale * _quant_scale),
         _quant_scale, clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
-        true);
+        true, _scaled_ffn2_colsum[_layer_id]);
   }
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */

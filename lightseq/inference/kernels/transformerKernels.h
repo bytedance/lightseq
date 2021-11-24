@@ -14,6 +14,10 @@ const float min_log_probability = -2000.f;
 const float epsilon = 0.000000000001;
 
 template <typename T>
+void launch_scaled_colsum(const T* inp, T* out, int rows, int cols, float scale,
+                          cudaStream_t stream);
+
+template <typename T>
 void ker_norm_layer_launcher(int token_num, int hidden_size,
                              cudaStream_t stream, T* matrix, const T* scale,
                              const T* bias, int max_thread_per_block);

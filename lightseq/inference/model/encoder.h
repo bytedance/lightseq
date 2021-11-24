@@ -85,6 +85,8 @@ class Encoder {
   const float _quant_scale = 127;
   const float _src_scaled_emb_clip_max;
   const std::vector<float> _enc_clip_max;  // size: 8 * enc_layer_num
+  std::vector<_DataType *> _scaled_ffn2_colsum;
+
 #endif
 
   int _batch_size;

@@ -233,6 +233,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                          _tw._hidden_size, _tw._trg_vocab_size, _quant_scale,
                          _trg_scaled_emb_clip_max, _stream, _cublas_lt_handle);
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
+  _scaled_ffn2_colsum = std::vector<_DataType*>(_tw._n_dec_layer);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_dec_layer;
     CHECK_GPU_ERROR(
@@ -263,7 +264,6 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 + 1],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
         _dec_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
-
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 8], _int8_p_d_dec_wei[_layer_id * 6 + 2],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
@@ -283,6 +283,18 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         _p_d_dec_wei[_weight_offset + 16], _int8_p_d_dec_wei[_layer_id * 6 + 5],
         _tw._inner_size, _tw._hidden_size, _quant_scale,
         _dec_clip_max[_layer_id * 12 + 5], _stream, _cublas_lt_handle);
+
+    _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // if (_tw._use_gelu ) {
+    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // } else {
+    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+    //                            _tw._hidden_size * sizeof(_DataType)));
+    //   launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
+    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+    //                        _tw._hidden_size,
+    //                        _dec_clip_max[_layer_id * 12 + 11] / 2, _stream);
+    // }
   }
 #endif
 
@@ -534,13 +546,8 @@ void Decoder<OpType_>::decoder_stack() {
     ffn_add_norm();
   }
 
+#ifndef INT8_MODE
   // last layer norm
-#ifdef INT8_MODE
-  // ker_norm_layer_int8O_launcher<_DataType>(
-  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-  //     _int8_ffn_in_buf, _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3],
-  //     _max_thread_per_block, _quant_scale, _output_ln_clip_max);
-#else
   ker_norm_layer_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
@@ -570,11 +577,6 @@ void Decoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  // cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
-  //                            _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
-  //                            1, _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id
-  //                            * 6], _cublas_lt_handle, _stream, false);
-
   cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
                       _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
                       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6],
@@ -594,14 +596,6 @@ void Decoder<OpType_>::self_attention() {
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
       _max_thread_per_block, _quant_scale * _quant_scale,
       _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6], true);
-
-  // ker_arrange_decself_qkv_int8I_launcher<_DataType>(
-  //     _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
-  //     _p_d_dec_wei[_weight_offset + 3], _p_d_query_buf1,
-  //     _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
-  //     _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
-  //     _max_thread_per_block, _quant_scale * _quant_scale,
-  //     _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6]);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
@@ -930,7 +924,7 @@ void Decoder<OpType_>::ffn_add_norm() {
         _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
         _quant_scale * _quant_scale,
         _dec_clip_max[_layer_id * 12 + 4] * _dec_clip_max[_layer_id * 12 + 10],
-        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true);
+        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true, false);
   }
 
 #ifdef DEBUG_RESULT
@@ -966,7 +960,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _dec_clip_max[_layer_id * 12 + 5] * _dec_clip_max[_layer_id * 12 + 11] /
           (_quant_scale * _quant_scale),
       _quant_scale, clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
-      true);
+      true, _scaled_ffn2_colsum[_layer_id]);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
