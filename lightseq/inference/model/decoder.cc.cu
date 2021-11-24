@@ -1,5 +1,3 @@
-
-
 #include "decoder.h"
 
 #include "../kernels/transformerKernels.h"
@@ -284,17 +282,16 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         _tw._inner_size, _tw._hidden_size, _quant_scale,
         _dec_clip_max[_layer_id * 12 + 5], _stream, _cublas_lt_handle);
 
-    _scaled_ffn2_colsum[_layer_id] = nullptr;
-    // if (_tw._use_gelu ) {
-    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
-    // } else {
-    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
-    //                            _tw._hidden_size * sizeof(_DataType)));
-    //   launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
-    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-    //                        _tw._hidden_size,
-    //                        _dec_clip_max[_layer_id * 12 + 11] / 2, _stream);
-    // }
+    if (_tw._use_gelu) {
+      _scaled_ffn2_colsum[_layer_id] = nullptr;
+    } else {
+      CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+                                 _tw._hidden_size * sizeof(_DataType)));
+      launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
+                           _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+                           _tw._hidden_size,
+                           _dec_clip_max[_layer_id * 12 + 11] / 2, _stream);
+    }
   }
 #endif
 
@@ -924,7 +921,7 @@ void Decoder<OpType_>::ffn_add_norm() {
         _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
         _quant_scale * _quant_scale,
         _dec_clip_max[_layer_id * 12 + 4] * _dec_clip_max[_layer_id * 12 + 10],
-        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true, false);
+        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true, true);
   }
 
 #ifdef DEBUG_RESULT
@@ -951,14 +948,13 @@ void Decoder<OpType_>::ffn_add_norm() {
     bias_ptr = _p_d_dec_wei[(_layer_id + 1) * _tw._weight_per_dec_layer + 1];
     res_bias_ptr =
         _p_d_dec_wei[(_layer_id + 1) * _tw._weight_per_dec_layer + 5];
-    ;
     clip_max = _dec_clip_max[(_layer_id + 1) * 12 + 6];
   }
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
       _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
       _dec_clip_max[_layer_id * 12 + 5] * _dec_clip_max[_layer_id * 12 + 11] /
-          (_quant_scale * _quant_scale),
+          (2 * _quant_scale * _quant_scale),
       _quant_scale, clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
       true, _scaled_ffn2_colsum[_layer_id]);
 #else
