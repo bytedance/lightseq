@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 find_package(CUDAToolkit)
 
-set(transformer_files decoder.cc.cu encoder.cc.cu)
+set(transformer_files decoder.cc.cu encoder.cc.cu cublas_helper.cc)
 add_library(transformer_model STATIC ${transformer_files})
 target_link_libraries(transformer_model PUBLIC cuda_kernels)
 target_link_libraries(transformer_model PUBLIC transformer_weight)

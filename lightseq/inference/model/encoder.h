@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
+#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -47,6 +48,8 @@ class Encoder {
   const TransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
+  cublasLtHandle_t _cublas_lt_handle;
+
   const _DataType _fone;
   const _DataType _fzero;
 #ifdef INT8_MODE
