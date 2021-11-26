@@ -121,7 +121,10 @@ def get_test_bert_encoder(num_layers):
         fairseq_bert_enc_layer_list
     )
 
-custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(num_layers)
+
+custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
+    num_layers
+)
 
 
 ###################### decoding layer ######################
