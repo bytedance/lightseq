@@ -6,7 +6,6 @@
 #include "../model/gpt_encoder.h"
 #include "../proto/gpt_weight.h"
 #include "../tools/util.h"
-#include "../tools/util.h"
 
 #ifdef FP16_MODE
 const lightseq::cuda::OperationType gpt_optype =
@@ -22,10 +21,10 @@ namespace py = pybind11;
 
 namespace lightseq {
 namespace cuda {
-class Gpt : public LSModelBase {
+class Gpt : public LSModel {
  private:
   typedef lightseq::cuda::OperationTypeTraits<gpt_optype> optraits;
-  lightseq::cuda::GptEncoder<gpt_optype>* encoder_;
+  std::shared_ptr<lightseq::cuda::GptEncoder<gpt_optype>> encoder_;
 
   int* d_input_;
   int* d_sample_id;
@@ -47,6 +46,12 @@ class Gpt : public LSModelBase {
   const int* get_result_ptr();
   const float* get_score_ptr();
   const int get_max_step() { return tw_._max_step; }
+
+  void Infer() override;
+  void set_input_ptr(int index, void* input_ptr) override;
+  void set_output_ptr(int index, void* output_ptr) override;
+  const void* get_output_ptr(int index) override;
+  std::vector<int> get_output_max_shape(int index) override;
 
 #ifdef ENABLE_PYTHON
   py::array_t<float> ppl(

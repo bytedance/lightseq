@@ -21,10 +21,10 @@ namespace py = pybind11;
 
 namespace lightseq {
 namespace cuda {
-class Bert : public LSModelBase {
+class Bert : public LSModel {
  private:
   typedef OperationTypeTraits<bert_optype> optraits;
-  BertEncoder<bert_optype> *encoder_;
+  std::shared_ptr<BertEncoder<bert_optype>> encoder_;
 
   optraits::DataType *d_encoder_output_;
   int *d_input_;
@@ -34,6 +34,12 @@ class Bert : public LSModelBase {
   cublasHandle_t hd_;
   void *d_buf_;
   BertWeight<bert_optype> tw_;
+
+  void Infer() override;
+  void set_input_ptr(int index, void *input_ptr) override;
+  void set_output_ptr(int index, void *output_ptr) override;
+  const void *get_output_ptr(int index) override;
+  std::vector<int> get_output_max_shape(int index) override;
 
  public:
   Bert(const std::string weight_path, const int max_batch_size);

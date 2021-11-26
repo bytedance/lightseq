@@ -4,7 +4,8 @@ namespace lightseq {
 namespace cuda {
 
 Bert::Bert(const std::string weight_path, const int max_batch_size)
-    : _max_batch_size(max_batch_size) {
+    : LSModel({"token_ids"}, {"encoder_output"}),
+      _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
   CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
@@ -37,9 +38,9 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
 
-  encoder_ =
-      new BertEncoder<bert_optype>(max_batch_size, d_input_, d_padding_mask_,
-                                   d_encoder_output_, tw_, stream_, hd_);
+  encoder_ = std::make_shared<BertEncoder<bert_optype>>(
+      max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
+      stream_, hd_);
   res = encoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -131,6 +132,59 @@ std::tuple<int, int, int> Bert::infer(const int *input_seq, int batch_size,
   }
 
   return std::make_tuple(batch_size, batch_seq_len, tw_._hidden_size);
+}
+
+void Bert::Infer() {
+  int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
+  encoder_->run_one_infer(batch_size, seq_len);
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+  set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
+}
+
+void Bert::set_input_ptr(int index, void *input_ptr) {
+  switch (index) {
+    case 0:
+      encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+void Bert::set_output_ptr(int index, void *output_ptr) {
+  switch (index) {
+    case 0:
+      encoder_->_p_d_output = static_cast<optraits::DataType *>(output_ptr);
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+const void *Bert::get_output_ptr(int index) {
+  switch (index) {
+    case 0:
+      return static_cast<void *>(encoder_->_p_d_output);
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+std::vector<int> Bert::get_output_max_shape(int index) {
+  switch (index) {
+    case 0:
+      return {_max_batch_size, tw_._max_step, tw_._hidden_size};
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
 }
 
 #endif

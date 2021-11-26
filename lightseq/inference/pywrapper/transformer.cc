@@ -1,19 +1,4 @@
-// #include <pybind11/numpy.h>
-// #include <pybind11/pybind11.h>
-
-// #include "../model/decoder.h"
-// #include "../model/encoder.h"
-// #include "../proto/transformer_weight.h"
-// #include "../tools/util.h"
 #include "transformer.h"
-
-// #ifdef FP16_MODE
-// const lightseq::cuda::OperationType transformer_optytpe =
-//     lightseq::cuda::OperationType::FP16;
-// #else
-// const lightseq::cuda::OperationType transformer_optytpe =
-//     lightseq::cuda::OperationType::FP32;
-// #endif
 
 namespace lightseq {
 namespace cuda {
@@ -50,9 +35,6 @@ Transformer::Transformer(const std::string weight_path,
       using thrust vector to avoid manage gpu memory by hand
   */
 
-  // register device memory for inputs and outputs
-  // CHECK_GPU_ERROR(
-  //     cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int)));
   CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_,
                              _max_batch_size * tw_._max_step * sizeof(int)));
 
