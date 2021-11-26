@@ -126,6 +126,8 @@ setup_kwargs = dict(
             "lightseq_fairseq_generate_cli:ls_cli_main",
             "lightseq-validate = lightseq.training.cli."
             "lightseq_fairseq_validate_cli:ls_cli_main",
+            "lightseq-deepspeed = lightseq.training.cli."
+            "lightseq_deepspeed_cli:ls_cli_main",
         ],
     },
 )
