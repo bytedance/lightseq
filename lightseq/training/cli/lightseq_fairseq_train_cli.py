@@ -5,7 +5,7 @@ from fairseq_cli.train import cli_main
 
 
 def ls_cli_main(*args, **kwargs):
-    user_path = pathlib.Path(__file__).parent.parent.joinpath("fs_modules")
+    user_path = pathlib.Path(__file__).parent.joinpath("fs_modules")
     sys.argv.extend(["--user-dir", str(user_path)])
     cli_main(*args, **kwargs)
 
