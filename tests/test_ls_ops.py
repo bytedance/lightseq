@@ -25,7 +25,7 @@ from lightseq.training.ops.pytorch.transformer_embedding_layer import (
     LSTransformerEmbeddingLayer,
 )
 from lightseq.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
-from examples.training.fairseq.fs_modules.ls_fs_transformer_decoder_layer import (
+from lightseq.training.cli.fs_modules.ls_fs_transformer_decoder_layer import (
     LSFSTransformerDecoderLayer,
 )
 
