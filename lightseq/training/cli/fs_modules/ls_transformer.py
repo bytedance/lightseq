@@ -202,6 +202,7 @@ class LSTransformerEncoder(FairseqEncoder):
             pre_layer_norm=args.encoder_normalize_before,
             fp16=args.fp16,
             local_rank=args.device_id,
+            activation_fn=args.activation_fn,
         )
         return LSTransformerEncoderLayer(config)
 
@@ -297,6 +298,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             fp16=args.fp16,
             local_rank=args.device_id,
             nlayer=args.decoder_layers,
+            activation_fn=args.activation_fn,
         )
         return LSFSTransformerDecoderLayer(config)
 
