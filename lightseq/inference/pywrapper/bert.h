@@ -35,13 +35,6 @@ class Bert : public LSModel {
   void *d_buf_;
   BertWeight<bert_optype> tw_;
 
-  void Infer() override;
-  void set_input_ptr(int index, void *input_ptr) override;
-  void set_output_ptr(int index, void *output_ptr) override;
-  const void *get_output_ptr(int index) override;
-  std::vector<int> get_input_max_shape(int index) override;
-  std::vector<int> get_output_max_shape(int index) override;
-
  public:
   Bert(const std::string weight_path, const int max_batch_size);
 
@@ -49,6 +42,14 @@ class Bert : public LSModel {
 
   const optraits::DataType *get_result_ptr();
   const int get_max_step() { return tw_._max_step; }
+  void Infer() override;
+  void set_input_ptr(int index, void *input_ptr) override;
+  void set_output_ptr(int index, void *output_ptr) override;
+  const void *get_output_ptr(int index) override;
+  std::vector<int> get_input_max_shape(int index) override;
+  std::vector<int> get_output_max_shape(int index) override;
+  DataType get_input_dtype(int index) override;
+  DataType get_output_dtype(int index) override;
 
 #ifdef ENABLE_PYTHON
   py::array_t<float> infer(

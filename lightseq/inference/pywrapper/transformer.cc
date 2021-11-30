@@ -5,7 +5,7 @@ namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
-    : LSModel({"token_ids"}, {"token_ids", "scores"}),
+    : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
       decoder_(nullptr),
@@ -41,8 +41,6 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
-  // CHECK_GPU_ERROR(cudaMalloc(&d_output_, _max_batch_size * tw_._beam_size *
-  //                                            tw_._max_step * sizeof(int)));
 
   encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
       _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
@@ -202,6 +200,34 @@ std::vector<int> Transformer::get_output_max_shape(int index) {
 
     case 1:
       return {_max_batch_size, tw_._beam_size};
+      break;
+
+    default:
+      throw std::runtime_error("invalid output index");
+      break;
+  }
+}
+
+DataType Transformer::get_input_dtype(int index) {
+  switch (index) {
+    case 0:
+      return DataType::kInt32;
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+DataType Transformer::get_output_dtype(int index) {
+  switch (index) {
+    case 0:
+      return DataType::kInt32;
+      break;
+
+    case 1:
+      return DataType::kFloat32;
       break;
 
     default:

@@ -174,6 +174,34 @@ std::vector<int> Bert::get_output_max_shape(int index) {
   }
 }
 
+DataType Bert::get_input_dtype(int index) {
+  switch (index) {
+    case 0:
+      return DataType::kInt32;
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+DataType Bert::get_output_dtype(int index) {
+  switch (index) {
+    case 0:
+      if (bert_optype == OperationType::FP32) {
+        return DataType::kFloat32;
+      } else {
+        return DataType::kFloat16;
+      }
+      break;
+
+    default:
+      throw std::runtime_error("invalid output index");
+      break;
+  }
+}
+
 #endif
 }  // namespace cuda
 }  // namespace lightseq

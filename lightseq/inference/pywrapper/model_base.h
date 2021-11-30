@@ -9,6 +9,22 @@
 namespace lightseq {
 namespace cuda {
 
+enum DataType {
+  kNotSupported = 0,
+  kFloat32 = 1,
+  kInt32 = 2,
+  kInt64 = 3,
+  kFloat16 = 4,
+  kInt8 = 5,
+  kInt16 = 6,
+  kByte = 7,
+  kUInt8 = 8,
+  kUInt16 = 9,
+  kUInt32 = 10,
+  kUInt64 = 11,
+  kFloat64 = 12
+};
+
 // Bellow is an usage example for lightseq cpp API
 //
 // auto model = lightseq::cuda::LSModelFactory::get_instance().CreateModel(
@@ -59,6 +75,7 @@ class LSModel {
   virtual std::vector<int> get_input_max_shape(int index) = 0;
   std::string get_input_name(int index) { return kInputNames[index]; }
   int get_input_size() { return kInputNames.size(); }
+  virtual DataType get_input_dtype(int index) = 0;
 
   virtual void set_output_ptr(int index, void* output_ptr) = 0;
   virtual const void* get_output_ptr(int index) = 0;
@@ -66,6 +83,7 @@ class LSModel {
   int get_output_size() { return kOutputNames.size(); }
   std::vector<int> get_output_shape(int index) { return output_shapes_[index]; }
   virtual std::vector<int> get_output_max_shape(int index) = 0;
+  virtual DataType get_output_dtype(int index) = 0;
 
  protected:
   void set_output_shape(int index, std::vector<int> shape) {

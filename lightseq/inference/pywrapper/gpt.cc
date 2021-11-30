@@ -233,6 +233,39 @@ std::vector<int> Gpt::get_output_max_shape(int index) {
   }
 }
 
+DataType Gpt::get_input_dtype(int index) {
+  switch (index) {
+    case 0:
+      return DataType::kInt32;
+      break;
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
+
+DataType Gpt::get_output_dtype(int index) {
+  switch (index) {
+    case 0:
+      if (tw_._sampling_method == "ppl") {
+        return DataType::kFloat32;
+        break;
+      } else if (tw_._sampling_method == "topk" ||
+                 tw_._sampling_method == "topp") {
+        return DataType::kInt32;
+        break;
+      } else {
+        throw std::runtime_error("Unsupported sampling_method");
+        break;
+      }
+
+    default:
+      throw std::runtime_error("invalid output index");
+      break;
+  }
+}
+
 #endif
 }  // namespace cuda
 }  // namespace lightseq

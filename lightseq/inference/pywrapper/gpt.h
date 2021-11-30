@@ -53,6 +53,8 @@ class Gpt : public LSModel {
   const void* get_output_ptr(int index) override;
   std::vector<int> get_input_max_shape(int index) override;
   std::vector<int> get_output_max_shape(int index) override;
+  DataType get_input_dtype(int index) override;
+  DataType get_output_dtype(int index) override;
 
 #ifdef ENABLE_PYTHON
   py::array_t<float> ppl(
