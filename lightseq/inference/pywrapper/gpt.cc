@@ -129,48 +129,6 @@ py::array_t<int> Gpt::sample(
 
 #else
 
-int Gpt::ppl(const int* input_seq, int batch_size, int batch_seq_len,
-             float* result_seq) {
-  const int* old_input_ptr = encoder_->_p_d_token_id;
-  encoder_->_p_d_token_id = input_seq;
-
-  float* old_result_ptr = nullptr;
-  if (result_seq != nullptr) {
-    old_result_ptr = encoder_->_p_d_ppl;
-    encoder_->_p_d_ppl = result_seq;
-  }
-
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
-
-  if (result_seq != nullptr) {
-    encoder_->_p_d_ppl = old_result_ptr;
-  }
-  return batch_size;
-}
-
-std::tuple<int, int> Gpt::sample(const int* input_seq, int batch_size,
-                                 int batch_seq_len, int* result_seq) {
-  const int* old_input_ptr = encoder_->_p_d_token_id;
-  encoder_->_p_d_token_id = input_seq;
-
-  int* old_result_ptr = nullptr;
-  if (result_seq != nullptr) {
-    old_result_ptr = encoder_->_p_d_sample_id;
-    encoder_->_p_d_sample_id = result_seq;
-  }
-
-  int sampled_seq_len = encoder_->run_one_sample(batch_size, batch_seq_len);
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
-
-  if (result_seq != nullptr) {
-    encoder_->_p_d_sample_id = old_result_ptr;
-  }
-  return std::make_tuple(batch_size, sampled_seq_len);
-}
-
 void Gpt::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
@@ -216,7 +174,7 @@ void Gpt::set_output_ptr(int index, void* output_ptr) {
       }
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }
@@ -235,6 +193,17 @@ const void* Gpt::get_output_ptr(int index) {
         throw std::runtime_error("Unsupported sampling_method");
         break;
       }
+
+    default:
+      throw std::runtime_error("invalid output index");
+      break;
+  }
+}
+
+std::vector<int> Gpt::get_input_max_shape(int index) {
+  switch (index) {
+    case 0:
+      return {_max_batch_size, tw_._max_step};
 
     default:
       throw std::runtime_error("invalid input index");
@@ -259,7 +228,7 @@ std::vector<int> Gpt::get_output_max_shape(int index) {
       }
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }

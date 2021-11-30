@@ -51,6 +51,7 @@ class Gpt : public LSModel {
   void set_input_ptr(int index, void* input_ptr) override;
   void set_output_ptr(int index, void* output_ptr) override;
   const void* get_output_ptr(int index) override;
+  std::vector<int> get_input_max_shape(int index) override;
   std::vector<int> get_output_max_shape(int index) override;
 
 #ifdef ENABLE_PYTHON
@@ -61,12 +62,6 @@ class Gpt : public LSModel {
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
       std::string sampling_method = "", const int topk = -1,
       const float topp = -1.0f);
-#else
-  int ppl(const int* input_seq, int batch_size, int batch_seq_len,
-          float* result_seq = nullptr);
-
-  std::tuple<int, int> sample(const int* input_seq, int batch_size,
-                              int batch_seq_len, int* result_seq = nullptr);
 #endif
 };
 

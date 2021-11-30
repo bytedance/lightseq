@@ -120,57 +120,8 @@ std::tuple<py::array_t<int>, py::array_t<float>> Transformer::infer(
                  sizeof(float) * scores.size(), cudaMemcpyDeviceToHost));
   return std::make_tuple(tokens, scores);
 }
-#else
 
-std::tuple<int, int, int> Transformer::infer(int *input_seq, int batch_size,
-                                             int batch_seq_len, int *result_seq,
-                                             float *scores,
-                                             bool multiple_output) {
-  if (multiple_output) {
-    if (tw_._sampling_method == "beam_search") {
-      decoder_->_output_topk = multiple_output;
-    } else {
-      std::cout << "multiple_output will only work on beam search" << std::endl;
-    }
-  }
-
-  int *old_input_ptr = encoder_->_p_d_token_id;
-  encoder_->_p_d_token_id = input_seq;
-
-  int *old_result_ptr = nullptr;
-  if (result_seq != nullptr) {
-    old_result_ptr = decoder_->_p_d_result;
-    decoder_->_p_d_result = result_seq;
-  }
-
-  float *old_score_ptr = nullptr;
-  if (scores != nullptr) {
-    old_score_ptr = decoder_->_p_d_alive_seq_score;
-    decoder_->_p_d_alive_seq_score = scores;
-  }
-
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-  decoder_->run_one_infer(batch_size, batch_seq_len);
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
-
-  int output_seq_len = get_output_seq_len();
-  int beam_size = tw_._beam_size;
-  int output_k = decoder_->_output_topk ? beam_size : 1;
-
-  if (old_result_ptr != nullptr) {
-    decoder_->_p_d_result = old_result_ptr;
-  }
-  if (old_score_ptr != nullptr) {
-    decoder_->_p_d_alive_seq_score = old_score_ptr;
-  }
-  encoder_->_p_d_token_id = old_input_ptr;
-
-  return std::make_tuple(batch_size, output_k, output_seq_len);
-}
 #endif
-
-void set_output_shape(int index, std::vector<int> shape) {}
 
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
@@ -184,8 +135,8 @@ void Transformer::Infer() {
   int beam_size = tw_._beam_size;
   int output_k = decoder_->_output_topk ? beam_size : 1;
 
-  set_output_shape(0, {input_shapes_[0][0], output_k, output_seq_len});
-  set_output_shape(1, {input_shapes_[0][0], output_k});
+  set_output_shape(0, {batch_size, output_k, output_seq_len});
+  set_output_shape(1, {batch_size, output_k});
 }
 
 void Transformer::set_input_ptr(int index, void *input_ptr) {
@@ -226,6 +177,18 @@ const void *Transformer::get_output_ptr(int index) {
       break;
 
     default:
+      throw std::runtime_error("invalid output index");
+      break;
+  }
+}
+
+std::vector<int> Transformer::get_input_max_shape(int index) {
+  switch (index) {
+    case 0:
+      return {_max_batch_size, tw_._max_step};
+      break;
+
+    default:
       throw std::runtime_error("invalid input index");
       break;
   }
@@ -242,7 +205,7 @@ std::vector<int> Transformer::get_output_max_shape(int index) {
       break;
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }

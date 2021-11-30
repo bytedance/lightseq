@@ -56,6 +56,7 @@ class LSModel {
   void set_input_shape(int index, std::vector<int> shape) {
     input_shapes_.at(index) = std::move(shape);
   }
+  virtual std::vector<int> get_input_max_shape(int index) = 0;
   std::string get_input_name(int index) { return kInputNames[index]; }
   int get_input_size() { return kInputNames.size(); }
 

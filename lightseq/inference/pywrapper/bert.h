@@ -39,6 +39,7 @@ class Bert : public LSModel {
   void set_input_ptr(int index, void *input_ptr) override;
   void set_output_ptr(int index, void *output_ptr) override;
   const void *get_output_ptr(int index) override;
+  std::vector<int> get_input_max_shape(int index) override;
   std::vector<int> get_output_max_shape(int index) override;
 
  public:
@@ -52,10 +53,7 @@ class Bert : public LSModel {
 #ifdef ENABLE_PYTHON
   py::array_t<float> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq);
-#else
-  std::tuple<int, int, int> infer(const int *input_seq, int batch_size,
-                                  int batch_seq_len,
-                                  optraits::DataType *result_seq = nullptr);
+
 #endif
 };
 

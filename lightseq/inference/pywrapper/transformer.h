@@ -40,31 +40,26 @@ class Transformer : public LSModel {
 
   int get_output_seq_len();
 
- public:
-  Transformer(const std::string weight_path, const int max_batch_size);
-
-  ~Transformer();
-
   const int *get_result_ptr();
   const float *get_score_ptr();
   const int get_max_step() { return tw_._max_step; }
   const int get_beam_size() { return tw_._beam_size; }
 
+ public:
+  Transformer(const std::string weight_path, const int max_batch_size);
+  ~Transformer();
+
   void Infer() override;
   void set_input_ptr(int index, void *input_ptr) override;
   void set_output_ptr(int index, void *output_ptr) override;
   const void *get_output_ptr(int index) override;
+  std::vector<int> get_input_max_shape(int index) override;
   std::vector<int> get_output_max_shape(int index) override;
 
 #ifdef ENABLE_PYTHON
   std::tuple<py::array_t<int>, py::array_t<float>> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
       bool multiple_output = false);
-#else
-  std::tuple<int, int, int> infer(int *input_seq, int batch_size,
-                                  int batch_seq_len, int *result_seq = nullptr,
-                                  float *scores = nullptr,
-                                  bool multiple_output = false);
 #endif
 };
 

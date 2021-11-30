@@ -111,29 +111,6 @@ py::array_t<float> Bert::infer(
 
 #else
 
-std::tuple<int, int, int> Bert::infer(const int *input_seq, int batch_size,
-                                      int batch_seq_len,
-                                      optraits::DataType *result_seq) {
-  const int *old_input_ptr = encoder_->_p_d_token_id;
-  encoder_->_p_d_token_id = input_seq;
-
-  optraits::DataType *old_result_ptr = nullptr;
-  if (result_seq != nullptr) {
-    old_result_ptr = encoder_->_p_d_output;
-    encoder_->_p_d_output = result_seq;
-  }
-
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
-
-  if (result_seq != nullptr) {
-    encoder_->_p_d_output = old_result_ptr;
-  }
-
-  return std::make_tuple(batch_size, batch_seq_len, tw_._hidden_size);
-}
-
 void Bert::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
   encoder_->run_one_infer(batch_size, seq_len);
@@ -160,7 +137,7 @@ void Bert::set_output_ptr(int index, void *output_ptr) {
       break;
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }
@@ -171,18 +148,28 @@ const void *Bert::get_output_ptr(int index) {
       return static_cast<void *>(encoder_->_p_d_output);
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }
 
+std::vector<int> Bert::get_input_max_shape(int index) {
+  switch (index) {
+    case 0:
+      return {_max_batch_size, tw_._max_step};
+
+    default:
+      throw std::runtime_error("invalid input index");
+      break;
+  }
+}
 std::vector<int> Bert::get_output_max_shape(int index) {
   switch (index) {
     case 0:
       return {_max_batch_size, tw_._max_step, tw_._hidden_size};
 
     default:
-      throw std::runtime_error("invalid input index");
+      throw std::runtime_error("invalid output index");
       break;
   }
 }
