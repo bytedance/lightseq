@@ -3,3 +3,4 @@ global-include *.cu *.cpp *.cc *.cuh *.h *.ldscript *.proto *.cmake
 prune dist
 prune build
 prune tests
+prune examples

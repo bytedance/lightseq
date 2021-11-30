@@ -606,7 +606,7 @@ def generate_bert_enc_layer():
         activation_dropout_ratio,
         activation_fn="gelu",
     )
-    layer.to(torch.device("cuda:0"))
+    layer.to(torch.device("cuda:0"), dtype=torch.half)
     return layer
 
 
