@@ -123,8 +123,7 @@ std::string GptEncoder<OpType_>::check() {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
   }
   std::string sampling_method = _tw._sampling_method;
-  if (_available_sampling_methods.find(sampling_method) ==
-      _available_sampling_methods.end()) {
+  if (kSamplingMethods.find(sampling_method) == kSamplingMethods.end()) {
     return std::string("unsupported sampling_method: ") + sampling_method;
   }
 

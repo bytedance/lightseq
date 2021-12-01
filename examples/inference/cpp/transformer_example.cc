@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
   int max_batch_size = 128;
 
-  auto model = lightseq::cuda::LSModelFactory::get_instance().CreateModel(
+  auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Transformer", model_weights_path, max_batch_size);
 
   int batch_size = 1;

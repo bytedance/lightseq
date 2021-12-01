@@ -85,7 +85,7 @@ class GptEncoder {
   int _layer_id;
   int _weight_offset;
 
-  const std::set<std::string> _available_sampling_methods = {"topk", "topp"};
+  const std::set<std::string> kSamplingMethods = {"topk", "topp", "ppl"};
 
  public:
   int _batch_seq_len;

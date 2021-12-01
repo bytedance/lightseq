@@ -122,8 +122,8 @@ class Decoder {
                               // after decoder
   const long _layer_size_encdec_k;
   const long _layer_size_self_k;
-  const std::set<std::string> _available_sampling_methods = {
-      "beam_search", "topk", "topp", "topk_greedy"};
+  const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
+                                                  "topk_greedy"};
 
  public:
   Decoder(int max_batch_size, const int* p_d_padding_mask,

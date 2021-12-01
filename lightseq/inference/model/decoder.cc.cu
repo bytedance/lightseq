@@ -244,8 +244,7 @@ std::string Decoder<OpType_>::check() {
   }
 
   std::string sampling_method = _tw._sampling_method;
-  if (_available_sampling_methods.find(sampling_method) ==
-      _available_sampling_methods.end()) {
+  if (kSamplingMethods.find(sampling_method) == kSamplingMethods.end()) {
     return std::string("unsupported sampling_method: ") + sampling_method;
   }
   if (sampling_method == "topk" || sampling_method == "topp") {

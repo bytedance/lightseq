@@ -27,7 +27,7 @@ enum DataType {
 
 // Bellow is an usage example for lightseq cpp API
 //
-// auto model = lightseq::cuda::LSModelFactory::get_instance().CreateModel(
+// auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
 //     "Transformer", model_weights_path, max_batch_size);
 // model->set_input_ptr(0, d_input);
 // model->set_input_shape(0, {batch_size, batch_seq_len});
@@ -104,12 +104,12 @@ class LSModelFactory {
   std::map<std::string, LSModelConstructor> object_map_;
 
  public:
-  static LSModelFactory& get_instance() {
+  static LSModelFactory& GetInstance() {
     static LSModelFactory factory;
     return factory;
   }
 
-  void model_register(std::string class_name, LSModelConstructor obj) {
+  void ModelRegister(std::string class_name, LSModelConstructor obj) {
     if (obj) {
       object_map_.insert(std::map<std::string, LSModelConstructor>::value_type(
           class_name, obj));
@@ -123,7 +123,7 @@ class LSModelFactory {
     if (iter != object_map_.end()) {
       return iter->second(weight_path, max_batch_size);
     } else {
-      throw std::runtime_error("class not found");
+      throw std::runtime_error("Model not supported");
     }
   }
 };
@@ -131,7 +131,7 @@ class LSModelFactory {
 class Reflector {
  public:
   Reflector(std::string name, LSModelConstructor obj) {
-    LSModelFactory::get_instance().model_register(name, obj);
+    LSModelFactory::GetInstance().ModelRegister(name, obj);
   }
   virtual ~Reflector() {}
 };
