@@ -173,41 +173,46 @@ void cublasLtMM_withAlgo(
   // #endif
   //   }
 
-  findAlgo = 1;
-  int algoId;
-  if (use_ORDER_COL32_2R_4R4) {
-    algoId = 7;
-  } else {
-    algoId = 6;
-  }
-  int swizzle = 0;
-  int customOption = 0;
-  int tile = 20;
-  int splitK_val = 0;
-  int reductionScheme = 0;
-  cublasLtMatmulAlgoInit(cublasLt_handle, computeType, CUDA_R_32I, CUDA_R_8I,
-                         CUDA_R_8I, CUDA_R_32I, CUDA_R_32I, algoId, &algo);
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
-                                       CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
-                                       &(customOption), sizeof(customOption));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_TILE_ID,
-                                       &(tile), sizeof(tile));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
-                                       &(splitK_val), sizeof(splitK_val));
-  cublasLtMatmulAlgoConfigSetAttribute(
-      &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle), sizeof(swizzle));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
-                                       CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
-                                       &(reductionScheme), sizeof(int));
-#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
-  int stages;
-  if (use_ORDER_COL32_2R_4R4)
-    stages = 15;
-  else
-    stages = 13;
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_STAGES_ID,
-                                       &(stages), sizeof(stages));
-#endif
+  //   findAlgo = 1;
+  //   int algoId;
+  //   if (use_ORDER_COL32_2R_4R4) {
+  //     algoId = 7;
+  //   } else {
+  //     algoId = 6;
+  //   }
+  //   int swizzle = 0;
+  //   int customOption = 0;
+  //   int tile = 20;
+  //   int splitK_val = 0;
+  //   int reductionScheme = 0;
+  //   cublasLtMatmulAlgoInit(cublasLt_handle, computeType, CUDA_R_32I,
+  //   CUDA_R_8I,
+  //                          CUDA_R_8I, CUDA_R_32I, CUDA_R_32I, algoId, &algo);
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //                                        CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
+  //                                        &(customOption),
+  //                                        sizeof(customOption));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_TILE_ID,
+  //                                        &(tile), sizeof(tile));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //   CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
+  //                                        &(splitK_val), sizeof(splitK_val));
+  //   cublasLtMatmulAlgoConfigSetAttribute(
+  //       &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle),
+  //       sizeof(swizzle));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //                                        CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
+  //                                        &(reductionScheme), sizeof(int));
+  // #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  //   int stages;
+  //   if (use_ORDER_COL32_2R_4R4)
+  //     stages = 15;
+  //   else
+  //     stages = 13;
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //   CUBLASLT_ALGO_CONFIG_STAGES_ID,
+  //                                        &(stages), sizeof(stages));
+  // #endif
 
   cublasLtMatmul(cublasLt_handle, matmulDesc, &alphaI, ATransform,
                  AtransformDesc, kernel, BtransformDesc, &betaI, res,
@@ -392,41 +397,46 @@ void cublasLtMM_withAlgo_int8IO(
   // #endif
   //   }
 
-  findAlgo = 1;
-  int algoId;
-  if (use_ORDER_COL32_2R_4R4) {
-    algoId = 7;
-  } else {
-    algoId = 6;
-  }
-  int swizzle = 0;
-  int customOption = 0;
-  int tile = 20;
-  int splitK_val = 0;
-  int reductionScheme = 0;
-  cublasLtMatmulAlgoInit(cublasLt_handle, computeType, CUDA_R_32F, CUDA_R_8I,
-                         CUDA_R_8I, CUDA_R_8I, CUDA_R_8I, algoId, &algo);
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
-                                       CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
-                                       &(customOption), sizeof(customOption));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_TILE_ID,
-                                       &(tile), sizeof(tile));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
-                                       &(splitK_val), sizeof(splitK_val));
-  cublasLtMatmulAlgoConfigSetAttribute(
-      &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle), sizeof(swizzle));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
-                                       CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
-                                       &(reductionScheme), sizeof(int));
-#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
-  int stages;
-  if (use_ORDER_COL32_2R_4R4)
-    stages = 15;
-  else
-    stages = 13;
-  cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_STAGES_ID,
-                                       &(stages), sizeof(stages));
-#endif
+  //   findAlgo = 1;
+  //   int algoId;
+  //   if (use_ORDER_COL32_2R_4R4) {
+  //     algoId = 7;
+  //   } else {
+  //     algoId = 6;
+  //   }
+  //   int swizzle = 0;
+  //   int customOption = 0;
+  //   int tile = 20;
+  //   int splitK_val = 0;
+  //   int reductionScheme = 0;
+  //   cublasLtMatmulAlgoInit(cublasLt_handle, computeType, CUDA_R_32F,
+  //   CUDA_R_8I,
+  //                          CUDA_R_8I, CUDA_R_8I, CUDA_R_8I, algoId, &algo);
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //                                        CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
+  //                                        &(customOption),
+  //                                        sizeof(customOption));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_TILE_ID,
+  //                                        &(tile), sizeof(tile));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //   CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
+  //                                        &(splitK_val), sizeof(splitK_val));
+  //   cublasLtMatmulAlgoConfigSetAttribute(
+  //       &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle),
+  //       sizeof(swizzle));
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //                                        CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
+  //                                        &(reductionScheme), sizeof(int));
+  // #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  //   int stages;
+  //   if (use_ORDER_COL32_2R_4R4)
+  //     stages = 15;
+  //   else
+  //     stages = 13;
+  //   cublasLtMatmulAlgoConfigSetAttribute(&algo,
+  //   CUBLASLT_ALGO_CONFIG_STAGES_ID,
+  //                                        &(stages), sizeof(stages));
+  // #endif
 
   float beta = 0.0f;
   CHECK_GPU_ERROR(cublasLtMatmul(
