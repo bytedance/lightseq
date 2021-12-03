@@ -1358,7 +1358,7 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
                               blockDim.x)] = thread_vocab_id;
 
   // step2 update seq_probs if alive seq when not eos
-  if (cur_step == 0 || can_vocab_id != end_id) {
+  if (can_vocab_id != end_id) {
     // alive seq
     if (threadIdx.x == 0) {
       if (diverse_lambda == 0) {
