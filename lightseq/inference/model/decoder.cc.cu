@@ -223,8 +223,11 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
       std::max(max_batch_dim,
                _tw._trg_vocab_size * _tw._beam_size * _max_batch_size) *
           sizeof(int32_t)));
-  CHECK_GPU_ERROR(
-      cudaMalloc(&_int8_ffn_out_buf, max_batch_dim * sizeof(int8_t)));
+  CHECK_GPU_ERROR(cudaMalloc(
+      &_int8_ffn_out_buf,
+      std::max(max_batch_dim,
+               _tw._trg_vocab_size * _tw._beam_size * _max_batch_size) *
+          sizeof(int8_t)));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_trg_emb_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
@@ -457,10 +460,17 @@ bool Decoder<OpType_>::run_step() {
 
   // _step_token_num (beam_size * batch_size) must be 4x
 
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
-                      _tw._trg_vocab_size, _tw._hidden_size, 0, 0, 0,
-                      _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
-                      _cublas_lt_handle, _stream, false);
+  // cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
+  //                     _tw._trg_vocab_size, _tw._hidden_size, 0, 0, 0,
+  //                     _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
+  //                     _cublas_lt_handle, _stream, false);
+  cublasLtMM_withAlgo_int8IO(_int8_ffn_out_buf, 1, _step_token_num,
+                             _tw._trg_vocab_size, _tw._hidden_size, 0, 0, 0,
+                             _output_ln_clip_max * _trg_scaled_emb_clip_max *
+                                 _logit_scaler /
+                                 (_logits_clip_max * _quant_scale),
+                             _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
+                             _cublas_lt_handle, _stream, false);
 
 #else
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -1151,11 +1161,18 @@ void Decoder<OpType_>::update_new_seq_probs() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
 
 #ifdef INT8_MODE
-  select_beam_rough_topk_I32in_launcher(
-      _int32_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-      _p_d_alive_seq_score, _p_d_alive_seq,
-      _output_ln_clip_max * _trg_scaled_emb_clip_max * _logit_scaler /
-          (_quant_scale * _quant_scale),
+  // select_beam_rough_topk_I32in_launcher(
+  //     _int32_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+  //     _p_d_alive_seq_score, _p_d_alive_seq,
+  //     _output_ln_clip_max * _trg_scaled_emb_clip_max * _logit_scaler /
+  //         (_quant_scale * _quant_scale),
+  //     _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
+  //     _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
+  //     _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
+  //     _tw._end_id);
+  select_beam_rough_topk_I8in_launcher(
+      _int8_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+      _p_d_alive_seq_score, _p_d_alive_seq, _logits_clip_max / _quant_scale,
       _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
       _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
       _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,

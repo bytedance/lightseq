@@ -110,5 +110,14 @@ void select_beam_rough_topk_I32in_launcher(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
+template <typename T>
+void select_beam_rough_topk_I8in_launcher(
+    const int8_t *logits, const T *logit_bias, const float *seq_probs,
+    const float *seq_score, const int *alive_seq, float dequant_scale,
+    int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
+    int max_step, float length_norm, int cur_step, int step_token_num,
+    int max_thread_per_block, cudaStream_t stream, int beam_size,
+    float diverse_lambda, int end_id);
+
 }  // namespace cuda
 }  // namespace lightseq
