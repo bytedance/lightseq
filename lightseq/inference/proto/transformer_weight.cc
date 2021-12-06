@@ -124,6 +124,7 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
   else {
     _trg_scaled_emb_clip_max = layer.scaled_emb_clip_max();
     _output_ln_clip_max = layer.output_ln_clip_max();
+    _logits_clip_max = layer.logits_clip_max();
   }
 #else
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
@@ -370,6 +371,10 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     _enc_clip_max.push_back(enc_layer.multihead_project_output_clip_max());
     _enc_clip_max.push_back(enc_layer.ffn_ln_clip_max());
     _enc_clip_max.push_back(enc_layer.ffn_first_act_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_qkv_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_output_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_second_output_clip_max());
 #endif
 
   }  // for
@@ -575,6 +580,12 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     _dec_clip_max.push_back(dec_layer.encdec_project_output_clip_max());
     _dec_clip_max.push_back(dec_layer.ffn_ln_clip_max());
     _dec_clip_max.push_back(dec_layer.ffn_first_act_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_qkv_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_output_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_q_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_output_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_first_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_second_output_clip_max());
 #endif
   }  // for
 

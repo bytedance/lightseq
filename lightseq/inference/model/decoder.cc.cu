@@ -44,6 +44,7 @@ Decoder<OpType_>::Decoder(int max_batch_size, const int* p_d_padding_mask,
 #ifdef INT8_MODE
       _trg_scaled_emb_clip_max(tw.get_trg_scaled_emb_clip_max()),
       _output_ln_clip_max(tw.get_output_ln_clip_max()),
+      _logits_clip_max(tw.get_logits_clip_max()),
       _encode_output_project_kernel_kv_clip_max(
           tw.get_encode_output_project_kernel_kv_clip_max()),
       _dec_clip_max(tw.get_dec_clip_max()),
@@ -256,31 +257,31 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
         _tw._hidden_size, _tw._hidden_size * 3, _quant_scale,
-        _dec_clip_max[_layer_id * 12], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18], _stream, _cublas_lt_handle);
 
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 + 1],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18 + 1], _stream, _cublas_lt_handle);
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 8], _int8_p_d_dec_wei[_layer_id * 6 + 2],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 2], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18 + 2], _stream, _cublas_lt_handle);
 
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 10], _int8_p_d_dec_wei[_layer_id * 6 + 3],
         _tw._hidden_size, _tw._hidden_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 3], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18 + 3], _stream, _cublas_lt_handle);
 
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 14], _int8_p_d_dec_wei[_layer_id * 6 + 4],
         _tw._hidden_size, _tw._inner_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 4], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18 + 4], _stream, _cublas_lt_handle);
 
     quantize_weight_col32t(
         _p_d_dec_wei[_weight_offset + 16], _int8_p_d_dec_wei[_layer_id * 6 + 5],
         _tw._inner_size, _tw._hidden_size, _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 5], _stream, _cublas_lt_handle);
+        _dec_clip_max[_layer_id * 18 + 5], _stream, _cublas_lt_handle);
 
     if (_tw._use_gelu) {
       _scaled_ffn2_colsum[_layer_id] = nullptr;
@@ -290,7 +291,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
       launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
                            _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
                            _tw._hidden_size,
-                           _dec_clip_max[_layer_id * 12 + 11] / 2, _stream);
+                           _dec_clip_max[_layer_id * 18 + 11] / 2, _stream);
     }
   }
 #endif
@@ -563,7 +564,7 @@ void Decoder<OpType_>::self_attention() {
         _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
         _int8_ffn_in_buf, _p_d_dec_wei[_weight_offset],
         _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-        _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 6],
+        _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 18 + 6],
         _tw._is_post_ln, true);
   }
 
@@ -592,7 +593,7 @@ void Decoder<OpType_>::self_attention() {
       _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
       _max_thread_per_block, _quant_scale * _quant_scale,
-      _dec_clip_max[_layer_id * 12] * _dec_clip_max[_layer_id * 12 + 6], true);
+      _dec_clip_max[_layer_id * 18] * _dec_clip_max[_layer_id * 18 + 6], true);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
@@ -698,7 +699,7 @@ void Decoder<OpType_>::self_attention() {
 #ifdef INT8_MODE
   launch_quantize_tensor(_p_d_query_buf1, _int8_ffn_in_buf, _step_token_num,
                          _tw._hidden_size, _quant_scale,
-                         _dec_clip_max[_layer_id * 12 + 7], _stream, true);
+                         _dec_clip_max[_layer_id * 18 + 7], _stream, true);
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "self attn ffn in(head): ", 3);
   print_vec(_int8_ffn_in_buf + _step_token_num * _tw._hidden_size - 3,
@@ -721,9 +722,9 @@ void Decoder<OpType_>::self_attention() {
       _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 6],
       _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
       _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-      _dec_clip_max[_layer_id * 12 + 1] * _dec_clip_max[_layer_id * 12 + 7] /
+      _dec_clip_max[_layer_id * 18 + 1] * _dec_clip_max[_layer_id * 18 + 7] /
           (_quant_scale * _quant_scale),
-      _quant_scale, _dec_clip_max[_layer_id * 12 + 8], _max_thread_per_block,
+      _quant_scale, _dec_clip_max[_layer_id * 18 + 8], _max_thread_per_block,
       _stream, _tw._is_post_ln, true);
 
 #else
@@ -774,7 +775,7 @@ void Decoder<OpType_>::encdec_attention() {
       _p_d_dec_wei[_weight_offset + 9], _p_d_query_buf1, _tw._beam_size,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
       _quant_scale * _quant_scale,
-      _dec_clip_max[_layer_id * 12 + 2] * _dec_clip_max[_layer_id * 12 + 8],
+      _dec_clip_max[_layer_id * 18 + 2] * _dec_clip_max[_layer_id * 18 + 8],
       true);
 
 #ifdef DEBUG_RESULT
@@ -839,7 +840,7 @@ void Decoder<OpType_>::encdec_attention() {
   ker_arrange_atten_output_int8O_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_query_buf1,
       _int8_ffn_in_buf, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
-      _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 12 + 9],
+      _max_thread_per_block, _quant_scale, _dec_clip_max[_layer_id * 18 + 9],
       true);
 
 #ifdef DEBUG_RESULT
@@ -864,9 +865,9 @@ void Decoder<OpType_>::encdec_attention() {
       _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 12],
       _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
       _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-      _dec_clip_max[_layer_id * 12 + 3] * _dec_clip_max[_layer_id * 12 + 9] /
+      _dec_clip_max[_layer_id * 18 + 3] * _dec_clip_max[_layer_id * 18 + 9] /
           (_quant_scale * _quant_scale),
-      _quant_scale, _dec_clip_max[_layer_id * 12 + 10], _max_thread_per_block,
+      _quant_scale, _dec_clip_max[_layer_id * 18 + 10], _max_thread_per_block,
       _stream, _tw._is_post_ln, true);
 
 #else
@@ -913,15 +914,15 @@ void Decoder<OpType_>::ffn_add_norm() {
         _step_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
         _quant_scale * _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 4] * _dec_clip_max[_layer_id * 12 + 10],
-        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true);
+        _dec_clip_max[_layer_id * 18 + 4] * _dec_clip_max[_layer_id * 18 + 10],
+        _quant_scale, _dec_clip_max[_layer_id * 18 + 11], true);
   } else {
     ker_bias_relu_int32I_int8O_launcher<_DataType>(
         _step_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
         _quant_scale * _quant_scale,
-        _dec_clip_max[_layer_id * 12 + 4] * _dec_clip_max[_layer_id * 12 + 10],
-        _quant_scale, _dec_clip_max[_layer_id * 12 + 11], true, true);
+        _dec_clip_max[_layer_id * 18 + 4] * _dec_clip_max[_layer_id * 18 + 10],
+        _quant_scale, _dec_clip_max[_layer_id * 18 + 11], true, true);
   }
 
 #ifdef DEBUG_RESULT
@@ -948,12 +949,12 @@ void Decoder<OpType_>::ffn_add_norm() {
     bias_ptr = _p_d_dec_wei[(_layer_id + 1) * _tw._weight_per_dec_layer + 1];
     res_bias_ptr =
         _p_d_dec_wei[(_layer_id + 1) * _tw._weight_per_dec_layer + 5];
-    clip_max = _dec_clip_max[(_layer_id + 1) * 12 + 6];
+    clip_max = _dec_clip_max[(_layer_id + 1) * 18 + 6];
   }
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
       _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-      _dec_clip_max[_layer_id * 12 + 5] * _dec_clip_max[_layer_id * 12 + 11] /
+      _dec_clip_max[_layer_id * 18 + 5] * _dec_clip_max[_layer_id * 18 + 11] /
           (2 * _quant_scale * _quant_scale),
       _quant_scale, clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
       true, _scaled_ffn2_colsum[_layer_id]);
