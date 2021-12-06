@@ -122,12 +122,14 @@ setup_kwargs = dict(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "lightseq-train = examples.training.fairseq.fs_cli."
+            "lightseq-train = lightseq.training.cli."
             "lightseq_fairseq_train_cli:ls_cli_main",
-            "lightseq-generate = examples.training.fairseq.fs_cli."
+            "lightseq-generate = lightseq.training.cli."
             "lightseq_fairseq_generate_cli:ls_cli_main",
-            "lightseq-validate = examples.training.fairseq.fs_cli."
+            "lightseq-validate = lightseq.training.cli."
             "lightseq_fairseq_validate_cli:ls_cli_main",
+            "lightseq-deepspeed = lightseq.training.cli."
+            "lightseq_deepspeed_cli:ls_cli_main",
         ],
     },
 )

@@ -13,7 +13,7 @@ sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 Or you can use LightSeq modules like `--arch ls_transformer_wmt_en_de_big_t2t`,
-by adding `--user-dir=${LIGHTSEQ_DIR}/examples/training/fairseq/fs_modules`
+by adding `--user-dir=${LIGHTSEQ_DIR}/lightseq/training/cli/fs_modules`
 to `fairseq-train`.
 
 This script firstly download the dataset and then run native Fairseq

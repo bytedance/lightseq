@@ -8,8 +8,8 @@ from deepspeed.utils import log_dist
 from fairseq import tasks, distributed_utils
 from fairseq.logging import metrics
 
-from examples.training.deepspeed.ds_fairseq_data import BatchIterator
-from examples.training.deepspeed.ds_fairseq_argument import gen_ds_fairseq_arg
+from ds_fairseq_data import BatchIterator
+from ds_fairseq_argument import gen_ds_fairseq_arg
 
 
 best_bleu = 0.0
