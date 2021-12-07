@@ -438,7 +438,7 @@ __global__ void ker_ppl(const T* logits, const int* input_ids,
     float log_prob =
         ((float)logits[token_idx_in_batch * vocab_size + token_id] -
          s_max_logit - logf(sum_exp_logit)) /
-        (float)seq_len;
+        (float)(seq_len - 1);
     atomicAdd(ppl + blockIdx.x, -log_prob);
   }
 }
