@@ -1341,15 +1341,17 @@ template void ker_arrange_atten_output_int8O_launcher<__half>(
     bool out_col32);
 
 template <typename T>
-__global__ void ker_arrange_decself_qkv_int32I(
-    const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
-    int head_num, int dim_per_head, int max_step, int step_id,
-    float scale_div_clip_max, bool input_col32) {
+__global__ void ker_arrange_decself_qkv_int32I(const int32_t *ori_qkv,
+                                               const T *qkv_bias, T *new_q,
+                                               T *new_k, T *new_v, int head_num,
+                                               int dim_per_head, int max_step,
+                                               int step_id, float dequant_scale,
+                                               bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
     int qkv_index;
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = blockIdx.y * hidden_size + i;
       qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
@@ -1357,7 +1359,7 @@ __global__ void ker_arrange_decself_qkv_int32I(
     } else {
       qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i;
     }
-    T val = float(ori_qkv[qkv_index]) / scale_div_clip_max +
+    T val = float(ori_qkv[qkv_index]) * dequant_scale +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
         blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
@@ -1384,7 +1386,7 @@ template <>
 __global__ void ker_arrange_decself_qkv_int32I<__half>(
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, float scale_div_clip_max, bool input_col32) {
+    int step_id, float dequant_scale, bool in_col32) {
   int half_hidden_size = dim_per_head * head_num;
   const int2 *p_qkv = (const int2 *)ori_qkv;
   const half2 *p_bias = (const half2 *)qkv_bias;
@@ -1392,7 +1394,7 @@ __global__ void ker_arrange_decself_qkv_int32I<__half>(
   half2 ori_qkv_h2;
   for (std::size_t i = threadIdx.x; i < half_hidden_size; i += blockDim.x) {
     int qkv_index;
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = (blockIdx.y * half_hidden_size + i) * 2;
       qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
@@ -1402,8 +1404,8 @@ __global__ void ker_arrange_decself_qkv_int32I<__half>(
       qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i;
     }
     v_ori_qkv = p_qkv[qkv_index];
-    ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) / scale_div_clip_max);
-    ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) / scale_div_clip_max);
+    ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) * dequant_scale);
+    ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) * dequant_scale);
     half2 val =
         __hadd2(ori_qkv_h2, __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
     // obvious，seq_id = batch_id * beam_size + beam_id
@@ -1432,12 +1434,11 @@ void ker_arrange_decself_qkv_int32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max,
-    bool input_col32) {
+    int max_thread_per_block, float dequant_scale, bool in_col32) {
   ker_arrange_decself_qkv_int32I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
-          max_step, step_id, quant_scale / clip_max, input_col32);
+          max_step, step_id, dequant_scale, in_col32);
 }
 
 template <>
@@ -1445,27 +1446,24 @@ void ker_arrange_decself_qkv_int32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, int max_thread_per_block, float quant_scale, float clip_max,
-    bool input_col32) {
+    int step_id, int max_thread_per_block, float dequant_scale, bool in_col32) {
   ker_arrange_decself_qkv_int32I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-          max_step, step_id, quant_scale / clip_max, input_col32);
+          max_step, step_id, dequant_scale, in_col32);
 }
 
 template void ker_arrange_decself_qkv_int32I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max,
-    bool input_col32);
+    int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template void ker_arrange_decself_qkv_int32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
-    int step_id, int max_thread_per_block, float quant_scale, float clip_max,
-    bool input_col32);
+    int step_id, int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
 __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
@@ -1473,7 +1471,7 @@ __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
                                               T *new_k, T *new_v, int head_num,
                                               int dim_per_head, int max_step,
                                               int step_id,
-                                              float scale_div_clip_max) {
+                                              float dequant_scale) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
@@ -1481,7 +1479,7 @@ __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
     int col_id = blockIdx.y * hidden_size + i;
     int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
                                            gridDim.y * hidden_size);
-    T val = float(ori_qkv[col32_index]) / scale_div_clip_max +
+    T val = float(ori_qkv[col32_index]) * dequant_scale +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
         blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
@@ -1508,7 +1506,7 @@ template <>
 __global__ void ker_arrange_decself_qkv_int8I<__half>(
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    float scale_div_clip_max) {
+    float dequant_scale) {
   int half_hidden_size = dim_per_head * head_num;
   const char2 *p_qkv = reinterpret_cast<const char2 *>(ori_qkv);
   const half2 *p_bias = reinterpret_cast<const half2 *>(qkv_bias);
@@ -1521,8 +1519,8 @@ __global__ void ker_arrange_decself_qkv_int8I<__half>(
                                            gridDim.y * half_hidden_size) >>
                       1;
     v_ori_qkv = p_qkv[col32_index];
-    ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) / scale_div_clip_max);
-    ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) / scale_div_clip_max);
+    ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) * dequant_scale);
+    ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) * dequant_scale);
     half2 val =
         __hadd2(ori_qkv_h2, __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
     // obvious，seq_id = batch_id * beam_size + beam_id
@@ -1551,11 +1549,11 @@ void ker_arrange_decself_qkv_int8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max) {
+    int max_thread_per_block, float dequant_scale) {
   ker_arrange_decself_qkv_int8I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
-          max_step, step_id, quant_scale / clip_max);
+          max_step, step_id, dequant_scale);
 }
 
 template <>
@@ -1563,24 +1561,24 @@ void ker_arrange_decself_qkv_int8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max) {
+    int max_thread_per_block, float dequant_scale) {
   ker_arrange_decself_qkv_int8I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-          max_step, step_id, quant_scale / clip_max);
+          max_step, step_id, dequant_scale);
 }
 
 template void ker_arrange_decself_qkv_int8I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float dequant_scale);
 
 template void ker_arrange_decself_qkv_int8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float dequant_scale);
 
 template <typename T>
 __global__ void ker_arrange_encdec_q_int32I(const int32_t *ori_q,
@@ -1707,9 +1705,9 @@ length_norm: length penlty value for current step
 cur_step: current step
 diverse_lambda: lambda for diverse beam search
 */
-template <typename T, int beam_size>
-__global__ void select_beam_rough_topk_I32in(
-    const int32_t *logits, const T *logit_bias, const float *seq_probs,
+template <typename T, typename S, int beam_size>
+__global__ void select_beam_rough_topk_intI(
+    const S *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, float diverse_lambda,
@@ -1846,53 +1844,53 @@ __global__ void select_beam_rough_topk_I32in(
   }
 }
 
-template <typename T>
-void select_beam_rough_topk_I32in_launcher(
-    const int32_t *logits, const T *logit_bias, const float *seq_probs,
+template <typename T, typename S>
+void select_beam_rough_topk_intI_launcher(
+    const S *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id) {
   if (beam_size == 1)
-    select_beam_rough_topk_I32in<T, 1>
+    select_beam_rough_topk_intI<T, S, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 2)
-    select_beam_rough_topk_I32in<T, 2>
+    select_beam_rough_topk_intI<T, S, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 4)
-    select_beam_rough_topk_I32in<T, 4>
+    select_beam_rough_topk_intI<T, S, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 8)
-    select_beam_rough_topk_I32in<T, 8>
+    select_beam_rough_topk_intI<T, S, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 16)
-    select_beam_rough_topk_I32in<T, 16>
+    select_beam_rough_topk_intI<T, S, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 32)
-    select_beam_rough_topk_I32in<T, 32>
+    select_beam_rough_topk_intI<T, S, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
 }
 
-template void select_beam_rough_topk_I32in_launcher<float>(
+template void select_beam_rough_topk_intI_launcher<float, int32_t>(
     const int32_t *logits, const float *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -1900,7 +1898,7 @@ template void select_beam_rough_topk_I32in_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
-template void select_beam_rough_topk_I32in_launcher<__half>(
+template void select_beam_rough_topk_intI_launcher<__half, int32_t>(
     const int32_t *logits, const __half *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -1908,221 +1906,7 @@ template void select_beam_rough_topk_I32in_launcher<__half>(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
-/**
-@brief: select_beam_rough_topk
-one block for one beam, compute the log seq probability ended with every token
-in
-vocab, base on the previous log seq probability and current step's logit, select
-rough topK candidate.
-
-@thread
-gridDim.x = batch_size * beam_size
-blockDim.x = max_thread_per_block
-
-@param
-logits: [batch_size, beam_size, vocab_size], cur step logit
-logit_bias: [vocab_size], logit bias
-seq_probs: [batch_size, beam_size], prefix sequence log probability
-seq_score: [batch_size, beam_size], prefix sequence score
-alive_seq: [batch_size, beam_size, max_step], prefix sequence id
-can_idx: [batch_size, beam_size, vocab_size], topk candidate's index
-can_score: [batch_size, beam_size, vocab_size], topk candidate's score
-num_beam_can: [1 + batch_size * beam_size].
-    the first ele save the number of topk candidate of the whole batch
-    the remaining batch_size * beam_size ele save the number of topk candidate
-    of each beam
-vocab_size: the vocab size of decoder
-max_step: max decode step
-length_norm: length penlty value for current step
-cur_step: current step
-diverse_lambda: lambda for diverse beam search
-*/
-template <typename T, int beam_size>
-__global__ void select_beam_rough_topk_I8in(
-    const int8_t *logits, const T *logit_bias, const float *seq_probs,
-    const float *seq_score, const int *alive_seq, float dequant_scale,
-    int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
-    int max_step, float length_norm, int cur_step, float diverse_lambda,
-    int end_id) {
-  if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
-    // this is a finished beam
-    if (threadIdx.x == 0) {
-      num_beam_can[blockIdx.x + 1] = 1;      // generate one candidate
-      int pos = atomicAdd(num_beam_can, 1);  // get a candidate pos
-      if (diverse_lambda == 0) {
-        can_score[pos] =
-            seq_score[blockIdx.x];  // this beam's score will not be change
-      } else {
-        // add the beam id offset in score to sort in each beam
-        int batch_id = blockIdx.x / beam_size;
-        can_score[pos] = seq_score[blockIdx.x] +
-                         (blockIdx.x - batch_id) * min_log_probability;
-      }
-      can_idx[pos] = end_id + (blockIdx.x % beam_size) * vocab_size;  // EOS
-    }
-    return;
-  }
-
-  /* step1: compute each thread's max_logit and sum_exp_logit, store in
-   * rough_top_kth_logit, sum_exp_logit */
-  const int block_start = blockIdx.x * vocab_size;
-  const int left_idx = block_start + threadIdx.x;
-  const int right_idx = (blockIdx.x + 1) * vocab_size;
-  float rough_top_kth_logit = CUDA_FLOAT_INF_NEG;
-  float sum_exp_logit = 0;
-  for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
-
-    float lgt = (float)logits[input_i] * dequant_scale +
-                (float)__ldg(&logit_bias[i - block_start]);
-    rough_top_kth_logit = fmaxf(rough_top_kth_logit, lgt);
-  }
-  float max_logit = blockReduceMax(rough_top_kth_logit);
-  __shared__ float s_max_logit;
-  if (threadIdx.x == 0) {
-    s_max_logit = max_logit;
-  }
-  __syncthreads();
-  for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
-    float lgt =
-        fmaxf((float)(logits[input_i]) * dequant_scale +
-                  (float)__ldg(&logit_bias[i - block_start]) - s_max_logit,
-              logit_thresh_min);
-    sum_exp_logit += expf(lgt);
-  }
-
-  /*
-  step2: compute rough top-kth-logits and sum_exp_logit among the whole beam,
-  saved into s_topk and
-      s_log_prob_base
-  */
-  __shared__ float
-      s_log_prob_base;      // prefix sequence log prob - log_sum_exp_logit
-  __shared__ float s_topk;  // rough top k-th value of logits
-  __shared__ int num_cur_beam_can;  // candidate number for this beam
-  sum_exp_logit = blockReduceSum(sum_exp_logit);
-  rough_top_kth_logit = blockRoughTopK<float, beam_size>(rough_top_kth_logit);
-  if (threadIdx.x == 0) {
-    s_log_prob_base = seq_probs[blockIdx.x] - logf(sum_exp_logit) - s_max_logit;
-    s_topk = rough_top_kth_logit;
-    num_cur_beam_can = 0;
-  }
-
-  /*
-  step3 : select the candidate token with logits bigger than s_topk,
-          compute the seq probability ended with them,
-      save the probability, token_index, selected token number.
-  */
-  int idx = left_idx;
-  int batch_id = blockIdx.x / beam_size;
-  int batch_start_pos = batch_id * beam_size * vocab_size;
-  // int unk_vocab_id = vocab_size - 3;  // last three element: unk, start, eos
-  __shared__ int l_n;  // current iteration candidate number
-  for (int iter = 0; iter < (vocab_size + blockDim.x - 1) / blockDim.x;
-       iter++) {
-    // zero the counter
-    if (threadIdx.x == 0) l_n = 0;
-    __syncthreads();
-
-    float lgt = CUDA_FLOAT_INF_NEG - 1.f;  // min s_topk is CUDA_FLOAT_INF_NEG
-    int pos;
-    int vocab_id = idx - block_start;
-
-    int row_id = blockIdx.x;
-    int col_id = vocab_id;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
-
-    // if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
-    if (vocab_id < vocab_size) {
-      lgt = (float)(logits[input_i]) * dequant_scale +
-            (float)__ldg(&logit_bias[vocab_id]);
-      if (lgt >= s_topk)
-        // pos: relative pos inside this iteration
-        pos = atomicAdd(&l_n, 1);
-    }
-    __syncthreads();
-
-    // leader increments the global counter
-    if (threadIdx.x == 0) {
-      atomicAdd(&num_cur_beam_can, l_n);
-      l_n = atomicAdd(num_beam_can, l_n);
-    }
-    __syncthreads();
-
-    // threads with true predicates write their elements
-    if ((lgt >= s_topk)) {
-      pos += l_n;  // increment local pos by global counter
-      if (diverse_lambda == 0) {
-        can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
-                               min_log_probability + 1.f) +
-                         batch_id * min_log_probability;
-      } else {
-        can_score[pos] = fmaxf((lgt + s_log_prob_base) * length_norm,
-                               min_log_probability + 1.f) +
-                         blockIdx.x * min_log_probability;
-      }
-      can_idx[pos] = idx - batch_start_pos;
-    }
-    __syncthreads();
-    idx += blockDim.x;
-  }
-  if (threadIdx.x == 0) {
-    num_beam_can[blockIdx.x + 1] = num_cur_beam_can;
-  }
-}
-
-template <typename T>
-void select_beam_rough_topk_I8in_launcher(
-    const int8_t *logits, const T *logit_bias, const float *seq_probs,
-    const float *seq_score, const int *alive_seq, float dequant_scale,
-    int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
-    int max_step, float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id) {
-  if (beam_size == 1)
-    select_beam_rough_topk_I8in<T, 1>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-  if (beam_size == 2)
-    select_beam_rough_topk_I8in<T, 2>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-  if (beam_size == 4)
-    select_beam_rough_topk_I8in<T, 4>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-  if (beam_size == 8)
-    select_beam_rough_topk_I8in<T, 8>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-  if (beam_size == 16)
-    select_beam_rough_topk_I8in<T, 16>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-  if (beam_size == 32)
-    select_beam_rough_topk_I8in<T, 32>
-        <<<step_token_num, max_thread_per_block, 0, stream>>>(
-            logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
-            can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
-}
-
-template void select_beam_rough_topk_I8in_launcher<float>(
+template void select_beam_rough_topk_intI_launcher<float, int8_t>(
     const int8_t *logits, const float *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2130,7 +1914,7 @@ template void select_beam_rough_topk_I8in_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
-template void select_beam_rough_topk_I8in_launcher<__half>(
+template void select_beam_rough_topk_intI_launcher<__half, int8_t>(
     const int8_t *logits, const __half *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,

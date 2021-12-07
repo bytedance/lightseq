@@ -9,6 +9,8 @@
 namespace lightseq {
 namespace cuda {
 
+const bool full_int8 = true;
+
 // for int8 cublasLtMM with algo
 // ATransform should be m*n, CUBLASLT_ORDER_COL32
 // kernel should be n*k, CUBLASLT_ORDER_COL4_4R2_8C or

@@ -84,15 +84,14 @@ void ker_arrange_decself_qkv_int32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max,
-    bool input_col32);
+    int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
 void ker_arrange_decself_qkv_int8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float dequant_scale);
 
 template <typename T>
 void ker_arrange_encdec_q_int32I_launcher(
@@ -101,18 +100,9 @@ void ker_arrange_encdec_q_int32I_launcher(
     int dim_per_head, int head_num, int max_thread_per_block, float quant_scale,
     float clip_max, bool input_col32);
 
-template <typename T>
-void select_beam_rough_topk_I32in_launcher(
-    const int32_t *logits, const T *logit_bias, const float *seq_probs,
-    const float *seq_score, const int *alive_seq, float dequant_scale,
-    int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
-    int max_step, float length_norm, int cur_step, int step_token_num,
-    int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
-
-template <typename T>
-void select_beam_rough_topk_I8in_launcher(
-    const int8_t *logits, const T *logit_bias, const float *seq_probs,
+template <typename T, typename S>
+void select_beam_rough_topk_intI_launcher(
+    const S *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
