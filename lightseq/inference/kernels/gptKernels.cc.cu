@@ -400,7 +400,7 @@ template <typename T>
 __global__ void ker_ppl(const T* logits, const int* input_ids,
                         const int* real_seq_len, float* ppl, int vocab_size) {
   int seq_len = real_seq_len[blockIdx.x];  // remove "eos"
-  if (blockIdx.y >= seq_len) {
+  if (blockIdx.y >= seq_len - 1) {
     // will not contribute to ppl
     return;
   }
