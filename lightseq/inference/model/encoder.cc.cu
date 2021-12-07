@@ -337,15 +337,15 @@ void Encoder<OpType_>::ffn_add_norm() {
     ker_bias_gelu_int32I_int8O_launcher<_DataType>(
         _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _quant_scale * _quant_scale,
-        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6],
+        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
+            (_quant_scale * _quant_scale),
         _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true);
   } else {
     ker_bias_relu_int32I_int8O_launcher<_DataType>(
         _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _quant_scale * _quant_scale,
-        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6],
+        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
+            (_quant_scale * _quant_scale),
         _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true, true);
   }
   /* ---step 2. second ffn layer--- */
