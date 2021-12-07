@@ -1184,7 +1184,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
 
 #ifdef INT8_MODE
   if (full_int8)
-    select_beam_rough_topk_intI_launcher(
+    select_beam_rough_topk_int8I_launcher(
         _int8_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _p_d_alive_seq_score, _p_d_alive_seq, _logits_clip_max / _quant_scale,
         _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
@@ -1192,7 +1192,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
         _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
         _tw._end_id);
   else
-    select_beam_rough_topk_intI_launcher(
+    select_beam_rough_topk_int32I_launcher(
         _int32_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
         _p_d_alive_seq_score, _p_d_alive_seq,
         _output_ln_clip_max * _trg_scaled_emb_clip_max * _logit_scaler /
