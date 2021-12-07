@@ -70,6 +70,7 @@ class Encoder {
 #ifdef INT8_MODE
   int8_t *_int8_ffn_in_buf;
   int32_t *_int32_ffn_out_buf;
+  int8_t *_int8_ffn_out_buf;
 #endif
 
   // {token_emb, pos_emb, norm_scale, norm_bias}

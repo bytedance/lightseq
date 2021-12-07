@@ -89,11 +89,25 @@ void ker_residual_bias_ln_i32I_launcher(
     const T *colsum = nullptr);
 
 template <typename T>
+void ker_residual_bias_ln_i8I_launcher(
+    const int8_t *input, const T *scale, const T *bias, const T *residual,
+    T *output, int batch_tokens, int hidden_size, float recover_scale,
+    int max_thread_per_block, cudaStream_t stream, bool input_col32 = false,
+    const T *colsum = nullptr);
+
+template <typename T>
 void ker_arrange_encself_qkv_int32I_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
-    float quant_scale, float clip_max, bool in_col32 = false);
+    float dequant_scale, bool in_col32 = false);
+
+template <typename T>
+void ker_arrange_encself_qkv_int8I_launcher(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
+    int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
+    float dequant_scale, bool in_col32 = false);
 
 template <typename T>
 void ker_arrange_atten_output_int8O_launcher(

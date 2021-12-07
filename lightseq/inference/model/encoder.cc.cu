@@ -79,6 +79,8 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
   CHECK_GPU_ERROR(cudaMalloc(&_int8_ffn_in_buf, max_batch_dim));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int32_ffn_out_buf, max_batch_dim * sizeof(int32_t)));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_ffn_out_buf, max_batch_dim * sizeof(int8_t)));
   _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
   _scaled_ffn2_colsum = std::vector<_DataType *>(_tw._n_enc_layer);
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
@@ -117,10 +119,10 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
     } else {
       CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
                                  _tw._hidden_size * sizeof(_DataType)));
+      float relu_scale = _enc_clip_max[_layer_id * 12 + 7] / 2;
       launch_scaled_colsum(_p_d_enc_wei[_weight_offset + 10],
                            _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-                           _tw._hidden_size,
-                           _enc_clip_max[_layer_id * 12 + 7] / 2, _stream);
+                           _tw._hidden_size, relu_scale, _stream);
     }
   }
 #endif
@@ -228,18 +230,35 @@ void Encoder<OpType_>::self_attention() {
         _tw._is_post_ln, true);
   }
 
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num,
-                      _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
-                      _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4],
-                      _cublas_lt_handle, _stream, false);
+  if (full_int8)
+    cublasLtMM_withAlgo_int8IO(
+        _int8_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size * 3,
+        _tw._hidden_size, 0, 0, 0,
+        _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
+            (_enc_clip_max[_layer_id * 12 + 8] * _quant_scale),
+        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4], _cublas_lt_handle,
+        _stream, false);
+  else
+    cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num,
+                        _tw._hidden_size * 3, _tw._hidden_size, 0, 0, 0,
+                        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4],
+                        _cublas_lt_handle, _stream, false);
 
   // get q, k, v by split and reshape qkv
-  ker_arrange_encself_qkv_int32I_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
-      _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
-      _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_scale * _quant_scale,
-      _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4], true);
+  if (full_int8)
+    ker_arrange_encself_qkv_int8I_launcher<_DataType>(
+        _batch_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
+        _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim,
+        _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
+        _enc_clip_max[_layer_id * 12 + 8] / _quant_scale, true);
+  else
+    ker_arrange_encself_qkv_int32I_launcher<_DataType>(
+        _batch_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
+        _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim,
+        _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
+        _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
+            _quant_scale * _quant_scale,
+        true);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
@@ -293,19 +312,37 @@ void Encoder<OpType_>::self_attention() {
       _quant_scale, _enc_clip_max[_layer_id * 12 + 5], true);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
-                      _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_enc_wei[_layer_id * 4 + 1], _cublas_lt_handle,
-                      _stream, false);
+  if (full_int8)
+    cublasLtMM_withAlgo_int8IO(
+        _int8_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
+        _tw._hidden_size, 0, 0, 0,
+        _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
+            (_enc_clip_max[_layer_id * 12 + 9] * _quant_scale),
+        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1],
+        _cublas_lt_handle, _stream, false);
+  else
+    cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num,
+                        _tw._hidden_size, _tw._hidden_size, 0, 0, 0,
+                        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1],
+                        _cublas_lt_handle, _stream, false);
 
-  ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
-      _int32_ffn_out_buf, _p_d_enc_wei[_weight_offset + 6],
-      _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11],
-      _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
-      _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
-          (_quant_scale * _quant_scale),
-      _quant_scale, _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block,
-      _stream, _tw._is_post_ln, true);
+  if (full_int8)
+    ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
+        _int8_ffn_out_buf, _p_d_enc_wei[_weight_offset + 6],
+        _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11],
+        _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
+        _enc_clip_max[_layer_id * 12 + 9] / _quant_scale, _quant_scale,
+        _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block, _stream,
+        _tw._is_post_ln, true);
+  else
+    ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
+        _int32_ffn_out_buf, _p_d_enc_wei[_weight_offset + 6],
+        _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11],
+        _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
+        _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
+            (_quant_scale * _quant_scale),
+        _quant_scale, _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block,
+        _stream, _tw._is_post_ln, true);
 
 #else
   // use v to save reshaped q, since they are in same size and v
@@ -328,31 +365,66 @@ template <OperationType OpType_>
 void Encoder<OpType_>::ffn_add_norm() {
 #ifdef INT8_MODE
 
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._inner_size,
-                      _tw._hidden_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_enc_wei[_layer_id * 4 + 2], _cublas_lt_handle,
-                      _stream, false);
+  if (full_int8)
+    cublasLtMM_withAlgo_int8IO(
+        _int8_ffn_out_buf, 1, _batch_token_num, _tw._inner_size,
+        _tw._hidden_size, 0, 0, 0,
+        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
+            (_enc_clip_max[_layer_id * 12 + 10] * _quant_scale),
+        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 2],
+        _cublas_lt_handle, _stream, false);
+  else
+    cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num,
+                        _tw._inner_size, _tw._hidden_size, 0, 0, 0,
+                        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 2],
+                        _cublas_lt_handle, _stream, false);
 
-  if (_tw._use_gelu) {
-    ker_bias_gelu_int32I_int8O_launcher<_DataType>(
-        _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
-            (_quant_scale * _quant_scale),
-        _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true);
+  if (full_int8) {
+    if (_tw._use_gelu) {
+      ker_bias_gelu_int8I_int8O_launcher<_DataType>(
+          _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
+          _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+          _enc_clip_max[_layer_id * 12 + 10] / _quant_scale, _quant_scale,
+          _enc_clip_max[_layer_id * 12 + 7], true);
+    } else {
+      ker_bias_relu_int8I_int8O_launcher<_DataType>(
+          _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
+          _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+          _enc_clip_max[_layer_id * 12 + 10] / _quant_scale, _quant_scale,
+          _enc_clip_max[_layer_id * 12 + 7], true, false);
+    }
   } else {
-    ker_bias_relu_int32I_int8O_launcher<_DataType>(
-        _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
-        _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
-            (_quant_scale * _quant_scale),
-        _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true, true);
+    if (_tw._use_gelu) {
+      ker_bias_gelu_int32I_int8O_launcher<_DataType>(
+          _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
+          _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+          _enc_clip_max[_layer_id * 12 + 2] *
+              _enc_clip_max[_layer_id * 12 + 6] / (_quant_scale * _quant_scale),
+          _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true);
+    } else {
+      ker_bias_relu_int32I_int8O_launcher<_DataType>(
+          _batch_token_num, _stream, _int32_ffn_out_buf, _int8_ffn_in_buf,
+          _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+          _enc_clip_max[_layer_id * 12 + 2] *
+              _enc_clip_max[_layer_id * 12 + 6] / (_quant_scale * _quant_scale),
+          _quant_scale, _enc_clip_max[_layer_id * 12 + 7], true, true);
+    }
   }
+
   /* ---step 2. second ffn layer--- */
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
-                      _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_enc_wei[_layer_id * 4 + 3], _cublas_lt_handle,
-                      _stream, false);
+  if (full_int8)
+    cublasLtMM_withAlgo_int8IO(
+        _int8_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
+        _tw._inner_size, 0, 0, 0,
+        _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
+            (_enc_clip_max[_layer_id * 12 + 11] * _quant_scale),
+        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 3],
+        _cublas_lt_handle, _stream, false);
+  else
+    cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num,
+                        _tw._hidden_size, _tw._inner_size, 0, 0, 0,
+                        _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 3],
+                        _cublas_lt_handle, _stream, false);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max;
@@ -360,25 +432,41 @@ void Encoder<OpType_>::ffn_add_norm() {
     scale_ptr = _p_d_src_emb_wei[2];
     bias_ptr = _p_d_src_emb_wei[3];
 
-    ker_residual_bias_ln_i32I_launcher<_DataType>(
-        _int32_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
-        _batch_token_num, _tw._hidden_size,
-        _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
-            (2 * _quant_scale * _quant_scale),
-        _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
+    if (full_int8)
+      ker_residual_bias_ln_i8I_launcher<_DataType>(
+          _int8_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
+          _batch_token_num, _tw._hidden_size,
+          _enc_clip_max[_layer_id * 12 + 11] / _quant_scale,
+          _max_thread_per_block, _stream, true);
+    else
+      ker_residual_bias_ln_i32I_launcher<_DataType>(
+          _int32_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
+          _batch_token_num, _tw._hidden_size,
+          _enc_clip_max[_layer_id * 12 + 3] *
+              _enc_clip_max[_layer_id * 12 + 7] /
+              (2 * _quant_scale * _quant_scale),
+          _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
   } else {
     scale_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
     bias_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 1];
     res_bias_ptr =
         _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 5];
     clip_max = _enc_clip_max[(_layer_id + 1) * 12 + 4];
-    ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
-        _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-        _p_d_output, _batch_token_num, _tw._hidden_size,
-        _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
-            (2 * _quant_scale * _quant_scale),
-        _quant_scale, clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
-        true, _scaled_ffn2_colsum[_layer_id]);
+    if (full_int8)
+      ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
+          _int8_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr,
+          _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
+          _enc_clip_max[_layer_id * 12 + 11] / _quant_scale, _quant_scale,
+          clip_max, _max_thread_per_block, _stream, _tw._is_post_ln, true);
+    else
+      ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
+          _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr,
+          _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
+          _enc_clip_max[_layer_id * 12 + 3] *
+              _enc_clip_max[_layer_id * 12 + 7] /
+              (2 * _quant_scale * _quant_scale),
+          _quant_scale, clip_max, _max_thread_per_block, _stream,
+          _tw._is_post_ln, true, _scaled_ffn2_colsum[_layer_id]);
   }
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
