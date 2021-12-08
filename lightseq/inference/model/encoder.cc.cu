@@ -257,7 +257,7 @@ void Encoder<OpType_>::self_attention() {
         _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim,
         _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
         _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
-            _quant_scale * _quant_scale,
+            (_quant_scale * _quant_scale),
         true);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
