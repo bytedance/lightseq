@@ -147,131 +147,6 @@ void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
 }
 
 template <typename T>
-__global__ void ker_norm_layer_i8O(T *matrix, int8_t *output, const T *scale,
-                                   const T *bias, int hidden_size,
-                                   float quant_scale) {
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
-  float val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    val += matrix[i];
-  }
-
-  // step 0. compute mean
-  __shared__ float s_mean;
-  float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
-  __syncthreads();
-
-  // step 1. compute variance
-  val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    float tmp = matrix[i] - s_mean;
-    val += tmp * tmp;
-  }
-  __shared__ float s_var;
-  reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0)
-    s_var = rsqrtf(reduce_res / float(hidden_size) + epsilon);
-  __syncthreads();
-
-  float output_f;
-
-  // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
-    val = matrix[i] - s_mean;
-    output_f = val * s_var * __ldg(&scale[i - block_start]) +
-               __ldg(&bias[i - block_start]);
-    matrix[i] = float2int8(output_f, quant_scale);
-  }
-}
-
-template <>
-__global__ void ker_norm_layer_i8O<__half>(__half *matrix, int8_t *output,
-                                           const __half *scale,
-                                           const __half *bias,
-                                           int half_hidden_size,
-                                           float quant_scale) {
-  uint block_start = blockIdx.x * half_hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = blockIdx.x * half_hidden_size + half_hidden_size;
-  half2 *pmatrix = (half2 *)matrix;
-  char2 *poutput = (char2 *)output;
-  const half2 *pscale = (const half2 *)scale;
-  const half2 *pbias = (const half2 *)bias;
-  float mean_dim = float(half_hidden_size) * 2.f;
-
-  float val = 0.0;
-  // step 0. compute mean
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-    val += local_f2.x + local_f2.y;
-  }
-  __shared__ float s_mean;
-  float reduce_res = blockReduceSum<float>(val);
-  if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
-  __syncthreads();
-
-  // step 1. compute variance
-  val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-    float tmpx = local_f2.x - s_mean;
-    float tmpy = local_f2.y - s_mean;
-    val += tmpx * tmpx + tmpy * tmpy;
-  }
-  __shared__ float s_var;
-  reduce_res = blockReduceSum(val);
-  if (threadIdx.x == 0) s_var = rsqrtf(reduce_res / mean_dim + epsilon);
-  __syncthreads();
-
-  char2 output_c2;
-
-  // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
-    float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
-    float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-    local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
-    local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
-    output_c2.x = float2int8(local_f2.x, quant_scale);
-    output_c2.y = float2int8(local_f2.y, quant_scale);
-    poutput[i] = output_c2;
-  }
-}
-
-template <typename T>
-void ker_norm_layer_i8O_launcher(int token_num, int hidden_size,
-                                 cudaStream_t stream, T *matrix, int8_t *output,
-                                 const T *scale, const T *bias,
-                                 int max_thread_per_block, float quant_scale) {
-  ker_norm_layer_i8O<T><<<token_num, max_thread_per_block, 0, stream>>>(
-      matrix, output, scale, bias, hidden_size, quant_scale);
-}
-
-template <>
-void ker_norm_layer_i8O_launcher<__half>(int token_num, int hidden_size,
-                                         cudaStream_t stream, __half *matrix,
-                                         int8_t *output, const __half *scale,
-                                         const __half *bias,
-                                         int max_thread_per_block,
-                                         float quant_scale) {
-  ker_norm_layer_i8O<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      matrix, output, scale, bias, hidden_size / 2, quant_scale);
-}
-
-template void ker_norm_layer_i8O_launcher<float>(
-    int token_num, int hidden_size, cudaStream_t stream, float *matrix,
-    int8_t *output, const float *scale, const float *bias,
-    int max_thread_per_block, float quant_scale);
-
-template void ker_norm_layer_i8O_launcher<__half>(
-    int token_num, int hidden_size, cudaStream_t stream, __half *matrix,
-    int8_t *output, const __half *scale, const __half *bias,
-    int max_thread_per_block, float quant_scale);
-
-template <typename T>
 __global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
                                           const T *scale, const T *bias,
                                           const T *residual_bias,
@@ -1635,100 +1510,6 @@ template void ker_bias_relu_i8I_i8O_launcher<__half>(
     float clip_max, bool in_out_col32, bool narrow_clip);
 
 template <typename T>
-__global__ void ker_residual_i32I(int32_t *input, T *output, int total_count,
-                                  float dequant_scale, T *colsum, int cols) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (i * 4 >= total_count) return;
-
-  float4 *out4 = reinterpret_cast<float4 *>(output);
-  const int4 *data4 = reinterpret_cast<const int4 *>(input);
-  const int4 input4 = data4[i];
-  float4 output4 = out4[i];
-
-  float4 *colsum4;
-  float4 cs4;
-  if (colsum) {
-    colsum4 = reinterpret_cast<float4 *>(colsum);
-    cs4 = colsum4[i % (cols / 4)];
-  }
-
-  output4.x += float(input4.x) * dequant_scale + (colsum ? cs4.x : 0);
-  output4.y += float(input4.y) * dequant_scale + (colsum ? cs4.y : 0);
-  output4.z += float(input4.z) * dequant_scale + (colsum ? cs4.z : 0);
-  output4.w += float(input4.w) * dequant_scale + (colsum ? cs4.w : 0);
-
-  out4[i] = output4;
-}
-
-/* fp16 version */
-template <>
-__global__ void ker_residual_i32I<__half>(int32_t *input, __half *output,
-                                          int total_count, float dequant_scale,
-                                          __half *colsum, int cols) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (i * 8 >= total_count) return;
-
-  const long4 *vals_long4 = reinterpret_cast<const long4 *>(input);
-  float4 *outs_h8 = reinterpret_cast<float4 *>(output);
-
-  long4 val_long4 = vals_long4[i];
-  int32_t *val1 = reinterpret_cast<int32_t *>(&val_long4);
-  float4 out_h8 = outs_h8[i];
-  __half *out_h1 = reinterpret_cast<__half *>(&out_h8);
-
-  float4 *colsum_h8;
-  float4 cs_h8;
-  __half *cs_h1;
-  if (colsum) {
-    colsum_h8 = reinterpret_cast<float4 *>(colsum);
-    cs_h8 = colsum_h8[i % (cols / 8)];
-    cs_h1 = reinterpret_cast<__half *>(&cs_h8);
-  }
-
-#pragma unroll
-  for (uint j = 0; j < 8; ++j) {
-    out_h1[j] = __hadd(out_h1[j], __float2half(float(val1[j]) * dequant_scale));
-    if (colsum) {
-      out_h1[j] = __hadd(out_h1[j], cs_h1[j]);
-    }
-  }
-  outs_h8[i] = out_h8;
-}
-
-template <typename T>
-void ker_residual_i32I_launcher(int32_t *input, T *output, int total_ele_num,
-                                float dequant_scale, cudaStream_t stream,
-                                T *colsum, int cols) {
-  int grid_dim = total_ele_num >> 10;
-  ker_residual_i32I<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, total_ele_num, dequant_scale, colsum, cols);
-}
-
-template <>
-void ker_residual_i32I_launcher<__half>(int32_t *input, __half *output,
-                                        int total_ele_num, float dequant_scale,
-                                        cudaStream_t stream, __half *colsum,
-                                        int cols) {
-  int grid_dim = total_ele_num >> 11;
-  ker_residual_i32I<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, total_ele_num, dequant_scale, colsum, cols);
-}
-
-template void ker_residual_i32I_launcher<float>(int32_t *input, float *output,
-                                                int total_ele_num,
-                                                float dequant_scale,
-                                                cudaStream_t stream,
-                                                float *colsum, int cols);
-
-template void ker_residual_i32I_launcher<__half>(int32_t *input, __half *output,
-                                                 int total_ele_num,
-                                                 float dequant_scale,
-                                                 cudaStream_t stream,
-                                                 __half *colsum, int cols);
-
-template <typename T>
 __global__ void ker_arrange_encself_qkv_i32I(
     const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
@@ -2160,15 +1941,21 @@ __global__ void ker_arrange_decself_qkv_i8I(const int8_t *ori_qkv,
                                             const T *qkv_bias, T *new_q,
                                             T *new_k, T *new_v, int head_num,
                                             int dim_per_head, int max_step,
-                                            int step_id, float dequant_scale) {
+                                            int step_id, float dequant_scale,
+                                            bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
-    int row_id = blockIdx.x;
-    int col_id = blockIdx.y * hidden_size + i;
-    int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
-                                           gridDim.y * hidden_size);
-    T val = float(ori_qkv[col32_index]) * dequant_scale +
+    int qkv_index;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = blockIdx.y * hidden_size + i;
+      qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                       gridDim.y * hidden_size);
+    } else {
+      qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i;
+    }
+    T val = float(ori_qkv[qkv_index]) * dequant_scale +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
         blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
@@ -2195,19 +1982,24 @@ template <>
 __global__ void ker_arrange_decself_qkv_i8I<__half>(
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    float dequant_scale) {
+    float dequant_scale, bool in_col32) {
   int half_hidden_size = dim_per_head * head_num;
-  const char2 *p_qkv = reinterpret_cast<const char2 *>(ori_qkv);
-  const half2 *p_bias = reinterpret_cast<const half2 *>(qkv_bias);
+  const char2 *p_qkv = (const char2 *)ori_qkv;
+  const half2 *p_bias = (const half2 *)qkv_bias;
   char2 v_ori_qkv;
   half2 ori_qkv_h2;
   for (std::size_t i = threadIdx.x; i < half_hidden_size; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = (blockIdx.y * half_hidden_size + i) * 2;
-    int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
-                                           gridDim.y * half_hidden_size) >>
-                      1;
-    v_ori_qkv = p_qkv[col32_index];
+    int qkv_index;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = (blockIdx.y * half_hidden_size + i) * 2;
+      qkv_index = row_major2flat_col32(row_id, col_id, gridDim.x,
+                                       gridDim.y * half_hidden_size * 2) >>
+                  1;
+    } else {
+      qkv_index = (blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i;
+    }
+    v_ori_qkv = p_qkv[qkv_index];
     ori_qkv_h2.x = __float2half(float(v_ori_qkv.x) * dequant_scale);
     ori_qkv_h2.y = __float2half(float(v_ori_qkv.y) * dequant_scale);
     half2 val =
@@ -2238,11 +2030,11 @@ void ker_arrange_decself_qkv_i8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale) {
+    int max_thread_per_block, float dequant_scale, bool in_col32) {
   ker_arrange_decself_qkv_i8I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
-          max_step, step_id, dequant_scale);
+          max_step, step_id, dequant_scale, in_col32);
 }
 
 template <>
@@ -2250,24 +2042,24 @@ void ker_arrange_decself_qkv_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale) {
+    int max_thread_per_block, float dequant_scale, bool in_col32) {
   ker_arrange_decself_qkv_i8I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
-          max_step, step_id, dequant_scale);
+          max_step, step_id, dequant_scale, in_col32);
 }
 
 template void ker_arrange_decself_qkv_i8I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale);
+    int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template void ker_arrange_decself_qkv_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale);
+    int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
 __global__ void ker_arrange_encdec_q_i32I(const int32_t *ori_q, const T *q_bias,
@@ -2493,7 +2285,7 @@ __global__ void select_beam_rough_topk_i32I(
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, float diverse_lambda,
-    int end_id) {
+    int end_id, bool in_col32) {
   if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
@@ -2521,11 +2313,15 @@ __global__ void select_beam_rough_topk_i32I(
   float rough_top_kth_logit = CUDA_FLOAT_INF_NEG;
   float sum_exp_logit = 0;
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
-
-    float lgt = (float)logits[input_i] * dequant_scale +
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = i;
+    }
+    float lgt = (float)logits[logits_idx] * dequant_scale +
                 (float)__ldg(&logit_bias[i - block_start]);
     rough_top_kth_logit = fmaxf(rough_top_kth_logit, lgt);
   }
@@ -2536,11 +2332,16 @@ __global__ void select_beam_rough_topk_i32I(
   }
   __syncthreads();
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = i;
+    }
     float lgt =
-        fmaxf((float)(logits[input_i]) * dequant_scale +
+        fmaxf((float)(logits[logits_idx]) * dequant_scale +
                   (float)__ldg(&logit_bias[i - block_start]) - s_max_logit,
               logit_thresh_min);
     sum_exp_logit += expf(lgt);
@@ -2583,13 +2384,18 @@ __global__ void select_beam_rough_topk_i32I(
     int pos;
     int vocab_id = idx - block_start;
 
-    int row_id = blockIdx.x;
-    int col_id = vocab_id;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = vocab_id;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = idx;
+    }
 
     // if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
     if (vocab_id < vocab_size) {
-      lgt = (float)(logits[input_i]) * dequant_scale +
+      lgt = (float)(logits[logits_idx]) * dequant_scale +
             (float)__ldg(&logit_bias[vocab_id]);
       if (lgt >= s_topk)
         // pos: relative pos inside this iteration
@@ -2633,43 +2439,43 @@ void select_beam_rough_topk_i32I_launcher(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id) {
+    float diverse_lambda, int end_id, bool in_col32) {
   if (beam_size == 1)
     select_beam_rough_topk_i32I<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 2)
     select_beam_rough_topk_i32I<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 4)
     select_beam_rough_topk_i32I<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 8)
     select_beam_rough_topk_i32I<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 16)
     select_beam_rough_topk_i32I<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 32)
     select_beam_rough_topk_i32I<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
 }
 
 template void select_beam_rough_topk_i32I_launcher<float>(
@@ -2678,7 +2484,7 @@ template void select_beam_rough_topk_i32I_launcher<float>(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32);
 
 template void select_beam_rough_topk_i32I_launcher<__half>(
     const int32_t *logits, const __half *logit_bias, const float *seq_probs,
@@ -2686,7 +2492,7 @@ template void select_beam_rough_topk_i32I_launcher<__half>(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32);
 
 template <typename T, int beam_size>
 __global__ void select_beam_rough_topk_i8I(
@@ -2694,7 +2500,7 @@ __global__ void select_beam_rough_topk_i8I(
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, float diverse_lambda,
-    int end_id) {
+    int end_id, bool in_col32) {
   if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
@@ -2722,11 +2528,16 @@ __global__ void select_beam_rough_topk_i8I(
   float rough_top_kth_logit = CUDA_FLOAT_INF_NEG;
   float sum_exp_logit = 0;
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = i;
+    }
 
-    float lgt = (float)logits[input_i] * dequant_scale +
+    float lgt = (float)logits[logits_idx] * dequant_scale +
                 (float)__ldg(&logit_bias[i - block_start]);
     rough_top_kth_logit = fmaxf(rough_top_kth_logit, lgt);
   }
@@ -2737,11 +2548,17 @@ __global__ void select_beam_rough_topk_i8I(
   }
   __syncthreads();
   for (int i = left_idx; i < right_idx; i += blockDim.x) {
-    int row_id = blockIdx.x;
-    int col_id = i - block_start;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = i;
+    }
+
     float lgt =
-        fmaxf((float)(logits[input_i]) * dequant_scale +
+        fmaxf((float)(logits[logits_idx]) * dequant_scale +
                   (float)__ldg(&logit_bias[i - block_start]) - s_max_logit,
               logit_thresh_min);
     sum_exp_logit += expf(lgt);
@@ -2784,13 +2601,18 @@ __global__ void select_beam_rough_topk_i8I(
     int pos;
     int vocab_id = idx - block_start;
 
-    int row_id = blockIdx.x;
-    int col_id = vocab_id;
-    int input_i = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    int logits_idx;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = vocab_id;
+      logits_idx = row_major2flat_col32(row_id, col_id, gridDim.x, vocab_size);
+    } else {
+      logits_idx = idx;
+    }
 
     // if ((vocab_id < vocab_size) && (vocab_id != unk_vocab_id)) {
     if (vocab_id < vocab_size) {
-      lgt = (float)(logits[input_i]) * dequant_scale +
+      lgt = (float)(logits[logits_idx]) * dequant_scale +
             (float)__ldg(&logit_bias[vocab_id]);
       if (lgt >= s_topk)
         // pos: relative pos inside this iteration
@@ -2834,43 +2656,43 @@ void select_beam_rough_topk_i8I_launcher(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id) {
+    float diverse_lambda, int end_id, bool in_col32) {
   if (beam_size == 1)
     select_beam_rough_topk_i8I<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 2)
     select_beam_rough_topk_i8I<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 4)
     select_beam_rough_topk_i8I<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 8)
     select_beam_rough_topk_i8I<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 16)
     select_beam_rough_topk_i8I<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
   if (beam_size == 32)
     select_beam_rough_topk_i8I<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, in_col32);
 }
 
 template void select_beam_rough_topk_i8I_launcher<float>(
@@ -2879,7 +2701,7 @@ template void select_beam_rough_topk_i8I_launcher<float>(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32);
 
 template void select_beam_rough_topk_i8I_launcher<__half>(
     const int8_t *logits, const __half *logit_bias, const float *seq_probs,
@@ -2887,7 +2709,7 @@ template void select_beam_rough_topk_i8I_launcher<__half>(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32);
 
 }  // namespace cuda
 }  // namespace lightseq

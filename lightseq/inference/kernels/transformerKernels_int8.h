@@ -18,12 +18,6 @@ void launch_dequantize_tensor(const int32_t *input, T *output, int batch_tokens,
                               cudaStream_t &stream, bool in_col32 = false);
 
 template <typename T>
-void ker_norm_layer_i8O_launcher(int token_num, int hidden_size,
-                                 cudaStream_t stream, T *matrix, int8_t *output,
-                                 const T *scale, const T *bias,
-                                 int max_thread_per_block, float quant_scale);
-
-template <typename T>
 void ker_norm_layer_resual_i8O_launcher(
     int token_num, int hidden_size, cudaStream_t stream, T *input,
     int8_t *output, const T *scale, const T *bias, const T *residual_bias,
@@ -44,6 +38,7 @@ void ker_bias_gelu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     float dequant_scale, float quant_scale,
                                     bool in_out_col32 = false);
 
+// TODO: remove clip_max
 template <typename T>
 void ker_bias_relu_i32I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                      int32_t *input, int8_t *output,
@@ -52,6 +47,7 @@ void ker_bias_relu_i32I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                      float clip_max, bool in_out_col32 = false,
                                      bool narrow_clip = false);
 
+// TODO: remove clip_max
 template <typename T>
 void ker_bias_relu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     int8_t *input, int8_t *output,
@@ -59,11 +55,6 @@ void ker_bias_relu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     float dequant_scale, float quant_scale,
                                     float clip_max, bool in_out_col32 = false,
                                     bool narrow_clip = false);
-
-template <typename T>
-void ker_residual_i32I_launcher(int32_t *input, T *output, int total_ele_num,
-                                float dequant_scale, cudaStream_t stream,
-                                T *colsum = nullptr, int cols = 0);
 
 template <typename T>
 void ker_residual_bias_ln_i32I_i8O_launcher(
@@ -127,16 +118,14 @@ void ker_arrange_decself_qkv_i8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale);
+    int max_thread_per_block, float dequant_scale, bool in_col32 = false);
 
 template <typename T>
-void ker_arrange_encdec_q_i32I_launcher(int step_token_num, int hidden_size,
-                                        cudaStream_t stream,
-                                        const int32_t *ori_q, const T *q_bias,
-                                        T *new_q, int beam_size,
-                                        int dim_per_head, int head_num,
-                                        int max_thread_per_block,
-                                        float dequant_scale, bool in_col32);
+void ker_arrange_encdec_q_i32I_launcher(
+    int step_token_num, int hidden_size, cudaStream_t stream,
+    const int32_t *ori_q, const T *q_bias, T *new_q, int beam_size,
+    int dim_per_head, int head_num, int max_thread_per_block,
+    float dequant_scale, bool in_col32 = false);
 
 template <typename T>
 void ker_arrange_encdec_q_i8I_launcher(int step_token_num, int hidden_size,
@@ -144,7 +133,8 @@ void ker_arrange_encdec_q_i8I_launcher(int step_token_num, int hidden_size,
                                        const T *q_bias, T *new_q, int beam_size,
                                        int dim_per_head, int head_num,
                                        int max_thread_per_block,
-                                       float dequant_scale, bool in_col32);
+                                       float dequant_scale,
+                                       bool in_col32 = false);
 
 template <typename T>
 void select_beam_rough_topk_i32I_launcher(
@@ -153,7 +143,7 @@ void select_beam_rough_topk_i32I_launcher(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32 = false);
 
 template <typename T>
 void select_beam_rough_topk_i8I_launcher(
@@ -162,7 +152,7 @@ void select_beam_rough_topk_i8I_launcher(
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool in_col32 = false);
 
 }  // namespace cuda
 }  // namespace lightseq
