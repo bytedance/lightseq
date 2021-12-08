@@ -83,7 +83,7 @@ class Encoder {
   const std::vector<const _DataType *> &_p_d_enc_wei;
 #ifdef INT8_MODE
   std::vector<int8_t *> _int8_p_d_enc_wei;
-  const float _quant_scale = 127;
+  const float _quant_range = 127;
   const float _src_scaled_emb_clip_max;
   const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;

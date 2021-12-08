@@ -151,7 +151,7 @@ class TransformerWeight {
   int _multilg_type;
 
 #ifdef INT8_MODE
-  const float _quant_scale = 127;
+  const float _quant_range = 127;
 #endif
 
   void print_model_config() {

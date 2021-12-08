@@ -26,7 +26,7 @@ void cublasLtMM_withAlgo(
 // ATransform should be m*k CUBLASLT_ORDER_COL32
 // kernel should be n*k CUBLASLT_ORDER_COL4_4R2_8C
 // res is m*n CUBLASLT_ORDER_COL32
-void cublasLtMM_withAlgo_int8IO(
+void cublasLtMM_withAlgo_i8IO(
     int8_t* res, int batchCount, int m, int n, int k, int64_t stridea,
     int64_t strideb, int64_t stridec, const float alpha,
     const int8_t* ATransform, const int8_t* kernel,

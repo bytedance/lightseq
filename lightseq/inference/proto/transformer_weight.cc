@@ -116,7 +116,7 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
   if (layer.token_embedding().size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (unsigned char ele : layer.token_embedding())
-    value.push_back(dequantize(ele, _quant_scale, layer.scaled_emb_clip_max()));
+    value.push_back(dequantize(ele, _quant_range, layer.scaled_emb_clip_max()));
   idx += vocab_size * _hidden_size;
 
   if (source == "src")
@@ -172,7 +172,7 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
                                                         per_layer_ele_num +
                                                     ele_id];
         value.push_back(dequantize(
-            ele, _quant_scale,
+            ele, _quant_range,
             layer.encode_output_project_kernel_kv_clip_max(layer_id)));
       }
       _encode_output_project_kernel_kv_clip_max.push_back(
@@ -266,7 +266,7 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
       return "Wrong multihead_project_kernel_qkv_size !";
     for (unsigned char ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(
-          dequantize(ele, _quant_scale,
+          dequantize(ele, _quant_range,
                      enc_layer.multihead_project_kernel_qkv_clip_max()));
 #else
     if (enc_layer.multihead_project_kernel_qkv_size() !=
@@ -291,7 +291,7 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
       return "Wrong multihead_project_kernel_output_size !";
     for (unsigned char ele : enc_layer.multihead_project_kernel_output())
       value.push_back(
-          dequantize(ele, _quant_scale,
+          dequantize(ele, _quant_range,
                      enc_layer.multihead_project_kernel_output_clip_max()));
 #else
     if (enc_layer.multihead_project_kernel_output_size() !=
@@ -327,7 +327,7 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
       return "Wrong ffn_first_kernel_size !";
     for (unsigned char ele : enc_layer.ffn_first_kernel())
       value.push_back(
-          dequantize(ele, _quant_scale, enc_layer.ffn_first_kernel_clip_max()));
+          dequantize(ele, _quant_range, enc_layer.ffn_first_kernel_clip_max()));
 #else
     if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
@@ -346,7 +346,7 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     if (enc_layer.ffn_second_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (unsigned char ele : enc_layer.ffn_second_kernel())
-      value.push_back(dequantize(ele, _quant_scale,
+      value.push_back(dequantize(ele, _quant_range,
                                  enc_layer.ffn_second_kernel_clip_max()));
 #else
     if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
@@ -418,7 +418,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
         _hidden_size * _hidden_size * 3)
       return "Wrong self_project_kernel_qkv size !";
     for (unsigned char ele : dec_layer.self_project_kernel_qkv())
-      value.push_back(dequantize(ele, _quant_scale,
+      value.push_back(dequantize(ele, _quant_range,
                                  dec_layer.self_project_kernel_qkv_clip_max()));
 #else
     if (dec_layer.self_project_kernel_qkv_size() !=
@@ -441,7 +441,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
       return "Wrong self_project_kernel_output size !";
     for (unsigned char ele : dec_layer.self_project_kernel_output())
       value.push_back(dequantize(
-          ele, _quant_scale, dec_layer.self_project_kernel_output_clip_max()));
+          ele, _quant_range, dec_layer.self_project_kernel_output_clip_max()));
 #else
     if (dec_layer.self_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
@@ -475,7 +475,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
         _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_q size !";
     for (unsigned char ele : dec_layer.encdec_project_kernel_q())
-      value.push_back(dequantize(ele, _quant_scale,
+      value.push_back(dequantize(ele, _quant_range,
                                  dec_layer.encdec_project_kernel_q_clip_max()));
 #else
     if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
@@ -497,7 +497,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
       return "Wrong encdec_project_kernel_output size !";
     for (unsigned char ele : dec_layer.encdec_project_kernel_output())
       value.push_back(
-          dequantize(ele, _quant_scale,
+          dequantize(ele, _quant_range,
                      dec_layer.encdec_project_kernel_output_clip_max()));
 #else
     if (dec_layer.encdec_project_kernel_output_size() !=
@@ -533,7 +533,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
       return "Wrong ffn_first_kernel_size !";
     for (unsigned char ele : dec_layer.ffn_first_kernel())
       value.push_back(
-          dequantize(ele, _quant_scale, dec_layer.ffn_first_kernel_clip_max()));
+          dequantize(ele, _quant_range, dec_layer.ffn_first_kernel_clip_max()));
 #else
     if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
@@ -552,7 +552,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     if (dec_layer.ffn_second_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (unsigned char ele : dec_layer.ffn_second_kernel())
-      value.push_back(dequantize(ele, _quant_scale,
+      value.push_back(dequantize(ele, _quant_range,
                                  dec_layer.ffn_second_kernel_clip_max()));
 #else
     if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)

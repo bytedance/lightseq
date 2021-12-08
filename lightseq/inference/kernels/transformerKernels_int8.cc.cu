@@ -11,17 +11,16 @@ Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
 namespace cuda {
-__forceinline__ __device__ int8_t float2int8(float x, float scale_div_clip_max,
-                                             float clip_max) {
-  float i8_f = x * scale_div_clip_max;
+__forceinline__ __device__ int8_t float2int8(float x, float quant_scale) {
+  float i8_f = x * quant_scale;
   int32_t i8 = __float2int_rn(i8_f);
   i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
   return int8_t(i8);
 }
 
-__forceinline__ __device__ int8_t posfloat2int8(float x, float scale,
+__forceinline__ __device__ int8_t posfloat2int8(float x, float quant_range,
                                                 float clip_max) {
-  float i8_f = x * 2 * scale / clip_max - scale;
+  float i8_f = x * 2 * quant_range / clip_max - quant_range;
   int32_t i8 = __float2int_rn(i8_f);
   i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
   return int8_t(i8);
@@ -29,8 +28,7 @@ __forceinline__ __device__ int8_t posfloat2int8(float x, float scale,
 
 __global__ void quantize_tensor_kernel(const float *input, int8_t *output,
                                        int batch_tokens, int hidden_size,
-                                       float scale_div_clip_max, float clip_max,
-                                       bool out_col32) {
+                                       float quant_scale, bool out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= batch_tokens * hidden_size) return;
   int output_index;
@@ -42,13 +40,12 @@ __global__ void quantize_tensor_kernel(const float *input, int8_t *output,
   } else {
     output_index = i;
   }
-  output[output_index] = float2int8(input[i], scale_div_clip_max, clip_max);
+  output[output_index] = float2int8(input[i], quant_scale);
 }
 
 __global__ void quantize_tensor_kernel(const __half *input, int8_t *output,
                                        int batch_tokens, int hidden_size,
-                                       float scale_div_clip_max, float clip_max,
-                                       bool out_col32) {
+                                       float quant_scale, bool out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= batch_tokens * hidden_size) return;
 
@@ -61,44 +58,40 @@ __global__ void quantize_tensor_kernel(const __half *input, int8_t *output,
   } else {
     output_index = i;
   }
-  output[output_index] =
-      float2int8(__half2float(input[i]), scale_div_clip_max, clip_max);
+  output[output_index] = float2int8(__half2float(input[i]), quant_scale);
 }
 
 template <>
 void launch_quantize_tensor<float>(const float *input, int8_t *output,
                                    int batch_tokens, int hidden_size,
-                                   float scale, float clip_max,
-                                   cudaStream_t &stream, bool out_col32) {
+                                   float quant_scale, cudaStream_t &stream,
+                                   bool out_col32) {
   int grid_dim = (batch_tokens * hidden_size) >> 10;
   quantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, batch_tokens, hidden_size, scale / clip_max, clip_max,
-      out_col32);
+      input, output, batch_tokens, hidden_size, quant_scale, out_col32);
 }
 
 template <>
 void launch_quantize_tensor<__half>(const __half *input, int8_t *output,
                                     int batch_tokens, int hidden_size,
-                                    float scale, float clip_max,
-                                    cudaStream_t &stream, bool out_col32) {
+                                    float quant_scale, cudaStream_t &stream,
+                                    bool out_col32) {
   int grid_dim = (batch_tokens * hidden_size) >> 10;
   quantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, batch_tokens, hidden_size, scale / clip_max, clip_max,
-      out_col32);
+      input, output, batch_tokens, hidden_size, quant_scale, out_col32);
 }
 
 template <typename T>
 __global__ void dequantize_tensor_kernel(const int32_t *input, T *output,
                                          int batch_tokens, int hidden_size,
-                                         float scale_div_clip_max,
-                                         float clip_max, bool in_col32);
+                                         float dequant_scale, bool in_col32);
 
 template <>
 __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
                                                 float *output, int batch_tokens,
                                                 int hidden_size,
-                                                float scale_div_clip_max,
-                                                float clip_max, bool in_col32) {
+                                                float dequant_scale,
+                                                bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= batch_tokens * hidden_size) return;
   int input_index;
@@ -110,13 +103,13 @@ __global__ void dequantize_tensor_kernel<float>(const int32_t *input,
   } else {
     input_index = i;
   }
-  output[i] = input[input_index] / scale_div_clip_max;
+  output[i] = input[input_index] * dequant_scale;
 }
 
 template <>
 __global__ void dequantize_tensor_kernel<__half>(
     const int32_t *input, __half *output, int batch_tokens, int hidden_size,
-    float scale_div_clip_max, float clip_max, bool in_col32) {
+    float dequant_scale, bool in_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= batch_tokens * hidden_size) return;
 
@@ -128,37 +121,35 @@ __global__ void dequantize_tensor_kernel<__half>(
   } else {
     in_index = i;
   }
-  output[i] = __float2half(float(input[in_index]) / scale_div_clip_max);
+  output[i] = __float2half(float(input[in_index]) * dequant_scale);
 }
 
 template <>
 void launch_dequantize_tensor<float>(const int32_t *input, float *output,
                                      int batch_tokens, int hidden_size,
-                                     float scale, float clip_max,
-                                     cudaStream_t &stream, bool in_col32) {
+                                     float dequant_scale, cudaStream_t &stream,
+                                     bool in_col32) {
   int total_count = batch_tokens * hidden_size;
   int grid_dim = total_count >> 10;
   dequantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, batch_tokens, hidden_size, scale / clip_max, clip_max,
-      in_col32);
+      input, output, batch_tokens, hidden_size, dequant_scale, in_col32);
 }
 
 template <>
 void launch_dequantize_tensor<__half>(const int32_t *input, __half *output,
                                       int batch_tokens, int hidden_size,
-                                      float scale, float clip_max,
-                                      cudaStream_t &stream, bool in_col32) {
+                                      float dequant_scale, cudaStream_t &stream,
+                                      bool in_col32) {
   int total_count = batch_tokens * hidden_size;
   int grid_dim = total_count >> 10;
   dequantize_tensor_kernel<<<grid_dim + 1, 1024, 0, stream>>>(
-      input, output, batch_tokens, hidden_size, scale / clip_max, clip_max,
-      in_col32);
+      input, output, batch_tokens, hidden_size, dequant_scale, in_col32);
 }
 
 template <typename T>
-__global__ void ker_norm_layer_int8O(T *matrix, int8_t *output, const T *scale,
-                                     const T *bias, int hidden_size,
-                                     float scale_div_clip_max, float clip_max) {
+__global__ void ker_norm_layer_i8O(T *matrix, int8_t *output, const T *scale,
+                                   const T *bias, int hidden_size,
+                                   float quant_scale) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -192,14 +183,16 @@ __global__ void ker_norm_layer_int8O(T *matrix, int8_t *output, const T *scale,
     val = matrix[i] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
-    matrix[i] = float2int8(output_f, scale_div_clip_max, clip_max);
+    matrix[i] = float2int8(output_f, quant_scale);
   }
 }
 
 template <>
-__global__ void ker_norm_layer_int8O<__half>(
-    __half *matrix, int8_t *output, const __half *scale, const __half *bias,
-    int half_hidden_size, float scale_div_clip_max, float clip_max) {
+__global__ void ker_norm_layer_i8O<__half>(__half *matrix, int8_t *output,
+                                           const __half *scale,
+                                           const __half *bias,
+                                           int half_hidden_size,
+                                           float quant_scale) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -242,50 +235,49 @@ __global__ void ker_norm_layer_int8O<__half>(
     float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
     local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
-    output_c2.x = float2int8(local_f2.x, scale_div_clip_max, clip_max);
-    output_c2.y = float2int8(local_f2.y, scale_div_clip_max, clip_max);
+    output_c2.x = float2int8(local_f2.x, quant_scale);
+    output_c2.y = float2int8(local_f2.y, quant_scale);
     poutput[i] = output_c2;
   }
 }
 
 template <typename T>
-void ker_norm_layer_int8O_launcher(int token_num, int hidden_size,
-                                   cudaStream_t stream, T *matrix,
-                                   int8_t *output, const T *scale,
-                                   const T *bias, int max_thread_per_block,
-                                   float quant_scale, float clip_max) {
-  ker_norm_layer_int8O<T><<<token_num, max_thread_per_block, 0, stream>>>(
-      matrix, output, scale, bias, hidden_size, quant_scale / clip_max,
-      clip_max);
+void ker_norm_layer_i8O_launcher(int token_num, int hidden_size,
+                                 cudaStream_t stream, T *matrix, int8_t *output,
+                                 const T *scale, const T *bias,
+                                 int max_thread_per_block, float quant_scale) {
+  ker_norm_layer_i8O<T><<<token_num, max_thread_per_block, 0, stream>>>(
+      matrix, output, scale, bias, hidden_size, quant_scale);
 }
 
 template <>
-void ker_norm_layer_int8O_launcher<__half>(int token_num, int hidden_size,
-                                           cudaStream_t stream, __half *matrix,
-                                           int8_t *output, const __half *scale,
-                                           const __half *bias,
-                                           int max_thread_per_block,
-                                           float quant_scale, float clip_max) {
-  ker_norm_layer_int8O<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      matrix, output, scale, bias, hidden_size / 2, quant_scale / clip_max,
-      clip_max);
+void ker_norm_layer_i8O_launcher<__half>(int token_num, int hidden_size,
+                                         cudaStream_t stream, __half *matrix,
+                                         int8_t *output, const __half *scale,
+                                         const __half *bias,
+                                         int max_thread_per_block,
+                                         float quant_scale) {
+  ker_norm_layer_i8O<__half><<<token_num, max_thread_per_block, 0, stream>>>(
+      matrix, output, scale, bias, hidden_size / 2, quant_scale);
 }
 
-template void ker_norm_layer_int8O_launcher<float>(
+template void ker_norm_layer_i8O_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float *matrix,
     int8_t *output, const float *scale, const float *bias,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float quant_scale);
 
-template void ker_norm_layer_int8O_launcher<__half>(
+template void ker_norm_layer_i8O_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half *matrix,
     int8_t *output, const __half *scale, const __half *bias,
-    int max_thread_per_block, float quant_scale, float clip_max);
+    int max_thread_per_block, float quant_scale);
 
 template <typename T>
-__global__ void ker_norm_layer_resual_int8O(
-    T *input, int8_t *output, const T *scale, const T *bias,
-    const T *residual_bias, const int hidden_size, float scale_div_clip_max,
-    float clip_max, bool is_post_ln, bool output_col32) {
+__global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
+                                          const T *scale, const T *bias,
+                                          const T *residual_bias,
+                                          const int hidden_size,
+                                          float quant_scale, bool is_post_ln,
+                                          bool out_col32) {
   uint block_start = blockIdx.x * hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = block_start + hidden_size;
@@ -319,8 +311,8 @@ __global__ void ker_norm_layer_resual_int8O(
     val = input[i] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
-    int8_t res = float2int8(output_f, scale_div_clip_max, clip_max);
-    if (output_col32) {
+    int8_t res = float2int8(output_f, quant_scale);
+    if (out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       int col32_index =
@@ -338,11 +330,10 @@ __global__ void ker_norm_layer_resual_int8O(
 }
 
 template <>
-__global__ void ker_norm_layer_resual_int8O<__half>(
+__global__ void ker_norm_layer_resual_i8O<__half>(
     __half *input, int8_t *output, const __half *scale, const __half *bias,
-    const __half *residual_bias, const int half_hidden_size,
-    float scale_div_clip_max, float clip_max, bool is_post_ln,
-    bool output_col32) {
+    const __half *residual_bias, const int half_hidden_size, float quant_scale,
+    bool is_post_ln, bool out_col32) {
   uint block_start = blockIdx.x * half_hidden_size;
   uint start = block_start + threadIdx.x;
   uint end = blockIdx.x * half_hidden_size + half_hidden_size;
@@ -386,10 +377,10 @@ __global__ void ker_norm_layer_resual_int8O<__half>(
     float2 local_f2 = safe_half2_to_float2(pinput[i]);
     local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
     local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
-    output_c2.x = float2int8(local_f2.x, scale_div_clip_max, clip_max);
-    output_c2.y = float2int8(local_f2.y, scale_div_clip_max, clip_max);
+    output_c2.x = float2int8(local_f2.x, quant_scale);
+    output_c2.y = float2int8(local_f2.y, quant_scale);
 
-    if (output_col32) {
+    if (out_col32) {
       int row_id = blockIdx.x;
       int col_id = (i - block_start) * 2;
       int col32_index = row_major2flat_col32(row_id, col_id, gridDim.x,
@@ -413,49 +404,47 @@ __global__ void ker_norm_layer_resual_int8O<__half>(
 }
 
 template <typename T>
-void ker_norm_layer_resual_int8O_launcher(int token_num, int hidden_size,
-                                          cudaStream_t stream, T *input,
-                                          int8_t *output, const T *scale,
-                                          const T *bias, const T *residual_bias,
-                                          const int max_thread_per_block,
-                                          float quant_scale, float clip_max,
-                                          bool is_post_ln, bool output_col32) {
-  ker_norm_layer_resual_int8O<T>
-      <<<token_num, max_thread_per_block, 0, stream>>>(
-          input, output, scale, bias, residual_bias, hidden_size,
-          quant_scale / clip_max, clip_max, is_post_ln, output_col32);
+void ker_norm_layer_resual_i8O_launcher(int token_num, int hidden_size,
+                                        cudaStream_t stream, T *input,
+                                        int8_t *output, const T *scale,
+                                        const T *bias, const T *residual_bias,
+                                        const int max_thread_per_block,
+                                        float quant_scale, bool is_post_ln,
+                                        bool out_col32) {
+  ker_norm_layer_resual_i8O<T><<<token_num, max_thread_per_block, 0, stream>>>(
+      input, output, scale, bias, residual_bias, hidden_size, quant_scale,
+      is_post_ln, out_col32);
 }
 
 template <>
-void ker_norm_layer_resual_int8O_launcher<__half>(
+void ker_norm_layer_resual_i8O_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half *input,
     int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln, bool output_col32) {
-  ker_norm_layer_resual_int8O<__half>
+    float quant_scale, bool is_post_ln, bool out_col32) {
+  ker_norm_layer_resual_i8O<__half>
       <<<token_num, max_thread_per_block, 0, stream>>>(
           input, output, scale, bias, residual_bias, hidden_size / 2,
-          quant_scale / clip_max, clip_max, is_post_ln, output_col32);
+          quant_scale, is_post_ln, out_col32);
 }
 
-template void ker_norm_layer_resual_int8O_launcher<float>(
+template void ker_norm_layer_resual_i8O_launcher<float>(
     int token_num, int hidden_size, cudaStream_t stream, float *input,
     int8_t *output, const float *scale, const float *bias,
     const float *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln, bool output_col32);
+    float quant_scale, bool is_post_ln, bool out_col32);
 
-template void ker_norm_layer_resual_int8O_launcher<__half>(
+template void ker_norm_layer_resual_i8O_launcher<__half>(
     int token_num, int hidden_size, cudaStream_t stream, __half *input,
     int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int max_thread_per_block,
-    float quant_scale, float clip_max, bool is_post_ln, bool output_col32);
+    float quant_scale, bool is_post_ln, bool out_col32);
 
 template <typename T>
 __global__ void ker_residual_bias_ln_i32I_i8O(
     const int32_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int hidden_size, float dequant_scale,
-    float quant_scale, float clip_max, bool is_post_ln, bool col32_in_out,
-    const T *colsum) {
+    float quant_scale, bool is_post_ln, bool in_out_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -464,7 +453,7 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -504,9 +493,9 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
     val = s_row_out[i - block_start] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
-    int8_t res = float2int8(output_f, quant_scale, clip_max);
+    int8_t res = float2int8(output_f, quant_scale);
     int output_index;
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       output_index =
@@ -530,8 +519,8 @@ template <>
 __global__ void ker_residual_bias_ln_i32I_i8O<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int hidden_size,
-    float dequant_scale, float quant_scale, float clip_max, bool is_post_ln,
-    bool col32_in_out, const half *colsum) {
+    float dequant_scale, float quant_scale, bool is_post_ln, bool in_out_col32,
+    const half *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -540,7 +529,7 @@ __global__ void ker_residual_bias_ln_i32I_i8O<half>(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -581,9 +570,9 @@ __global__ void ker_residual_bias_ln_i32I_i8O<half>(
     output_f =
         val * s_var * safe_half_to_float(__ldg(&scale[i - block_start])) +
         safe_half_to_float(__ldg(&bias[i - block_start]));
-    int8_t res = float2int8(output_f, quant_scale, clip_max);
+    int8_t res = float2int8(output_f, quant_scale);
     int output_index;
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       output_index =
@@ -608,50 +597,46 @@ template <typename T>
 void ker_residual_bias_ln_i32I_i8O_launcher(
     const int32_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int batch_tokens, int hidden_size,
-    float recover_scale, float quant_range, float clip_max,
-    int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const T *colsum) {
-  ker_residual_bias_ln_i32I_i8O<T>
-      <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
-         stream>>>(input, scale, bias, residual_bias, output, residual,
-                   hidden_size, recover_scale, quant_range / clip_max, clip_max,
-                   is_post_ln, col32_in_out, colsum);
+    float dequant_scale, float quant_scale, int max_thread_per_block,
+    cudaStream_t stream, bool is_post_ln, bool in_out_col32, const T *colsum) {
+  ker_residual_bias_ln_i32I_i8O<T><<<batch_tokens, max_thread_per_block,
+                                     hidden_size * sizeof(float), stream>>>(
+      input, scale, bias, residual_bias, output, residual, hidden_size,
+      dequant_scale, quant_scale, is_post_ln, in_out_col32, colsum);
 }
 
 template <>
 void ker_residual_bias_ln_i32I_i8O_launcher<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int batch_tokens,
-    int hidden_size, float recover_scale, float quant_range, float clip_max,
+    int hidden_size, float dequant_scale, float quant_scale,
     int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const half *colsum) {
-  ker_residual_bias_ln_i32I_i8O<half>
-      <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
-         stream>>>(input, scale, bias, residual_bias, output, residual,
-                   hidden_size, recover_scale, quant_range / clip_max, clip_max,
-                   is_post_ln, col32_in_out, colsum);
+    bool in_out_col32, const half *colsum) {
+  ker_residual_bias_ln_i32I_i8O<half><<<batch_tokens, max_thread_per_block,
+                                        hidden_size * sizeof(float), stream>>>(
+      input, scale, bias, residual_bias, output, residual, hidden_size,
+      dequant_scale, quant_scale, is_post_ln, in_out_col32, colsum);
 }
 
 template void ker_residual_bias_ln_i32I_i8O_launcher<float>(
     const int32_t *input, const float *scale, const float *bias,
     const float *residual_bias, int8_t *output, float *residual,
-    int batch_tokens, int hidden_size, float recover_scale, float quant_range,
-    float clip_max, int max_thread_per_block, cudaStream_t stream,
-    bool is_post_ln, bool col32_in_out, const float *colsum);
+    int batch_tokens, int hidden_size, float dequant_scale, float quant_scale,
+    int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
+    bool in_out_col32, const float *colsum);
 
 template void ker_residual_bias_ln_i32I_i8O_launcher<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int batch_tokens,
-    int hidden_size, float recover_scale, float quant_range, float clip_max,
+    int hidden_size, float dequant_scale, float quant_scale,
     int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const half *colsum);
+    bool in_out_col32, const half *colsum);
 
 template <typename T>
 __global__ void ker_residual_bias_ln_i8I_i8O(
     const int8_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int hidden_size, float dequant_scale,
-    float quant_scale, float clip_max, bool is_post_ln, bool col32_in_out,
-    const T *colsum) {
+    float quant_scale, bool is_post_ln, bool in_out_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -660,7 +645,7 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -700,9 +685,9 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
     val = s_row_out[i - block_start] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
-    int8_t res = float2int8(output_f, quant_scale, clip_max);
+    int8_t res = float2int8(output_f, quant_scale);
     int output_index;
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       output_index =
@@ -726,8 +711,8 @@ template <>
 __global__ void ker_residual_bias_ln_i8I_i8O<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int hidden_size,
-    float dequant_scale, float quant_scale, float clip_max, bool is_post_ln,
-    bool col32_in_out, const half *colsum) {
+    float dequant_scale, float quant_scale, bool is_post_ln, bool in_out_col32,
+    const half *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -736,7 +721,7 @@ __global__ void ker_residual_bias_ln_i8I_i8O<half>(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -777,9 +762,9 @@ __global__ void ker_residual_bias_ln_i8I_i8O<half>(
     output_f =
         val * s_var * safe_half_to_float(__ldg(&scale[i - block_start])) +
         safe_half_to_float(__ldg(&bias[i - block_start]));
-    int8_t res = float2int8(output_f, quant_scale, clip_max);
+    int8_t res = float2int8(output_f, quant_scale);
     int output_index;
-    if (col32_in_out) {
+    if (in_out_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       output_index =
@@ -804,49 +789,46 @@ template <typename T>
 void ker_residual_bias_ln_i8I_i8O_launcher(
     const int8_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int batch_tokens, int hidden_size,
-    float recover_scale, float quant_range, float clip_max,
-    int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const T *colsum) {
-  ker_residual_bias_ln_i8I_i8O<T>
-      <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
-         stream>>>(input, scale, bias, residual_bias, output, residual,
-                   hidden_size, recover_scale, quant_range / clip_max, clip_max,
-                   is_post_ln, col32_in_out, colsum);
+    float dequant_scale, float quant_scale, int max_thread_per_block,
+    cudaStream_t stream, bool is_post_ln, bool in_out_col32, const T *colsum) {
+  ker_residual_bias_ln_i8I_i8O<T><<<batch_tokens, max_thread_per_block,
+                                    hidden_size * sizeof(float), stream>>>(
+      input, scale, bias, residual_bias, output, residual, hidden_size,
+      dequant_scale, quant_scale, is_post_ln, in_out_col32, colsum);
 }
 
 template <>
 void ker_residual_bias_ln_i8I_i8O_launcher<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int batch_tokens,
-    int hidden_size, float recover_scale, float quant_range, float clip_max,
+    int hidden_size, float dequant_scale, float quant_scale,
     int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const half *colsum) {
-  ker_residual_bias_ln_i8I_i8O<half>
-      <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
-         stream>>>(input, scale, bias, residual_bias, output, residual,
-                   hidden_size, recover_scale, quant_range / clip_max, clip_max,
-                   is_post_ln, col32_in_out, colsum);
+    bool in_out_col32, const half *colsum) {
+  ker_residual_bias_ln_i8I_i8O<half><<<batch_tokens, max_thread_per_block,
+                                       hidden_size * sizeof(float), stream>>>(
+      input, scale, bias, residual_bias, output, residual, hidden_size,
+      dequant_scale, quant_scale, is_post_ln, in_out_col32, colsum);
 }
 
 template void ker_residual_bias_ln_i8I_i8O_launcher<float>(
     const int8_t *input, const float *scale, const float *bias,
     const float *residual_bias, int8_t *output, float *residual,
-    int batch_tokens, int hidden_size, float recover_scale, float quant_range,
-    float clip_max, int max_thread_per_block, cudaStream_t stream,
-    bool is_post_ln, bool col32_in_out, const float *colsum);
+    int batch_tokens, int hidden_size, float dequant_scale, float quant_scale,
+    int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
+    bool in_out_col32, const float *colsum);
 
 template void ker_residual_bias_ln_i8I_i8O_launcher<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual_bias, int8_t *output, half *residual, int batch_tokens,
-    int hidden_size, float recover_scale, float quant_range, float clip_max,
+    int hidden_size, float dequant_scale, float quant_scale,
     int max_thread_per_block, cudaStream_t stream, bool is_post_ln,
-    bool col32_in_out, const half *colsum);
+    bool in_out_col32, const half *colsum);
 
 template <typename T>
 __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
                                           const T *bias, const T *residual,
                                           T *output, int hidden_size,
-                                          float dequant_scale, bool input_col32,
+                                          float dequant_scale, bool in_col32,
                                           const T *colsum) {
   extern __shared__ float s_row_out[];
 
@@ -856,7 +838,7 @@ __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -906,7 +888,7 @@ template <>
 __global__ void ker_residual_bias_ln_i32I<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int hidden_size, float dequant_scale,
-    bool input_col32, const half *colsum) {
+    bool in_col32, const half *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -915,7 +897,7 @@ __global__ void ker_residual_bias_ln_i32I<half>(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -966,45 +948,45 @@ template <typename T>
 void ker_residual_bias_ln_i32I_launcher(const int32_t *input, const T *scale,
                                         const T *bias, const T *residual,
                                         T *output, int batch_tokens,
-                                        int hidden_size, float recover_scale,
+                                        int hidden_size, float dequant_scale,
                                         int max_thread_per_block,
-                                        cudaStream_t stream, bool input_col32,
+                                        cudaStream_t stream, bool in_col32,
                                         const T *colsum) {
   ker_residual_bias_ln_i32I<T>
       <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
          stream>>>(input, scale, bias, residual, output, hidden_size,
-                   recover_scale, input_col32, colsum);
+                   dequant_scale, in_col32, colsum);
 }
 
 template <>
 void ker_residual_bias_ln_i32I_launcher<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const half *colsum) {
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const half *colsum) {
   ker_residual_bias_ln_i32I<half>
       <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
          stream>>>(input, scale, bias, residual, output, hidden_size,
-                   recover_scale, input_col32, colsum);
+                   dequant_scale, in_col32, colsum);
 }
 
 template void ker_residual_bias_ln_i32I_launcher<float>(
     const int32_t *input, const float *scale, const float *bias,
     const float *residual, float *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const float *colsum);
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const float *colsum);
 
 template void ker_residual_bias_ln_i32I_launcher<half>(
     const int32_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const half *colsum);
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const half *colsum);
 
 template <typename T>
 __global__ void ker_residual_bias_ln_i8I(const int8_t *input, const T *scale,
                                          const T *bias, const T *residual,
                                          T *output, int hidden_size,
-                                         float dequant_scale, bool input_col32,
+                                         float dequant_scale, bool in_col32,
                                          const T *colsum) {
   extern __shared__ float s_row_out[];
 
@@ -1014,7 +996,7 @@ __global__ void ker_residual_bias_ln_i8I(const int8_t *input, const T *scale,
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -1064,7 +1046,7 @@ template <>
 __global__ void ker_residual_bias_ln_i8I<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int hidden_size, float dequant_scale,
-    bool input_col32, const half *colsum) {
+    bool in_col32, const half *colsum) {
   extern __shared__ float s_row_out[];
 
   uint block_start = blockIdx.x * hidden_size;
@@ -1073,7 +1055,7 @@ __global__ void ker_residual_bias_ln_i8I<half>(
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
-    if (input_col32) {
+    if (in_col32) {
       int row_id = blockIdx.x;
       int col_id = i - block_start;
       input_index =
@@ -1124,47 +1106,45 @@ template <typename T>
 void ker_residual_bias_ln_i8I_launcher(const int8_t *input, const T *scale,
                                        const T *bias, const T *residual,
                                        T *output, int batch_tokens,
-                                       int hidden_size, float recover_scale,
+                                       int hidden_size, float dequant_scale,
                                        int max_thread_per_block,
-                                       cudaStream_t stream, bool input_col32,
+                                       cudaStream_t stream, bool in_col32,
                                        const T *colsum) {
   ker_residual_bias_ln_i8I<T>
       <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
          stream>>>(input, scale, bias, residual, output, hidden_size,
-                   recover_scale, input_col32, colsum);
+                   dequant_scale, in_col32, colsum);
 }
 
 template <>
 void ker_residual_bias_ln_i8I_launcher<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const half *colsum) {
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const half *colsum) {
   ker_residual_bias_ln_i8I<half>
       <<<batch_tokens, max_thread_per_block, hidden_size * sizeof(float),
          stream>>>(input, scale, bias, residual, output, hidden_size,
-                   recover_scale, input_col32, colsum);
+                   dequant_scale, in_col32, colsum);
 }
 
 template void ker_residual_bias_ln_i8I_launcher<float>(
     const int8_t *input, const float *scale, const float *bias,
     const float *residual, float *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const float *colsum);
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const float *colsum);
 
 template void ker_residual_bias_ln_i8I_launcher<half>(
     const int8_t *input, const half *scale, const half *bias,
     const half *residual, half *output, int batch_tokens, int hidden_size,
-    float recover_scale, int max_thread_per_block, cudaStream_t stream,
-    bool input_col32, const half *colsum);
+    float dequant_scale, int max_thread_per_block, cudaStream_t stream,
+    bool in_col32, const half *colsum);
 
 template <typename T>
-__global__ void ker_bias_gelu_int32I_int8O(int32_t *input, int8_t *output,
-                                           const T *bias, int total_count,
-                                           int feature_dim, float dequant_scale,
-                                           float out_scale_div_clip_max,
-                                           float out_clip_max,
-                                           bool in_out_col32) {
+__global__ void ker_bias_gelu_i32I_i8O(int32_t *input, int8_t *output,
+                                       const T *bias, int total_count,
+                                       int feature_dim, float dequant_scale,
+                                       float quant_scale, bool in_out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
@@ -1193,19 +1173,21 @@ __global__ void ker_bias_gelu_int32I_int8O(int32_t *input, int8_t *output,
   output4.w = gelu<float>(float(input4.w) * dequant_scale + b4.w);
 
   char4 out_i4;
-  out_i4.x = float2int8(output4.x, out_scale_div_clip_max, out_clip_max);
-  out_i4.y = float2int8(output4.y, out_scale_div_clip_max, out_clip_max);
-  out_i4.z = float2int8(output4.z, out_scale_div_clip_max, out_clip_max);
-  out_i4.w = float2int8(output4.w, out_scale_div_clip_max, out_clip_max);
+  out_i4.x = float2int8(output4.x, quant_scale);
+  out_i4.y = float2int8(output4.y, quant_scale);
+  out_i4.z = float2int8(output4.z, quant_scale);
+  out_i4.w = float2int8(output4.w, quant_scale);
   out4[i] = out_i4;
 }
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_gelu_int32I_int8O<__half>(
-    int32_t *input, int8_t *output, const __half *bias, int total_count,
-    int feature_dim, float dequant_scale, float out_scale_div_clip_max,
-    float out_clip_max, bool in_out_col32) {
+__global__ void ker_bias_gelu_i32I_i8O<__half>(int32_t *input, int8_t *output,
+                                               const __half *bias,
+                                               int total_count, int feature_dim,
+                                               float dequant_scale,
+                                               float quant_scale,
+                                               bool in_out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
@@ -1236,54 +1218,51 @@ __global__ void ker_bias_gelu_int32I_int8O<__half>(
     float out_f;
     out_f =
         gelu<float>(float(val1[j]) * dequant_scale + __half2float(b_half[j]));
-    out_i1[j] = float2int8(out_f, out_scale_div_clip_max, out_clip_max);
+    out_i1[j] = float2int8(out_f, quant_scale);
   }
   outs_i8[i] = out_i8;
 }
 
 template <typename T>
-void ker_bias_gelu_int32I_int8O_launcher(int batch_token_num,
-                                         cudaStream_t stream, int32_t *input,
-                                         int8_t *output, const T *bias,
-                                         int feature_dim, float dequant_scale,
-                                         float out_scale, float out_clip_max,
-                                         bool in_out_col32) {
+void ker_bias_gelu_i32I_i8O_launcher(int batch_token_num, cudaStream_t stream,
+                                     int32_t *input, int8_t *output,
+                                     const T *bias, int feature_dim,
+                                     float dequant_scale, float quant_scale,
+                                     bool in_out_col32) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 10;
-  ker_bias_gelu_int32I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale,
-      out_scale / out_clip_max, out_clip_max, in_out_col32);
+  ker_bias_gelu_i32I_i8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      in_out_col32);
 }
 
 template <>
-void ker_bias_gelu_int32I_int8O_launcher<__half>(
+void ker_bias_gelu_i32I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32) {
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 11;
-  ker_bias_gelu_int32I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale,
-      out_scale / out_clip_max, out_clip_max, in_out_col32);
+  ker_bias_gelu_i32I_i8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      in_out_col32);
 }
 
-template void ker_bias_gelu_int32I_int8O_launcher<float>(
+template void ker_bias_gelu_i32I_i8O_launcher<float>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const float *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32);
+    const float *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32);
 
-template void ker_bias_gelu_int32I_int8O_launcher<__half>(
+template void ker_bias_gelu_i32I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32);
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32);
 
 template <typename T>
-__global__ void ker_bias_gelu_int8I_int8O(int8_t *input, int8_t *output,
-                                          const T *bias, int total_count,
-                                          int feature_dim, float dequant_scale,
-                                          float out_scale_div_clip_max,
-                                          float out_clip_max,
-                                          bool in_out_col32) {
+__global__ void ker_bias_gelu_i8I_i8O(int8_t *input, int8_t *output,
+                                      const T *bias, int total_count,
+                                      int feature_dim, float dequant_scale,
+                                      float quant_scale, bool in_out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
@@ -1312,19 +1291,21 @@ __global__ void ker_bias_gelu_int8I_int8O(int8_t *input, int8_t *output,
   output4.w = gelu<float>(float(input4.w) * dequant_scale + b4.w);
 
   char4 out_i4;
-  out_i4.x = float2int8(output4.x, out_scale_div_clip_max, out_clip_max);
-  out_i4.y = float2int8(output4.y, out_scale_div_clip_max, out_clip_max);
-  out_i4.z = float2int8(output4.z, out_scale_div_clip_max, out_clip_max);
-  out_i4.w = float2int8(output4.w, out_scale_div_clip_max, out_clip_max);
+  out_i4.x = float2int8(output4.x, quant_scale);
+  out_i4.y = float2int8(output4.y, quant_scale);
+  out_i4.z = float2int8(output4.z, quant_scale);
+  out_i4.w = float2int8(output4.w, quant_scale);
   out4[i] = out_i4;
 }
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_gelu_int8I_int8O<__half>(
-    int8_t *input, int8_t *output, const __half *bias, int total_count,
-    int feature_dim, float dequant_scale, float out_scale_div_clip_max,
-    float out_clip_max, bool in_out_col32) {
+__global__ void ker_bias_gelu_i8I_i8O<__half>(int8_t *input, int8_t *output,
+                                              const __half *bias,
+                                              int total_count, int feature_dim,
+                                              float dequant_scale,
+                                              float quant_scale,
+                                              bool in_out_col32) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
@@ -1355,54 +1336,52 @@ __global__ void ker_bias_gelu_int8I_int8O<__half>(
     float out_f;
     out_f =
         gelu<float>(float(val1[j]) * dequant_scale + __half2float(b_half[j]));
-    out_i1[j] = float2int8(out_f, out_scale_div_clip_max, out_clip_max);
+    out_i1[j] = float2int8(out_f, quant_scale);
   }
   outs_i8[i] = out_i8;
 }
 
 template <typename T>
-void ker_bias_gelu_int8I_int8O_launcher(int batch_token_num,
-                                        cudaStream_t stream, int8_t *input,
-                                        int8_t *output, const T *bias,
-                                        int feature_dim, float dequant_scale,
-                                        float out_scale, float out_clip_max,
-                                        bool in_out_col32) {
+void ker_bias_gelu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
+                                    int8_t *input, int8_t *output,
+                                    const T *bias, int feature_dim,
+                                    float dequant_scale, float quant_scale,
+                                    bool in_out_col32) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 10;
-  ker_bias_gelu_int8I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale,
-      out_scale / out_clip_max, out_clip_max, in_out_col32);
+  ker_bias_gelu_i8I_i8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      in_out_col32);
 }
 
 template <>
-void ker_bias_gelu_int8I_int8O_launcher<__half>(
+void ker_bias_gelu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32) {
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 11;
-  ker_bias_gelu_int8I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale,
-      out_scale / out_clip_max, out_clip_max, in_out_col32);
+  ker_bias_gelu_i8I_i8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      in_out_col32);
 }
 
-template void ker_bias_gelu_int8I_int8O_launcher<float>(
+template void ker_bias_gelu_i8I_i8O_launcher<float>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const float *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32);
+    const float *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32);
 
-template void ker_bias_gelu_int8I_int8O_launcher<__half>(
+template void ker_bias_gelu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32);
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    bool in_out_col32);
 
 template <typename T>
-__global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
-                                           const T *bias, int total_count,
-                                           int feature_dim, float dequant_scale,
-                                           float out_scale, float out_clip_max,
-                                           bool in_out_col32,
-                                           bool narrow_clip) {
+__global__ void ker_bias_relu_i32I_i8O(int32_t *input, int8_t *output,
+                                       const T *bias, int total_count,
+                                       int feature_dim, float dequant_scale,
+                                       float quant_scale, float clip_max,
+                                       bool in_out_col32, bool narrow_clip) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
@@ -1432,15 +1411,15 @@ __global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
 
   char4 out_i4;
   if (narrow_clip) {
-    out_i4.x = posfloat2int8(output4.x, out_scale, out_clip_max);
-    out_i4.y = posfloat2int8(output4.y, out_scale, out_clip_max);
-    out_i4.z = posfloat2int8(output4.z, out_scale, out_clip_max);
-    out_i4.w = posfloat2int8(output4.w, out_scale, out_clip_max);
+    out_i4.x = posfloat2int8(output4.x, quant_scale * clip_max, clip_max);
+    out_i4.y = posfloat2int8(output4.y, quant_scale * clip_max, clip_max);
+    out_i4.z = posfloat2int8(output4.z, quant_scale * clip_max, clip_max);
+    out_i4.w = posfloat2int8(output4.w, quant_scale * clip_max, clip_max);
   } else {
-    out_i4.x = float2int8(output4.x, out_scale / out_clip_max, out_clip_max);
-    out_i4.y = float2int8(output4.y, out_scale / out_clip_max, out_clip_max);
-    out_i4.z = float2int8(output4.z, out_scale / out_clip_max, out_clip_max);
-    out_i4.w = float2int8(output4.w, out_scale / out_clip_max, out_clip_max);
+    out_i4.x = float2int8(output4.x, quant_scale);
+    out_i4.y = float2int8(output4.y, quant_scale);
+    out_i4.z = float2int8(output4.z, quant_scale);
+    out_i4.w = float2int8(output4.w, quant_scale);
   }
 
   out4[i] = out_i4;
@@ -1448,9 +1427,9 @@ __global__ void ker_bias_relu_int32I_int8O(int32_t *input, int8_t *output,
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_relu_int32I_int8O<__half>(
+__global__ void ker_bias_relu_i32I_i8O<__half>(
     int32_t *input, int8_t *output, const __half *bias, int total_count,
-    int feature_dim, float dequant_scale, float out_scale, float out_clip_max,
+    int feature_dim, float dequant_scale, float quant_scale, float clip_max,
     bool in_out_col32, bool narrow_clip) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1483,55 +1462,55 @@ __global__ void ker_bias_relu_int32I_int8O<__half>(
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
     if (narrow_clip)
-      out_i1[j] = posfloat2int8(out_f, out_scale, out_clip_max);
+      out_i1[j] = posfloat2int8(out_f, quant_scale * clip_max, clip_max);
     else
-      out_i1[j] = float2int8(out_f, out_scale / out_clip_max, out_clip_max);
+      out_i1[j] = float2int8(out_f, quant_scale);
   }
   outs_i8[i] = out_i8;
 }
 
 template <typename T>
-void ker_bias_relu_int32I_int8O_launcher(int batch_token_num,
-                                         cudaStream_t stream, int32_t *input,
-                                         int8_t *output, const T *bias,
-                                         int feature_dim, float dequant_scale,
-                                         float out_scale, float out_clip_max,
-                                         bool in_out_col32, bool narrow_clip) {
+void ker_bias_relu_i32I_i8O_launcher(int batch_token_num, cudaStream_t stream,
+                                     int32_t *input, int8_t *output,
+                                     const T *bias, int feature_dim,
+                                     float dequant_scale, float quant_scale,
+                                     float clip_max, bool in_out_col32,
+                                     bool narrow_clip) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 10;
-  ker_bias_relu_int32I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, out_scale,
-      out_clip_max, in_out_col32, narrow_clip);
+  ker_bias_relu_i32I_i8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      clip_max, in_out_col32, narrow_clip);
 }
 
 template <>
-void ker_bias_relu_int32I_int8O_launcher<__half>(
+void ker_bias_relu_i32I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip) {
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 11;
-  ker_bias_relu_int32I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, out_scale,
-      out_clip_max, in_out_col32, narrow_clip);
+  ker_bias_relu_i32I_i8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      clip_max, in_out_col32, narrow_clip);
 }
 
-template void ker_bias_relu_int32I_int8O_launcher<float>(
+template void ker_bias_relu_i32I_i8O_launcher<float>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const float *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip);
+    const float *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip);
 
-template void ker_bias_relu_int32I_int8O_launcher<__half>(
+template void ker_bias_relu_i32I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int32_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip);
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip);
 
 template <typename T>
-__global__ void ker_bias_relu_int8I_int8O(int8_t *input, int8_t *output,
-                                          const T *bias, int total_count,
-                                          int feature_dim, float dequant_scale,
-                                          float out_scale, float out_clip_max,
-                                          bool in_out_col32, bool narrow_clip) {
+__global__ void ker_bias_relu_i8I_i8O(int8_t *input, int8_t *output,
+                                      const T *bias, int total_count,
+                                      int feature_dim, float dequant_scale,
+                                      float quant_scale, float clip_max,
+                                      bool in_out_col32, bool narrow_clip) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
@@ -1561,15 +1540,15 @@ __global__ void ker_bias_relu_int8I_int8O(int8_t *input, int8_t *output,
 
   char4 out_i4;
   if (narrow_clip) {
-    out_i4.x = posfloat2int8(output4.x, out_scale, out_clip_max);
-    out_i4.y = posfloat2int8(output4.y, out_scale, out_clip_max);
-    out_i4.z = posfloat2int8(output4.z, out_scale, out_clip_max);
-    out_i4.w = posfloat2int8(output4.w, out_scale, out_clip_max);
+    out_i4.x = posfloat2int8(output4.x, quant_scale * clip_max, clip_max);
+    out_i4.y = posfloat2int8(output4.y, quant_scale * clip_max, clip_max);
+    out_i4.z = posfloat2int8(output4.z, quant_scale * clip_max, clip_max);
+    out_i4.w = posfloat2int8(output4.w, quant_scale * clip_max, clip_max);
   } else {
-    out_i4.x = float2int8(output4.x, out_scale / out_clip_max, out_clip_max);
-    out_i4.y = float2int8(output4.y, out_scale / out_clip_max, out_clip_max);
-    out_i4.z = float2int8(output4.z, out_scale / out_clip_max, out_clip_max);
-    out_i4.w = float2int8(output4.w, out_scale / out_clip_max, out_clip_max);
+    out_i4.x = float2int8(output4.x, quant_scale);
+    out_i4.y = float2int8(output4.y, quant_scale);
+    out_i4.z = float2int8(output4.z, quant_scale);
+    out_i4.w = float2int8(output4.w, quant_scale);
   }
 
   out4[i] = out_i4;
@@ -1577,9 +1556,9 @@ __global__ void ker_bias_relu_int8I_int8O(int8_t *input, int8_t *output,
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_relu_int8I_int8O<__half>(
+__global__ void ker_bias_relu_i8I_i8O<__half>(
     int8_t *input, int8_t *output, const __half *bias, int total_count,
-    int feature_dim, float dequant_scale, float out_scale, float out_clip_max,
+    int feature_dim, float dequant_scale, float quant_scale, float clip_max,
     bool in_out_col32, bool narrow_clip) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1612,53 +1591,52 @@ __global__ void ker_bias_relu_int8I_int8O<__half>(
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
     if (narrow_clip)
-      out_i1[j] = posfloat2int8(out_f, out_scale, out_clip_max);
+      out_i1[j] = posfloat2int8(out_f, quant_scale * clip_max, clip_max);
     else
-      out_i1[j] = float2int8(out_f, out_scale / out_clip_max, out_clip_max);
+      out_i1[j] = float2int8(out_f, quant_scale);
   }
   outs_i8[i] = out_i8;
 }
 
 template <typename T>
-void ker_bias_relu_int8I_int8O_launcher(int batch_token_num,
-                                        cudaStream_t stream, int8_t *input,
-                                        int8_t *output, const T *bias,
-                                        int feature_dim, float dequant_scale,
-                                        float out_scale, float out_clip_max,
-                                        bool in_out_col32, bool narrow_clip) {
+void ker_bias_relu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
+                                    int8_t *input, int8_t *output,
+                                    const T *bias, int feature_dim,
+                                    float dequant_scale, float quant_scale,
+                                    float clip_max, bool in_out_col32,
+                                    bool narrow_clip) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 10;
-  ker_bias_relu_int8I_int8O<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, out_scale,
-      out_clip_max, in_out_col32, narrow_clip);
+  ker_bias_relu_i8I_i8O<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      clip_max, in_out_col32, narrow_clip);
 }
 
 template <>
-void ker_bias_relu_int8I_int8O_launcher<__half>(
+void ker_bias_relu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip) {
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip) {
   int total_count = batch_token_num * feature_dim;
   int grid_dim = total_count >> 11;
-  ker_bias_relu_int8I_int8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, out_scale,
-      out_clip_max, in_out_col32, narrow_clip);
+  ker_bias_relu_i8I_i8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
+      clip_max, in_out_col32, narrow_clip);
 }
 
-template void ker_bias_relu_int8I_int8O_launcher<float>(
+template void ker_bias_relu_i8I_i8O_launcher<float>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const float *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip);
+    const float *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip);
 
-template void ker_bias_relu_int8I_int8O_launcher<__half>(
+template void ker_bias_relu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
-    const __half *bias, int feature_dim, float dequant_scale, float out_scale,
-    float out_clip_max, bool in_out_col32, bool narrow_clip);
+    const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
+    float clip_max, bool in_out_col32, bool narrow_clip);
 
 template <typename T>
-__global__ void ker_residual_int32I(int32_t *input, T *output, int total_count,
-                                    float scale_div_clip_max, T *colsum,
-                                    int cols) {
+__global__ void ker_residual_i32I(int32_t *input, T *output, int total_count,
+                                  float dequant_scale, T *colsum, int cols) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= total_count) return;
@@ -1675,20 +1653,19 @@ __global__ void ker_residual_int32I(int32_t *input, T *output, int total_count,
     cs4 = colsum4[i % (cols / 4)];
   }
 
-  output4.x += float(input4.x) / scale_div_clip_max + (colsum ? cs4.x : 0);
-  output4.y += float(input4.y) / scale_div_clip_max + (colsum ? cs4.y : 0);
-  output4.z += float(input4.z) / scale_div_clip_max + (colsum ? cs4.z : 0);
-  output4.w += float(input4.w) / scale_div_clip_max + (colsum ? cs4.w : 0);
+  output4.x += float(input4.x) * dequant_scale + (colsum ? cs4.x : 0);
+  output4.y += float(input4.y) * dequant_scale + (colsum ? cs4.y : 0);
+  output4.z += float(input4.z) * dequant_scale + (colsum ? cs4.z : 0);
+  output4.w += float(input4.w) * dequant_scale + (colsum ? cs4.w : 0);
 
   out4[i] = output4;
 }
 
 /* fp16 version */
 template <>
-__global__ void ker_residual_int32I<__half>(int32_t *input, __half *output,
-                                            int total_count,
-                                            float scale_div_clip_max,
-                                            __half *colsum, int cols) {
+__global__ void ker_residual_i32I<__half>(int32_t *input, __half *output,
+                                          int total_count, float dequant_scale,
+                                          __half *colsum, int cols) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= total_count) return;
@@ -1712,8 +1689,7 @@ __global__ void ker_residual_int32I<__half>(int32_t *input, __half *output,
 
 #pragma unroll
   for (uint j = 0; j < 8; ++j) {
-    out_h1[j] =
-        __hadd(out_h1[j], __float2half(float(val1[j]) / scale_div_clip_max));
+    out_h1[j] = __hadd(out_h1[j], __float2half(float(val1[j]) * dequant_scale));
     if (colsum) {
       out_h1[j] = __hadd(out_h1[j], cs_h1[j]);
     }
@@ -1722,34 +1698,38 @@ __global__ void ker_residual_int32I<__half>(int32_t *input, __half *output,
 }
 
 template <typename T>
-void ker_residual_int32I_launcher(int32_t *input, T *output, int total_ele_num,
-                                  float quant_scale, float clip_max,
-                                  cudaStream_t stream, T *colsum, int cols) {
+void ker_residual_i32I_launcher(int32_t *input, T *output, int total_ele_num,
+                                float dequant_scale, cudaStream_t stream,
+                                T *colsum, int cols) {
   int grid_dim = total_ele_num >> 10;
-  ker_residual_int32I<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, total_ele_num, quant_scale / clip_max, colsum, cols);
+  ker_residual_i32I<T><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, total_ele_num, dequant_scale, colsum, cols);
 }
 
 template <>
-void ker_residual_int32I_launcher<__half>(int32_t *input, __half *output,
-                                          int total_ele_num, float quant_scale,
-                                          float clip_max, cudaStream_t stream,
-                                          __half *colsum, int cols) {
+void ker_residual_i32I_launcher<__half>(int32_t *input, __half *output,
+                                        int total_ele_num, float dequant_scale,
+                                        cudaStream_t stream, __half *colsum,
+                                        int cols) {
   int grid_dim = total_ele_num >> 11;
-  ker_residual_int32I<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, total_ele_num, quant_scale / clip_max, colsum, cols);
+  ker_residual_i32I<__half><<<grid_dim + 1, 256, 0, stream>>>(
+      input, output, total_ele_num, dequant_scale, colsum, cols);
 }
 
-template void ker_residual_int32I_launcher<float>(
-    int32_t *input, float *output, int total_ele_num, float quant_scale,
-    float clip_max, cudaStream_t stream, float *colsum, int cols);
+template void ker_residual_i32I_launcher<float>(int32_t *input, float *output,
+                                                int total_ele_num,
+                                                float dequant_scale,
+                                                cudaStream_t stream,
+                                                float *colsum, int cols);
 
-template void ker_residual_int32I_launcher<__half>(
-    int32_t *input, __half *output, int total_ele_num, float quant_scale,
-    float clip_max, cudaStream_t stream, __half *colsum, int cols);
+template void ker_residual_i32I_launcher<__half>(int32_t *input, __half *output,
+                                                 int total_ele_num,
+                                                 float dequant_scale,
+                                                 cudaStream_t stream,
+                                                 __half *colsum, int cols);
 
 template <typename T>
-__global__ void ker_arrange_encself_qkv_int32I(
+__global__ void ker_arrange_encself_qkv_i32I(
     const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
     bool in_col32) {
@@ -1779,7 +1759,7 @@ __global__ void ker_arrange_encself_qkv_int32I(
 }
 
 template <>
-__global__ void ker_arrange_encself_qkv_int32I<__half>(
+__global__ void ker_arrange_encself_qkv_i32I<__half>(
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     float dequant_scale, bool in_col32) {
@@ -1816,46 +1796,48 @@ __global__ void ker_arrange_encself_qkv_int32I<__half>(
 }
 
 template <typename T>
-void ker_arrange_encself_qkv_int32I_launcher(
+void ker_arrange_encself_qkv_i32I_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32) {
-  ker_arrange_encself_qkv_int32I<T>
+  ker_arrange_encself_qkv_i32I<T>
       <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len,
           dim_per_head, head_num, dequant_scale, in_col32);
 }
 
 template <>
-void ker_arrange_encself_qkv_int32I_launcher<__half>(
+void ker_arrange_encself_qkv_i32I_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32) {
-  ker_arrange_encself_qkv_int32I<__half>
+  ker_arrange_encself_qkv_i32I<__half>
       <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
           dim_per_head / 2, head_num, dequant_scale, in_col32);
 }
 
-template void ker_arrange_encself_qkv_int32I_launcher<float>(
+template void ker_arrange_encself_qkv_i32I_launcher<float>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const float *qkv_bias, float *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32);
 
-template void ker_arrange_encself_qkv_int32I_launcher<__half>(
+template void ker_arrange_encself_qkv_i32I_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
-__global__ void ker_arrange_encself_qkv_int8I(
-    const int8_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
-    int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
-    bool in_col32) {
+__global__ void ker_arrange_encself_qkv_i8I(const int8_t *ori_qkv,
+                                            const T *qkv_bias, T *new_qkv,
+                                            int max_batch_dim,
+                                            int batch_seq_len, int dim_per_head,
+                                            int head_num, float dequant_scale,
+                                            bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   int batch_id = blockIdx.x / batch_seq_len;
   int token_id = blockIdx.x % batch_seq_len;
@@ -1882,7 +1864,7 @@ __global__ void ker_arrange_encself_qkv_int8I(
 }
 
 template <>
-__global__ void ker_arrange_encself_qkv_int8I<__half>(
+__global__ void ker_arrange_encself_qkv_i8I<__half>(
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     float dequant_scale, bool in_col32) {
@@ -1919,47 +1901,46 @@ __global__ void ker_arrange_encself_qkv_int8I<__half>(
 }
 
 template <typename T>
-void ker_arrange_encself_qkv_int8I_launcher(
+void ker_arrange_encself_qkv_i8I_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_qkv, int max_batch_dim,
     int batch_seq_len, int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32) {
-  ker_arrange_encself_qkv_int8I<T>
+  ker_arrange_encself_qkv_i8I<T>
       <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_qkv, max_batch_dim, batch_seq_len,
           dim_per_head, head_num, dequant_scale, in_col32);
 }
 
 template <>
-void ker_arrange_encself_qkv_int8I_launcher<__half>(
+void ker_arrange_encself_qkv_i8I_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32) {
-  ker_arrange_encself_qkv_int8I<__half>
+  ker_arrange_encself_qkv_i8I<__half>
       <<<dim3(batch_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_qkv, max_batch_dim / 2, batch_seq_len,
           dim_per_head / 2, head_num, dequant_scale, in_col32);
 }
 
-template void ker_arrange_encself_qkv_int8I_launcher<float>(
+template void ker_arrange_encself_qkv_i8I_launcher<float>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const float *qkv_bias, float *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32);
 
-template void ker_arrange_encself_qkv_int8I_launcher<__half>(
+template void ker_arrange_encself_qkv_i8I_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_qkv,
     int max_batch_dim, int batch_seq_len, int dim_per_head, int head_num,
     int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
-__global__ void ker_arrange_atten_output_int8O(const T *ori_q, int8_t *new_q,
-                                               int beam_size, int dim_per_head,
-                                               int head_num,
-                                               float scale_div_clip_max,
-                                               float clip_max, bool out_col32) {
+__global__ void ker_arrange_atten_output_i8O(const T *ori_q, int8_t *new_q,
+                                             int beam_size, int dim_per_head,
+                                             int head_num, float quant_scale,
+                                             bool out_col32) {
   int hidden_size = dim_per_head * head_num;
   int batch_id = blockIdx.x / beam_size;
   // note, for encoder, beam_id is token_id; for decoder, beam_id is beam_id
@@ -1978,14 +1959,14 @@ __global__ void ker_arrange_atten_output_int8O(const T *ori_q, int8_t *new_q,
     new_q[out_index] =
         float2int8(ori_q[targetid_4dim(batch_id, head_id, beam_id, dim_id,
                                        head_num, beam_size, dim_per_head)],
-                   scale_div_clip_max, clip_max);
+                   quant_scale);
   }
 }
 
 template <>
-__global__ void ker_arrange_atten_output_int8O<__half>(
+__global__ void ker_arrange_atten_output_i8O<__half>(
     const __half *ori_q, int8_t *new_q, int beam_size, int dim_per_head,
-    int head_num, float scale_div_clip_max, float clip_max, bool out_col32) {
+    int head_num, float quant_scale, bool out_col32) {
   int batch_id = blockIdx.x / beam_size;
   // note, for encoder, beam_id is token_id; for decoder, beam_id is beam_id
   int beam_id = blockIdx.x % beam_size;
@@ -2009,55 +1990,53 @@ __global__ void ker_arrange_atten_output_int8O<__half>(
     char2 v_new_q;
     v_ori_q = p_ori_q[targetid_4dim(batch_id, head_id, beam_id, dim_id,
                                     head_num, beam_size, dim_per_head)];
-    v_new_q.x = float2int8(float(v_ori_q.x), scale_div_clip_max, clip_max);
-    v_new_q.y = float2int8(float(v_ori_q.y), scale_div_clip_max, clip_max);
+    v_new_q.x = float2int8(float(v_ori_q.x), quant_scale);
+    v_new_q.y = float2int8(float(v_ori_q.y), quant_scale);
     p_new_q[out_index] = v_new_q;
   }
 }
 
 template <typename T>
-void ker_arrange_atten_output_int8O_launcher(
-    int batch_token_num, int hidden_size, cudaStream_t stream, const T *ori_q,
-    int8_t *new_q, int beam_size, int dim_per_head, int head_num,
-    int max_thread_per_block, float quant_scale, float clip_max,
-    bool out_col32) {
-  ker_arrange_atten_output_int8O<T>
+void ker_arrange_atten_output_i8O_launcher(int batch_token_num, int hidden_size,
+                                           cudaStream_t stream, const T *ori_q,
+                                           int8_t *new_q, int beam_size,
+                                           int dim_per_head, int head_num,
+                                           int max_thread_per_block,
+                                           float quant_scale, bool out_col32) {
+  ker_arrange_atten_output_i8O<T>
       <<<batch_token_num, max_thread_per_block, 0, stream>>>(
-          ori_q, new_q, beam_size, dim_per_head, head_num,
-          quant_scale / clip_max, clip_max, out_col32);
+          ori_q, new_q, beam_size, dim_per_head, head_num, quant_scale,
+          out_col32);
 }
 
 template <>
-void ker_arrange_atten_output_int8O_launcher<__half>(
+void ker_arrange_atten_output_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const __half *ori_q, int8_t *new_q, int beam_size, int dim_per_head,
-    int head_num, int max_thread_per_block, float quant_scale, float clip_max,
-    bool out_col32) {
-  ker_arrange_atten_output_int8O<__half>
+    int head_num, int max_thread_per_block, float quant_scale, bool out_col32) {
+  ker_arrange_atten_output_i8O<__half>
       <<<batch_token_num, max_thread_per_block, 0, stream>>>(
-          ori_q, new_q, beam_size, dim_per_head / 2, head_num,
-          quant_scale / clip_max, clip_max, out_col32);
+          ori_q, new_q, beam_size, dim_per_head / 2, head_num, quant_scale,
+          out_col32);
 }
 
-template void ker_arrange_atten_output_int8O_launcher<float>(
+template void ker_arrange_atten_output_i8O_launcher<float>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const float *ori_q, int8_t *new_q, int beam_size, int dim_per_head,
-    int head_num, int max_thread_per_block, float quant_scale, float clip_max,
-    bool out_col32);
+    int head_num, int max_thread_per_block, float quant_scale, bool out_col32);
 
-template void ker_arrange_atten_output_int8O_launcher<__half>(
+template void ker_arrange_atten_output_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const __half *ori_q, int8_t *new_q, int beam_size, int dim_per_head,
-    int head_num, int max_thread_per_block, float quant_scale, float clip_max,
-    bool out_col32);
+    int head_num, int max_thread_per_block, float quant_scale, bool out_col32);
 
 template <typename T>
-__global__ void ker_arrange_decself_qkv_int32I(const int32_t *ori_qkv,
-                                               const T *qkv_bias, T *new_q,
-                                               T *new_k, T *new_v, int head_num,
-                                               int dim_per_head, int max_step,
-                                               int step_id, float dequant_scale,
-                                               bool in_col32) {
+__global__ void ker_arrange_decself_qkv_i32I(const int32_t *ori_qkv,
+                                             const T *qkv_bias, T *new_q,
+                                             T *new_k, T *new_v, int head_num,
+                                             int dim_per_head, int max_step,
+                                             int step_id, float dequant_scale,
+                                             bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
@@ -2094,7 +2073,7 @@ __global__ void ker_arrange_decself_qkv_int32I(const int32_t *ori_qkv,
 }
 
 template <>
-__global__ void ker_arrange_decself_qkv_int32I<__half>(
+__global__ void ker_arrange_decself_qkv_i32I<__half>(
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
     int step_id, float dequant_scale, bool in_col32) {
@@ -2141,48 +2120,47 @@ __global__ void ker_arrange_decself_qkv_int32I<__half>(
 }
 
 template <typename T>
-void ker_arrange_decself_qkv_int32I_launcher(
+void ker_arrange_decself_qkv_i32I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale, bool in_col32) {
-  ker_arrange_decself_qkv_int32I<T>
+  ker_arrange_decself_qkv_i32I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
           max_step, step_id, dequant_scale, in_col32);
 }
 
 template <>
-void ker_arrange_decself_qkv_int32I_launcher<__half>(
+void ker_arrange_decself_qkv_i32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
     int step_id, int max_thread_per_block, float dequant_scale, bool in_col32) {
-  ker_arrange_decself_qkv_int32I<__half>
+  ker_arrange_decself_qkv_i32I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
           max_step, step_id, dequant_scale, in_col32);
 }
 
-template void ker_arrange_decself_qkv_int32I_launcher<float>(
+template void ker_arrange_decself_qkv_i32I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale, bool in_col32);
 
-template void ker_arrange_decself_qkv_int32I_launcher<__half>(
+template void ker_arrange_decself_qkv_i32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_qkv, const __half *qkv_bias, __half *new_q,
     __half *new_k, __half *new_v, int head_num, int dim_per_head, int max_step,
     int step_id, int max_thread_per_block, float dequant_scale, bool in_col32);
 
 template <typename T>
-__global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
-                                              const T *qkv_bias, T *new_q,
-                                              T *new_k, T *new_v, int head_num,
-                                              int dim_per_head, int max_step,
-                                              int step_id,
-                                              float dequant_scale) {
+__global__ void ker_arrange_decself_qkv_i8I(const int8_t *ori_qkv,
+                                            const T *qkv_bias, T *new_q,
+                                            T *new_k, T *new_v, int head_num,
+                                            int dim_per_head, int max_step,
+                                            int step_id, float dequant_scale) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     // blockdim is equal to hidden_size
@@ -2214,7 +2192,7 @@ __global__ void ker_arrange_decself_qkv_int8I(const int8_t *ori_qkv,
 }
 
 template <>
-__global__ void ker_arrange_decself_qkv_int8I<__half>(
+__global__ void ker_arrange_decself_qkv_i8I<__half>(
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     float dequant_scale) {
@@ -2256,47 +2234,46 @@ __global__ void ker_arrange_decself_qkv_int8I<__half>(
 }
 
 template <typename T>
-void ker_arrange_decself_qkv_int8I_launcher(
+void ker_arrange_decself_qkv_i8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
     int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale) {
-  ker_arrange_decself_qkv_int8I<T>
+  ker_arrange_decself_qkv_i8I<T>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head,
           max_step, step_id, dequant_scale);
 }
 
 template <>
-void ker_arrange_decself_qkv_int8I_launcher<__half>(
+void ker_arrange_decself_qkv_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale) {
-  ker_arrange_decself_qkv_int8I<__half>
+  ker_arrange_decself_qkv_i8I<__half>
       <<<dim3(step_token_num, 3), max_thread_per_block, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, new_v, head_num, dim_per_head / 2,
           max_step, step_id, dequant_scale);
 }
 
-template void ker_arrange_decself_qkv_int8I_launcher<float>(
+template void ker_arrange_decself_qkv_i8I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const float *qkv_bias, float *new_q, float *new_k,
     float *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale);
 
-template void ker_arrange_decself_qkv_int8I_launcher<__half>(
+template void ker_arrange_decself_qkv_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const __half *qkv_bias, __half *new_q, __half *new_k,
     __half *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale);
 
 template <typename T>
-__global__ void ker_arrange_encdec_q_int32I(const int32_t *ori_q,
-                                            const T *q_bias, T *new_q,
-                                            int beam_size, int dim_per_head,
-                                            int head_num, float dequant_scale,
-                                            bool in_col32) {
+__global__ void ker_arrange_encdec_q_i32I(const int32_t *ori_q, const T *q_bias,
+                                          T *new_q, int beam_size,
+                                          int dim_per_head, int head_num,
+                                          float dequant_scale, bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     int qkv_index;
@@ -2318,7 +2295,7 @@ __global__ void ker_arrange_encdec_q_int32I(const int32_t *ori_q,
 }
 
 template <>
-__global__ void ker_arrange_encdec_q_int32I<__half>(
+__global__ void ker_arrange_encdec_q_i32I<__half>(
     const int32_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, float dequant_scale, bool in_col32) {
   int half_hidden_size = dim_per_head * head_num;
@@ -2350,48 +2327,48 @@ __global__ void ker_arrange_encdec_q_int32I<__half>(
 }
 
 template <typename T>
-void ker_arrange_encdec_q_int32I_launcher(int step_token_num, int hidden_size,
-                                          cudaStream_t stream,
-                                          const int32_t *ori_q, const T *q_bias,
-                                          T *new_q, int beam_size,
-                                          int dim_per_head, int head_num,
-                                          int max_thread_per_block,
-                                          float dequant_scale, bool in_col32) {
-  ker_arrange_encdec_q_int32I<T>
+void ker_arrange_encdec_q_i32I_launcher(int step_token_num, int hidden_size,
+                                        cudaStream_t stream,
+                                        const int32_t *ori_q, const T *q_bias,
+                                        T *new_q, int beam_size,
+                                        int dim_per_head, int head_num,
+                                        int max_thread_per_block,
+                                        float dequant_scale, bool in_col32) {
+  ker_arrange_encdec_q_i32I<T>
       <<<step_token_num, max_thread_per_block, 0, stream>>>(
           ori_q, q_bias, new_q, beam_size, dim_per_head, head_num,
           dequant_scale, in_col32);
 }
 
 template <>
-void ker_arrange_encdec_q_int32I_launcher<__half>(
+void ker_arrange_encdec_q_i32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32) {
-  ker_arrange_encdec_q_int32I<__half>
+  ker_arrange_encdec_q_i32I<__half>
       <<<step_token_num, max_thread_per_block, 0, stream>>>(
           ori_q, q_bias, new_q, beam_size, dim_per_head / 2, head_num,
           dequant_scale, in_col32);
 }
 
-template void ker_arrange_encdec_q_int32I_launcher<float>(
+template void ker_arrange_encdec_q_i32I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_q, const float *q_bias, float *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32);
 
-template void ker_arrange_encdec_q_int32I_launcher<__half>(
+template void ker_arrange_encdec_q_i32I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int32_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32);
 
 template <typename T>
-__global__ void ker_arrange_encdec_q_int8I(const int8_t *ori_q, const T *q_bias,
-                                           T *new_q, int beam_size,
-                                           int dim_per_head, int head_num,
-                                           float dequant_scale, bool in_col32) {
+__global__ void ker_arrange_encdec_q_i8I(const int8_t *ori_q, const T *q_bias,
+                                         T *new_q, int beam_size,
+                                         int dim_per_head, int head_num,
+                                         float dequant_scale, bool in_col32) {
   int hidden_size = dim_per_head * head_num;
   for (std::size_t i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     int qkv_index;
@@ -2413,7 +2390,7 @@ __global__ void ker_arrange_encdec_q_int8I(const int8_t *ori_q, const T *q_bias,
 }
 
 template <>
-__global__ void ker_arrange_encdec_q_int8I<__half>(
+__global__ void ker_arrange_encdec_q_i8I<__half>(
     const int8_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, float dequant_scale, bool in_col32) {
   int half_hidden_size = dim_per_head * head_num;
@@ -2445,38 +2422,37 @@ __global__ void ker_arrange_encdec_q_int8I<__half>(
 }
 
 template <typename T>
-void ker_arrange_encdec_q_int8I_launcher(int step_token_num, int hidden_size,
-                                         cudaStream_t stream,
-                                         const int8_t *ori_q, const T *q_bias,
-                                         T *new_q, int beam_size,
-                                         int dim_per_head, int head_num,
-                                         int max_thread_per_block,
-                                         float dequant_scale, bool in_col32) {
-  ker_arrange_encdec_q_int8I<T>
+void ker_arrange_encdec_q_i8I_launcher(int step_token_num, int hidden_size,
+                                       cudaStream_t stream, const int8_t *ori_q,
+                                       const T *q_bias, T *new_q, int beam_size,
+                                       int dim_per_head, int head_num,
+                                       int max_thread_per_block,
+                                       float dequant_scale, bool in_col32) {
+  ker_arrange_encdec_q_i8I<T>
       <<<step_token_num, max_thread_per_block, 0, stream>>>(
           ori_q, q_bias, new_q, beam_size, dim_per_head, head_num,
           dequant_scale, in_col32);
 }
 
 template <>
-void ker_arrange_encdec_q_int8I_launcher<__half>(
+void ker_arrange_encdec_q_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32) {
-  ker_arrange_encdec_q_int8I<__half>
+  ker_arrange_encdec_q_i8I<__half>
       <<<step_token_num, max_thread_per_block, 0, stream>>>(
           ori_q, q_bias, new_q, beam_size, dim_per_head / 2, head_num,
           dequant_scale, in_col32);
 }
 
-template void ker_arrange_encdec_q_int8I_launcher<float>(
+template void ker_arrange_encdec_q_i8I_launcher<float>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_q, const float *q_bias, float *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
     float dequant_scale, bool in_col32);
 
-template void ker_arrange_encdec_q_int8I_launcher<__half>(
+template void ker_arrange_encdec_q_i8I_launcher<__half>(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_q, const __half *q_bias, __half *new_q, int beam_size,
     int dim_per_head, int head_num, int max_thread_per_block,
@@ -2512,7 +2488,7 @@ cur_step: current step
 diverse_lambda: lambda for diverse beam search
 */
 template <typename T, int beam_size>
-__global__ void select_beam_rough_topk_int32I(
+__global__ void select_beam_rough_topk_i32I(
     const int32_t *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2651,7 +2627,7 @@ __global__ void select_beam_rough_topk_int32I(
 }
 
 template <typename T>
-void select_beam_rough_topk_int32I_launcher(
+void select_beam_rough_topk_i32I_launcher(
     const int32_t *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2659,44 +2635,44 @@ void select_beam_rough_topk_int32I_launcher(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id) {
   if (beam_size == 1)
-    select_beam_rough_topk_int32I<T, 1>
+    select_beam_rough_topk_i32I<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 2)
-    select_beam_rough_topk_int32I<T, 2>
+    select_beam_rough_topk_i32I<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 4)
-    select_beam_rough_topk_int32I<T, 4>
+    select_beam_rough_topk_i32I<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 8)
-    select_beam_rough_topk_int32I<T, 8>
+    select_beam_rough_topk_i32I<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 16)
-    select_beam_rough_topk_int32I<T, 16>
+    select_beam_rough_topk_i32I<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 32)
-    select_beam_rough_topk_int32I<T, 32>
+    select_beam_rough_topk_i32I<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
 }
 
-template void select_beam_rough_topk_int32I_launcher<float>(
+template void select_beam_rough_topk_i32I_launcher<float>(
     const int32_t *logits, const float *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2704,7 +2680,7 @@ template void select_beam_rough_topk_int32I_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
-template void select_beam_rough_topk_int32I_launcher<__half>(
+template void select_beam_rough_topk_i32I_launcher<__half>(
     const int32_t *logits, const __half *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2713,7 +2689,7 @@ template void select_beam_rough_topk_int32I_launcher<__half>(
     float diverse_lambda, int end_id);
 
 template <typename T, int beam_size>
-__global__ void select_beam_rough_topk_int8I(
+__global__ void select_beam_rough_topk_i8I(
     const int8_t *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2852,7 +2828,7 @@ __global__ void select_beam_rough_topk_int8I(
 }
 
 template <typename T>
-void select_beam_rough_topk_int8I_launcher(
+void select_beam_rough_topk_i8I_launcher(
     const int8_t *logits, const T *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2860,44 +2836,44 @@ void select_beam_rough_topk_int8I_launcher(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id) {
   if (beam_size == 1)
-    select_beam_rough_topk_int8I<T, 1>
+    select_beam_rough_topk_i8I<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 2)
-    select_beam_rough_topk_int8I<T, 2>
+    select_beam_rough_topk_i8I<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 4)
-    select_beam_rough_topk_int8I<T, 4>
+    select_beam_rough_topk_i8I<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 8)
-    select_beam_rough_topk_int8I<T, 8>
+    select_beam_rough_topk_i8I<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 16)
-    select_beam_rough_topk_int8I<T, 16>
+    select_beam_rough_topk_i8I<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
   if (beam_size == 32)
-    select_beam_rough_topk_int8I<T, 32>
+    select_beam_rough_topk_i8I<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, dequant_scale,
             can_idx, can_score, num_beam_can, vocab_size, max_step, length_norm,
             cur_step, diverse_lambda, end_id);
 }
 
-template void select_beam_rough_topk_int8I_launcher<float>(
+template void select_beam_rough_topk_i8I_launcher<float>(
     const int8_t *logits, const float *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
@@ -2905,7 +2881,7 @@ template void select_beam_rough_topk_int8I_launcher<float>(
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id);
 
-template void select_beam_rough_topk_int8I_launcher<__half>(
+template void select_beam_rough_topk_i8I_launcher<__half>(
     const int8_t *logits, const __half *logit_bias, const float *seq_probs,
     const float *seq_score, const int *alive_seq, float dequant_scale,
     int *can_idx, float *can_score, int *num_beam_can, int vocab_size,
