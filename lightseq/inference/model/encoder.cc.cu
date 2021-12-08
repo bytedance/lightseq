@@ -94,36 +94,40 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
     CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
                                _tw._inner_size * _tw._hidden_size));
 
-    quantize_weight_col32t(
-        _p_d_enc_wei[_weight_offset + 2], _int8_p_d_enc_wei[_layer_id * 4],
-        _tw._hidden_size, _tw._hidden_size * 3, _quant_range,
-        _enc_clip_max[_layer_id * 12], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 2],
+                           _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
+                           _tw._hidden_size * 3,
+                           _quant_range / _enc_clip_max[_layer_id * 12],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_enc_wei[_weight_offset + 4], _int8_p_d_enc_wei[_layer_id * 4 + 1],
-        _tw._hidden_size, _tw._hidden_size, _quant_range,
-        _enc_clip_max[_layer_id * 12 + 1], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 4],
+                           _int8_p_d_enc_wei[_layer_id * 4 + 1],
+                           _tw._hidden_size, _tw._hidden_size,
+                           _quant_range / _enc_clip_max[_layer_id * 12 + 1],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_enc_wei[_weight_offset + 8], _int8_p_d_enc_wei[_layer_id * 4 + 2],
-        _tw._hidden_size, _tw._inner_size, _quant_range,
-        _enc_clip_max[_layer_id * 12 + 2], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 8],
+                           _int8_p_d_enc_wei[_layer_id * 4 + 2],
+                           _tw._hidden_size, _tw._inner_size,
+                           _quant_range / _enc_clip_max[_layer_id * 12 + 2],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_enc_wei[_weight_offset + 10], _int8_p_d_enc_wei[_layer_id * 4 + 3],
-        _tw._inner_size, _tw._hidden_size, _quant_range,
-        _enc_clip_max[_layer_id * 12 + 3], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 10],
+                           _int8_p_d_enc_wei[_layer_id * 4 + 3],
+                           _tw._inner_size, _tw._hidden_size,
+                           _quant_range / _enc_clip_max[_layer_id * 12 + 3],
+                           _stream, _cublas_lt_handle);
 
-    if (_tw._use_gelu) {
-      _scaled_ffn2_colsum[_layer_id] = nullptr;
-    } else {
-      CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
-                                 _tw._hidden_size * sizeof(_DataType)));
-      float relu_scale = _enc_clip_max[_layer_id * 12 + 7] / 2;
-      launch_scaled_colsum(_p_d_enc_wei[_weight_offset + 10],
-                           _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-                           _tw._hidden_size, relu_scale, _stream);
-    }
+    // if (_tw._use_gelu) {
+    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // } else {
+    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+    //                              _tw._hidden_size * sizeof(_DataType)));
+    //   float relu_scale = _enc_clip_max[_layer_id * 12 + 7] / 2;
+    //   launch_scaled_colsum(_p_d_enc_wei[_weight_offset + 10],
+    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+    //                        _tw._hidden_size, relu_scale, _stream);
+    // }
   }
 #endif
   return;
@@ -409,7 +413,7 @@ void Encoder<OpType_>::ffn_add_norm() {
           _enc_clip_max[_layer_id * 12 + 2] *
               _enc_clip_max[_layer_id * 12 + 6] / (_quant_range * _quant_range),
           _quant_range / _enc_clip_max[_layer_id * 12 + 7],
-          _enc_clip_max[_layer_id * 12 + 7], true, true);
+          _enc_clip_max[_layer_id * 12 + 7], true, false);
     }
   }
 
@@ -445,9 +449,8 @@ void Encoder<OpType_>::ffn_add_norm() {
           _int32_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
           _batch_token_num, _tw._hidden_size,
           _enc_clip_max[_layer_id * 12 + 3] *
-              _enc_clip_max[_layer_id * 12 + 7] /
-              (2 * _quant_range * _quant_range),
-          _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
+              _enc_clip_max[_layer_id * 12 + 7] / (_quant_range * _quant_range),
+          _max_thread_per_block, _stream, true);
   } else {
     scale_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
     bias_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 1];
@@ -466,10 +469,9 @@ void Encoder<OpType_>::ffn_add_norm() {
           _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr,
           _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
           _enc_clip_max[_layer_id * 12 + 3] *
-              _enc_clip_max[_layer_id * 12 + 7] /
-              (2 * _quant_range * _quant_range),
+              _enc_clip_max[_layer_id * 12 + 7] / (_quant_range * _quant_range),
           _quant_range / clip_max, _max_thread_per_block, _stream,
-          _tw._is_post_ln, true, _scaled_ffn2_colsum[_layer_id]);
+          _tw._is_post_ln, true);
   }
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */

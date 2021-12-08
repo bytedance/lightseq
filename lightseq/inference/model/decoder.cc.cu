@@ -232,8 +232,9 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
       cudaMalloc(&_int8_p_d_trg_emb_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight_col32t(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei,
-                         _tw._hidden_size, _tw._trg_vocab_size, _quant_range,
-                         _trg_scaled_emb_clip_max, _stream, _cublas_lt_handle);
+                         _tw._hidden_size, _tw._trg_vocab_size,
+                         _quant_range / _trg_scaled_emb_clip_max, _stream,
+                         _cublas_lt_handle);
   _int8_p_d_dec_wei = std::vector<int8_t*>(_tw._n_dec_layer * 6);
   _scaled_ffn2_colsum = std::vector<_DataType*>(_tw._n_dec_layer);
   for (_layer_id = 0; _layer_id < _tw._n_dec_layer; _layer_id++) {
@@ -257,45 +258,51 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
         cudaMalloc(&_int8_p_d_dec_wei[_layer_id * 6 + 5],
                    _tw._inner_size * _tw._hidden_size * sizeof(int8_t)));
 
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 2], _int8_p_d_dec_wei[_layer_id * 6],
-        _tw._hidden_size, _tw._hidden_size * 3, _quant_range,
-        _dec_clip_max[_layer_id * 18], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 2],
+                           _int8_p_d_dec_wei[_layer_id * 6], _tw._hidden_size,
+                           _tw._hidden_size * 3,
+                           _quant_range / _dec_clip_max[_layer_id * 18],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 4], _int8_p_d_dec_wei[_layer_id * 6 + 1],
-        _tw._hidden_size, _tw._hidden_size, _quant_range,
-        _dec_clip_max[_layer_id * 18 + 1], _stream, _cublas_lt_handle);
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 8], _int8_p_d_dec_wei[_layer_id * 6 + 2],
-        _tw._hidden_size, _tw._hidden_size, _quant_range,
-        _dec_clip_max[_layer_id * 18 + 2], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 4],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 1],
+                           _tw._hidden_size, _tw._hidden_size,
+                           _quant_range / _dec_clip_max[_layer_id * 18 + 1],
+                           _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 8],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 2],
+                           _tw._hidden_size, _tw._hidden_size,
+                           _quant_range / _dec_clip_max[_layer_id * 18 + 2],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 10], _int8_p_d_dec_wei[_layer_id * 6 + 3],
-        _tw._hidden_size, _tw._hidden_size, _quant_range,
-        _dec_clip_max[_layer_id * 18 + 3], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 10],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 3],
+                           _tw._hidden_size, _tw._hidden_size,
+                           _quant_range / _dec_clip_max[_layer_id * 18 + 3],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 14], _int8_p_d_dec_wei[_layer_id * 6 + 4],
-        _tw._hidden_size, _tw._inner_size, _quant_range,
-        _dec_clip_max[_layer_id * 18 + 4], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 14],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 4],
+                           _tw._hidden_size, _tw._inner_size,
+                           _quant_range / _dec_clip_max[_layer_id * 18 + 4],
+                           _stream, _cublas_lt_handle);
 
-    quantize_weight_col32t(
-        _p_d_dec_wei[_weight_offset + 16], _int8_p_d_dec_wei[_layer_id * 6 + 5],
-        _tw._inner_size, _tw._hidden_size, _quant_range,
-        _dec_clip_max[_layer_id * 18 + 5], _stream, _cublas_lt_handle);
+    quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 16],
+                           _int8_p_d_dec_wei[_layer_id * 6 + 5],
+                           _tw._inner_size, _tw._hidden_size,
+                           _quant_range / _dec_clip_max[_layer_id * 18 + 5],
+                           _stream, _cublas_lt_handle);
 
-    if (_tw._use_gelu) {
-      _scaled_ffn2_colsum[_layer_id] = nullptr;
-    } else {
-      CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
-                                 _tw._hidden_size * sizeof(_DataType)));
-      float relu_scale = _dec_clip_max[_layer_id * 18 + 11] / 2;
-      launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
-                           _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-                           _tw._hidden_size, relu_scale, _stream);
-    }
+    // if (_tw._use_gelu) {
+    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
+    // } else {
+    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+    //                              _tw._hidden_size * sizeof(_DataType)));
+    //   float relu_scale = _dec_clip_max[_layer_id * 18 + 11] / 2;
+    //   launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
+    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+    //                        _tw._hidden_size, relu_scale, _stream);
+    // }
   }
 #endif
 
@@ -612,7 +619,7 @@ void Decoder<OpType_>::self_attention() {
         _p_d_self_k_bgeem1[_layer_id], _p_d_self_v_bgeem1[_layer_id],
         _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
         _max_thread_per_block,
-        _dec_clip_max[_layer_id * 18 + 12] / _quant_range);
+        _dec_clip_max[_layer_id * 18 + 12] / _quant_range, true);
   else
     ker_arrange_decself_qkv_i32I_launcher<_DataType>(
         _step_token_num, _tw._hidden_size, _stream, _int32_ffn_out_buf,
@@ -1033,7 +1040,7 @@ void Decoder<OpType_>::ffn_add_norm() {
               _dec_clip_max[_layer_id * 18 + 10] /
               (_quant_range * _quant_range),
           _quant_range / _dec_clip_max[_layer_id * 18 + 11],
-          _dec_clip_max[_layer_id * 18 + 11], true, true);
+          _dec_clip_max[_layer_id * 18 + 11], true, false);
     }
   }
 
@@ -1085,9 +1092,9 @@ void Decoder<OpType_>::ffn_add_norm() {
         _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
         _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
         _dec_clip_max[_layer_id * 18 + 5] * _dec_clip_max[_layer_id * 18 + 11] /
-            (2 * _quant_range * _quant_range),
+            (_quant_range * _quant_range),
         _quant_range / clip_max, _max_thread_per_block, _stream,
-        _tw._is_post_ln, true, _scaled_ffn2_colsum[_layer_id]);
+        _tw._is_post_ln, true);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
@@ -1288,7 +1295,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
         _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
         _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
         _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-        _tw._end_id);
+        _tw._end_id, true);
   else
     select_beam_rough_topk_i32I_launcher(
         _int32_ffn_out_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
@@ -1298,7 +1305,7 @@ void Decoder<OpType_>::update_new_seq_probs() {
         _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
         _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
         _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-        _tw._end_id);
+        _tw._end_id, true);
 #else
   select_beam_rough_topk_launcher(
       _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
