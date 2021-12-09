@@ -84,11 +84,13 @@ int main() {
   int iteration = 10;
   bool debug = false;
 
+  // There are some restraints of the decoder shapes
   int batch_size = 8;
   int seq_len = 70;
   int beam_size = 4;
   int hidden_size = 1024;
   int vocab_size = 46896;
+  int head_num = 8;
 
   vvi shapes;
   // encoder
@@ -103,6 +105,21 @@ int main() {
   shapes.push_back({1, batch_size * beam_size, hidden_size, 4 * hidden_size});
   // logits
   shapes.push_back({1, batch_size * beam_size, vocab_size, hidden_size});
+  // batch gemm
+  shapes.push_back(
+      {batch_size * head_num, seq_len, seq_len, hidden_size / head_num});
+  shapes.push_back(
+      {batch_size * head_num, hidden_size / head_num, seq_len, seq_len});
+  shapes.push_back(
+      {batch_size * head_num, seq_len, beam_size, hidden_size / head_num});
+  shapes.push_back(
+      {batch_size * head_num, hidden_size / head_num, beam_size, seq_len});
+  for (int step = 1; step <= seq_len; step += 10) {
+    shapes.push_back(
+        {beam_size * batch_size * head_num, step, 1, hidden_size / head_num});
+    shapes.push_back(
+        {beam_size * batch_size * head_num, hidden_size / head_num, 1, step});
+  }
 
   vf speedup = vf(3, 0);
   for (auto shape : shapes) {

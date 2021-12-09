@@ -18,9 +18,9 @@ __forceinline__ __device__ int8_t float2int8(float x, float quant_scale) {
   return int8_t(i8);
 }
 
-__forceinline__ __device__ int8_t posfloat2int8(float x, float quant_range,
+__forceinline__ __device__ int8_t posfloat2int8(float x, float quant_scale,
                                                 float clip_max) {
-  float i8_f = x * 2 * quant_range / clip_max - quant_range;
+  float i8_f = x * 2 * quant_scale - quant_scale * clip_max;
   int32_t i8 = __float2int_rn(i8_f);
   i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
   return int8_t(i8);
@@ -1286,10 +1286,10 @@ __global__ void ker_bias_relu_i32I_i8O(int32_t *input, int8_t *output,
 
   char4 out_i4;
   if (narrow_clip) {
-    out_i4.x = posfloat2int8(output4.x, quant_scale * clip_max, clip_max);
-    out_i4.y = posfloat2int8(output4.y, quant_scale * clip_max, clip_max);
-    out_i4.z = posfloat2int8(output4.z, quant_scale * clip_max, clip_max);
-    out_i4.w = posfloat2int8(output4.w, quant_scale * clip_max, clip_max);
+    out_i4.x = posfloat2int8(output4.x, quant_scale, clip_max);
+    out_i4.y = posfloat2int8(output4.y, quant_scale, clip_max);
+    out_i4.z = posfloat2int8(output4.z, quant_scale, clip_max);
+    out_i4.w = posfloat2int8(output4.w, quant_scale, clip_max);
   } else {
     out_i4.x = float2int8(output4.x, quant_scale);
     out_i4.y = float2int8(output4.y, quant_scale);
@@ -1337,7 +1337,7 @@ __global__ void ker_bias_relu_i32I_i8O<__half>(
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
     if (narrow_clip)
-      out_i1[j] = posfloat2int8(out_f, quant_scale * clip_max, clip_max);
+      out_i1[j] = posfloat2int8(out_f, quant_scale, clip_max);
     else
       out_i1[j] = float2int8(out_f, quant_scale);
   }
@@ -1415,10 +1415,10 @@ __global__ void ker_bias_relu_i8I_i8O(int8_t *input, int8_t *output,
 
   char4 out_i4;
   if (narrow_clip) {
-    out_i4.x = posfloat2int8(output4.x, quant_scale * clip_max, clip_max);
-    out_i4.y = posfloat2int8(output4.y, quant_scale * clip_max, clip_max);
-    out_i4.z = posfloat2int8(output4.z, quant_scale * clip_max, clip_max);
-    out_i4.w = posfloat2int8(output4.w, quant_scale * clip_max, clip_max);
+    out_i4.x = posfloat2int8(output4.x, quant_scale, clip_max);
+    out_i4.y = posfloat2int8(output4.y, quant_scale, clip_max);
+    out_i4.z = posfloat2int8(output4.z, quant_scale, clip_max);
+    out_i4.w = posfloat2int8(output4.w, quant_scale, clip_max);
   } else {
     out_i4.x = float2int8(output4.x, quant_scale);
     out_i4.y = float2int8(output4.y, quant_scale);
@@ -1466,7 +1466,7 @@ __global__ void ker_bias_relu_i8I_i8O<__half>(
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
     if (narrow_clip)
-      out_i1[j] = posfloat2int8(out_f, quant_scale * clip_max, clip_max);
+      out_i1[j] = posfloat2int8(out_f, quant_scale, clip_max);
     else
       out_i1[j] = float2int8(out_f, quant_scale);
   }
