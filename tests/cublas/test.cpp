@@ -35,24 +35,29 @@ vf _main(int C, int B, int O, int H, int iteration, bool debug) {
   checkCublasStatus(cublasCreate(&handle));
   checkCublasStatus(cublasLtCreate(&lt_handle));
 
+  float cublas_ft = -1, cublas_ht = -1, cublas_it = -1;
+  float cublaslt_ft = -1, cublaslt_ht = -1, cublaslt_it = -1;
+
   printf(">>>>> test cublas gemm ex >>>>>\n");
-  float cublas_ft = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha,
-                                 &f_beta, iteration);
-  float cublas_ht = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha,
-                                 &h_beta, iteration);
-  float cublas_it = test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha,
-                                 &i_beta, iteration);
+  cublas_ft = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                           iteration);
+  cublas_ht = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                           iteration);
+  cublas_it = test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
+                           iteration);
   print_res(Y, fY, hY, iY, C, B, O, H, cublas_ft, cublas_ht, cublas_it, debug);
 
-  printf(">>>>> test cublas lt matmul >>>>>\n");
-  float cublaslt_ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY,
-                                     &f_alpha, &f_beta, iteration);
-  float cublaslt_ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY,
-                                     &h_alpha, &h_beta, iteration);
-  float cublaslt_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
-                                          &i_alpha, &i_beta, iteration);
-  print_res(Y, fY, hY, iY, C, B, O, H, cublaslt_ft, cublaslt_ht, cublaslt_it,
-            debug);
+  if (C == 1) {
+    printf(">>>>> test cublas lt matmul >>>>>\n");
+    cublaslt_ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha,
+                                 &f_beta, iteration);
+    cublaslt_ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha,
+                                 &h_beta, iteration);
+    cublaslt_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
+                                      &i_alpha, &i_beta, iteration);
+    print_res(Y, fY, hY, iY, C, B, O, H, cublaslt_ft, cublaslt_ht, cublaslt_it,
+              debug);
+  }
 
   // printf(">>>>> test tvm gemm >>>>>\n");
   // float tvm_it = test_tvm_gemm(iX, iW, iY, iteration);
@@ -65,19 +70,24 @@ vf _main(int C, int B, int O, int H, int iteration, bool debug) {
   // printf("  diff: %.5f\n", ie / C / B / O);
   // printf("  time: %.3f ms\n", tvm_it);
 
-  printf("SPEEDUP (cublas fp16 / lt fp16):     %.3f\n",
-         cublas_ht / cublaslt_ht);
+  if (C == 1)
+    printf("SPEEDUP (cublas fp16 / lt fp16):     %.3f\n",
+           cublas_ht / cublaslt_ht);
   printf("SPEEDUP (cublas fp16 / cublas int8): %.3f\n", cublas_ht / cublas_it);
-  printf("SPEEDUP (cublas fp16 / lt int8):     %.3f\n",
-         cublas_ht / cublaslt_it);
+  if (C == 1)
+    printf("SPEEDUP (cublas fp16 / lt int8):     %.3f\n",
+           cublas_ht / cublaslt_it);
 
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
   free_memory(iX, iW, iY);
   if (debug) checkCudaStatus(cudaFree(Y));
 
-  return {cublas_ht / cublaslt_ht, cublas_ht / cublas_it,
-          cublas_ht / cublaslt_it};
+  if (C == 1)
+    return {cublas_ht / cublaslt_ht, cublas_ht / cublas_it,
+            cublas_ht / cublaslt_it};
+  else
+    return {0, cublas_ht / cublas_it, 0};
 }
 
 int main() {
@@ -105,15 +115,17 @@ int main() {
   shapes.push_back({1, batch_size * beam_size, hidden_size, 4 * hidden_size});
   // logits
   shapes.push_back({1, batch_size * beam_size, vocab_size, hidden_size});
-  // batch gemm
+  // batch gemm (encoder)
   shapes.push_back(
       {batch_size * head_num, seq_len, seq_len, hidden_size / head_num});
   shapes.push_back(
       {batch_size * head_num, hidden_size / head_num, seq_len, seq_len});
+  // batch gemm (decoder encdec attention)
   shapes.push_back(
       {batch_size * head_num, seq_len, beam_size, hidden_size / head_num});
   shapes.push_back(
       {batch_size * head_num, hidden_size / head_num, beam_size, seq_len});
+  // batch gemm (decoder self attention)
   for (int step = 1; step <= seq_len; step += 10) {
     shapes.push_back(
         {beam_size * batch_size * head_num, step, 1, hidden_size / head_num});
