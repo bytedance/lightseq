@@ -1,15 +1,18 @@
+#include <iostream>
 #include <vector>
 #include "gemm.h"
 
 typedef std::vector<int> vi;
-typedef std::vector<vi> vvi;
+typedef std::pair<std::string, vi> psvi;
+typedef std::vector<psvi> vpsvi;
 typedef std::vector<float> vf;
 
-vf _main(int C, int B, int O, int H, int iteration, bool debug) {
+vf _main(std::string name, int C, int B, int O, int H, int iteration,
+         bool debug) {
   printf(
-      ">>>>>>>>>>>>>>>>>>>> shape: X(%d, %d, %d), W(%d, %d, %d) "
+      ">>>>>>>>>>>>>>>>>>>> %s, shape: X(%d, %d, %d), W(%d, %d, %d) "
       ">>>>>>>>>>>>>>>>>>>>\n",
-      C, B, H, C, O, H);
+      name.c_str(), C, B, H, C, O, H);
 
   float *Y;
   if (debug) checkCudaStatus(cudaMallocManaged(&Y, C * B * O * sizeof(float)));
@@ -102,40 +105,65 @@ int main() {
   int vocab_size = 46896;
   int head_num = 8;
 
-  vvi shapes;
+  vpsvi shapes;
   // encoder
-  shapes.push_back({1, batch_size * seq_len, 3 * hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * seq_len, hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * seq_len, 4 * hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * seq_len, hidden_size, 4 * hidden_size});
+  shapes.push_back(std::make_pair(
+      std::string("enc attn qkv"),
+      vi({1, batch_size * seq_len, 3 * hidden_size, hidden_size})));
+  shapes.push_back(
+      std::make_pair(std::string("enc attn out"),
+                     vi({1, batch_size * seq_len, hidden_size, hidden_size})));
+  shapes.push_back(std::make_pair(
+      std::string("enc ffn1"),
+      vi({1, batch_size * seq_len, 4 * hidden_size, hidden_size})));
+  shapes.push_back(std::make_pair(
+      std::string("enc ffn2"),
+      vi({1, batch_size * seq_len, hidden_size, 4 * hidden_size})));
   // decoder
-  shapes.push_back({1, batch_size * beam_size, 3 * hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * beam_size, hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * beam_size, 4 * hidden_size, hidden_size});
-  shapes.push_back({1, batch_size * beam_size, hidden_size, 4 * hidden_size});
+  shapes.push_back(std::make_pair(
+      std::string("dec attn qkv"),
+      vi({1, batch_size * beam_size, 3 * hidden_size, hidden_size})));
+  shapes.push_back(std::make_pair(
+      std::string("dec attn out"),
+      vi({1, batch_size * beam_size, hidden_size, hidden_size})));
+  shapes.push_back(std::make_pair(
+      std::string("dec ffn1"),
+      vi({1, batch_size * beam_size, 4 * hidden_size, hidden_size})));
+  shapes.push_back(std::make_pair(
+      std::string("dec ffn2"),
+      vi({1, batch_size * beam_size, hidden_size, 4 * hidden_size})));
   // logits
-  shapes.push_back({1, batch_size * beam_size, vocab_size, hidden_size});
+  shapes.push_back(
+      std::make_pair(std::string("logits"),
+                     vi({1, batch_size * beam_size, vocab_size, hidden_size})));
   // batch gemm (encoder)
-  shapes.push_back(
-      {batch_size * head_num, seq_len, seq_len, hidden_size / head_num});
-  shapes.push_back(
-      {batch_size * head_num, hidden_size / head_num, seq_len, seq_len});
+  shapes.push_back(std::make_pair(
+      std::string("enc attn score"),
+      vi({batch_size * head_num, seq_len, seq_len, hidden_size / head_num})));
+  shapes.push_back(std::make_pair(
+      std::string("enc attn value"),
+      vi({batch_size * head_num, hidden_size / head_num, seq_len, seq_len})));
   // batch gemm (decoder encdec attention)
-  shapes.push_back(
-      {batch_size * head_num, seq_len, beam_size, hidden_size / head_num});
-  shapes.push_back(
-      {batch_size * head_num, hidden_size / head_num, beam_size, seq_len});
+  shapes.push_back(std::make_pair(
+      std::string("dec encdec attn score"),
+      vi({batch_size * head_num, seq_len, beam_size, hidden_size / head_num})));
+  shapes.push_back(std::make_pair(
+      std::string("dec encdec attn value"),
+      vi({batch_size * head_num, hidden_size / head_num, beam_size, seq_len})));
   // batch gemm (decoder self attention)
   for (int step = 1; step <= seq_len; step += 10) {
-    shapes.push_back(
-        {beam_size * batch_size * head_num, step, 1, hidden_size / head_num});
-    shapes.push_back(
-        {beam_size * batch_size * head_num, hidden_size / head_num, 1, step});
+    shapes.push_back(std::make_pair(std::string("dec self attn score"),
+                                    vi({beam_size * batch_size * head_num, step,
+                                        1, hidden_size / head_num})));
+    shapes.push_back(std::make_pair(std::string("dec self attn value"),
+                                    vi({beam_size * batch_size * head_num,
+                                        hidden_size / head_num, 1, step})));
   }
 
   vf speedup = vf(3, 0);
   for (auto shape : shapes) {
-    vf su = _main(shape[0], shape[1], shape[2], shape[3], iteration, debug);
+    vf su = _main(shape.first, shape.second[0], shape.second[1],
+                  shape.second[2], shape.second[3], iteration, debug);
     for (int i = 0; i < 3; ++i) speedup[i] += su[i];
   }
 
