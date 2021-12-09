@@ -1,4 +1,11 @@
+#include <iostream>
+#include <vector>
 #include <stdexcept>
+
+typedef std::vector<int> vi;
+typedef std::pair<std::string, vi> psvi;
+typedef std::vector<psvi> vpsvi;
+typedef std::vector<float> vf;
 
 inline void checkCudaStatus(cudaError_t status) {
   if (status != cudaSuccess) {
@@ -101,4 +108,8 @@ void print_res(float *Y, float *fY, __half *hY, int32_t *iY, int C, int B,
     ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
   printf("  diff: %.5f\n", ie / C / B / O);
   printf("  time: %.3f ms\n", it);
+}
+
+void vec_pb(vpsvi &shapes, std::string name, vi shape) {
+  shapes.push_back(std::make_pair(name, shape));
 }

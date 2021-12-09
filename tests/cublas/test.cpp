@@ -1,11 +1,4 @@
-#include <iostream>
-#include <vector>
 #include "gemm.h"
-
-typedef std::vector<int> vi;
-typedef std::pair<std::string, vi> psvi;
-typedef std::vector<psvi> vpsvi;
-typedef std::vector<float> vf;
 
 vf _main(std::string name, int C, int B, int O, int H, int iteration,
          bool debug) {
@@ -105,59 +98,45 @@ int main() {
   int vocab_size = 46896;
   int head_num = 8;
 
+  int inner_size = 4 * hidden_size;
+  int head_dim = hidden_size / head_num;
+  int batch_token_size = batch_size * seq_len;
+  int batch_beam_size = batch_size * beam_size;
+  int batch_head_num = batch_size * head_num;
+
   vpsvi shapes;
   // encoder
-  shapes.push_back(std::make_pair(
-      std::string("enc attn qkv"),
-      vi({1, batch_size * seq_len, 3 * hidden_size, hidden_size})));
-  shapes.push_back(
-      std::make_pair(std::string("enc attn out"),
-                     vi({1, batch_size * seq_len, hidden_size, hidden_size})));
-  shapes.push_back(std::make_pair(
-      std::string("enc ffn1"),
-      vi({1, batch_size * seq_len, 4 * hidden_size, hidden_size})));
-  shapes.push_back(std::make_pair(
-      std::string("enc ffn2"),
-      vi({1, batch_size * seq_len, hidden_size, 4 * hidden_size})));
+  vec_pb(shapes, "enc attn qkv",
+         {1, batch_token_size, 3 * hidden_size, hidden_size});
+  vec_pb(shapes, "enc attn out",
+         {1, batch_token_size, hidden_size, hidden_size});
+  vec_pb(shapes, "enc ffn1", {1, batch_token_size, inner_size, hidden_size});
+  vec_pb(shapes, "enc ffn2", {1, batch_token_size, hidden_size, inner_size});
   // decoder
-  shapes.push_back(std::make_pair(
-      std::string("dec attn qkv"),
-      vi({1, batch_size * beam_size, 3 * hidden_size, hidden_size})));
-  shapes.push_back(std::make_pair(
-      std::string("dec attn out"),
-      vi({1, batch_size * beam_size, hidden_size, hidden_size})));
-  shapes.push_back(std::make_pair(
-      std::string("dec ffn1"),
-      vi({1, batch_size * beam_size, 4 * hidden_size, hidden_size})));
-  shapes.push_back(std::make_pair(
-      std::string("dec ffn2"),
-      vi({1, batch_size * beam_size, hidden_size, 4 * hidden_size})));
+  vec_pb(shapes, "dec attn qkv",
+         {1, batch_beam_size, 3 * hidden_size, hidden_size});
+  vec_pb(shapes, "dec attn out",
+         {1, batch_beam_size, hidden_size, hidden_size});
+  vec_pb(shapes, "dec ffn1", {1, batch_beam_size, inner_size, hidden_size});
+  vec_pb(shapes, "dec ffn2", {1, batch_beam_size, hidden_size, inner_size});
   // logits
-  shapes.push_back(
-      std::make_pair(std::string("logits"),
-                     vi({1, batch_size * beam_size, vocab_size, hidden_size})));
+  vec_pb(shapes, "logits", {1, batch_beam_size, vocab_size, hidden_size});
   // batch gemm (encoder)
-  shapes.push_back(std::make_pair(
-      std::string("enc attn score"),
-      vi({batch_size * head_num, seq_len, seq_len, hidden_size / head_num})));
-  shapes.push_back(std::make_pair(
-      std::string("enc attn value"),
-      vi({batch_size * head_num, hidden_size / head_num, seq_len, seq_len})));
+  vec_pb(shapes, "enc attn score",
+         {batch_head_num, seq_len, seq_len, head_dim});
+  vec_pb(shapes, "enc attn value",
+         {batch_head_num, head_dim, seq_len, seq_len});
   // batch gemm (decoder encdec attention)
-  shapes.push_back(std::make_pair(
-      std::string("dec encdec attn score"),
-      vi({batch_size * head_num, seq_len, beam_size, hidden_size / head_num})));
-  shapes.push_back(std::make_pair(
-      std::string("dec encdec attn value"),
-      vi({batch_size * head_num, hidden_size / head_num, beam_size, seq_len})));
+  vec_pb(shapes, "dec encdec attn score",
+         {batch_head_num, seq_len, beam_size, head_dim});
+  vec_pb(shapes, "dec encdec attn value",
+         {batch_head_num, head_dim, beam_size, seq_len});
   // batch gemm (decoder self attention)
   for (int step = 1; step <= seq_len; step += 10) {
-    shapes.push_back(std::make_pair(std::string("dec self attn score"),
-                                    vi({beam_size * batch_size * head_num, step,
-                                        1, hidden_size / head_num})));
-    shapes.push_back(std::make_pair(std::string("dec self attn value"),
-                                    vi({beam_size * batch_size * head_num,
-                                        hidden_size / head_num, 1, step})));
+    vec_pb(shapes, "dec self attn score",
+           {batch_beam_size * head_num, step, 1, head_dim});
+    vec_pb(shapes, "dec self attn value",
+           {batch_beam_size * head_num, head_dim, 1, step});
   }
 
   vf speedup = vf(3, 0);
