@@ -69,7 +69,7 @@ class TransformerWeight {
   float _logits_clip_max;
   std::vector<float> _encode_output_project_kernel_kv_clip_max;
   std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
-  std::vector<float> _dec_clip_max;  // size: 18 * dec_layer_num
+  std::vector<float> _dec_clip_max;  // size: 19 * dec_layer_num
 #endif
 
  public:

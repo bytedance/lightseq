@@ -586,6 +586,7 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     _dec_clip_max.push_back(dec_layer.encdec_output_dense_clip_max());
     _dec_clip_max.push_back(dec_layer.ffn_first_output_clip_max());
     _dec_clip_max.push_back(dec_layer.ffn_second_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_qkv_bias_out_clip_max());
 #endif
   }  // for
 

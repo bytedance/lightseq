@@ -130,7 +130,7 @@ class Decoder {
   const float _output_ln_clip_max;
   const float _logits_clip_max;
   const std::vector<float> _encode_output_project_kernel_kv_clip_max;
-  const std::vector<float> _dec_clip_max;  // size: 18 * dec_layer_num
+  const std::vector<float> _dec_clip_max;  // size: 19 * dec_layer_num
   std::vector<_DataType*> _scaled_ffn2_colsum;
 #endif
   const _DataType _type_one;

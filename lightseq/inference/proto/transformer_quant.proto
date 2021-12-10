@@ -97,6 +97,7 @@ message DecoderLayer {
   float encdec_output_dense_clip_max = 34;
   float ffn_first_output_clip_max = 35;
   float ffn_second_output_clip_max = 36;
+  float self_qkv_bias_out_clip_max = 37;
 }
 
 message EmbeddingLayer {
