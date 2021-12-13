@@ -293,16 +293,16 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                            _quant_range / _dec_clip_max[_layer_id * 19 + 5],
                            _stream, _cublas_lt_handle);
 
-    // if (_tw._use_gelu) {
-    //   _scaled_ffn2_colsum[_layer_id] = nullptr;
-    // } else {
-    //   CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
-    //                              _tw._hidden_size * sizeof(_DataType)));
-    //   float relu_scale = _dec_clip_max[_layer_id * 19 + 11] / 2;
-    //   launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
-    //                        _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-    //                        _tw._hidden_size, relu_scale, _stream);
-    // }
+    if (_tw._use_gelu) {
+      _scaled_ffn2_colsum[_layer_id] = nullptr;
+    } else {
+      CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+                                 _tw._hidden_size * sizeof(_DataType)));
+      float relu_scale = _dec_clip_max[_layer_id * 19 + 11] / 2;
+      launch_scaled_colsum(_p_d_dec_wei[_weight_offset + 16],
+                           _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
+                           _tw._hidden_size, relu_scale, _stream);
+    }
   }
 #endif
 
@@ -1021,7 +1021,7 @@ void Decoder<OpType_>::ffn_add_norm() {
           _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
           _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
           _quant_range / _dec_clip_max[_layer_id * 19 + 11],
-          _dec_clip_max[_layer_id * 19 + 11], true, false);
+          _dec_clip_max[_layer_id * 19 + 11], true, true);
     }
   } else {
     if (_tw._use_gelu) {
@@ -1040,7 +1040,7 @@ void Decoder<OpType_>::ffn_add_norm() {
               _dec_clip_max[_layer_id * 19 + 10] /
               (_quant_range * _quant_range),
           _quant_range / _dec_clip_max[_layer_id * 19 + 11],
-          _dec_clip_max[_layer_id * 19 + 11], true, false);
+          _dec_clip_max[_layer_id * 19 + 11], true, true);
     }
   }
 
@@ -1051,19 +1051,20 @@ void Decoder<OpType_>::ffn_add_norm() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  if (full_int8)
-    cublasLtMM_withAlgo_i8IO(
-        _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
-        _tw._inner_size, 0, 0, 0,
-        _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
-            (_dec_clip_max[_layer_id * 19 + 17] * _quant_range),
-        _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 5],
-        _cublas_lt_handle, _stream, false);
-  else
-    cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
-                        _tw._hidden_size, _tw._inner_size, 0, 0, 0,
-                        _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 5],
-                        _cublas_lt_handle, _stream, false);
+  // if (full_int8)
+  //   cublasLtMM_withAlgo_i8IO(
+  //       _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+  //       _tw._inner_size, 0, 0, 0,
+  //       _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 +
+  //       11] /
+  //           (_dec_clip_max[_layer_id * 19 + 17] * _quant_range),
+  //       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 5],
+  //       _cublas_lt_handle, _stream, false);
+  // else
+  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+                      _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
+                      _int8_p_d_dec_wei[_layer_id * 6 + 5], _cublas_lt_handle,
+                      _stream, false);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max;
@@ -1080,21 +1081,21 @@ void Decoder<OpType_>::ffn_add_norm() {
     clip_max = _dec_clip_max[(_layer_id + 1) * 19 + 6];
   }
 
-  if (full_int8)
-    ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
-        _int8_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-        _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-        _dec_clip_max[_layer_id * 19 + 17] / _quant_range,
-        _quant_range / clip_max, _max_thread_per_block, _stream,
-        _tw._is_post_ln, true);
-  else
-    ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
-        _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-        _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-        _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
-            (_quant_range * _quant_range),
-        _quant_range / clip_max, _max_thread_per_block, _stream,
-        _tw._is_post_ln, true);
+  // if (full_int8)
+  //   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
+  //       _int8_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr,
+  //       _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num,
+  //       _tw._hidden_size, _dec_clip_max[_layer_id * 19 + 17] / _quant_range,
+  //       _quant_range / clip_max, _max_thread_per_block, _stream,
+  //       _tw._is_post_ln, true);
+  // else
+  ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
+      _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
+      _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
+      _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
+          (2 * _quant_range * _quant_range),
+      _quant_range / clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
+      true, _scaled_ffn2_colsum[_layer_id]);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
