@@ -1619,6 +1619,14 @@ template void ker_refresh_cache_launcher<__half>(
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
     bool diverse, int end_id);
 
+template void ker_refresh_cache_launcher<int8_t>(
+    int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
+    const int* num_can_per_beam, const int* can_idx, const int8_t* self_k_bgeem,
+    const int8_t* self_v_bgeem, int8_t* new_self_k_bgeem,
+    int8_t* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
+    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
+    bool diverse, int end_id);
+
 /**
 @brief: ker_write_trg_tokenid_pos_penalty
 write result from alive seq to output, for length_penlty >= 0

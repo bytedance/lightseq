@@ -174,6 +174,7 @@ class TransformerWeight {
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
+    std::cout << "max step: " << _max_step << std::endl;
     std::cout << "extra decode length(max decode length - src input length): "
               << _extra_decode_length << std::endl;
     std::cout << "length penalty: " << _length_penalty << std::endl;

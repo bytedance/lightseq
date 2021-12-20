@@ -116,9 +116,16 @@ void ker_arrange_decself_qkv_i32I_launcher(
 template <typename T>
 void ker_arrange_decself_qkv_i8I_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
-    const int8_t *ori_qkv, const T *qkv_bias, T *new_q, T *new_k, T *new_v,
-    int head_num, int dim_per_head, int max_step, int step_id,
-    int max_thread_per_block, float dequant_scale, bool in_col32 = false);
+    const int8_t *ori_qkv, const T *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *new_v, int head_num, int dim_per_head, int max_step, int step_id,
+    int max_thread_per_block, float dequant_scale, float quant_scale,
+    bool in_col32 = false);
+
+void ker_fuse_softmax_new_value_int8_launcher(
+    const int32_t *correlation, const int8_t *v, int8_t *new_v,
+    int batch_head_num, int step_num, int max_step, int head_num, int head_dim,
+    float attn_scale, float dequant_scale, float quant_scale, bool col32_out,
+    cudaStream_t stream);
 
 template <typename T>
 void ker_arrange_encdec_q_i32I_launcher(

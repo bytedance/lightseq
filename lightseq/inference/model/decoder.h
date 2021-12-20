@@ -108,6 +108,12 @@ class Decoder {
   int8_t* _int8_ffn_in_buf;
   int32_t* _int32_ffn_out_buf;
   int8_t* _int8_ffn_out_buf;
+  std::vector<int8_t*> _p_d_self_k_cache;
+  std::vector<int8_t*> _p_d_self_v_cache;
+  int8_t** _p_d_self_k_cache1;
+  int8_t** _p_d_self_k_cache2;
+  int8_t** _p_d_self_v_cache1;
+  int8_t** _p_d_self_v_cache2;
 #endif
 
   int _batch_size;
