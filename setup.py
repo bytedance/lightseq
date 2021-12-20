@@ -53,7 +53,8 @@ class CMakeBuild(build_ext):
             extdir += os.path.sep
 
         cmake_args = [
-            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
+            # fixed for lightseq.inference
+            "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + os.path.join(extdir, "lightseq"),
             "-DPYTHON_EXECUTABLE=" + sys.executable,
         ]
 
@@ -97,10 +98,13 @@ setup_kwargs = dict(
     name="lightseq",
     version=__version__,
     author="Xiaohui Wang, Ying Xiong, Xian Qian, Yang Wei",
-    author_email="wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
-    ", qian.xian@bytedance.com, weiyang.god@bytedance.com",
-    description="LightSeq is a high performance inference library "
-    "for sequence processing and generation implemented in CUDA",
+    author_email=(
+        "wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
+        ", qian.xian@bytedance.com, weiyang.god@bytedance.com"
+    ),
+    description=(
+        "LightSeq is a high performance library for sequence processing and generation"
+    ),
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/bytedance/lightseq",
@@ -117,12 +121,14 @@ setup_kwargs = dict(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "lightseq-train = examples.training.fairseq.fs_cli."
+            "lightseq-train = lightseq.training.cli."
             "lightseq_fairseq_train_cli:ls_cli_main",
-            "lightseq-generate = examples.training.fairseq.fs_cli."
+            "lightseq-generate = lightseq.training.cli."
             "lightseq_fairseq_generate_cli:ls_cli_main",
-            "lightseq-validate = examples.training.fairseq.fs_cli."
+            "lightseq-validate = lightseq.training.cli."
             "lightseq_fairseq_validate_cli:ls_cli_main",
+            "lightseq-deepspeed = lightseq.training.cli."
+            "lightseq_deepspeed_cli:ls_cli_main",
         ],
     },
 )

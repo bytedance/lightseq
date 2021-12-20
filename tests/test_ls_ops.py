@@ -25,7 +25,7 @@ from lightseq.training.ops.pytorch.transformer_embedding_layer import (
     LSTransformerEmbeddingLayer,
 )
 from lightseq.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
-from examples.training.fairseq.fs_modules.ls_fs_transformer_decoder_layer import (
+from lightseq.training.cli.fs_modules.ls_fs_transformer_decoder_layer import (
     LSFSTransformerDecoderLayer,
 )
 
@@ -95,7 +95,7 @@ def get_test_bert_encoder(num_layers):
             activation_fn="gelu",
         )
         layer = LSTransformerEncoderLayer(config, initial_weights, initial_biases)
-        layer.to(torch.device("cuda:0"))
+        layer.to(torch.device("cuda:0"), dtype=torch.half)
         return layer
 
     def gen_bert_enc_layer_pair():
@@ -120,6 +120,11 @@ def get_test_bert_encoder(num_layers):
     return torch.nn.ModuleList(custom_bert_enc_layer_list), torch.nn.ModuleList(
         fairseq_bert_enc_layer_list
     )
+
+
+custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
+    num_layers
+)
 
 
 ###################### decoding layer ######################
@@ -363,21 +368,13 @@ def test_encoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_bert_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
-    num_layers = 1
-
-    custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
-        num_layers
-    )
-
-    custom_bert_enc_layer_list = custom_bert_enc_layer_list.to(kt.dtype)
-    fairseq_bert_enc_layer_list = fairseq_bert_enc_layer_list.to(kt.dtype)
 
     def custom():
         res = hidden_states.clone()
@@ -397,11 +394,10 @@ def test_bert_encoder_layer_forward():
             res.transpose(0, 1).contiguous().detach(),
         ]
 
-    del custom_bert_enc_layer_list, fairseq_bert_enc_layer_list
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
 def test_bert_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -410,13 +406,6 @@ def test_bert_encoder_layer_backward():
 
     hidden_states = kt.rand((batch_size, seq_len, hidden_size))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
-
-    num_layers = 1
-    custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
-        num_layers
-    )
-    custom_bert_enc_layer_list = custom_bert_enc_layer_list.to(kt.dtype).train()
-    fairseq_bert_enc_layer_list = fairseq_bert_enc_layer_list.to(kt.dtype).train()
 
     cus_x = hidden_states.clone()
     for i in range(num_layers):
@@ -491,7 +480,6 @@ def test_bert_encoder_layer_backward():
             grad_list.extend(cur_grads)
         return grad_list
 
-    del custom_bert_enc_layer_list, fairseq_bert_enc_layer_list
     return custom, baseline
 
 
@@ -778,7 +766,7 @@ def test_decoder_layer_forward_inference():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_embedding_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -815,7 +803,7 @@ def test_embedding_layer_forward():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_embedding_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -883,7 +871,7 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
     return loss, nll_loss
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_cross_entropy_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)
@@ -902,6 +890,8 @@ def test_cross_entropy_layer_forward():
 
     def custom():
         res, cus_nll_loss = custom_layer(inputs, targets_32)
+        res = res.to(inputs)
+        cus_nll_loss = cus_nll_loss.to(inputs)
         return [
             res.contiguous().detach(),
             cus_nll_loss.contiguous().detach(),
@@ -923,7 +913,7 @@ def test_cross_entropy_layer_forward():
     return custom, baseline
 
 
-@kt.case(ntest=10)
+@kt.case(dtypes=[torch.half], ntest=10)
 def test_cross_entropy_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     vocab_size = random.randint(30413, 40519)

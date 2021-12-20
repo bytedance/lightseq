@@ -72,6 +72,4 @@ add_subdirectory(lightseq/inference/model)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
 
-if(NOT BUILD_PYTHON)
-  add_subdirectory(examples/inference/cpp)
-endif()
+# add_subdirectory(examples/inference/cpp)
