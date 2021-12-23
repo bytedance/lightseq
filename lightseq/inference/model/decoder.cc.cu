@@ -251,9 +251,6 @@ std::string Decoder<OpType_>::check() {
     _output_topk = true;
   }
 
-  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
-    return "lang id should not be null when multilg";
-  }
   return "";
 }
 
@@ -267,6 +264,9 @@ void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   }
   if (batch_seq_len > _tw._max_step) {
     throw std::runtime_error("seq len of input greater than max_step");
+  }
+  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
+    throw std::runtime_error("lang id should not be null when multilg");
   }
   /* ---step1. init--- */
   _batch_size = batch_size;

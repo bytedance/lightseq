@@ -42,7 +42,6 @@ class Encoder {
   int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
   _DataType
       *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
-  const int *_p_d_lang_id;
   const TransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -85,6 +84,7 @@ class Encoder {
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
   int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+  const int *_p_d_lang_id;
 };
 
 }  // namespace cuda

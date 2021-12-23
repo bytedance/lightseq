@@ -60,7 +60,6 @@ class Decoder {
   const _DataType* _p_d_encoder_output;
   int* _p_d_sample_unfinished;
   curandState* _p_d_curandstate;  //[batch_size]
-  const int* _p_d_lang_id;        // source token id
 
   std::vector<float> _h_alive_seq_probs;
   std::vector<float> _h_length_norm;
@@ -139,6 +138,7 @@ class Decoder {
   float* _p_d_alive_seq_score;
   bool _output_topk;
   int* _p_d_result;
+  const int* _p_d_lang_id;
 };
 
 }  // namespace cuda

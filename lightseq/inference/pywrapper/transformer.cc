@@ -5,7 +5,8 @@ namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
-    : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
+    : LSModel({"source_ids", "source_lang_ids", "target_lang_ids"},
+              {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
       decoder_(nullptr),
@@ -142,6 +143,12 @@ void Transformer::set_input_ptr(int index, void *input_ptr) {
     case 0:
       encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
       break;
+    case 1:
+      encoder_->_p_d_lang_id = static_cast<int *>(input_ptr);
+      break;
+    case 2:
+      decoder_->_p_d_lang_id = static_cast<int *>(input_ptr);
+      break;
 
     default:
       throw std::runtime_error("invalid input index");
@@ -185,6 +192,12 @@ std::vector<int> Transformer::get_input_max_shape(int index) {
     case 0:
       return {_max_batch_size, tw_._max_step};
       break;
+    case 1:
+      return {_max_batch_size};
+      break;
+    case 2:
+      return {_max_batch_size};
+      break;
 
     default:
       throw std::runtime_error("invalid input index");
@@ -211,6 +224,12 @@ std::vector<int> Transformer::get_output_max_shape(int index) {
 DataType Transformer::get_input_dtype(int index) {
   switch (index) {
     case 0:
+      return DataType::kInt32;
+      break;
+    case 1:
+      return DataType::kInt32;
+      break;
+    case 2:
       return DataType::kInt32;
       break;
 
