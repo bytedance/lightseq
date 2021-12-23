@@ -1,5 +1,7 @@
 #include "transformer.h"
 
+#include "embKernels.h"
+
 namespace lightseq {
 namespace cuda {
 
@@ -35,19 +37,23 @@ Transformer::Transformer(const std::string weight_path,
       using thrust vector to avoid manage gpu memory by hand
   */
 
-  CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_,
-                             _max_batch_size * tw_._max_step * sizeof(int)));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
+  CHECK_GPU_ERROR(cudaMalloc(
+      &d_padding_mask_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
 
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
-  int *src_lang_ids, *tgt_lang_ids;
-  CHECK_GPU_ERROR(cudaMalloc(&src_lang_ids, _max_batch_size * sizeof(int32_t)));
-  CHECK_GPU_ERROR(cudaMalloc(&tgt_lang_ids, _max_batch_size * sizeof(int32_t)));
+
+  CHECK_GPU_ERROR(
+      cudaMalloc(&d_src_lang_id_, _max_batch_size * sizeof(int32_t)));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&d_trg_lang_id_, _max_batch_size * sizeof(int32_t)));
 
   encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
       _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-      stream_, hd_, src_lang_ids);
+      stream_, hd_, d_src_lang_id_);
   res = encoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -55,7 +61,7 @@ Transformer::Transformer(const std::string weight_path,
 
   decoder_ = std::make_shared<Decoder<transformer_optytpe>>(
       _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
-      stream_, hd_, true, tgt_lang_ids);
+      stream_, hd_, true, d_trg_lang_id_);
   res = decoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -130,9 +136,10 @@ void Transformer::Infer() {
   // for multilg
   if (tw_._multilg_type != 0) {
     // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
-    launch_split_multilg_request((int *)d_input_copy_, (int *)d_src_lang_id_,
-                                 (int *)d_trg_lang_id_, (int *)d_input_,
-                                 batch_size, seq_len, stream_);
+    launch_split_multilg_request(encoder_->_p_d_token_id, d_src_lang_id_,
+                                 d_trg_lang_id_, d_input_, batch_size, seq_len,
+                                 stream_);
+    encoder_->_p_d_token_id = d_input_;
     if (tw_._multilg_type == 1) {
       seq_len -= 2;
     }

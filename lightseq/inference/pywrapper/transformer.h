@@ -30,6 +30,8 @@ class Transformer : public LSModel {
 
   optraits::DataType *d_encoder_output_;
   int *d_input_;
+  int *d_src_lang_id_;
+  int *d_trg_lang_id_;
   int *d_output_;
   int *d_padding_mask_;
   void *d_buf_;
