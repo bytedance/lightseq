@@ -5,8 +5,7 @@ namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
-    : LSModel({"source_ids", "source_lang_ids", "target_lang_ids"},
-              {"target_ids", "target_scores"}),
+    : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
       decoder_(nullptr),
@@ -42,10 +41,13 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
+  int *src_lang_ids, *tgt_lang_ids;
+  CHECK_GPU_ERROR(cudaMalloc(&src_lang_ids, _max_batch_size * sizeof(int32_t)));
+  CHECK_GPU_ERROR(cudaMalloc(&tgt_lang_ids, _max_batch_size * sizeof(int32_t)));
 
   encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
       _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-      stream_, hd_);
+      stream_, hd_, src_lang_ids);
   res = encoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -53,7 +55,7 @@ Transformer::Transformer(const std::string weight_path,
 
   decoder_ = std::make_shared<Decoder<transformer_optytpe>>(
       _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
-      stream_, hd_, true);
+      stream_, hd_, true, tgt_lang_ids);
   res = decoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -125,6 +127,20 @@ std::tuple<py::array_t<int>, py::array_t<float>> Transformer::infer(
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
+  // for multilg
+  if (tw_._multilg_type != 0) {
+    // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
+    launch_split_multilg_request((int *)d_input_copy_, (int *)d_src_lang_id_,
+                                 (int *)d_trg_lang_id_, (int *)d_input_,
+                                 batch_size, seq_len, stream_);
+    if (tw_._multilg_type == 1) {
+      seq_len -= 2;
+    }
+    if (tw_._multilg_type == 2) {
+      seq_len -= 1;
+    }
+  }
+
   encoder_->run_one_infer(batch_size, seq_len);
   decoder_->run_one_infer(batch_size, seq_len);
 
@@ -142,12 +158,6 @@ void Transformer::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
       encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
-      break;
-    case 1:
-      encoder_->_p_d_lang_id = static_cast<int *>(input_ptr);
-      break;
-    case 2:
-      decoder_->_p_d_lang_id = static_cast<int *>(input_ptr);
       break;
 
     default:
@@ -192,12 +202,6 @@ std::vector<int> Transformer::get_input_max_shape(int index) {
     case 0:
       return {_max_batch_size, tw_._max_step};
       break;
-    case 1:
-      return {_max_batch_size};
-      break;
-    case 2:
-      return {_max_batch_size};
-      break;
 
     default:
       throw std::runtime_error("invalid input index");
@@ -224,12 +228,6 @@ std::vector<int> Transformer::get_output_max_shape(int index) {
 DataType Transformer::get_input_dtype(int index) {
   switch (index) {
     case 0:
-      return DataType::kInt32;
-      break;
-    case 1:
-      return DataType::kInt32;
-      break;
-    case 2:
       return DataType::kInt32;
       break;
 
