@@ -31,6 +31,7 @@ set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include)
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
 include_directories(${COMMON_HEADER_DIRS})
+include_directories(SYSTEM "3rdparty/cub")
 
 link_directories(${COMMON_LIB_DIRS})
 
@@ -50,7 +51,8 @@ add_subdirectory(lightseq/inference/kernels)
 add_subdirectory(lightseq/inference/tools)
 add_subdirectory(lightseq/inference/proto)
 add_subdirectory(lightseq/inference/model)
-add_subdirectory(examples/inference/cpp)
 add_subdirectory(3rdparty/pybind11)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
+
+# add_subdirectory(examples/inference/cpp)

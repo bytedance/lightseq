@@ -307,8 +307,12 @@ class LSTransformerEncoderLayer(nn.Module):
             raise ValueError(
                 f"Sequence length {sl} exceeds the limit {self.max_seq_len}."
             )
-        assert bs == encoder_padding_mask.size(0) and sl == encoder_padding_mask.size(1)
-
+        if len(encoder_padding_mask.size()) == 1:
+            assert bs == 1 and sl == encoder_padding_mask.size(0)
+        else:
+            assert bs == encoder_padding_mask.size(
+                0
+            ) and sl == encoder_padding_mask.size(1)
         output = LSTransformerEncoderFunc.apply(
             hidden_states,
             encoder_padding_mask,

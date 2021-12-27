@@ -3,7 +3,7 @@
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
 
-#include "3rdparty/cub/cub/cub.cuh"
+#include <cub/cub.cuh>
 
 namespace lightseq {
 namespace cuda {
@@ -12,14 +12,6 @@ const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
 const float min_log_probability = -2000.f;
 const float epsilon = 0.000000000001;
-
-template <typename T>
-void ker_enc_embedding_launcher(int batch_size, int batch_seq_len,
-                                int hidden_size, cudaStream_t stream,
-                                const T* token_emb, const T* pos_emb,
-                                const int* token_id, T* output,
-                                int* padding_mask, int padding_id,
-                                int max_thread_per_block);
 
 template <typename T>
 void ker_norm_layer_launcher(int token_num, int hidden_size,
@@ -53,13 +45,6 @@ template <typename T>
 void ker_bias_relu_launcher(int batch_token_num, int block_dim,
                             cudaStream_t stream, T* input, const T* bias,
                             int feature_dim);
-
-template <typename T>
-void ker_dec_embedding_launcher(int step_token_num, int hidden_size,
-                                cudaStream_t stream, const T* token_emb,
-                                const T* pos_emb, const int* token_id,
-                                T* output, int step, int max_step,
-                                int vocab_size, int max_thread_per_block);
 
 template <typename T>
 void ker_arrange_encself_qkv_launcher(int batch_token_num, int hidden_size,

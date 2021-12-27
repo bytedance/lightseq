@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 
 #include "../proto/transformer_weight.h"
 #include "../tools/util.h"
@@ -61,7 +62,7 @@ class Decoder {
   int* _p_d_result;
   int* _p_d_sample_unfinished;
   curandState* _p_d_curandstate;  //[batch_size]
-  const int* _p_d_token_id;       // source token id
+  const int* _p_d_lang_id;        // source token id
 
   std::vector<float> _h_alive_seq_probs;
   std::vector<float> _h_length_norm;
@@ -129,7 +130,7 @@ class Decoder {
           const _DataType* p_d_encoder_output, int* p_d_result,
           TransformerWeight<OpType_>& tw, cudaStream_t stream,
           cublasHandle_t hd, bool output_topk = false,
-          const int* p_d_token_id = nullptr);
+          const int* p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();

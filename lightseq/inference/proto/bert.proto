@@ -53,7 +53,10 @@ message BertModelConf {
   int32 src_padding_id = 2;
   bool is_post_ln = 3; // Pre-LN or Post-LN
   bool use_gelu = 4; // use gelu for activation otherwise relu
-  bool is_multilingual = 5;
+  // Multilingual model type, 0 for bilingual
+  // 1 for token level multilingual,
+  // 2 for sentence level multilingual
+  int32 multilg_type = 5;
 }
 
 message Bert {
