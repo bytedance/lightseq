@@ -1331,12 +1331,12 @@ bool Decoder<OpType_>::beam_search() {
   if (_cur_step > 0) {
 #ifdef INT8_MODE
     ker_refresh_cache_launcher<int8_t>(
-        _tw._n_dec_layer * (_cur_step + 1), _step_token_num * 2,
-        _max_thread_per_block, _stream, _p_d_can_num + 1, _p_d_can_idx,
-        _p_d_self_k_cache1[0], _p_d_self_v_cache1[0], _p_d_self_k_cache2[0],
-        _p_d_self_v_cache2[0], _layer_size_self_k, _tw._beam_size,
-        _tw._dim_per_head, _tw._head_num, _tw._trg_vocab_size, _cur_step,
-        _tw._max_step, _tw._diverse_lambda != 0, _tw._end_id);
+        _tw._n_dec_layer, _step_token_num * 2, _max_thread_per_block, _stream,
+        _p_d_can_num + 1, _p_d_can_idx, _p_d_self_k_cache1[0],
+        _p_d_self_v_cache1[0], _p_d_self_k_cache2[0], _p_d_self_v_cache2[0],
+        _layer_size_self_k, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
+        _tw._trg_vocab_size, _cur_step, _tw._max_step, _tw._diverse_lambda != 0,
+        _tw._end_id);
     int8_t** ftmp = _p_d_self_k_cache2;
     _p_d_self_k_cache2 = _p_d_self_k_cache1;
     _p_d_self_k_cache1 = ftmp;
