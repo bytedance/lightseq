@@ -28,7 +28,7 @@ __half TransformerWeight<OperationType::FP16>::float2required(float value) {
 }
 
 float dequantize(unsigned char i, float scale, float clip_max) {
-  return (float(i) - scale) / scale * clip_max;
+  return (float(i) - scale) * clip_max / scale;
 }
 
 /**
