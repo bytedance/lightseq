@@ -214,21 +214,23 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
 
 #ifdef INT8_MODE
-  int max_batch_dim = _max_batch_size * _tw._beam_size *
-                      std::max(_tw._inner_size, _tw._hidden_size * 3);
+  int max_batch_dim =
+      _max_batch_size * _tw._beam_size *
+      roundoff(std::max(_tw._inner_size, _tw._hidden_size * 3), 32);
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_in_buf, max_batch_dim * sizeof(int8_t)));
   CHECK_GPU_ERROR(cudaMalloc(
       &_int32_ffn_out_buf,
       std::max(std::max(max_batch_dim, _max_batch_size * _tw._beam_size *
                                            _tw._head_num * _tw._max_step),
-               _tw._trg_vocab_size * _tw._beam_size * _max_batch_size) *
+               roundoff(_tw._trg_vocab_size, 32) * _tw._beam_size *
+                   _max_batch_size) *
           sizeof(int32_t)));
-  CHECK_GPU_ERROR(cudaMalloc(
-      &_int8_ffn_out_buf,
-      std::max(max_batch_dim,
-               _tw._trg_vocab_size * _tw._beam_size * _max_batch_size) *
-          sizeof(int8_t)));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_ffn_out_buf,
+                 std::max(max_batch_dim, roundoff(_tw._trg_vocab_size, 32) *
+                                             _tw._beam_size * _max_batch_size) *
+                     sizeof(int8_t)));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_trg_emb_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
@@ -290,6 +292,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                            _tw._hidden_size, _tw._hidden_size,
                            _quant_range / _dec_clip_max[_layer_id * 19 + 1],
                            _stream, _cublas_lt_handle);
+
     quantize_weight_col32t(_p_d_dec_wei[_weight_offset + 8],
                            _int8_p_d_dec_wei[_layer_id * 6 + 2],
                            _tw._hidden_size, _tw._hidden_size,

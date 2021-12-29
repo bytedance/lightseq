@@ -322,9 +322,9 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
     float quant_scale, bool is_post_ln, bool in_out_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -338,7 +338,7 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
     }
     float residual_out =
         __int2float_rn(input[input_index]) * dequant_scale + residual[i];
-    if (colsum) residual_out += colsum[i - block_start];
+    if (colsum != nullptr) residual_out += __ldg(&colsum[i - block_start]);
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
   }
@@ -398,9 +398,9 @@ __global__ void ker_residual_bias_ln_i32I_i8O<half>(
     const half *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -414,7 +414,8 @@ __global__ void ker_residual_bias_ln_i32I_i8O<half>(
     }
     float residual_out = __int2float_rn(input[input_index]) * dequant_scale +
                          safe_half_to_float(residual[i]);
-    if (colsum) residual_out += safe_half_to_float(colsum[i - block_start]);
+    if (colsum != nullptr)
+      residual_out += safe_half_to_float(__ldg(&colsum[i - block_start]));
     s_row_out[i - block_start] = residual_out;
     val += residual_out;
   }
