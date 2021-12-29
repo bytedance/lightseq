@@ -153,11 +153,11 @@ __global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
                                           const int hidden_size,
                                           float quant_scale, bool is_post_ln,
                                           bool out_col32) {
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     val += input[i];
   }
 
@@ -169,7 +169,7 @@ __global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
 
   // step 1. compute variance
   val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     float tmp = input[i] - s_mean;
     val += tmp * tmp;
   }
@@ -182,7 +182,7 @@ __global__ void ker_norm_layer_resual_i8O(T *input, int8_t *output,
   float output_f;
 
   // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     val = input[i] - s_mean;
     output_f = val * s_var * __ldg(&scale[i - block_start]) +
                __ldg(&bias[i - block_start]);
@@ -209,9 +209,9 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
     __half *input, int8_t *output, const __half *scale, const __half *bias,
     const __half *residual_bias, const int half_hidden_size, float quant_scale,
     bool is_post_ln, bool out_col32) {
-  uint block_start = blockIdx.x * half_hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = blockIdx.x * half_hidden_size + half_hidden_size;
+  int block_start = blockIdx.x * half_hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = blockIdx.x * half_hidden_size + half_hidden_size;
   half2 *pinput = (half2 *)input;
   char2 *poutput = (char2 *)output;
   const half2 *pscale = (const half2 *)scale;
@@ -221,7 +221,7 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
 
   float val = 0.0;
   // step 0. compute mean
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     float2 local_f2 = safe_half2_to_float2(pinput[i]);
     val += local_f2.x + local_f2.y;
   }
@@ -232,7 +232,7 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
 
   // step 1. compute variance
   val = 0.0;
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     float2 local_f2 = safe_half2_to_float2(pinput[i]);
     float tmpx = local_f2.x - s_mean;
     float tmpy = local_f2.y - s_mean;
@@ -246,7 +246,7 @@ __global__ void ker_norm_layer_resual_i8O<__half>(
   char2 output_c2;
 
   // step 2. layer norm
-  for (uint i = start; i < end; i += blockDim.x) {
+  for (int i = start; i < end; i += blockDim.x) {
     float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
     float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
     float2 local_f2 = safe_half2_to_float2(pinput[i]);
@@ -352,7 +352,7 @@ __global__ void ker_residual_bias_ln_i32I_i8O(
   // step 1. compute variance
   val = 0.0;
   for (int i = start; i < end; i += blockDim.x) {
-    float tmp = s_row_out[i] - s_mean;
+    float tmp = s_row_out[i - block_start] - s_mean;
     val += tmp * tmp;
   }
   __shared__ float s_var;
@@ -515,9 +515,9 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
     float quant_scale, bool is_post_ln, bool in_out_col32, const T *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -545,7 +545,7 @@ __global__ void ker_residual_bias_ln_i8I_i8O(
   // step 1. compute variance
   val = 0.0;
   for (int i = start; i < end; i += blockDim.x) {
-    float tmp = s_row_out[i] - s_mean;
+    float tmp = s_row_out[i - block_start] - s_mean;
     val += tmp * tmp;
   }
   __shared__ float s_var;
@@ -591,9 +591,9 @@ __global__ void ker_residual_bias_ln_i8I_i8O<half>(
     const half *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -708,9 +708,9 @@ __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
                                           const T *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -739,7 +739,7 @@ __global__ void ker_residual_bias_ln_i32I(const int32_t *input, const T *scale,
   // step 1. compute variance
   val = 0.0;
   for (int i = start; i < end; i += blockDim.x) {
-    float tmp = s_row_out[i] - s_mean;
+    float tmp = s_row_out[i - block_start] - s_mean;
     val += tmp * tmp;
   }
   __shared__ float s_var;
@@ -767,9 +767,9 @@ __global__ void ker_residual_bias_ln_i32I<half>(
     bool in_col32, const half *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -866,9 +866,9 @@ __global__ void ker_residual_bias_ln_i8I(const int8_t *input, const T *scale,
                                          const T *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -897,7 +897,7 @@ __global__ void ker_residual_bias_ln_i8I(const int8_t *input, const T *scale,
   // step 1. compute variance
   val = 0.0;
   for (int i = start; i < end; i += blockDim.x) {
-    float tmp = s_row_out[i] - s_mean;
+    float tmp = s_row_out[i - block_start] - s_mean;
     val += tmp * tmp;
   }
   __shared__ float s_var;
@@ -925,9 +925,9 @@ __global__ void ker_residual_bias_ln_i8I<half>(
     bool in_col32, const half *colsum) {
   extern __shared__ float s_row_out[];
 
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
+  int block_start = blockIdx.x * hidden_size;
+  int start = block_start + threadIdx.x;
+  int end = block_start + hidden_size;
   float val = 0.0;
   int input_index;
   for (int i = start; i < end; i += blockDim.x) {
@@ -1090,7 +1090,7 @@ __global__ void ker_bias_gelu_i32I_i8O<__half>(int32_t *input, int8_t *output,
   int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
 
 #pragma unroll
-  for (uint j = 0; j < 8; ++j) {
+  for (int j = 0; j < 8; ++j) {
     float out_f;
     out_f =
         gelu<float>(float(val1[j]) * dequant_scale + __half2float(b_half[j]));
@@ -1208,7 +1208,7 @@ __global__ void ker_bias_gelu_i8I_i8O<__half>(int8_t *input, int8_t *output,
   int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
 
 #pragma unroll
-  for (uint j = 0; j < 8; ++j) {
+  for (int j = 0; j < 8; ++j) {
     float out_f;
     out_f =
         gelu<float>(float(val1[j]) * dequant_scale + __half2float(b_half[j]));
@@ -1333,7 +1333,7 @@ __global__ void ker_bias_relu_i32I_i8O<__half>(
   int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
 
 #pragma unroll
-  for (uint j = 0; j < 8; ++j) {
+  for (int j = 0; j < 8; ++j) {
     float out_f;
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
@@ -1462,7 +1462,7 @@ __global__ void ker_bias_relu_i8I_i8O<__half>(
   int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
 
 #pragma unroll
-  for (uint j = 0; j < 8; ++j) {
+  for (int j = 0; j < 8; ++j) {
     float out_f;
     out_f = max(float(val1[j]) * dequant_scale + __half2float(b_half[j]),
                 (float)0.f);
