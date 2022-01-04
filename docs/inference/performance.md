@@ -127,4 +127,3 @@ The following table is a comparison between Hugging Face BERT-base model and Lig
 | 32         | 64      | 109.13           | 36.20        | 3.01             |
 | 32         | 128     | 260.13           | 66.03        | 3.94             |
 | 32         | 256     | 498.84           | 145.57       | 3.43             |
-
