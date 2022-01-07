@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from operator import attrgetter
 from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
-from examples.inference.python.proto.transformer_pb2 import Transformer
+from proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
