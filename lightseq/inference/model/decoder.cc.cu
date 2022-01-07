@@ -1,5 +1,3 @@
-#include <unistd.h>
-
 #include "decoder.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"

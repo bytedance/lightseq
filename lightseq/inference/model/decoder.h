@@ -12,6 +12,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
+#include <unistd.h>
 
 #include "../proto/transformer_weight.h"
 #include "../tools/util.h"
