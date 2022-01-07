@@ -64,53 +64,6 @@ Bert::~Bert() {
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
 }
 
-const Bert::optraits::DataType *Bert::get_result_ptr() {
-  return d_encoder_output_;
-}
-
-#ifdef ENABLE_PYTHON
-
-py::array_t<float> Bert::infer(
-    py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
-  // deal with input
-  auto input_seq_out = input_seq.mutable_unchecked<2>();
-  const int *input_seq_data = input_seq_out.data(0, 0);
-
-  int batch_size = input_seq_out.shape(0);
-  int batch_seq_len = input_seq_out.shape(1);
-
-  CHECK_GPU_ERROR(cudaMemcpyAsync(d_input_, input_seq_data,
-                                  sizeof(int) * input_seq_out.size(),
-                                  cudaMemcpyHostToDevice, stream_));
-
-  // Start inference and copy result
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-
-  auto bert_output =
-      py::array_t<float>({batch_size, batch_seq_len, tw_._hidden_size});
-  float *bert_output_data = bert_output.mutable_data(0, 0, 0);
-  std::vector<optraits::DataType> h_bert_out(bert_output.size());
-
-  CHECK_GPU_ERROR(
-      cudaMemcpyAsync(h_bert_out.data(), d_encoder_output_,
-                      sizeof(optraits::DataType) * bert_output.size(),
-                      cudaMemcpyDeviceToHost, stream_));
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
-
-  for (auto i = 0; i < h_bert_out.size(); i++) {
-    float data;
-    if (bert_optype == OperationType::FP16) {
-      data = __half2float(h_bert_out[i]);
-    } else {
-      data = h_bert_out[i];
-    }
-    bert_output_data[i] = data;
-  }
-  return bert_output;
-};
-
-#else
-
 void Bert::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
   encoder_->run_one_infer(batch_size, seq_len);
@@ -202,6 +155,5 @@ DataType Bert::get_output_dtype(int index) {
   }
 }
 
-#endif
 }  // namespace cuda
 }  // namespace lightseq

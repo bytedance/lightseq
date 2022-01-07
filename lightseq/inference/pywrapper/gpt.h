@@ -1,7 +1,4 @@
-#ifdef ENABLE_PYTHON
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#endif
+
 #include "model_base.h"
 #include "../model/gpt_encoder.h"
 #include "../proto/gpt_weight.h"
@@ -13,10 +10,6 @@ const lightseq::cuda::OperationType gpt_optype =
 #else
 const lightseq::cuda::OperationType gpt_optype =
     lightseq::cuda::OperationType::FP32;
-#endif
-
-#ifdef ENABLE_PYTHON
-namespace py = pybind11;
 #endif
 
 namespace lightseq {
@@ -55,16 +48,6 @@ class Gpt : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
-
-#ifdef ENABLE_PYTHON
-  py::array_t<float> ppl(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq);
-
-  py::array_t<int> sample(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-      std::string sampling_method = "", const int topk = -1,
-      const float topp = -1.0f);
-#endif
 };
 
 LSMODEL_REGISTER(Gpt);

@@ -68,6 +68,7 @@ class LSModel {
   virtual ~LSModel() {}
   virtual void Infer() = 0;
 
+  // input getter and setter
   virtual void set_input_ptr(int index, void* input_ptr) = 0;
   void set_input_shape(int index, std::vector<int> shape) {
     input_shapes_.at(index) = std::move(shape);
@@ -77,6 +78,7 @@ class LSModel {
   int get_input_size() { return kInputNames.size(); }
   virtual DataType get_input_dtype(int index) = 0;
 
+  // output getter and setter
   virtual void set_output_ptr(int index, void* output_ptr) = 0;
   virtual const void* get_output_ptr(int index) = 0;
   std::string get_output_name(int index) { return kOutputNames[index]; }

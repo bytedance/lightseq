@@ -6,7 +6,6 @@ find_package(CUDA 10.1 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
-option(BUILD_PYTHON "build for python api" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
 
 if(FP16_MODE)
@@ -19,12 +18,6 @@ endif()
 if(DEBUG_MODE)
   add_compile_definitions(DEBUG_RESULT)
   message(STATUS "Debug computation result")
-endif()
-
-if(BUILD_PYTHON)
-  add_compile_definitions(ENABLE_PYTHON)
-  set(DYNAMIC_API OFF)
-  message(STATUS "Build for python wrapper")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})

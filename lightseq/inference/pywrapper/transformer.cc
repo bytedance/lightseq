@@ -45,7 +45,6 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(cudaMalloc(
       &d_encoder_output_, _max_batch_size * tw_._max_step * tw_._hidden_size *
                               sizeof(optraits::DataType)));
-
   CHECK_GPU_ERROR(
       cudaMalloc(&d_src_lang_id_, _max_batch_size * sizeof(int32_t)));
   CHECK_GPU_ERROR(
@@ -83,8 +82,9 @@ Transformer::~Transformer() {
   CHECK_GPU_ERROR(cudaFree(d_input_));
   CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
   CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
-  CHECK_GPU_ERROR(cudaFree(d_output_));
   CHECK_GPU_ERROR(cudaFree(d_buf_));
+  CHECK_GPU_ERROR(cudaFree(d_src_lang_id_));
+  CHECK_GPU_ERROR(cudaFree(d_trg_lang_id_));
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
 }
 
@@ -95,40 +95,6 @@ const float *Transformer::get_score_ptr() {
 }
 
 int Transformer::get_output_seq_len() { return decoder_->_cur_step + 1; };
-
-#ifdef ENABLE_PYTHON
-
-std::tuple<py::array_t<int>, py::array_t<float>> Transformer::infer(
-    py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-    bool multiple_output) {
-  auto input_seq_out = input_seq.mutable_unchecked<2>();
-  const int *input_seq_data = input_seq_out.data(0, 0);
-  int batch_size = input_seq_out.shape(0);
-  int batch_seq_len = input_seq_out.shape(1);
-
-  lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpyAsync(
-      d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
-      cudaMemcpyHostToDevice, stream_));
-
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-  decoder_->run_one_infer(batch_size, batch_seq_len);
-  int tokens_size = get_output_seq_len();
-  int beam_size = tw_._beam_size;
-  int output_k = multiple_output ? beam_size : 1;
-  auto tokens = py::array_t<int>({batch_size, output_k, tokens_size});
-  int *tokens_data = tokens.mutable_data(0, 0);
-  lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output_,
-                                             sizeof(int) * tokens.size(),
-                                             cudaMemcpyDeviceToHost));
-  auto scores = py::array_t<float>({batch_size, output_k});
-  float *scores_data = scores.mutable_data(0, 0);
-  lightseq::cuda::CHECK_GPU_ERROR(
-      cudaMemcpy(scores_data, decoder_->_p_d_alive_seq_score,
-                 sizeof(float) * scores.size(), cudaMemcpyDeviceToHost));
-  return std::make_tuple(tokens, scores);
-}
-
-#endif
 
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];

@@ -68,67 +68,6 @@ Gpt::~Gpt() {
 const int* Gpt::get_result_ptr() { return d_sample_id; }
 const float* Gpt::get_score_ptr() { return d_ppl; }
 
-#ifdef ENABLE_PYTHON
-
-py::array_t<float> Gpt::ppl(
-    py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
-  auto input_seq_out = input_seq.mutable_unchecked<2>();
-  const int* input_seq_data = input_seq_out.data(0, 0);
-  int batch_size = input_seq_out.shape(0);
-  int batch_seq_len = input_seq_out.shape(1);
-
-  CHECK_GPU_ERROR(cudaMemcpyAsync(d_input_, input_seq_data,
-                                  sizeof(int) * input_seq_out.size(),
-                                  cudaMemcpyHostToDevice, stream_));
-
-  encoder_->run_one_infer(batch_size, batch_seq_len);
-
-  auto probs = py::array_t<float>(batch_size);
-  float* probs_data = probs.mutable_data(0);
-  CHECK_GPU_ERROR(cudaMemcpy(probs_data, d_ppl, sizeof(float) * probs.size(),
-                             cudaMemcpyDeviceToHost));
-  return probs;
-}
-
-py::array_t<int> Gpt::sample(
-    py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-    std::string sampling_method, const int topk, const float topp) {
-  if (!sampling_method.empty()) {
-    tw_._sampling_method = sampling_method;
-  }
-  if (topk != -1) {
-    tw_._topk = topk;
-  }
-  if (topp != -1) {
-    tw_._topp = topp;
-  }
-
-  std::string res = encoder_->check();
-  if (!res.empty()) {
-    throw std::runtime_error(res);
-  }
-
-  auto input_seq_out = input_seq.mutable_unchecked<2>();
-  const int* input_seq_data = input_seq_out.data(0, 0);
-  int batch_size = input_seq_out.shape(0);
-  int batch_seq_len = input_seq_out.shape(1);
-
-  CHECK_GPU_ERROR(cudaMemcpyAsync(d_input_, input_seq_data,
-                                  sizeof(int) * input_seq_out.size(),
-                                  cudaMemcpyHostToDevice, stream_));
-
-  int sampled_seq_len = encoder_->run_one_sample(batch_size, batch_seq_len);
-
-  auto tokens = py::array_t<int>({batch_size, sampled_seq_len});
-  int* tokens_data = tokens.mutable_data(0);
-  CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_sample_id,
-                             sizeof(int) * tokens.size(),
-                             cudaMemcpyDeviceToHost));
-  return tokens;
-}
-
-#else
-
 void Gpt::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
@@ -266,6 +205,5 @@ DataType Gpt::get_output_dtype(int index) {
   }
 }
 
-#endif
 }  // namespace cuda
 }  // namespace lightseq

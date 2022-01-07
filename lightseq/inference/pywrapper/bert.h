@@ -1,7 +1,4 @@
-#ifdef ENABLE_PYTHON
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#endif
+
 #include "model_base.h"
 #include "../model/bert_encoder.h"
 #include "../proto/bert_weight.h"
@@ -13,10 +10,6 @@ const lightseq::cuda::OperationType bert_optype =
 #else
 const lightseq::cuda::OperationType bert_optype =
     lightseq::cuda::OperationType::FP32;
-#endif
-
-#ifdef ENABLE_PYTHON
-namespace py = pybind11;
 #endif
 
 namespace lightseq {
@@ -40,8 +33,6 @@ class Bert : public LSModel {
 
   ~Bert();
 
-  const optraits::DataType *get_result_ptr();
-  const int get_max_step() { return tw_._max_step; }
   void Infer() override;
   void set_input_ptr(int index, void *input_ptr) override;
   void set_output_ptr(int index, void *output_ptr) override;
@@ -50,12 +41,6 @@ class Bert : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
-
-#ifdef ENABLE_PYTHON
-  py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq);
-
-#endif
 };
 
 LSMODEL_REGISTER(Bert);

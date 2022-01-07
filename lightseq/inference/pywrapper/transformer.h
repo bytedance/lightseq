@@ -1,7 +1,5 @@
-#ifdef ENABLE_PYTHON
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#endif
+
+
 #include "model_base.h"
 #include "../model/decoder.h"
 #include "../model/encoder.h"
@@ -14,10 +12,6 @@ const lightseq::cuda::OperationType transformer_optytpe =
 #else
 const lightseq::cuda::OperationType transformer_optytpe =
     lightseq::cuda::OperationType::FP32;
-#endif
-
-#ifdef ENABLE_PYTHON
-namespace py = pybind11;
 #endif
 
 namespace lightseq {
@@ -59,12 +53,6 @@ class Transformer : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
-
-#ifdef ENABLE_PYTHON
-  std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq,
-      bool multiple_output = false);
-#endif
 };
 
 LSMODEL_REGISTER(Transformer);
