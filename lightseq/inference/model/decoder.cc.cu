@@ -198,7 +198,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
   CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
-
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   CHECK_GPU_ERROR(cudaGetLastError());
   std::cout << "decoder buffer init succeed" << std::endl;
   return;
@@ -237,6 +237,17 @@ std::string Decoder<OpType_>::check() {
   if (!btmp) {
     return "wrong beam_size, should be 1, 2, 4, 8, 16 or 32";
   }
+
+  std::string sampling_method = _tw._sampling_method;
+  if (kSamplingMethods.find(sampling_method) == kSamplingMethods.end()) {
+    return std::string("unsupported sampling_method: ") + sampling_method;
+  }
+  if (sampling_method == "topk" || sampling_method == "topp") {
+    _output_topk = false;
+  }
+  if (sampling_method == "topk_greedy") {
+    _output_topk = true;
+  }
   if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
     return "lang id should not be null when multilg";
   }
@@ -248,6 +259,13 @@ Decoder inference
 */
 template <OperationType OpType_>
 void Decoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
+  if (batch_size > _max_batch_size) {
+    throw std::runtime_error("batch size of input greater than max_batch_size");
+  }
+  if (batch_seq_len > _tw._max_step) {
+    throw std::runtime_error("seq len of input greater than max_step");
+  }
+
   /* ---step1. init--- */
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;

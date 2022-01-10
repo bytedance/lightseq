@@ -98,6 +98,12 @@ Encoder inference
 */
 template <OperationType OpType_>
 void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
+  if (batch_size > _max_batch_size) {
+    throw std::runtime_error("batch size of input greater than max_batch_size");
+  }
+  if (batch_seq_len > _tw._max_step) {
+    throw std::runtime_error("seq len of input greater than max_step");
+  }
   /* ---step1. init--- */
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;

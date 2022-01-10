@@ -399,7 +399,7 @@ template <typename T>
 __global__ void ker_ppl(const T* logits, const int* input_ids,
                         const int* real_seq_len, float* ppl, int vocab_size) {
   int seq_len = real_seq_len[blockIdx.x];  // remove "eos"
-  if (blockIdx.y >= seq_len) {
+  if (blockIdx.y >= seq_len - 1) {
     // will not contribute to ppl
     return;
   }
@@ -437,7 +437,7 @@ __global__ void ker_ppl(const T* logits, const int* input_ids,
     float log_prob =
         ((float)logits[token_idx_in_batch * vocab_size + token_id] -
          s_max_logit - logf(sum_exp_logit)) /
-        (float)seq_len;
+        (float)(seq_len - 1);
     atomicAdd(ppl + blockIdx.x, -log_prob);
   }
 }

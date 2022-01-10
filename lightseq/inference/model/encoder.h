@@ -39,11 +39,9 @@ class Encoder {
   void ffn_add_norm();
 
   const int _max_batch_size;
-  const int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
   int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
   _DataType
       *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
-  const int *_p_d_lang_id;
   const TransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
@@ -77,7 +75,7 @@ class Encoder {
   int _weight_offset;
 
  public:
-  Encoder(int max_batch_size, const int *p_d_token_id, int *p_d_padding_mask,
+  Encoder(int max_batch_size, int *p_d_token_id, int *p_d_padding_mask,
           _DataType *p_d_output, const TransformerWeight<OpType_> &tw,
           cudaStream_t stream, cublasHandle_t hd,
           const int *p_d_lang_id = nullptr);
@@ -85,6 +83,8 @@ class Encoder {
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
+  int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+  const int *_p_d_lang_id;
 };
 
 }  // namespace cuda

@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
 
-# load HDF5 package
-set(HDF5_USE_STATIC_LIBRARIES ON)
 # (default) use C API for HDF5 library
 find_package(HDF5 REQUIRED)
 
