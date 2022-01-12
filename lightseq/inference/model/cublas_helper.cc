@@ -454,7 +454,7 @@ void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
                                        int row, int col,
                                        cublasLtHandle_t lt_handle,
                                        cudaStream_t stream) {
-  int ldtransform = 32 * roundoff(col, 8);
+  int ldtransform = 32 * round_up(col, 8);
   float transform_alpha = 1.0f, transform_beta = 0.0f;
   cublasLtMatrixTransformDesc_t transform_desc = NULL;
   cublasLtMatrixLayout_t input_desc = NULL, output_desc = NULL;

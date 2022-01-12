@@ -34,7 +34,7 @@ void cublasLtMM_withAlgo_i8IO(
     // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
     bool use_ORDER_COL32_2R_4R4);
 
-inline int roundoff(int v, int d) { return (v + d - 1) / d * d; }
+inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
 
 void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
                                        int row, int col,
