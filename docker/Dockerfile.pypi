@@ -1,36 +1,39 @@
 FROM quay.io/pypa/manylinux2010_x86_64
 
 
-ENV CUDA_VERSION 10.1.243
-ENV CUDA_PKG_VERSION 10-1-$CUDA_VERSION-1
+ENV CUDA_PKG_VERSION 11-2-11.2.152-1
+ENV CUDA_LIB_VERSION 11-2-11.2.2-1
+ENV LIBCUBLAS_VERSION 11-2-11.4.1.1043-1
 
 
 RUN yum -y install yum-utils && yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel6/x86_64/cuda-rhel6.repo &&\
-    yum install --setopt=obsoletes=0 -y \
+    yum upgrade -y &&\
+    yum install -y \
+    make \
     # base
     cuda-cudart-$CUDA_PKG_VERSION \
-    cuda-compat-10-1 \
+    cuda-compat-11-2 \
     # runtime
-    cuda-libraries-$CUDA_PKG_VERSION \
+    cuda-libraries-$CUDA_LIB_VERSION \
     cuda-nvtx-$CUDA_PKG_VERSION \
-    cuda-npp-$CUDA_PKG_VERSION \
-    libcublas10-10.2.1.243-1 \
-    libnccl-2.7.8-1+cuda10.1 \
+    libnpp-$CUDA_PKG_VERSION \
+    libcublas-$LIBCUBLAS_VERSION \
+    libnccl-2.8.4-1+cuda11.2 \
     # devel
-    cuda-nvml-dev-$CUDA_PKG_VERSION \
-    cuda-command-line-tools-$CUDA_PKG_VERSION \
-    libcublas-devel-10.2.1.243-1 \
-    cuda-cudart-dev-$CUDA_PKG_VERSION \
-    cuda-libraries-dev-$CUDA_PKG_VERSION \
-    cuda-minimal-build-$CUDA_PKG_VERSION \
+    cuda-nvml-devel-$CUDA_PKG_VERSION \
+    cuda-command-line-tools-$CUDA_LIB_VERSION \
+    libcublas-devel-$LIBCUBLAS_VERSION \
+    cuda-cudart-devel-$CUDA_PKG_VERSION \
+    cuda-libraries-devel-$CUDA_LIB_VERSION \
+    cuda-minimal-build-$CUDA_LIB_VERSION \
     cuda-nvprof-$CUDA_PKG_VERSION \
-    cuda-npp-dev-$CUDA_PKG_VERSION \
-    libnccl-devel-2.7.8-1+cuda10.1 \
-    && ln -s cuda-10.1 /usr/local/cuda \
+    libnpp-devel-$CUDA_PKG_VERSION \
+    libnccl-devel-2.8.4-1+cuda11.2 \
+    && ln -s cuda-11.2 /usr/local/cuda \
     && yum clean all \
     && rm -rf /var/cache/yum/*
 
-RUN yum install -y yum-plugin-versionlock && yum versionlock libcublas10
+RUN yum install -y yum-plugin-versionlock && yum versionlock libcublas11
 
 
 # install protobuf
