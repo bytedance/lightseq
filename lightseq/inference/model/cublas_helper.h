@@ -9,6 +9,12 @@
 namespace lightseq {
 namespace cuda {
 
+enum Layout {
+  kRowMajor,
+  kColMajor,
+  kColMajor32,
+};
+
 const bool full_int8 = true;
 
 // for int8 cublasLtMM with algo
@@ -34,17 +40,22 @@ void cublasLtMM_withAlgo_i8IO(
     // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
     bool use_ORDER_COL32_2R_4R4);
 
+void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
+                   int8_t* output_c, int batchCount, int m, int n, int k,
+                   int64_t stridea, int64_t strideb, int64_t stridec,
+                   const float alpha, cublasLtHandle_t cublasLt_handle,
+                   cudaStream_t stream);
+
 inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
 
-void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
-                                       int row, int col,
-                                       cublasLtHandle_t lt_handle,
-                                       cudaStream_t stream);
+void transform_weight_layout(const int8_t* input, int8_t* output, int row,
+                             int col, Layout layout, cublasLtHandle_t lt_handle,
+                             cudaStream_t stream);
 
 template <typename T>
-void quantize_weight_col32t(const T* origin_weight, int8_t* quantized_weight,
-                            int rows, int cols, float quant_scale,
-                            cudaStream_t stream, cublasLtHandle_t handle);
+void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
+                     int cols, float quant_scale, cudaStream_t stream,
+                     cublasLtHandle_t handle, bool layout_col32t = true);
 
 }  // namespace cuda
 }  // namespace lightseq

@@ -450,34 +450,108 @@ void cublasLtMM_withAlgo_i8IO(
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
 }
 
-void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
-                                       int row, int col,
-                                       cublasLtHandle_t lt_handle,
-                                       cudaStream_t stream) {
-  int ldtransform = 32 * round_up(col, 8);
+void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
+                   int8_t* output_c, int batchCount, int m, int n, int k,
+                   int64_t stridea, int64_t strideb, int64_t stridec,
+                   const float alpha, cublasLtHandle_t cublasLt_handle,
+                   cudaStream_t stream) {
+  cublasOperation_t opTranspose = CUBLAS_OP_T;
+  cudaDataType_t scaleType = CUDA_R_32F;
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  cublasComputeType_t computeType = CUBLAS_COMPUTE_32I;
+#else
+  cudaDataType_t computeType = CUDA_R_32I;
+#endif
+  cublasLtMatmulDesc_t matmul_desc;
+  cublasLtMatrixLayout_t desc_a = NULL;
+  cublasLtMatrixLayout_t desc_b = NULL;
+  cublasLtMatrixLayout_t desc_c = NULL;
+
+  int lda = k;
+  int ldb = k;
+  int ldc = m;
+
+  // create matmulDesc
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  cublasLtMatmulDescCreate(&matmul_desc, computeType, scaleType);
+#else
+  cublasLtMatmulDescCreate(&matmul_desc, computeType);
+#endif
+  cublasLtMatmulDescSetAttribute(matmul_desc, CUBLASLT_MATMUL_DESC_TRANSA,
+                                 &opTranspose, sizeof(cublasOperation_t));
+  cublasLtMatmulDescSetAttribute(matmul_desc, CUBLASLT_MATMUL_DESC_SCALE_TYPE,
+                                 &scaleType, sizeof(scaleType));
+
+  cublasLtMatrixLayoutCreate(&desc_a, CUDA_R_8I, k, m, lda);
+  cublasLtMatrixLayoutCreate(&desc_b, CUDA_R_8I, k, n, ldb);
+  cublasLtMatrixLayoutCreate(&desc_c, CUDA_R_8I, m, n, ldc);
+
+  if (batchCount > 1) {
+    cublasLtMatrixLayoutSetAttribute(desc_a, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        desc_a, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridea,
+        sizeof(stridea));
+    cublasLtMatrixLayoutSetAttribute(desc_b, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        desc_b, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideb,
+        sizeof(strideb));
+    cublasLtMatrixLayoutSetAttribute(desc_c, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        desc_c, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridec,
+        sizeof(stridec));
+  }
+
+  float beta = 0.0f;
+  CHECK_GPU_ERROR(cublasLtMatmul(
+      cublasLt_handle, matmul_desc, &alpha, input_a, desc_a, input_b, desc_b,
+      &beta, output_c, desc_c, output_c, desc_c, NULL, NULL, 0, stream));
+
+  CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(matmul_desc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(desc_a));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(desc_b));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(desc_c));
+}
+
+void transform_weight_layout(const int8_t* input, int8_t* output, int row,
+                             int col, Layout layout, cublasLtHandle_t lt_handle,
+                             cudaStream_t stream) {
   float transform_alpha = 1.0f, transform_beta = 0.0f;
   cublasLtMatrixTransformDesc_t transform_desc = NULL;
   cublasLtMatrixLayout_t input_desc = NULL, output_desc = NULL;
   cublasLtOrder_t order_col = CUBLASLT_ORDER_COL;
   cublasLtOrder_t order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
-  //   cublasOperation_t opTranspose = CUBLAS_OP_T;
+  cublasOperation_t transpose = CUBLAS_OP_T;
 
   CHECK_GPU_ERROR(
       cublasLtMatrixLayoutCreate(&input_desc, CUDA_R_8I, col, row, col));
   CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
       input_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_col, sizeof(order_col)));
-
-  CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, col, row,
-                                             ldtransform));
-  CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
-      output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
-      sizeof(order_COL4_4R2_8C)));
-
   CHECK_GPU_ERROR(
       cublasLtMatrixTransformDescCreate(&transform_desc, CUDA_R_32F));
-  //   CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
-  //       transform_desc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &opTranspose,
-  //       sizeof(opTranspose)));
+
+  if (layout == kColMajor32) {
+    int ldtransform = 32 * round_up(col, 8);
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, col,
+                                               row, ldtransform));
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+        output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
+        sizeof(order_COL4_4R2_8C)));
+  } else if (layout == kColMajor) {
+    int ldtransform = row;
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, row,
+                                               col, ldtransform));
+    CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
+        output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_col,
+        sizeof(order_col)));
+    CHECK_GPU_ERROR(cublasLtMatrixTransformDescSetAttribute(
+        transform_desc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &transpose,
+        sizeof(transpose)));
+  } else {
+    throw std::runtime_error("unsupported layout");
+  }
 
   CHECK_GPU_ERROR(cublasLtMatrixTransform(
       lt_handle, transform_desc, &transform_alpha, input, input_desc,
@@ -489,34 +563,51 @@ void transform_weight_row_major2col32t(const int8_t* input, int8_t* output,
 }
 
 template <typename T>
-void quantize_weight_col32t(const T* origin_weight, int8_t* quantized_weight,
-                            int rows, int cols, float quant_scale,
-                            cudaStream_t stream, cublasLtHandle_t handle) {
-  int8_t* temp_weight;
-  CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
+void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
+                     int cols, float quant_scale, cudaStream_t stream,
+                     cublasLtHandle_t handle, bool layout_col32t) {
+  if (layout_col32t) {
+    int8_t* temp_weight;
+    CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
 
-  launch_quantize_tensor(origin_weight, temp_weight, rows, cols, quant_scale,
-                         stream);
-  CHECK_GPU_ERROR(cudaDeviceSynchronize());
-  CHECK_GPU_ERROR(cudaGetLastError());
+    launch_quantize_tensor(origin_weight, temp_weight, rows, cols, quant_scale,
+                           stream);
+    CHECK_GPU_ERROR(cudaDeviceSynchronize());
+    CHECK_GPU_ERROR(cudaGetLastError());
 
-  transform_weight_row_major2col32t(temp_weight, quantized_weight, rows, cols,
-                                    handle, stream);
+    transform_weight_layout(temp_weight, quantized_weight, rows, cols,
+                            kColMajor32, handle, stream);
 
-  CHECK_GPU_ERROR(cudaFree(temp_weight));
+    CHECK_GPU_ERROR(cudaFree(temp_weight));
+  } else {
+    int8_t* temp_weight;
+    CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
+
+    launch_quantize_tensor(origin_weight, temp_weight, rows, cols, quant_scale,
+                           stream);
+    CHECK_GPU_ERROR(cudaDeviceSynchronize());
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    transform_weight_layout(temp_weight, quantized_weight, rows, cols,
+                            kColMajor, handle, stream);
+
+    CHECK_GPU_ERROR(cudaFree(temp_weight));
+  }
 }
 
-template void quantize_weight_col32t<float>(const float* origin_weight,
-                                            int8_t* quantized_weight, int rows,
-                                            int cols, float quant_scale,
-                                            cudaStream_t stream,
-                                            cublasLtHandle_t handle);
+template void quantize_weight<float>(const float* origin_weight,
+                                     int8_t* quantized_weight, int rows,
+                                     int cols, float quant_scale,
+                                     cudaStream_t stream,
+                                     cublasLtHandle_t handle,
+                                     bool layout_col32t);
 
-template void quantize_weight_col32t<half>(const half* origin_weight,
-                                           int8_t* quantized_weight, int rows,
-                                           int cols, float quant_scale,
-                                           cudaStream_t stream,
-                                           cublasLtHandle_t handle);
+template void quantize_weight<half>(const half* origin_weight,
+                                    int8_t* quantized_weight, int rows,
+                                    int cols, float quant_scale,
+                                    cudaStream_t stream,
+                                    cublasLtHandle_t handle,
+                                    bool layout_col32t);
 
 }  // namespace cuda
 }  // namespace lightseq

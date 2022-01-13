@@ -94,29 +94,29 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
     CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
                                _tw._inner_size * _tw._hidden_size));
 
-    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 2],
-                           _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
-                           _tw._hidden_size * 3,
-                           _quant_range / _enc_clip_max[_layer_id * 12],
-                           _stream, _cublas_lt_handle);
+    quantize_weight(_p_d_enc_wei[_weight_offset + 2],
+                    _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
+                    _tw._hidden_size * 3,
+                    _quant_range / _enc_clip_max[_layer_id * 12], _stream,
+                    _cublas_lt_handle);
 
-    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 4],
-                           _int8_p_d_enc_wei[_layer_id * 4 + 1],
-                           _tw._hidden_size, _tw._hidden_size,
-                           _quant_range / _enc_clip_max[_layer_id * 12 + 1],
-                           _stream, _cublas_lt_handle);
+    quantize_weight(_p_d_enc_wei[_weight_offset + 4],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 1], _tw._hidden_size,
+                    _tw._hidden_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 1], _stream,
+                    _cublas_lt_handle);
 
-    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 8],
-                           _int8_p_d_enc_wei[_layer_id * 4 + 2],
-                           _tw._hidden_size, _tw._inner_size,
-                           _quant_range / _enc_clip_max[_layer_id * 12 + 2],
-                           _stream, _cublas_lt_handle);
+    quantize_weight(_p_d_enc_wei[_weight_offset + 8],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 2], _tw._hidden_size,
+                    _tw._inner_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 2], _stream,
+                    _cublas_lt_handle);
 
-    quantize_weight_col32t(_p_d_enc_wei[_weight_offset + 10],
-                           _int8_p_d_enc_wei[_layer_id * 4 + 3],
-                           _tw._inner_size, _tw._hidden_size,
-                           _quant_range / _enc_clip_max[_layer_id * 12 + 3],
-                           _stream, _cublas_lt_handle);
+    quantize_weight(_p_d_enc_wei[_weight_offset + 10],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 3], _tw._inner_size,
+                    _tw._hidden_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 3], _stream,
+                    _cublas_lt_handle);
 
     if (_tw._use_gelu) {
       _scaled_ffn2_colsum[_layer_id] = nullptr;
