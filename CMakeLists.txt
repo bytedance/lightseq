@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(LightSeq LANGUAGES C CXX CUDA)
 
-set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75)
+set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80 86)
 find_package(CUDA 10.1 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
