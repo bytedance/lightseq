@@ -6,7 +6,7 @@ function repair_wheel() {
     if ! auditwheel show "$wheel"; then
         echo "Skipping non-platform wheel $wheel"
     else
-        auditwheel repair "$wheel" --plat manylinux2010_x86_64 -w $(dirname $(readlink -e $wheel))
+        auditwheel repair "$wheel" --plat manylinux_2_24_x86_64 -w $(dirname $(readlink -e $wheel))
     fi
 }
 
