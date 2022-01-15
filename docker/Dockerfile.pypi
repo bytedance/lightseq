@@ -1,58 +1,39 @@
-FROM quay.io/pypa/manylinux2014_x86_64
+FROM quay.io/pypa/manylinux_2_24_x86_64
 
 
-ENV CUDA_PKG_VERSION 11-2-11.2.152-1
-ENV CUDA_LIB_VERSION 11-2-11.2.2-1
-ENV LIBCUBLAS_VERSION 11-2-11.4.1.1043-1
-ENV LIBNPP_VERSION 11-2-11.3.2.152-1
-
-RUN echo $'[cuda]\n\
-name=cuda\n\
-baseurl=https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64\n\
-enabled=1\n\
-gpgcheck=1\n\
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA'\ > /etc/yum.repos.d/cuda.repo
-
-RUN echo $'[nvidia-ml]\n\
-name=nvidia-ml\n\
-baseurl=https://developer.download.nvidia.com/compute/machine-learning/repos/rhel8/x86_64\n\
-enabled=1\n\
-gpgcheck=1\n\
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA'\ > /etc/yum.repos.d/nvidia-ml.repo
-
-
-RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/7fa2af80.pub | sed '/^Version/d' > /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA && \
-    echo "d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5  /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA" | sha256sum -c
-
-
-RUN yum upgrade -y &&\
-    yum install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gnupg2 curl ca-certificates build-essential \
+    python3-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
+    automake \
+    libtool \
+    curl \
     make \
-    # base
-    cuda-cudart-$CUDA_PKG_VERSION \
-    cuda-compat-11-2 \
-    # runtime
-    cuda-libraries-$CUDA_LIB_VERSION \
-    cuda-nvtx-$CUDA_PKG_VERSION \
-    libnpp-$LIBNPP_VERSION \
-    libcublas-$LIBCUBLAS_VERSION \
-    libnccl-2.8.4-1+cuda11.2 \
-    # devel
-    cuda-command-line-tools-$CUDA_LIB_VERSION \
-    cuda-libraries-devel-$CUDA_LIB_VERSION \
-    cuda-minimal-build-$CUDA_LIB_VERSION \
-    cuda-cudart-devel-$CUDA_PKG_VERSION \
-    cuda-nvprof-$CUDA_PKG_VERSION \
-    cuda-nvml-devel-$CUDA_PKG_VERSION \
-    libcublas-devel-$LIBCUBLAS_VERSION \
-    libnpp-devel-$LIBNPP_VERSION \
-    libnccl-devel-2.8.4-1+cuda11.2 \
-    # all
-    && ln -s cuda-11.2 /usr/local/cuda \
-    && yum clean all \
-    && rm -rf /var/cache/yum/*
+    g++ \
+    unzip \
+    sshpass \
+    software-properties-common \
+    dirmngr\
+    apt-transport-https \
+    lsb-release \
+    ca-certificates \
+    openssh-client && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN yum install -y yum-plugin-versionlock && yum versionlock libcublas11
+RUN curl -O -L -C - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
+    mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
+    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /" && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    cuda-toolkit-11-3 && \
+    rm -rf /var/lib/apt/lists/*
+
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs
 
 
 # install protobuf
@@ -80,7 +61,6 @@ RUN curl -O -L -C - \
     cd hdf5-hdf5-1_12_0 && \
     ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
     make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
-
 
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:${PATH}
