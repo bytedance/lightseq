@@ -290,7 +290,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                     _int8_p_d_dec_wei[_layer_id * 6 + 1], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 1], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, false);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 8],
                     _int8_p_d_dec_wei[_layer_id * 6 + 2], _tw._hidden_size,
@@ -302,7 +302,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                     _int8_p_d_dec_wei[_layer_id * 6 + 3], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 3], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, false);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 14],
                     _int8_p_d_dec_wei[_layer_id * 6 + 4], _tw._hidden_size,
@@ -314,7 +314,7 @@ void Decoder<OpType_>::init_buffer(void* pbuf) {
                     _int8_p_d_dec_wei[_layer_id * 6 + 5], _tw._inner_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 5], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, false);
 
     if (_tw._use_gelu) {
       _scaled_ffn2_colsum[_layer_id] = nullptr;
@@ -770,23 +770,32 @@ void Decoder<OpType_>::self_attention() {
       _step_token_num * _tw._head_num, _cur_step + 1, _tw._max_step,
       _tw._head_num, _tw._dim_per_head, float(_atten_scaler),
       _dec_clip_max[_layer_id * 19 + 18] / _quant_range,
-      _quant_range / _dec_clip_max[_layer_id * 19 + 7], true, _stream);
+      _quant_range / _dec_clip_max[_layer_id * 19 + 7], false, _stream);
 
 #ifdef DEBUG_RESULT
-  print_vec(_int8_ffn_in_buf, "self attn ffn in(head): ", 3);
-  print_vec(_int8_ffn_in_buf + _step_token_num * _tw._hidden_size - 3,
-            "self attn ffn in(tail): ", 3);
+  print_vec(_int8_ffn_in_buf, "self attn ffn in(head): ", 40);
+  print_vec(_int8_ffn_in_buf + _step_token_num * _tw._hidden_size - 40,
+            "self attn ffn in(tail): ", 40);
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
   if (full_int8) {
-    cublasLtMM_withAlgo_i8IO(
-        _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
-        _tw._hidden_size, 0, 0, 0,
-        _dec_clip_max[_layer_id * 19 + 1] * _dec_clip_max[_layer_id * 19 + 7] /
-            (_dec_clip_max[_layer_id * 19 + 13] * _quant_range),
-        _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 1],
-        _cublas_lt_handle, _stream, false);
+    // cublasLtMM_withAlgo_i8IO(
+    //     _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+    //     _tw._hidden_size, 0, 0, 0,
+    //     _dec_clip_max[_layer_id * 19 + 1] * _dec_clip_max[_layer_id * 19 + 7]
+    //     /
+    //         (_dec_clip_max[_layer_id * 19 + 13] * _quant_range),
+    //     _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 1],
+    //     _cublas_lt_handle, _stream, false);
+
+    cublaslt_gemm(_int8_p_d_dec_wei[_layer_id * 6 + 1], _int8_ffn_in_buf,
+                  _int8_ffn_out_buf, 1, _tw._hidden_size, _step_token_num,
+                  _tw._hidden_size, 0, 0, 0,
+                  _dec_clip_max[_layer_id * 19 + 1] *
+                      _dec_clip_max[_layer_id * 19 + 7] /
+                      (_dec_clip_max[_layer_id * 19 + 13] * _quant_range),
+                  _cublas_lt_handle, _stream);
   } else {
     cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
                         _tw._hidden_size, _tw._hidden_size, 0, 0, 0,
@@ -795,9 +804,9 @@ void Decoder<OpType_>::self_attention() {
   }
 
 #ifdef DEBUG_RESULT
-  print_vec(_int8_ffn_out_buf, "self attn ffn out w/o bias(head): ", 3);
-  print_vec(_int8_ffn_out_buf + _step_token_num * _tw._hidden_size - 3,
-            "self attn ffn out w/o bias(tail): ", 3);
+  print_vec(_int8_ffn_out_buf, "self attn ffn out w/o bias(head): ", 40);
+  print_vec(_int8_ffn_out_buf + _step_token_num * _tw._hidden_size - 40,
+            "self attn ffn out w/o bias(tail): ", 40);
 #endif
 
   if (full_int8) {
@@ -807,7 +816,7 @@ void Decoder<OpType_>::self_attention() {
         _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num,
         _tw._hidden_size, _dec_clip_max[_layer_id * 19 + 13] / _quant_range,
         _quant_range / _dec_clip_max[_layer_id * 19 + 8], _max_thread_per_block,
-        _stream, _tw._is_post_ln, true);
+        _stream, _tw._is_post_ln, false, true);
   } else {
     ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
         _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 6],
@@ -981,7 +990,7 @@ void Decoder<OpType_>::encdec_attention() {
       _step_token_num, _tw._hidden_size, _stream, _p_d_query_buf1,
       _int8_ffn_in_buf, _tw._beam_size, _tw._dim_per_head, _tw._head_num,
       _max_thread_per_block, _quant_range / _dec_clip_max[_layer_id * 19 + 9],
-      true);
+      false);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "encdec attn ffn in(head): ", 3);
@@ -991,13 +1000,20 @@ void Decoder<OpType_>::encdec_attention() {
 #endif
 
   if (full_int8)
-    cublasLtMM_withAlgo_i8IO(
-        _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
-        _tw._hidden_size, 0, 0, 0,
-        _dec_clip_max[_layer_id * 19 + 3] * _dec_clip_max[_layer_id * 19 + 9] /
-            (_dec_clip_max[_layer_id * 19 + 15] * _quant_range),
-        _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 3],
-        _cublas_lt_handle, _stream, false);
+    // cublasLtMM_withAlgo_i8IO(
+    //     _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+    //     _tw._hidden_size, 0, 0, 0,
+    //     _dec_clip_max[_layer_id * 19 + 3] * _dec_clip_max[_layer_id * 19 + 9] /
+    //         (_dec_clip_max[_layer_id * 19 + 15] * _quant_range),
+    //     _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 3],
+    //     _cublas_lt_handle, _stream, false);
+  cublaslt_gemm(_int8_p_d_dec_wei[_layer_id * 6 + 3], _int8_ffn_in_buf,
+                _int8_ffn_out_buf, 1, _tw._hidden_size, _step_token_num,
+                _tw._hidden_size, 0, 0, 0,
+                _dec_clip_max[_layer_id * 19 + 3] *
+                    _dec_clip_max[_layer_id * 19 + 9] /
+                    (_dec_clip_max[_layer_id * 19 + 15] * _quant_range),
+                _cublas_lt_handle, _stream);
   else
     cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num,
                         _tw._hidden_size, _tw._hidden_size, 0, 0, 0,
@@ -1017,7 +1033,7 @@ void Decoder<OpType_>::encdec_attention() {
         _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num,
         _tw._hidden_size, _dec_clip_max[_layer_id * 19 + 15] / _quant_range,
         _quant_range / _dec_clip_max[_layer_id * 19 + 10],
-        _max_thread_per_block, _stream, _tw._is_post_ln, true);
+        _max_thread_per_block, _stream, _tw._is_post_ln, false, true);
   else
     ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
         _int32_ffn_out_buf, _p_d_dec_wei[_weight_offset + 12],
@@ -1046,9 +1062,9 @@ void Decoder<OpType_>::encdec_attention() {
 
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaGetLastError());
-  print_vec(_p_d_cur_step_query, "self attn ffn out(head): ", 3);
+  print_vec(_p_d_cur_step_query, "encdec attn ffn out(head): ", 3);
   print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 3,
-            "self attn ffn out(tail): ", 3);
+            "encdec attn ffn out(tail): ", 3);
 #endif
   return;
 }
@@ -1090,7 +1106,7 @@ void Decoder<OpType_>::ffn_add_norm() {
           _p_d_dec_wei[_weight_offset + 15], _tw._inner_size,
           _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
           _quant_range / _dec_clip_max[_layer_id * 19 + 11],
-          _dec_clip_max[_layer_id * 19 + 11], true, true);
+          _dec_clip_max[_layer_id * 19 + 11], true, false, true);
     }
   } else {
     if (_tw._use_gelu) {
@@ -1130,10 +1146,14 @@ void Decoder<OpType_>::ffn_add_norm() {
   //       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 5],
   //       _cublas_lt_handle, _stream, false);
   // else
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
-                      _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_dec_wei[_layer_id * 6 + 5], _cublas_lt_handle,
-                      _stream, false);
+  // cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _step_token_num, _tw._hidden_size,
+  //                     _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
+  //                     _int8_p_d_dec_wei[_layer_id * 6 + 5], _cublas_lt_handle,
+  //                     _stream, false);
+
+  cublaslt_gemm(_int8_p_d_dec_wei[_layer_id * 6 + 5], _int8_ffn_in_buf,
+                _int32_ffn_out_buf, 1, _tw._hidden_size, _step_token_num,
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max;
@@ -1164,7 +1184,7 @@ void Decoder<OpType_>::ffn_add_norm() {
       _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
           (2 * _quant_range * _quant_range),
       _quant_range / clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
-      true, _scaled_ffn2_colsum[_layer_id]);
+      false, true, _scaled_ffn2_colsum[_layer_id]);
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(

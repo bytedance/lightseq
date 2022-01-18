@@ -31,6 +31,7 @@ void ker_bias_gelu_i32I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                      float dequant_scale, float quant_scale,
                                      bool in_out_col32 = false);
 
+// TODO: support col32 switch for input and output like relu
 template <typename T>
 void ker_bias_gelu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     int8_t *input, int8_t *output,
@@ -53,7 +54,8 @@ void ker_bias_relu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     int8_t *input, int8_t *output,
                                     const T *bias, int feature_dim,
                                     float dequant_scale, float quant_scale,
-                                    float clip_max, bool in_out_col32 = false,
+                                    float clip_max, bool in_col32 = true,
+                                    bool out_col32 = true,
                                     bool narrow_clip = false);
 
 template <typename T>
@@ -61,16 +63,16 @@ void ker_residual_bias_ln_i32I_i8O_launcher(
     const int32_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int batch_tokens, int hidden_size,
     float dequant_scale, float quant_scale, int max_thread_per_block,
-    cudaStream_t stream, bool is_post_ln = false, bool in_out_col32 = false,
-    const T *colsum = nullptr);
+    cudaStream_t stream, bool is_post_ln = false, bool in_col32 = true,
+    bool out_col32 = true, const T *colsum = nullptr);
 
 template <typename T>
 void ker_residual_bias_ln_i8I_i8O_launcher(
     const int8_t *input, const T *scale, const T *bias, const T *residual_bias,
     int8_t *output, T *residual, int batch_tokens, int hidden_size,
     float dequant_scale, float quant_scale, int max_thread_per_block,
-    cudaStream_t stream, bool is_post_ln = false, bool in_out_col32 = false,
-    const T *colsum = nullptr);
+    cudaStream_t stream, bool is_post_ln = false, bool in_col32 = true,
+    bool out_col32 = true, const T *colsum = nullptr);
 
 template <typename T>
 void ker_residual_bias_ln_i32I_launcher(

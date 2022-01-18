@@ -396,7 +396,7 @@ void Encoder<OpType_>::ffn_add_norm() {
           _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
           _enc_clip_max[_layer_id * 12 + 10] / _quant_range,
           _quant_range / _enc_clip_max[_layer_id * 12 + 7],
-          _enc_clip_max[_layer_id * 12 + 7], true, true);
+          _enc_clip_max[_layer_id * 12 + 7], true, true, true);
     }
   } else {
     if (_tw._use_gelu) {
@@ -472,7 +472,7 @@ void Encoder<OpType_>::ffn_add_norm() {
         _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
             (2 * _quant_range * _quant_range),
         _quant_range / clip_max, _max_thread_per_block, _stream,
-        _tw._is_post_ln, true, _scaled_ffn2_colsum[_layer_id]);
+        _tw._is_post_ln, true, true, _scaled_ffn2_colsum[_layer_id]);
   }
 #else
   /* ---step 0. layer_norm, add output_bias to "query"--- */

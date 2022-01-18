@@ -40,10 +40,11 @@ void cublasLtMM_withAlgo_i8IO(
     // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
     bool use_ORDER_COL32_2R_4R4);
 
+template <typename OutType, typename ScaleType>
 void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
-                   int8_t* output_c, int batchCount, int m, int n, int k,
+                   OutType* output_c, int batchCount, int m, int n, int k,
                    int64_t stridea, int64_t strideb, int64_t stridec,
-                   const float alpha, cublasLtHandle_t cublasLt_handle,
+                   const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
                    cudaStream_t stream);
 
 inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
