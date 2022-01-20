@@ -74,6 +74,7 @@ class CMakeBuild(build_ext):
             cmake_args += ["-DFP16_MODE=OFF"] if ENABLE_FP32 else ["-DFP16_MODE=ON"]
             cmake_args += ["-DINT8_MODE=ON"] if ENABLE_INT8 else ["-DINT8_MODE=OFF"]
             cmake_args += ["-DDEBUG_MODE=ON"] if ENABLE_DEBUG else ["-DDEBUG_MODE=OFF"]
+            cmake_args += ["-DDYNAMIC_API=OFF"]
             build_args += ["--target", "lightseq"]
             build_args += ["--", "-j{}".format(multiprocessing.cpu_count())]
 

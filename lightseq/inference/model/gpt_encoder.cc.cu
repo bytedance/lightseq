@@ -122,11 +122,29 @@ std::string GptEncoder<OpType_>::check() {
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
   }
+  std::string sampling_method = _tw._sampling_method;
+  if (kSamplingMethods.find(sampling_method) == kSamplingMethods.end()) {
+    return std::string("unsupported sampling_method: ") + sampling_method;
+  }
+
+  if (_tw._topk <= 0) {
+    return "topk must be positive";
+  }
+  if (_tw._topp <= 0 && _tw._topp >= 1.0) {
+    return "topp must be in (0, 1)";
+  }
+
   return "";
 }
 
 template <OperationType OpType_>
 void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
+  if (batch_size > _max_batch_size) {
+    throw std::runtime_error("batch size of input greater than max_batch_size");
+  }
+  if (batch_seq_len > _tw._max_step) {
+    throw std::runtime_error("seq len of input greater than max_step");
+  }
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
@@ -173,13 +191,15 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 
 template <OperationType OpType_>
 int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
+  if (batch_size > _max_batch_size) {
+    throw std::runtime_error("batch size of input greater than max_batch_size");
+  }
+  if (batch_seq_len > _tw._max_step) {
+    throw std::runtime_error("seq len of input greater than max_step");
+  }
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
-
-  if (_batch_seq_len >= _tw._max_step) {
-    return _batch_seq_len;
-  }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_real_seq_len, _h_real_seq_len.data(),
                                   sizeof(int) * _batch_size,
@@ -188,7 +208,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
                                   sizeof(float) * _batch_size,
                                   cudaMemcpyHostToDevice, _stream));
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id, _p_d_token_id,
-                                  sizeof(int) * _batch_size * _tw._max_step,
+                                  sizeof(int) * _batch_size * _batch_seq_len,
                                   cudaMemcpyDeviceToDevice, _stream));
 #ifdef DEBUG_RESULT
   std::cout << "batch_size-" << batch_size << " batch_seq_len-" << batch_seq_len
