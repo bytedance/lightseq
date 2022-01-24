@@ -14,6 +14,20 @@ endif()
 
 target_include_directories(transformer_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+set(deltalm_files deltalm_decoder.cc.cu deltalm_encoder.cc.cu)
+add_library(deltalm_model STATIC ${deltalm_files})
+target_link_libraries(deltalm_model PUBLIC cuda_kernels)
+target_link_libraries(deltalm_model PUBLIC deltalm_weight)
+if(DYNAMIC_API)
+  target_link_libraries(deltalm_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(deltalm_model PRIVATE CUDA::cublas_static
+                                                  CUDA::cublasLt_static)
+endif()
+
+target_include_directories(deltalm_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+
 add_library(gpt_model STATIC gpt_encoder.cc.cu)
 target_link_libraries(gpt_model PUBLIC cuda_kernels)
 target_link_libraries(gpt_model PUBLIC gpt_weight)

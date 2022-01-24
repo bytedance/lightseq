@@ -25,6 +25,24 @@ set_target_properties(
     "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
 
 add_library(
+  deltalm_server SHARED deltalm_server.cc.cu custom.h
+                            ${CONFIG_PROTO_SRC} ${CONFIG_PROTO_HEADER})
+target_link_libraries(deltalm_server PUBLIC deltalm_model)
+target_include_directories(deltalm_server
+                           INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(deltalm_server
+                           INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(
+  deltalm_server PROPERTIES LINK_DEPENDS
+                                ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
+set_target_properties(
+  deltalm_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+
+
+add_library(
   transformer_generate_server SHARED generate_server.cc.cu custom.h
                                      ${CONFIG_PROTO_SRC} ${CONFIG_PROTO_HEADER})
 target_link_libraries(transformer_generate_server PUBLIC transformer_model)

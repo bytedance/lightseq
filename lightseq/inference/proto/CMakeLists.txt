@@ -12,6 +12,8 @@ protobuf_generate_cpp(GPT_PROTO_SRC GPT_PROTO_HEADER gpt.proto)
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
 protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
                       transformer.proto)
+protobuf_generate_cpp(DELTALM_PROTO_SRC DELTALM_PROTO_HEADER
+                      deltalm.proto)
 
 add_library(gpt_weight STATIC gpt_weight.cc ${GPT_PROTO_SRC}
                               ${GPT_PROTO_HEADER})
@@ -34,4 +36,14 @@ target_link_libraries(transformer_weight PUBLIC utils ${Protobuf_LIBRARIES}
 target_include_directories(transformer_weight
                            PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(transformer_weight
+                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(
+  deltalm_weight STATIC deltalm_weight.cc ${DELTALM_PROTO_SRC}
+                            ${DELTALM_PROTO_HEADER})
+target_link_libraries(deltalm_weight PUBLIC utils ${Protobuf_LIBRARIES}
+                                                ${HDF5_LIBRARIES})
+target_include_directories(deltalm_weight
+                           PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(deltalm_weight
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
