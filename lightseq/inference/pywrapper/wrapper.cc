@@ -70,8 +70,8 @@ class PyTransformer {
                                                cudaMemcpyDeviceToHost));
 
     std::vector<int> score_shape = model_->get_output_shape(1);
-    auto scores = py::array_t<int>(score_shape);
-    int *scores_data = scores.mutable_data(0, 0);
+    auto scores = py::array_t<float>(score_shape);
+    float *scores_data = scores.mutable_data(0, 0);
     const float *d_scores =
         static_cast<const float *>(model_->get_output_ptr(1));
 
