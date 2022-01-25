@@ -7,7 +7,7 @@ option optimize_for = LITE_RUNTIME;
 // "Feed-Forward Networks"
 // plz see https://arxiv.org/abs/1706.03762 for details
 
-message EncoderLayer {
+message QuantEncoderLayer {
   // encoder-self-attention
   repeated float multihead_norm_scale = 1;  // [hidden_size]
   repeated float multihead_norm_bias = 2;   // [hidden_size]
@@ -52,7 +52,7 @@ message EncoderLayer {
   float ffn_second_output_clip_max = 24;
 }
 
-message DecoderLayer {
+message QuantDecoderLayer {
   // decoder-self-attention
   repeated float self_norm_scale = 1;          // [hidden_size]
   repeated float self_norm_bias = 2;           // [hidden_size]
@@ -100,7 +100,7 @@ message DecoderLayer {
   float self_qkv_bias_out_clip_max = 37;
 }
 
-message EmbeddingLayer {
+message QuantEmbeddingLayer {
   // token embedding table
   // for encoder, it is in [src_vocab_size, hidden_size]
   // for decoder, it is in [hidden_size, trg_vocab_size]
@@ -134,7 +134,7 @@ message EmbeddingLayer {
   float logits_clip_max = 12;
 }
 
-message ModelConf {
+message QuantModelConf {
   int32 head_num = 1;   // head number for multi-head attention
   int32 beam_size = 2;  // beam size of beam search
   int32 extra_decode_length =
@@ -156,10 +156,10 @@ message ModelConf {
   int32 multilg_type = 15;
 }
 
-message Transformer {
-  EmbeddingLayer src_embedding = 1;         // source embedding
-  repeated EncoderLayer encoder_stack = 2;  // encoder weights
-  EmbeddingLayer trg_embedding = 3;         // target embedding
-  repeated DecoderLayer decoder_stack = 4;  // decoder weighs
-  ModelConf model_conf = 5;                 // model_config
+message QuantTransformer {
+  QuantEmbeddingLayer src_embedding = 1;         // source embedding
+  repeated QuantEncoderLayer encoder_stack = 2;  // encoder weights
+  QuantEmbeddingLayer trg_embedding = 3;         // target embedding
+  repeated QuantDecoderLayer decoder_stack = 4;  // decoder weighs
+  QuantModelConf model_conf = 5;                 // model_config
 }
