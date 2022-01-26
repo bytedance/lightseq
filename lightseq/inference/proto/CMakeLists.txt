@@ -11,7 +11,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 protobuf_generate_cpp(GPT_PROTO_SRC GPT_PROTO_HEADER gpt.proto)
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
 protobuf_generate_cpp(Q_TRANSFORMER_PROTO_SRC Q_TRANSFORMER_PROTO_HEADER
-                      transformer_quant.proto)
+                      quant_transformer.proto)
 protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
                       transformer.proto)
 

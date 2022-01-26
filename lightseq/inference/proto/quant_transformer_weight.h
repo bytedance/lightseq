@@ -15,7 +15,7 @@
 
 #include "../tools/util.h"
 
-#include "transformer_quant.pb.h"
+#include "quant_transformer.pb.h"
 
 namespace lightseq {
 namespace cuda {
