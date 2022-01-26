@@ -1,8 +1,8 @@
 #pragma once
 #include <stdexcept>
+
 #include <cuda.h>
 #include <cuda_fp16.h>
-#include <curand_kernel.h>
 
 namespace lightseq {
 namespace cuda {
@@ -214,6 +214,11 @@ __forceinline__ __host__ __device__ int targetid_6dim(int id1, int id2, int id3,
 }
 
 /* Convert half2 into float2, mask inf and -inf */
+__forceinline__ __host__ __device__ float safe_half_to_float(half hval) {
+  return fmax(fmin(100000.f, __half2float(hval)), -100000.f);
+}
+
+/* Convert half2 into float2, mask inf and -inf */
 __forceinline__ __host__ __device__ float2 safe_half2_to_float2(half2 vhalf2) {
   float2 vfloat2 = __half22float2(vhalf2);
   vfloat2.x = fmax(fmin(100000.f, vfloat2.x), -100000.f);
@@ -301,6 +306,14 @@ __forceinline__ __host__ __device__ int flat_6dim(int id1, int id2, int id3,
   res += id1 * ld;
 
   return res;
+}
+
+/* row major index to col32 index */
+__forceinline__ __host__ __device__ int row_major2flat_col32(int row_id,
+                                                             int col_id,
+                                                             int row_size,
+                                                             int col_size) {
+  return ((col_id & 0xffffe0) * row_size) + (row_id << 5) + (col_id & 31);
 }
 
 /* Convert vector index to 6-dim tensor index */

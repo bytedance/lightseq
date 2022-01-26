@@ -1,4 +1,4 @@
-#include "transformer_weight.h"
+#include "quant_transformer_weight.h"
 
 #include <fstream>
 /**
@@ -15,7 +15,7 @@ Cast weights into required datatype.
 The datatype of weights in custom proto file will always be in fp32.
 */
 template <>
-float TransformerWeight<OperationType::FP32>::float2required(float value) {
+float QuantTransformerWeight<OperationType::FP32>::float2required(float value) {
   return value;
 }
 
@@ -23,11 +23,12 @@ float TransformerWeight<OperationType::FP32>::float2required(float value) {
 fp16 version, cast fp32 into fp16
 */
 template <>
-__half TransformerWeight<OperationType::FP16>::float2required(float value) {
+__half QuantTransformerWeight<OperationType::FP16>::float2required(
+    float value) {
   return __float2half_rn(value);
 }
 
-float dequantize(unsigned char i, float scale, float clip_max) {
+__inline__ float dequantize(unsigned char i, float scale, float clip_max) {
   return (float(i) - scale) * clip_max / scale;
 }
 
@@ -35,20 +36,20 @@ float dequantize(unsigned char i, float scale, float clip_max) {
 Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::proto_get_model_config(
-    const Transformer &transformer, bool only_decoder) {
+void QuantTransformerWeight<OpType_>::proto_get_model_config(
+    const QuantTransformer &transformer, bool only_decoder) {
   _hidden_size = transformer.trg_embedding().norm_scale_size();
   _max_step =
       transformer.trg_embedding().position_embedding_size() / _hidden_size;
 
   _inner_size =
-      transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+      transformer.decoder_stack()[0].ffn_first_kernel().size() / _hidden_size;
   if (!only_decoder) {
     _src_vocab_size =
-        transformer.src_embedding().token_embedding_size() / _hidden_size;
+        transformer.src_embedding().token_embedding().size() / _hidden_size;
   }
   _trg_vocab_size =
-      transformer.trg_embedding().token_embedding_size() / _hidden_size;
+      transformer.trg_embedding().token_embedding().size() / _hidden_size;
 
   if (!only_decoder) {
     _n_enc_layer = transformer.encoder_stack_size();
@@ -93,8 +94,8 @@ Compared with the encoder, the decoder has more
   distinguish between encoder and decoder
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
-    const EmbeddingLayer &layer, std::string source) {
+std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
+    const QuantEmbeddingLayer &layer, std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::vector<int> offset;
@@ -103,12 +104,19 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
 
   offset.push_back(idx);
 
-
-  if (layer.token_embedding_size() != vocab_size * _hidden_size)
+  if (layer.token_embedding().size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
-  for (float ele : layer.token_embedding()) value.push_back(ele);
+  for (unsigned char ele : layer.token_embedding())
+    value.push_back(dequantize(ele, _quant_range, layer.scaled_emb_clip_max()));
   idx += vocab_size * _hidden_size;
 
+  if (source == "src")
+    _src_scaled_emb_clip_max = layer.scaled_emb_clip_max();
+  else {
+    _trg_scaled_emb_clip_max = layer.scaled_emb_clip_max();
+    _output_ln_clip_max = layer.output_ln_clip_max();
+    _logits_clip_max = layer.logits_clip_max();
+  }
 
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
@@ -138,11 +146,23 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
 
     offset.push_back(idx);
 
-    if (layer.encode_output_project_kernel_kv_size() !=
-        _hidden_size * _hidden_size * 2 * _n_dec_layer)
+    int per_layer_ele_num = _hidden_size * _hidden_size * 2;
+    if (layer.encode_output_project_kernel_kv().size() !=
+        per_layer_ele_num * _n_dec_layer)
       return "Wrong encode_output_project_kernel_kv_size !";
-    for (float ele : layer.encode_output_project_kernel_kv())
-      value.push_back(ele);
+    for (int layer_id = 0; layer_id < _n_dec_layer; ++layer_id) {
+      for (int ele_id = 0; ele_id < per_layer_ele_num; ++ele_id) {
+        unsigned char ele =
+            layer.encode_output_project_kernel_kv()[layer_id *
+                                                        per_layer_ele_num +
+                                                    ele_id];
+        value.push_back(dequantize(
+            ele, _quant_range,
+            layer.encode_output_project_kernel_kv_clip_max(layer_id)));
+      }
+      _encode_output_project_kernel_kv_clip_max.push_back(
+          layer.encode_output_project_kernel_kv_clip_max(layer_id));
+    }
 
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
@@ -199,8 +219,8 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
-    const Transformer &transformer) {
+std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
+    const QuantTransformer &transformer) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -220,11 +240,13 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
 
     offset.push_back(idx);
 
-    if (enc_layer.multihead_project_kernel_qkv_size() !=
+    if (enc_layer.multihead_project_kernel_qkv().size() !=
         _hidden_size * _hidden_size * 3)
       return "Wrong multihead_project_kernel_qkv_size !";
-    for (float ele : enc_layer.multihead_project_kernel_qkv())
-      value.push_back(ele);
+    for (unsigned char ele : enc_layer.multihead_project_kernel_qkv())
+      value.push_back(
+          dequantize(ele, _quant_range,
+                     enc_layer.multihead_project_kernel_qkv_clip_max()));
 
     idx += _hidden_size * _hidden_size * 3;
 
@@ -237,11 +259,13 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
 
     offset.push_back(idx);
 
-    if (enc_layer.multihead_project_kernel_output_size() !=
+    if (enc_layer.multihead_project_kernel_output().size() !=
         _hidden_size * _hidden_size)
       return "Wrong multihead_project_kernel_output_size !";
-    for (float ele : enc_layer.multihead_project_kernel_output())
-      value.push_back(ele);
+    for (unsigned char ele : enc_layer.multihead_project_kernel_output())
+      value.push_back(
+          dequantize(ele, _quant_range,
+                     enc_layer.multihead_project_kernel_output_clip_max()));
 
     idx += _hidden_size * _hidden_size;
 
@@ -266,9 +290,11 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
 
     offset.push_back(idx);
 
-    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_first_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
-    for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
+    for (unsigned char ele : enc_layer.ffn_first_kernel())
+      value.push_back(
+          dequantize(ele, _quant_range, enc_layer.ffn_first_kernel_clip_max()));
 
     idx += _hidden_size * _inner_size;
 
@@ -280,9 +306,11 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
 
     offset.push_back(idx);
 
-    if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_second_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
-    for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
+    for (unsigned char ele : enc_layer.ffn_second_kernel())
+      value.push_back(dequantize(ele, _quant_range,
+                                 enc_layer.ffn_second_kernel_clip_max()));
 
     idx += _hidden_size * _inner_size;
 
@@ -292,7 +320,19 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
-
+    _enc_clip_max.push_back(enc_layer.multihead_project_kernel_qkv_clip_max());
+    _enc_clip_max.push_back(
+        enc_layer.multihead_project_kernel_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_kernel_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_second_kernel_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_ln_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_project_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_ln_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_act_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_qkv_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_output_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_second_output_clip_max());
 
   }  // for
 
@@ -310,8 +350,8 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
 Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
-    const Transformer &transformer) {
+std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
+    const QuantTransformer &transformer) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -331,10 +371,12 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.self_project_kernel_qkv_size() !=
+    if (dec_layer.self_project_kernel_qkv().size() !=
         _hidden_size * _hidden_size * 3)
       return "Wrong self_project_kernel_qkv size !";
-    for (float ele : dec_layer.self_project_kernel_qkv()) value.push_back(ele);
+    for (unsigned char ele : dec_layer.self_project_kernel_qkv())
+      value.push_back(dequantize(ele, _quant_range,
+                                 dec_layer.self_project_kernel_qkv_clip_max()));
 
     idx += _hidden_size * _hidden_size * 3;
 
@@ -346,11 +388,12 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.self_project_kernel_output_size() !=
+    if (dec_layer.self_project_kernel_output().size() !=
         _hidden_size * _hidden_size)
       return "Wrong self_project_kernel_output size !";
-    for (float ele : dec_layer.self_project_kernel_output())
-      value.push_back(ele);
+    for (unsigned char ele : dec_layer.self_project_kernel_output())
+      value.push_back(dequantize(
+          ele, _quant_range, dec_layer.self_project_kernel_output_clip_max()));
 
     idx += _hidden_size * _hidden_size;
 
@@ -374,9 +417,12 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
+    if (dec_layer.encdec_project_kernel_q().size() !=
+        _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_q size !";
-    for (float ele : dec_layer.encdec_project_kernel_q()) value.push_back(ele);
+    for (unsigned char ele : dec_layer.encdec_project_kernel_q())
+      value.push_back(dequantize(ele, _quant_range,
+                                 dec_layer.encdec_project_kernel_q_clip_max()));
 
     idx += _hidden_size * _hidden_size;
 
@@ -388,11 +434,13 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.encdec_project_kernel_output_size() !=
+    if (dec_layer.encdec_project_kernel_output().size() !=
         _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_output size !";
-    for (float ele : dec_layer.encdec_project_kernel_output())
-      value.push_back(ele);
+    for (unsigned char ele : dec_layer.encdec_project_kernel_output())
+      value.push_back(
+          dequantize(ele, _quant_range,
+                     dec_layer.encdec_project_kernel_output_clip_max()));
 
     idx += _hidden_size * _hidden_size;
 
@@ -417,9 +465,11 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+    if (dec_layer.ffn_first_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
-    for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
+    for (unsigned char ele : dec_layer.ffn_first_kernel())
+      value.push_back(
+          dequantize(ele, _quant_range, dec_layer.ffn_first_kernel_clip_max()));
 
     idx += _hidden_size * _inner_size;
 
@@ -431,9 +481,11 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 
     offset.push_back(idx);
 
-    if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+    if (dec_layer.ffn_second_kernel().size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
-    for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
+    for (unsigned char ele : dec_layer.ffn_second_kernel())
+      value.push_back(dequantize(ele, _quant_range,
+                                 dec_layer.ffn_second_kernel_clip_max()));
 
     idx += _hidden_size * _inner_size;
 
@@ -443,6 +495,25 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
+    _dec_clip_max.push_back(dec_layer.self_project_kernel_qkv_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_project_kernel_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_project_kernel_q_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_project_kernel_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_first_kernel_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_second_kernel_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_ln_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_project_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_ln_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_project_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_ln_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_first_act_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_qkv_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_output_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_q_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.encdec_output_dense_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_first_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.ffn_second_output_clip_max());
+    _dec_clip_max.push_back(dec_layer.self_qkv_bias_out_clip_max());
 
   }  // for
 
@@ -460,8 +531,8 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
 Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
-                                                       bool only_decoder) {
+void QuantTransformerWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
+                                                            bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
 
   _inner_size =
@@ -568,8 +639,8 @@ Compared with the encoder, the decoder has more
   distinguish between encoder and decoder
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                    std::string source) {
+void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
+                                                         std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::string dataset_prefix =
@@ -693,7 +764,7 @@ void TransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -815,7 +886,7 @@ void TransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
-void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
+void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -983,12 +1054,12 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
 Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
-std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
-                                                     bool only_decoder) {
+std::string QuantTransformerWeight<OpType_>::initializing(
+    std::string weight_path, bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
-    Transformer transformer;
+    QuantTransformer transformer;
     // Verify that the version of the library that we linked against is
     // compatible with the version of the headers we compiled against.
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -1058,8 +1129,8 @@ std::string TransformerWeight<OpType_>::initializing(std::string weight_path,
   }
 }
 
-template class TransformerWeight<OperationType::FP16>;
-template class TransformerWeight<OperationType::FP32>;
+template class QuantTransformerWeight<OperationType::FP16>;
+template class QuantTransformerWeight<OperationType::FP32>;
 
 }  // namespace cuda
 }  // namespace lightseq
