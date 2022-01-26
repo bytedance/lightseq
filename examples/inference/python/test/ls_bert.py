@@ -81,12 +81,11 @@ def main():
     ls_model = LightseqBertClassification("lightseq_bert_base_uncased.hdf5", hf_model)
 
     sentences = [
-        "Hello, my dog is cute, do you think so? Hello, my dog is cute, do you think so? Hello, my dog is cute, do you think so?",
-        "Hey, how are you? I am fine, and you? Hey, how are you? I am fine, and you? Hey, how are you? I am fine, and you?",
-        "This is a test, so you do not need to worry about it. This is a test, so you do not need to worry about it. This is a test, so you do not need to worry about it.",
-        "Testing the model again, and this is the last test. Testing the model again, and this is the last test. Testing the model again, and this is the last test.",
+        "Hello, my dog is cute",
+        "Hey, how are you",
+        "This is a test",
+        "Testing the model again",
     ]
-    sentences = sentences * 16
 
     print("====================START warmup====================")
     warmup(tokenizer, ls_model, hf_model, sentences)

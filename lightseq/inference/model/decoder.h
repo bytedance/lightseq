@@ -57,7 +57,7 @@ class Decoder {
   TransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
-  cublasLtHandle_t _cublas_lt_handle;
+
 
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;

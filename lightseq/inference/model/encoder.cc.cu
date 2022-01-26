@@ -2,8 +2,6 @@
 
 #include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
-#include "../kernels/transformerKernels_int8.h"
-#include "cublas_helper.h"
 
 /**
 @file
@@ -36,7 +34,7 @@ Encoder<OpType_>::Encoder(int max_batch_size, int *p_d_token_id,
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {
-  CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
+
 }
 
 /**
@@ -147,12 +145,10 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     ffn_add_norm();
   }
 
-
   // last layer norm
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
-
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -172,7 +168,6 @@ Encoder self attention
 */
 template <OperationType OpType_>
 void Encoder<OpType_>::self_attention() {
-
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -192,7 +187,6 @@ void Encoder<OpType_>::self_attention() {
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
       _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block);
-
 
   /* ---step 2. correlation = q * k, perform softmax on correlation--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -235,7 +229,6 @@ void Encoder<OpType_>::self_attention() {
 
 template <OperationType OpType_>
 void Encoder<OpType_>::ffn_add_norm() {
-
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
