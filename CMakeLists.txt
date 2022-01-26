@@ -1,24 +1,19 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(LightSeq LANGUAGES C CXX CUDA)
 
-set(CMAKE_CUDA_ARCHITECTURES 60 61 70 75 80 86)
-find_package(CUDA 10.1 REQUIRED)
+set(CMAKE_CUDA_ARCHITECTURES
+    60
+    61
+    70
+    75
+    80
+    86
+    87)
+find_package(CUDA 11.6 REQUIRED)
 
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
-
-if(FP16_MODE)
-  add_compile_definitions(FP16_MODE)
-  message(STATUS "Build using fp16 precision")
-else()
-  message(STATUS "Build using fp32 precision")
-endif()
-
-if(DEBUG_MODE)
-  add_compile_definitions(DEBUG_RESULT)
-  message(STATUS "Debug computation result")
-endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
@@ -41,7 +36,6 @@ endif()
 set(Protobuf_USE_STATIC_LIBS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,6 +47,18 @@ include_directories(${COMMON_HEADER_DIRS})
 include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/3rdparty/cub)
 
 link_directories(${COMMON_LIB_DIRS})
+
+if(FP16_MODE)
+  add_definitions(-DFP16_MODE)
+  message(STATUS "Build using fp16 precision")
+else()
+  message(STATUS "Build using fp32 precision")
+endif()
+
+if(DEBUG_MODE)
+  add_definitions(-DDEBUG_RESULT)
+  message(STATUS "Debug computation result")
+endif()
 
 add_subdirectory(3rdparty/pybind11)
 add_subdirectory(lightseq/inference/kernels)

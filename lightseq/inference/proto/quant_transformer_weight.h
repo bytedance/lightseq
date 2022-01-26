@@ -14,7 +14,8 @@
 #include <vector>
 
 #include "../tools/util.h"
-#include "transformer.pb.h"
+
+#include "quant_transformer.pb.h"
 
 namespace lightseq {
 namespace cuda {
@@ -23,19 +24,19 @@ namespace cuda {
 Load the model weights which stored in custom proto file into GPU memory.
 */
 template <OperationType OpType_>
-class TransformerWeight {
+class QuantTransformerWeight {
  private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
 
   // parsing function for protobuffer
-  void proto_get_model_config(const Transformer &transformer,
+  void proto_get_model_config(const QuantTransformer &transformer,
                               bool only_decoder = false);
-  std::string proto_parse_emb_wei(const EmbeddingLayer &layer,
+  std::string proto_parse_emb_wei(const QuantEmbeddingLayer &layer,
                                   std::string source);
-  std::string proto_parse_enc_wei(const Transformer &transformer);
-  std::string proto_parse_dec_wei(const Transformer &transformer);
+  std::string proto_parse_enc_wei(const QuantTransformer &transformer);
+  std::string proto_parse_dec_wei(const QuantTransformer &transformer);
 
   // parsing function for hdf5
   void hdf5_get_model_config(hid_t hdf5_file, bool only_decoder = false);
@@ -56,6 +57,15 @@ class TransformerWeight {
   thrust::device_vector<_DataType> _d_dec_wei;
   thrust::device_vector<_DataType> _d_src_lang_emb;
   thrust::device_vector<_DataType> _d_trg_lang_emb;
+
+  // store the clip_max of weights and activations
+  float _src_scaled_emb_clip_max;
+  float _trg_scaled_emb_clip_max;
+  float _output_ln_clip_max;
+  float _logits_clip_max;
+  std::vector<float> _encode_output_project_kernel_kv_clip_max;
+  std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
+  std::vector<float> _dec_clip_max;  // size: 19 * dec_layer_num
 
  public:
   std::string initializing(std::string proto_path, bool only_decoder = false);
@@ -90,6 +100,22 @@ class TransformerWeight {
     return _p_d_dec_wei;
   }
 
+  float get_src_scaled_emb_clip_max() const { return _src_scaled_emb_clip_max; }
+
+  float get_trg_scaled_emb_clip_max() const { return _trg_scaled_emb_clip_max; }
+
+  float get_output_ln_clip_max() const { return _output_ln_clip_max; }
+
+  float get_logits_clip_max() const { return _logits_clip_max; }
+
+  std::vector<float> get_enc_clip_max() const { return _enc_clip_max; }
+
+  std::vector<float> get_dec_clip_max() const { return _dec_clip_max; }
+
+  std::vector<float> get_encode_output_project_kernel_kv_clip_max() const {
+    return _encode_output_project_kernel_kv_clip_max;
+  }
+
   int _hidden_size;
   int _inner_size;
   int _max_step;
@@ -116,6 +142,8 @@ class TransformerWeight {
   bool _no_scale_embedding;
   bool _use_gelu;
   int _multilg_type;
+
+  const float _quant_range = 127;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;

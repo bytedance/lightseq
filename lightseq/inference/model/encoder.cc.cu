@@ -1,4 +1,5 @@
 #include "encoder.h"
+
 #include "../kernels/transformerKernels.h"
 #include "../kernels/embKernels.h"
 
@@ -29,9 +30,12 @@ Encoder<OpType_>::Encoder(int max_batch_size, int *p_d_token_id,
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
+
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024) {}
+      _max_thread_per_block(1024) {
+
+}
 
 /**
 Compute GPU memory size needed by transformer encoder,
@@ -61,6 +65,8 @@ void Encoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_c = _p_d_v + _max_batch_dim;
   _p_d_ffn_buf1 = p_d_buf;
   _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
+  // encoder and decoder use the same buffer to save gpu memory useage
+
   return;
 }
 
@@ -138,6 +144,7 @@ void Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
     self_attention();
     ffn_add_norm();
   }
+
   // last layer norm
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
@@ -175,7 +182,6 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _p_d_q, _BType, _tw._hidden_size, &_fzero,
       _p_d_qkv_projected, _CType, _tw._hidden_size * 3, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_qkv_projected,
@@ -204,6 +210,7 @@ void Encoder<OpType_>::self_attention() {
       _tw._dim_per_head, _batch_seq_len * _tw._dim_per_head,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
   // use v to save reshaped q, since they are in same size and v
   // will not be use again before the next multi-head-attention
   ker_arrange_atten_output_launcher<_DataType>(
@@ -216,6 +223,7 @@ void Encoder<OpType_>::self_attention() {
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 4], _AType,
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
   return;
 }
 
@@ -227,7 +235,6 @@ void Encoder<OpType_>::ffn_add_norm() {
       _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
       _p_d_enc_wei[_weight_offset + 11], _max_thread_per_block,
       _tw._is_post_ln);
-
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
@@ -235,7 +242,6 @@ void Encoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
   if (_tw._use_gelu) {
     ker_bias_gelu_launcher<_DataType>(
         _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
@@ -245,7 +251,6 @@ void Encoder<OpType_>::ffn_add_norm() {
         _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
         _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
   }
-
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
@@ -253,6 +258,7 @@ void Encoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
   return;
 }
 
