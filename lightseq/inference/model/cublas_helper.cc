@@ -11,17 +11,28 @@
 namespace lightseq {
 namespace cuda {
 
-// for int8 cublasLtMM with algo
-// ATransform should be m*k, CUBLASLT_ORDER_COL32
-// kernel should be n*k, CUBLASLT_ORDER_COL4_4R2_8C or
-// CUBLASLT_ORDER_COL32_2R_4R4 res is m*n, CUBLASLT_ORDER_COL32
-
-void cublasLtMM_withAlgo(
-    int* res, int batchCount, int m, int n, int k, int64_t stridea,
-    int64_t strideb, int64_t stridec, const int8_t* ATransform,
-    const int8_t* kernel, cublasLtHandle_t cublasLt_handle, cudaStream_t stream,
-    // std::map<std::string, cublasLtMatmulAlgo_info>& cublasLtAlgoMap,
-    bool use_ORDER_COL32_2R_4R4) {
+/**
+ * @brief cublasLt imma gemm for i8 in i32 out
+ *
+ * @param res int32 output
+ * @param batchCount batch for batched gemm
+ * @param m
+ * @param n
+ * @param k
+ * @param stridea
+ * @param strideb
+ * @param stridec
+ * @param ATransform int8_t input A
+ * @param kernel int8_t input B
+ * @param cublasLt_handle
+ * @param stream
+ * @param use_ORDER_COL32_2R_4R4 B layout switch
+ */
+void cublasLtMM_withAlgo(int* res, int batchCount, int m, int n, int k,
+                         int64_t stridea, int64_t strideb, int64_t stridec,
+                         const int8_t* ATransform, const int8_t* kernel,
+                         cublasLtHandle_t cublasLt_handle, cudaStream_t stream,
+                         bool use_ORDER_COL32_2R_4R4) {
   cublasOperation_t opTranspose = CUBLAS_OP_T;
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   cublasComputeType_t computeType = CUBLAS_COMPUTE_32I;
@@ -52,7 +63,6 @@ void cublasLtMM_withAlgo(
     ldbTransform = 32 * ((n + 8 - 1) / 8) * 8;
   int ldcTransform = 32 * m;
 
-  // create matmulDesc
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   cublasLtMatmulDescCreate(&matmulDesc, computeType, CUDA_R_32I);
 #else
@@ -93,17 +103,9 @@ void cublasLtMM_withAlgo(
   int alphaI = 1;
   int betaI = 0;
 
-  // get algo
-  cublasLtMatmulAlgo_t algo;
-  char mark[1000];
-  // sprintf(mark, "%d_%d_%d_%d_%d", batchCount, m, n, k, INT8_DATATYPE);
-  std::string markStr(mark);
-  int findAlgo = 0;
-
   cublasLtMatmul(cublasLt_handle, matmulDesc, &alphaI, ATransform,
                  AtransformDesc, kernel, BtransformDesc, &betaI, res,
-                 CtransformDesc, res, CtransformDesc,
-                 (findAlgo == 1 ? (&algo) : NULL), NULL, 0, stream);
+                 CtransformDesc, res, CtransformDesc, NULL, NULL, 0, stream);
 
   cublasLtMatmulDescDestroy(matmulDesc);
   cublasLtMatrixLayoutDestroy(AtransformDesc);
@@ -111,21 +113,32 @@ void cublasLtMM_withAlgo(
   cublasLtMatrixLayoutDestroy(CtransformDesc);
 }
 
-// for int8 IO cublasLtMM with algo
-// ATransform should be m*k CUBLASLT_ORDER_COL32
-// kernel should be n*k CUBLASLT_ORDER_COL4_4R2_8C
-// res is m*n CUBLASLT_ORDER_COL32
-void cublasLtMM_withAlgo_i8IO(
-    int8_t* res, int batchCount, int m, int n, int k, int64_t stridea,
-    int64_t strideb, int64_t stridec, const float alpha,
-    const int8_t* ATransform, const int8_t* kernel,
-    cublasLtHandle_t cublasLt_handle, cudaStream_t stream,
-    // std::map<std::string, cublasLtMatmulAlgo_info> &cublasLtAlgoMap,
-    bool use_ORDER_COL32_2R_4R4) {
+/**
+ * @brief cublasLt imma gemm for i8 in i8 out
+ *
+ * @param res
+ * @param batchCount
+ * @param m
+ * @param n
+ * @param k
+ * @param stridea
+ * @param strideb
+ * @param stridec
+ * @param alpha
+ * @param ATransform
+ * @param kernel
+ * @param cublasLt_handle
+ * @param stream
+ * @param use_ORDER_COL32_2R_4R4
+ */
+void cublasLtMM_withAlgo_i8IO(int8_t* res, int batchCount, int m, int n, int k,
+                              int64_t stridea, int64_t strideb, int64_t stridec,
+                              const float alpha, const int8_t* ATransform,
+                              const int8_t* kernel,
+                              cublasLtHandle_t cublasLt_handle,
+                              cudaStream_t stream,
+                              bool use_ORDER_COL32_2R_4R4) {
   cublasOperation_t opTranspose = CUBLAS_OP_T;
-  // int8 gemm does not support CUBLAS_POINTER_MODE_DEVICE
-  // cublasLtPointerMode_t pointerMode =
-  // CUBLASLT_POINTER_MODE_ALPHA_DEVICE_VECTOR_BETA_ZERO;
   cudaDataType_t scaleType = CUDA_R_32F;
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   cublasComputeType_t computeType = CUBLAS_COMPUTE_32I;
@@ -158,7 +171,6 @@ void cublasLtMM_withAlgo_i8IO(
 
   int ldcTransform = 32 * m;
 
-  // create matmulDesc
 #if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
   cublasLtMatmulDescCreate(&matmulDesc, computeType, scaleType);
 #else
@@ -168,9 +180,7 @@ void cublasLtMM_withAlgo_i8IO(
                                  &opTranspose, sizeof(cublasOperation_t));
   cublasLtMatmulDescSetAttribute(matmulDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE,
                                  &scaleType, sizeof(scaleType));
-  // cublasLtMatmulDescSetAttribute(matmulDesc,
-  // CUBLASLT_MATMUL_DESC_POINTER_MODE, &pointerMode,
-  // sizeof(cublasLtPointerMode_t));
+
   cublasLtMatrixLayoutCreate(&AtransformDesc, CUDA_R_8I, m, k, ldaTransform);
   cublasLtMatrixLayoutSetAttribute(AtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
                                    &order_COL32, sizeof(order_COL32));
@@ -213,6 +223,25 @@ void cublasLtMM_withAlgo_i8IO(
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
 }
 
+/**
+ * @brief cublasLt gemm without imma
+ *
+ * @tparam OutType output dtype
+ * @tparam ScaleType scale dtype
+ * @param input_a
+ * @param input_b
+ * @param output_c
+ * @param batch_count
+ * @param m
+ * @param n
+ * @param k
+ * @param stridea
+ * @param strideb
+ * @param stridec
+ * @param alpha
+ * @param cublasLt_handle
+ * @param stream
+ */
 template <typename OutType, typename ScaleType>
 void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
                    OutType* output_c, int batch_count, int m, int n, int k,
@@ -302,6 +331,17 @@ template void cublaslt_gemm<int8_t, float>(
     int64_t stridec, const float alpha, cublasLtHandle_t cublasLt_handle,
     cudaStream_t stream);
 
+/**
+ * @brief transform kernel layout for int8 gemm
+ *
+ * @param input
+ * @param output
+ * @param row
+ * @param col
+ * @param layout
+ * @param lt_handle
+ * @param stream
+ */
 void transform_weight_layout(const int8_t* input, int8_t* output, int row,
                              int col, Layout layout, cublasLtHandle_t lt_handle,
                              cudaStream_t stream) {
@@ -343,6 +383,19 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
   CHECK_GPU_ERROR(cublasLtMatrixTransformDescDestroy(transform_desc));
 }
 
+/**
+ * @brief offline kernel quantization
+ *
+ * @tparam T kernel dtype
+ * @param origin_weight input kernel data
+ * @param quantized_weight output quantized kernel data
+ * @param rows
+ * @param cols
+ * @param quant_scale
+ * @param stream
+ * @param handle
+ * @param layout_col32t layout to support different gemm
+ */
 template <typename T>
 void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
                      int cols, float quant_scale, cudaStream_t stream,

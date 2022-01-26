@@ -15,7 +15,7 @@
 #include <string>
 #include <unistd.h>
 
-#include "../proto/transformer_weight.h"
+#include "../proto/quant_transformer_weight.h"
 #include "../tools/util.h"
 
 /**
@@ -27,7 +27,7 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-class Decoder {
+class QuantDecoder {
  private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
@@ -54,7 +54,7 @@ class Decoder {
   int _h_can_num_batch;
   int _h_unfinished;
   size_t _cub_sort_buffer_bytes;
-  TransformerWeight<OpType_>& _tw;
+  QuantTransformerWeight<OpType_>& _tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
   cublasLtHandle_t _cublas_lt_handle;
@@ -103,6 +103,16 @@ class Decoder {
   _DataType* _p_d_encoder_out_buf;
   _DataType* _p_d_logit_buf;
 
+  int8_t* _int8_ffn_in_buf;
+  int32_t* _int32_ffn_out_buf;
+  int8_t* _int8_ffn_out_buf;
+  std::vector<int8_t*> _p_d_self_k_cache;
+  std::vector<int8_t*> _p_d_self_v_cache;
+  int8_t** _p_d_self_k_cache1;
+  int8_t** _p_d_self_k_cache2;
+  int8_t** _p_d_self_v_cache1;
+  int8_t** _p_d_self_v_cache2;
+
 
   int _batch_size;
   int _batch_seq_len;
@@ -117,8 +127,21 @@ class Decoder {
   const std::vector<const _DataType*>&
       _p_d_dec_wei;  // size: 18 * dec_layer_num
 
+  std::vector<int8_t*> _int8_p_d_dec_wei;
+  int8_t* _int8_p_d_trg_emb_wei;
+  const float _quant_range = 127;
+  const float _trg_scaled_emb_clip_max;
+  const float _output_ln_clip_max;
+  const float _logits_clip_max;
+  const std::vector<float> _encode_output_project_kernel_kv_clip_max;
+  const std::vector<float> _dec_clip_max;  // size: 19 * dec_layer_num
+  std::vector<_DataType*> _scaled_ffn2_colsum;
+
   const _DataType _type_one;
   const _DataType _type_zero;
+
+  const int32_t _ione;
+  const int32_t _izero;
 
   const float _fzero;
   const _DataType
@@ -131,9 +154,9 @@ class Decoder {
                                                   "topk_greedy"};
 
  public:
-  Decoder(int max_batch_size, const int* p_d_padding_mask,
+  QuantDecoder(int max_batch_size, const int* p_d_padding_mask,
           const _DataType* p_d_encoder_output, int* p_d_result,
-          TransformerWeight<OpType_>& tw, cudaStream_t stream,
+          QuantTransformerWeight<OpType_>& tw, cudaStream_t stream,
           cublasHandle_t hd, bool output_topk = false,
           const int* p_d_lang_id = nullptr);
   long compute_buffer_bytesize();

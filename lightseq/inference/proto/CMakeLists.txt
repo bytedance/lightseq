@@ -8,20 +8,12 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-option(INT8_MODE "inference with int8" OFF)
-if(INT8_MODE)
-  add_definitions(-DINT8_MODE)
-endif()
-
 protobuf_generate_cpp(GPT_PROTO_SRC GPT_PROTO_HEADER gpt.proto)
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
-if(INT8_MODE)
-  protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
-                        transformer_quant.proto)
-else()
-  protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
-                        transformer.proto)
-endif()
+protobuf_generate_cpp(Q_TRANSFORMER_PROTO_SRC Q_TRANSFORMER_PROTO_HEADER
+                      transformer_quant.proto)
+protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
+                      transformer.proto)
 
 add_library(gpt_weight STATIC gpt_weight.cc ${GPT_PROTO_SRC}
                               ${GPT_PROTO_HEADER})
@@ -44,4 +36,15 @@ target_link_libraries(transformer_weight PUBLIC utils ${Protobuf_LIBRARIES}
 target_include_directories(transformer_weight
                            PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(transformer_weight
+                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(
+  quant_transformer_weight STATIC
+  quant_transformer_weight.cc ${Q_TRANSFORMER_PROTO_SRC}
+  ${Q_TRANSFORMER_PROTO_HEADER})
+target_link_libraries(quant_transformer_weight
+                      PUBLIC utils ${Protobuf_LIBRARIES} ${HDF5_LIBRARIES})
+target_include_directories(quant_transformer_weight
+                           PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(quant_transformer_weight
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
