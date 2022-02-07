@@ -69,9 +69,15 @@ void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
   std::cout << "encoder buffer init start" << std::endl;
 
   // _DataType *p_d_buf = reinterpret_cast<_DataType *>(pbuf);
-  CHECK_GPU_ERROR(cudaMalloc(&_p_d_q, _max_batch_dim * sizeof(_DataType)));
-  CHECK_GPU_ERROR(cudaMalloc(&_p_d_k, _max_batch_dim * sizeof(_DataType)));
-  CHECK_GPU_ERROR(cudaMalloc(&_p_d_v, _max_batch_dim * sizeof(_DataType)));
+  _DataType *qkv_buf;
+  CHECK_GPU_ERROR(cudaMalloc(&qkv_buf, 3 * _max_batch_dim * sizeof(_DataType)));
+  // CHECK_GPU_ERROR(cudaMalloc(&_p_d_q, _max_batch_dim * sizeof(_DataType)));
+  // CHECK_GPU_ERROR(cudaMalloc(&_p_d_k, _max_batch_dim * sizeof(_DataType)));
+  // CHECK_GPU_ERROR(cudaMalloc(&_p_d_v, _max_batch_dim * sizeof(_DataType)));
+  _p_d_q = qkv_buf;
+  _p_d_k = qkv_buf + _max_batch_dim;
+  _p_d_v = qkv_buf + 2 * _max_batch_dim;
+
   CHECK_GPU_ERROR(cudaMalloc(&_p_d_c, _max_batch_size * _tw._head_num *
                                           _tw._max_step * _tw._max_step *
                                           sizeof(_DataType)));
