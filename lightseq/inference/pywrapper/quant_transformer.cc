@@ -66,13 +66,6 @@ QuantTransformer::QuantTransformer(const std::string weight_path,
     throw std::runtime_error(res);
   }
 
-  long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
-                               decoder_->compute_buffer_bytesize());
-  std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
-            << "MB GPU buffer for transformer" << std::endl;
-
-  // encoder and decoder use the same buffer to save gpu memory useage
-  CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));

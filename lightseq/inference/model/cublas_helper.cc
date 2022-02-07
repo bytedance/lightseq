@@ -400,22 +400,26 @@ template <typename T>
 void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
                      int cols, float quant_scale, cudaStream_t stream,
                      cublasLtHandle_t handle, bool layout_col32t) {
-  int8_t* temp_weight;
-  CHECK_GPU_ERROR(cudaMalloc(&temp_weight, rows * cols * sizeof(int8_t)));
+  int8_t* temp1;
+  T* temp2;
+  CHECK_GPU_ERROR(cudaMalloc(&temp1, rows * cols * sizeof(int8_t)));
+  CHECK_GPU_ERROR(cudaMalloc(&temp2, rows * cols * sizeof(T)));
+  CHECK_GPU_ERROR(cudaMemcpyAsync(temp2, origin_weight, rows * cols * sizeof(T),
+                                  cudaMemcpyHostToDevice, stream));
 
-  launch_quantize_tensor(origin_weight, temp_weight, rows, cols, quant_scale,
-                         stream);
-  CHECK_GPU_ERROR(cudaDeviceSynchronize());
+  launch_quantize_tensor(temp2, temp1, rows, cols, quant_scale, stream);
+
   CHECK_GPU_ERROR(cudaGetLastError());
 
   if (layout_col32t) {
-    transform_weight_layout(temp_weight, quantized_weight, rows, cols,
-                            kColMajor32, handle, stream);
+    transform_weight_layout(temp1, quantized_weight, rows, cols, kColMajor32,
+                            handle, stream);
   } else {
-    transform_weight_layout(temp_weight, quantized_weight, rows, cols,
-                            kColMajor, handle, stream);
+    transform_weight_layout(temp1, quantized_weight, rows, cols, kColMajor,
+                            handle, stream);
   }
-  CHECK_GPU_ERROR(cudaFree(temp_weight));
+  CHECK_GPU_ERROR(cudaFree(temp1));
+  CHECK_GPU_ERROR(cudaFree(temp2));
 }
 
 template void quantize_weight<float>(const float* origin_weight,

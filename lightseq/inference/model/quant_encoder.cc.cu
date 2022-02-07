@@ -51,10 +51,11 @@ Compute GPU memory size needed by transformer encoder,
 */
 template <OperationType OpType_>
 long QuantEncoder<OpType_>::compute_buffer_bytesize() {
-  long sz1 = _max_batch_dim * 6 +
-             _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
-  return max(sz1, sz2) * sizeof(_DataType);
+  // long sz1 = _max_batch_dim * 6 +
+  //            _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
+  // long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step *
+  // _tw._inner_size; return max(sz1, sz2) * sizeof(_DataType);
+  return 0;
 }
 
 /**
@@ -65,15 +66,15 @@ These buffer are used during custom cuda kernel function,
 */
 template <OperationType OpType_>
 void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
-  _DataType *p_d_buf = reinterpret_cast<_DataType *>(pbuf);
-  _p_d_qkv_projected = p_d_buf;
-  _p_d_q = _p_d_qkv_projected + _max_batch_dim * 3;
-  _p_d_k = _p_d_q + _max_batch_dim;
-  _p_d_v = _p_d_k + _max_batch_dim;
-  _p_d_c = _p_d_v + _max_batch_dim;
-  _p_d_ffn_buf1 = p_d_buf;
-  _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
-  // encoder and decoder use the same buffer to save gpu memory useage
+  std::cout << "encoder buffer init start" << std::endl;
+
+  // _DataType *p_d_buf = reinterpret_cast<_DataType *>(pbuf);
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_q, _max_batch_dim * sizeof(_DataType)));
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_k, _max_batch_dim * sizeof(_DataType)));
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_v, _max_batch_dim * sizeof(_DataType)));
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_c, _max_batch_size * _tw._head_num *
+                                          _tw._max_step * _tw._max_step *
+                                          sizeof(_DataType)));
 
   int max_batch_dim = _max_batch_size * _tw._max_step *
                       std::max(_tw._inner_size, _tw._hidden_size * 3);
@@ -82,6 +83,8 @@ void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
       cudaMalloc(&_int32_ffn_out_buf, max_batch_dim * sizeof(int32_t)));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_out_buf, max_batch_dim * sizeof(int8_t)));
+
+  // prepare gpu memory for weight
   _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
   _scaled_ffn2_colsum = std::vector<_DataType *>(_tw._n_enc_layer);
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
@@ -94,6 +97,27 @@ void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
                                _tw._hidden_size * _tw._inner_size));
     CHECK_GPU_ERROR(cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
                                _tw._inner_size * _tw._hidden_size));
+
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 1], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(to_gpu(_p_d_enc_wei[_weight_offset + 3],
+                                   _tw._hidden_size * 3, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 5], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 6], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 7], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 9], _tw._inner_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 11], _tw._hidden_size, _stream));
 
     quantize_weight(_p_d_enc_wei[_weight_offset + 2],
                     _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
@@ -125,12 +149,22 @@ void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
       CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
                                  _tw._hidden_size * sizeof(_DataType)));
       float relu_scale = _enc_clip_max[_layer_id * 12 + 7] / 2;
-      launch_scaled_colsum(_p_d_enc_wei[_weight_offset + 10],
-                           _scaled_ffn2_colsum[_layer_id], _tw._inner_size,
-                           _tw._hidden_size, relu_scale, _stream);
+      _DataType *temp;
+      int weight_size = _tw._inner_size * _tw._hidden_size;
+
+      CHECK_GPU_ERROR(cudaMalloc(&temp, weight_size * sizeof(_DataType)));
+      CHECK_GPU_ERROR(cudaMemcpyAsync(temp, _p_d_enc_wei[_weight_offset + 10],
+                                      weight_size * sizeof(_DataType),
+                                      cudaMemcpyHostToDevice, _stream));
+      launch_scaled_colsum(temp, _scaled_ffn2_colsum[_layer_id],
+                           _tw._inner_size, _tw._hidden_size, relu_scale,
+                           _stream);
+
+      CHECK_GPU_ERROR(cudaGetLastError());
+      CHECK_GPU_ERROR(cudaFree(temp));
     }
   }
-
+  std::cout << "encoder buffer init succeed" << std::endl;
   return;
 }
 
@@ -230,11 +264,12 @@ void QuantEncoder<OpType_>::self_attention() {
   if (_layer_id == 0) {
     ker_norm_layer_resual_i8O_launcher<_DataType>(
         _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
-        _int8_ffn_in_buf, _p_d_enc_wei[_weight_offset],
-        _p_d_enc_wei[_weight_offset + 1], _p_d_enc_wei[_weight_offset + 5],
+        _int8_ffn_in_buf, _p_device_wei[_weight_offset],
+        _p_device_wei[_weight_offset + 1], _p_device_wei[_weight_offset + 5],
         _max_thread_per_block, _quant_range / _enc_clip_max[_layer_id * 12 + 4],
         _tw._is_post_ln, true);
   }
+  CHECK_GPU_ERROR(cudaGetLastError());
 
   cublasLtMM_withAlgo_i8IO(
       _int8_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size * 3,
@@ -248,7 +283,7 @@ void QuantEncoder<OpType_>::self_attention() {
 
   ker_arrange_encself_qkv_i8I_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
-      _p_d_enc_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
+      _p_device_wei[_weight_offset + 3], _p_d_q, _max_batch_dim, _batch_seq_len,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
       _enc_clip_max[_layer_id * 12 + 8] / _quant_range, true);
 
@@ -293,8 +328,8 @@ void QuantEncoder<OpType_>::self_attention() {
       _stream, false);
 
   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
-      _int8_ffn_out_buf, _p_d_enc_wei[_weight_offset + 6],
-      _p_d_enc_wei[_weight_offset + 7], _p_d_enc_wei[_weight_offset + 11],
+      _int8_ffn_out_buf, _p_device_wei[_weight_offset + 6],
+      _p_device_wei[_weight_offset + 7], _p_device_wei[_weight_offset + 11],
       _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
       _enc_clip_max[_layer_id * 12 + 9] / _quant_range,
       _quant_range / _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block,
@@ -316,13 +351,13 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(
         _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+        _p_device_wei[_weight_offset + 9], _tw._inner_size,
         _enc_clip_max[_layer_id * 12 + 10] / _quant_range,
         _quant_range / _enc_clip_max[_layer_id * 12 + 7], true);
   } else {
     ker_bias_relu_i8I_i8O_launcher<_DataType>(
         _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
-        _p_d_enc_wei[_weight_offset + 9], _tw._inner_size,
+        _p_device_wei[_weight_offset + 9], _tw._inner_size,
         _enc_clip_max[_layer_id * 12 + 10] / _quant_range,
         _quant_range / _enc_clip_max[_layer_id * 12 + 7],
         _enc_clip_max[_layer_id * 12 + 7], true, true, true);
@@ -347,10 +382,10 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
             (2 * _quant_range * _quant_range),
         _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
   } else {
-    scale_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
-    bias_ptr = _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 1];
+    scale_ptr = _p_device_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
+    bias_ptr = _p_device_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 1];
     res_bias_ptr =
-        _p_d_enc_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 5];
+        _p_device_wei[(_layer_id + 1) * _tw._weight_per_enc_layer + 5];
     clip_max = _enc_clip_max[(_layer_id + 1) * 12 + 4];
 
     ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(

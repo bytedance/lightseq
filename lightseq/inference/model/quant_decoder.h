@@ -113,7 +113,6 @@ class QuantDecoder {
   int8_t** _p_d_self_v_cache1;
   int8_t** _p_d_self_v_cache2;
 
-
   int _batch_size;
   int _batch_seq_len;
   int _batch_token_num;
@@ -126,6 +125,8 @@ class QuantDecoder {
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
   const std::vector<const _DataType*>&
       _p_d_dec_wei;  // size: 18 * dec_layer_num
+  std::vector<const _DataType*> _p_device_wei;
+  std::vector<const _DataType*> _p_device_emb;
 
   std::vector<int8_t*> _int8_p_d_dec_wei;
   int8_t* _int8_p_d_trg_emb_wei;
@@ -155,10 +156,10 @@ class QuantDecoder {
 
  public:
   QuantDecoder(int max_batch_size, const int* p_d_padding_mask,
-          const _DataType* p_d_encoder_output, int* p_d_result,
-          QuantTransformerWeight<OpType_>& tw, cudaStream_t stream,
-          cublasHandle_t hd, bool output_topk = false,
-          const int* p_d_lang_id = nullptr);
+               const _DataType* p_d_encoder_output, int* p_d_result,
+               QuantTransformerWeight<OpType_>& tw, cudaStream_t stream,
+               cublasHandle_t hd, bool output_topk = false,
+               const int* p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();
