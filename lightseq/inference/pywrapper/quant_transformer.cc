@@ -66,8 +66,8 @@ QuantTransformer::QuantTransformer(const std::string weight_path,
     throw std::runtime_error(res);
   }
 
-  encoder_->init_buffer(d_buf_);
-  decoder_->init_buffer(d_buf_);
+  encoder_->init_buffer();
+  decoder_->init_buffer();
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 }
 
@@ -75,7 +75,6 @@ QuantTransformer::~QuantTransformer() {
   CHECK_GPU_ERROR(cudaFree(d_input_));
   CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
   CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
-  CHECK_GPU_ERROR(cudaFree(d_buf_));
   CHECK_GPU_ERROR(cudaFree(d_src_lang_id_));
   CHECK_GPU_ERROR(cudaFree(d_trg_lang_id_));
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));

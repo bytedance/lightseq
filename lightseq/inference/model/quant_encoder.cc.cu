@@ -65,7 +65,7 @@ These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
 template <OperationType OpType_>
-void QuantEncoder<OpType_>::init_buffer(void *pbuf) {
+void QuantEncoder<OpType_>::init_buffer() {
   std::cout << "encoder buffer init start" << std::endl;
 
   _DataType *qkv_buf;

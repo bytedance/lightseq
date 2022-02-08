@@ -88,7 +88,7 @@ These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
 template <OperationType OpType_>
-void QuantDecoder<OpType_>::init_buffer(void* pbuf) {
+void QuantDecoder<OpType_>::init_buffer() {
   std::cout << "decoder buffer init start" << std::endl;
 
   // malloc activations and cache
