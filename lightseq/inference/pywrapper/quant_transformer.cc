@@ -1,6 +1,6 @@
 #include "quant_transformer.h"
 
-#include "embKernels.h"
+#include "embKernels_int8.h"
 
 namespace lightseq {
 namespace cuda {
@@ -94,17 +94,7 @@ void QuantTransformer::Infer() {
 
   // for multilg
   if (tw_._multilg_type != 0) {
-    // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
-    launch_split_multilg_request(encoder_->_p_d_token_id, d_src_lang_id_,
-                                 d_trg_lang_id_, d_input_, batch_size, seq_len,
-                                 stream_);
-    encoder_->_p_d_token_id = d_input_;
-    if (tw_._multilg_type == 1) {
-      seq_len -= 2;
-    }
-    if (tw_._multilg_type == 2) {
-      seq_len -= 1;
-    }
+    throw std::runtime_error("multilingle not supported");
   }
 
   encoder_->run_one_infer(batch_size, seq_len);
