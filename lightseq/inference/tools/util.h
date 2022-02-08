@@ -217,8 +217,8 @@ class HDF5DatasetNotFoundError : public std::runtime_error {
 };
 
 template <typename T>
-T *to_gpu(const T *host_pointer, int size, cudaStream_t stream) {
-  T *gpu_pointer;
+T* to_gpu(const T* host_pointer, int size, cudaStream_t stream) {
+  T* gpu_pointer;
   CHECK_GPU_ERROR(cudaMalloc(&gpu_pointer, size * sizeof(T)));
   CHECK_GPU_ERROR(cudaMemcpyAsync(gpu_pointer, host_pointer, size * sizeof(T),
                                   cudaMemcpyHostToDevice, stream));

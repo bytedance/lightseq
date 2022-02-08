@@ -82,7 +82,7 @@ class PyTransformer {
   }
 };
 
-class PyQuantTransformer  {
+class PyQuantTransformer {
  private:
   lightseq::cuda::LSModel *model_;
   int *d_input_;
@@ -119,16 +119,14 @@ class PyQuantTransformer  {
   }
 
   std::tuple<py::array_t<int>, py::array_t<float>> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq)
-      {
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
 
     lightseq::cuda::CHECK_GPU_ERROR(
-        cudaMemcpy(d_input_, input_seq_data, sizeof(int) *
-        input_seq_out.size(),
+        cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
                    cudaMemcpyHostToDevice));
 
     model_->set_input_ptr(0, d_input_);
@@ -139,8 +137,7 @@ class PyQuantTransformer  {
     std::vector<int> output_shape = model_->get_output_shape(0);
     auto tokens = py::array_t<int>(output_shape);
     int *tokens_data = tokens.mutable_data(0, 0);
-    const int *d_output = static_cast<const int
-    *>(model_->get_output_ptr(0));
+    const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
     lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output,
                                                sizeof(int) * tokens.size(),
                                                cudaMemcpyDeviceToHost));

@@ -130,6 +130,7 @@ class QuantDecoder {
 
   std::vector<int8_t*> _int8_p_d_dec_wei;
   int8_t* _int8_p_d_trg_emb_wei;
+  int8_t* _int8_p_d_trg_emb_bottom_wei;
   const float _quant_range = 127;
   const float _trg_scaled_emb_clip_max;
   const float _output_ln_clip_max;

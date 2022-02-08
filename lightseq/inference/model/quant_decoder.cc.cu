@@ -2,7 +2,7 @@
 
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"
-#include "../kernels/embKernels.h"
+#include "../kernels/embKernels_int8.h"
 #include "cublas_helper.h"
 
 /**
@@ -174,8 +174,14 @@ void QuantDecoder<OpType_>::init_buffer(void* pbuf) {
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei, _tw._hidden_size,
                   _tw._trg_vocab_size, _quant_range / _trg_scaled_emb_clip_max,
                   _stream, _cublas_lt_handle);
-  _p_device_emb.push_back(to_gpu(
-      _p_d_trg_emb_wei[0], _tw._trg_vocab_size * _tw._hidden_size, _stream));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_p_d_trg_emb_bottom_wei,
+                 _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
+  quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_bottom_wei,
+                  _tw._hidden_size, _tw._trg_vocab_size,
+                  _quant_range / _trg_scaled_emb_clip_max, _stream,
+                  _cublas_lt_handle, false, false);
+  _p_device_emb.push_back(nullptr);
   _p_device_emb.push_back(
       to_gpu(_p_d_trg_emb_wei[1], _tw._max_step * _tw._hidden_size, _stream));
   _p_device_emb.push_back(
@@ -563,11 +569,12 @@ template <OperationType OpType_>
 void QuantDecoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
-  launch_dec_emb<_DataType>(_p_device_emb[0], _p_device_emb[1], _p_d_alive_seq,
-                            _p_device_emb[7], _p_d_lang_id, _p_d_cur_step_query,
-                            _batch_size, _tw._beam_size, _tw._hidden_size,
-                            _tw._trg_vocab_size, _cur_step, _tw._max_step,
-                            _tw._multilg_type, _stream);
+  launch_dec_emb_i8I<_DataType>(
+      _int8_p_d_trg_emb_bottom_wei, _p_device_emb[1], _p_d_alive_seq,
+      _p_device_emb[7], _p_d_lang_id, _p_d_cur_step_query, _batch_size,
+      _tw._beam_size, _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
+      _tw._max_step, _tw._multilg_type, _stream,
+      _trg_scaled_emb_clip_max / _quant_range);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id

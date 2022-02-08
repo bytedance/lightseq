@@ -6,7 +6,7 @@ namespace lightseq {
 namespace cuda {
 
 QuantTransformer::QuantTransformer(const std::string weight_path,
-                         const int max_batch_size)
+                                   const int max_batch_size)
     : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
