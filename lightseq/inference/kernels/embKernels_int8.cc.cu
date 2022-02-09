@@ -81,12 +81,14 @@ __global__ void ker_enc_emb_i8I<__half>(const int8_t *token_emb,
     __half2 *value_h2 = (__half2 *)(&value);
     char2 *value_i2 = (char2 *)(&value_i8);
     __half2 *pemb_h2 = (__half2 *)(&pemb);
-#pragma unroll
+#pragma unrollcd
     for (int i = 0; i < 4; i++) {
       float2 value_f2;
       float2 pemb_f2 = __half22float2(pemb_h2[i]);
-      value_f2.x = float(value_i2[i].x) * dequant_scale + pemb_f2.x;
-      value_f2.y = float(value_i2[i].y) * dequant_scale + pemb_f2.y;
+      value_f2.x =
+          float(__half(float(value_i2[i].x) * dequant_scale)) + pemb_f2.x;
+      value_f2.y =
+          float(__half(float(value_i2[i].y) * dequant_scale)) + pemb_f2.y;
       value_h2[i] = __float22half2_rn(value_f2);
     }
   }
@@ -168,7 +170,7 @@ __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
   int8_t emb;
   int token = tokens[flat_3dim(batch_idx, beam_idx, step, beam_size, max_step)];
   emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
-  float value = float(emb) * dequant_scale +
+  float value = float(T(float(emb) * dequant_scale)) +
                 float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
   output[idx] = T(value);
 }
