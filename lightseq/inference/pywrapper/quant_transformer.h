@@ -16,7 +16,7 @@ const lightseq::cuda::OperationType qtransformer_optytpe =
 
 namespace lightseq {
 namespace cuda {
-class QuantTransformer:public LSModel  {
+class QuantTransformer : public LSModel {
  private:
   typedef OperationTypeTraits<qtransformer_optytpe> optraits;
   std::shared_ptr<QuantEncoder<qtransformer_optytpe>> encoder_;
@@ -28,7 +28,6 @@ class QuantTransformer:public LSModel  {
   int *d_trg_lang_id_;
   int *d_output_;
   int *d_padding_mask_;
-  void *d_buf_;
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;
@@ -45,14 +44,14 @@ class QuantTransformer:public LSModel  {
   QuantTransformer(const std::string weight_path, const int max_batch_size);
   ~QuantTransformer();
 
-  void Infer() ;
-  void set_input_ptr(int index, void *input_ptr) ;
-  void set_output_ptr(int index, void *output_ptr) ;
-  const void *get_output_ptr(int index) ;
-  std::vector<int> get_input_max_shape(int index) ;
-  std::vector<int> get_output_max_shape(int index) ;
-  DataType get_input_dtype(int index) ;
-  DataType get_output_dtype(int index) ;
+  void Infer();
+  void set_input_ptr(int index, void *input_ptr);
+  void set_output_ptr(int index, void *output_ptr);
+  const void *get_output_ptr(int index);
+  std::vector<int> get_input_max_shape(int index);
+  std::vector<int> get_output_max_shape(int index);
+  DataType get_input_dtype(int index);
+  DataType get_output_dtype(int index);
 };
 
 LSMODEL_REGISTER(QuantTransformer);

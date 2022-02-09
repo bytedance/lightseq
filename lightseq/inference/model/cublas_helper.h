@@ -44,7 +44,7 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
 template <typename T>
 void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
                      int cols, float quant_scale, cudaStream_t stream,
-                     cublasLtHandle_t handle, bool layout_col32t = true);
+                     cublasLtHandle_t handle, Layout layout = kColMajor32);
 
 }  // namespace cuda
 }  // namespace lightseq

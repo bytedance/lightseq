@@ -58,7 +58,6 @@ class Decoder {
   cudaStream_t _stream;
   cublasHandle_t _hd;
 
-
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
   int* _p_d_sample_unfinished;
@@ -102,7 +101,6 @@ class Decoder {
   _DataType* _p_d_c;
   _DataType* _p_d_encoder_out_buf;
   _DataType* _p_d_logit_buf;
-
 
   int _batch_size;
   int _batch_seq_len;

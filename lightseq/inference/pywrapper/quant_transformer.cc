@@ -1,12 +1,12 @@
 #include "quant_transformer.h"
 
-#include "embKernels.h"
+#include "embKernels_int8.h"
 
 namespace lightseq {
 namespace cuda {
 
 QuantTransformer::QuantTransformer(const std::string weight_path,
-                         const int max_batch_size)
+                                   const int max_batch_size)
     : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
@@ -66,15 +66,8 @@ QuantTransformer::QuantTransformer(const std::string weight_path,
     throw std::runtime_error(res);
   }
 
-  long buf_bytesize = std::max(encoder_->compute_buffer_bytesize(),
-                               decoder_->compute_buffer_bytesize());
-  std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
-            << "MB GPU buffer for transformer" << std::endl;
-
-  // encoder and decoder use the same buffer to save gpu memory useage
-  CHECK_GPU_ERROR(cudaMalloc(&d_buf_, buf_bytesize));
-  encoder_->init_buffer(d_buf_);
-  decoder_->init_buffer(d_buf_);
+  encoder_->init_buffer();
+  decoder_->init_buffer();
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 }
 
@@ -82,7 +75,6 @@ QuantTransformer::~QuantTransformer() {
   CHECK_GPU_ERROR(cudaFree(d_input_));
   CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
   CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
-  CHECK_GPU_ERROR(cudaFree(d_buf_));
   CHECK_GPU_ERROR(cudaFree(d_src_lang_id_));
   CHECK_GPU_ERROR(cudaFree(d_trg_lang_id_));
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
@@ -101,17 +93,7 @@ void QuantTransformer::Infer() {
 
   // for multilg
   if (tw_._multilg_type != 0) {
-    // multilg request: src_lang_id, trg_lang_id, src_token0, src_token1...
-    launch_split_multilg_request(encoder_->_p_d_token_id, d_src_lang_id_,
-                                 d_trg_lang_id_, d_input_, batch_size, seq_len,
-                                 stream_);
-    encoder_->_p_d_token_id = d_input_;
-    if (tw_._multilg_type == 1) {
-      seq_len -= 2;
-    }
-    if (tw_._multilg_type == 2) {
-      seq_len -= 1;
-    }
+    throw std::runtime_error("multilingle not supported");
   }
 
   encoder_->run_one_infer(batch_size, seq_len);

@@ -92,8 +92,6 @@ void ker_fuse_softmax_new_value_int8_launcher(
     float attn_scale, float dequant_scale, float quant_scale, bool col32_out,
     cudaStream_t stream);
 
-
-
 template <typename T>
 void ker_arrange_encdec_q_i8I_launcher(int step_token_num, int hidden_size,
                                        cudaStream_t stream, const int8_t *ori_q,
@@ -102,8 +100,6 @@ void ker_arrange_encdec_q_i8I_launcher(int step_token_num, int hidden_size,
                                        int max_thread_per_block,
                                        float dequant_scale,
                                        bool in_col32 = false);
-
-
 
 template <typename T>
 void select_beam_rough_topk_i8I_launcher(

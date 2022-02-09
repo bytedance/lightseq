@@ -27,10 +27,6 @@ __half TransformerWeight<OperationType::FP16>::float2required(float value) {
   return __float2half_rn(value);
 }
 
-float dequantize(unsigned char i, float scale, float clip_max) {
-  return (float(i) - scale) * clip_max / scale;
-}
-
 /**
 Read model config stored in custom proto file.
 */
@@ -103,12 +99,10 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
 
   offset.push_back(idx);
 
-
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (float ele : layer.token_embedding()) value.push_back(ele);
   idx += vocab_size * _hidden_size;
-
 
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
@@ -292,8 +286,6 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
-
-
   }  // for
 
   std::vector<_DataType> raw_value;
@@ -442,7 +434,6 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
       return "Wrong ffn_second_bias_size !";
     for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
-
 
   }  // for
 

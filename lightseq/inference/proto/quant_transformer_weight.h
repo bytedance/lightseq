@@ -5,7 +5,6 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <thrust/device_vector.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -50,13 +49,13 @@ class QuantTransformerWeight {
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
   std::vector<const _DataType *> _p_d_dec_wei;      // size: 18 * dec_layer_num
 
-  // store the weights on gpu memo
-  thrust::device_vector<_DataType> _d_src_emb_wei;
-  thrust::device_vector<_DataType> _d_trg_emb_wei;
-  thrust::device_vector<_DataType> _d_enc_wei;
-  thrust::device_vector<_DataType> _d_dec_wei;
-  thrust::device_vector<_DataType> _d_src_lang_emb;
-  thrust::device_vector<_DataType> _d_trg_lang_emb;
+  // store the weights on cpu memory
+  std::vector<_DataType> _d_enc_wei;
+  std::vector<_DataType> _d_dec_wei;
+  std::vector<_DataType> _d_trg_emb_wei;
+  std::vector<_DataType> _d_trg_lang_emb;
+  std::vector<_DataType> _d_src_emb_wei;
+  std::vector<_DataType> _d_src_lang_emb;
 
   // store the clip_max of weights and activations
   float _src_scaled_emb_clip_max;
@@ -121,6 +120,8 @@ class QuantTransformerWeight {
   int _max_step;
   int _src_vocab_size;
   int _trg_vocab_size;
+  int _src_lang_size;
+  int _trg_lang_size;
   int _n_enc_layer;  // number of encoder layer
   int _n_dec_layer;  // number of decoder layer
   int _dim_per_head;

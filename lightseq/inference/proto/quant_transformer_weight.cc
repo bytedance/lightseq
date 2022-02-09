@@ -84,6 +84,8 @@ void QuantTransformerWeight<OpType_>::proto_get_model_config(
   _no_scale_embedding = transformer.model_conf().no_scale_embedding();
   _use_gelu = transformer.model_conf().use_gelu();
   _multilg_type = transformer.model_conf().multilg_type();
+  _src_lang_size = transformer.src_embedding().lang_emb().size() / _hidden_size;
+  _trg_lang_size = transformer.trg_embedding().lang_emb().size() / _hidden_size;
 }
 
 /**
@@ -138,9 +140,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
     std::vector<_DataType> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset)
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -184,8 +184,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
     for (float e : value) raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
-      _p_d_trg_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
+      _p_d_trg_emb_wei.push_back(_d_trg_emb_wei.data() + e);
     }
   }  // trg
 
@@ -198,12 +197,10 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+      _p_d_src_emb_wei.push_back(_d_src_lang_emb.data());
     } else {
       _d_trg_lang_emb = raw_value;
-      _p_d_trg_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+      _p_d_trg_emb_wei.push_back(_d_trg_lang_emb.data());
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"
@@ -340,8 +337,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_enc_wei(
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  for (int e : offset) _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
   return "";
 }
@@ -521,8 +517,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_dec_wei(
   for (float e : value) raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_dec_wei.push_back(thrust::raw_pointer_cast(_d_dec_wei.data()) + e);
+  for (int e : offset) _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
   std::cout << "Finish loading dec_wei from host to device" << std::endl;
   return "";
 }
@@ -693,9 +688,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     raw_value.reserve(value.size());
     for (float e : value) raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset)
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -729,8 +722,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     for (float e : value) raw_value.push_back(float2required(e));
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
-      _p_d_trg_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
+      _p_d_trg_emb_wei.push_back(_d_trg_emb_wei.data() + e);
     }
   }  // trg
 
@@ -743,13 +735,11 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+      _p_d_src_emb_wei.push_back(_d_src_lang_emb.data());
     } else {
       size_t lang_emb_size = raw_value.size();
       _d_trg_lang_emb = raw_value;
-      _p_d_trg_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+      _p_d_trg_emb_wei.push_back(_d_trg_lang_emb.data());
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"
@@ -877,8 +867,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  for (int e : offset) _p_d_enc_wei.push_back((_d_enc_wei.data()) + e);
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
 }
 
@@ -1045,8 +1034,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
   for (float e : value) raw_value.push_back(float2required(e));
   _d_dec_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_dec_wei.push_back(thrust::raw_pointer_cast(_d_dec_wei.data()) + e);
+  for (int e : offset) _p_d_dec_wei.push_back(_d_dec_wei.data() + e);
   std::cout << "Finish loading dec_wei from host to device" << std::endl;
 }
 

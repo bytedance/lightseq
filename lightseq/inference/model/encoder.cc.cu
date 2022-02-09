@@ -33,9 +33,7 @@ Encoder<OpType_>::Encoder(int max_batch_size, int *p_d_token_id,
 
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024) {
-
-}
+      _max_thread_per_block(1024) {}
 
 /**
 Compute GPU memory size needed by transformer encoder,
