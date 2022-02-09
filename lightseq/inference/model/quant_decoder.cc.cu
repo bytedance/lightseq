@@ -198,6 +198,8 @@ void QuantDecoder<OpType_>::init_buffer() {
   if (_tw._multilg_type != 0) {
     _p_device_emb.push_back(
         to_gpu(_p_d_trg_emb_wei[7], _tw._hidden_size, _stream));
+  } else {
+    _p_device_emb.push_back(nullptr);
   }
 
   // malloc reused kv cache and encdec output

@@ -140,9 +140,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
     std::vector<_DataType> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset)
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -199,8 +197,7 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+      _p_d_src_emb_wei.push_back(_d_src_lang_emb.data());
     } else {
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(_d_trg_lang_emb.data());
@@ -691,9 +688,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     raw_value.reserve(value.size());
     for (float e : value) raw_value.push_back(float2required(e));
     _d_src_emb_wei = raw_value;
-    for (int e : offset)
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+    for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -740,8 +735,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
     if (source == "src") {
       _d_src_lang_emb = raw_value;
-      _p_d_src_emb_wei.push_back(
-          thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+      _p_d_src_emb_wei.push_back(_d_src_lang_emb.data());
     } else {
       size_t lang_emb_size = raw_value.size();
       _d_trg_lang_emb = raw_value;

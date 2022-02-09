@@ -79,8 +79,10 @@ class QuantEncoder {
   // encoder_layer_num
   const std::vector<const _DataType *> &_p_d_enc_wei;
   std::vector<const _DataType *> _p_device_wei;
+  std::vector<const _DataType *> _p_device_emb;
 
   std::vector<int8_t *> _int8_p_d_enc_wei;
+  int8_t *_int8_p_d_src_emb_wei;
   const float _quant_range = 127;
   const float _src_scaled_emb_clip_max;
   const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num

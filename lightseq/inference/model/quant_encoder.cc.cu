@@ -1,7 +1,7 @@
 #include "quant_encoder.h"
 
 #include "../kernels/transformerKernels.h"
-#include "../kernels/embKernels.h"
+#include "../kernels/embKernels_int8.h"
 #include "../kernels/transformerKernels_int8.h"
 #include "cublas_helper.h"
 
@@ -85,6 +85,27 @@ void QuantEncoder<OpType_>::init_buffer() {
       cudaMalloc(&_int32_ffn_out_buf, max_batch_dim * sizeof(int32_t)));
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_ffn_out_buf, max_batch_dim * sizeof(int8_t)));
+
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_p_d_src_emb_wei,
+                 _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
+  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei, _tw._hidden_size,
+                  _tw._src_vocab_size, _quant_range / _src_scaled_emb_clip_max,
+                  _stream, _cublas_lt_handle, false, false);
+
+  _p_device_emb.push_back(nullptr);
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[1], _tw._max_step * _tw._hidden_size, _stream));
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[2], _tw._hidden_size, _stream));
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[3], _tw._hidden_size, _stream));
+  if (_tw._multilg_type != 0) {
+    _p_device_emb.push_back(
+        to_gpu(_p_d_src_emb_wei[4], _tw._hidden_size, _stream));
+  } else {
+    _p_device_emb.push_back(nullptr);
+  }
 
   // prepare gpu memory for weight
   _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
@@ -222,11 +243,11 @@ void QuantEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
   /* ---step2. encoder feedforward--- */
-  launch_enc_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_src_emb_wei[1],
-                            _p_d_token_id, _p_d_output, _p_d_padding_mask,
-                            _tw._padding_id, batch_size, batch_seq_len,
-                            _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
-                            _p_d_lang_id, _tw._multilg_type);
+  launch_enc_emb_i8I<_DataType>(
+      _int8_p_d_src_emb_wei, _p_device_emb[1], _p_d_token_id, _p_d_output,
+      _p_d_padding_mask, _tw._padding_id, batch_size, batch_seq_len,
+      _tw._hidden_size, _stream, _p_device_emb[4], _p_d_lang_id,
+      _tw._multilg_type, _src_scaled_emb_clip_max / _quant_range);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
@@ -236,8 +257,8 @@ void QuantEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                 "emb out", 10);
     }
   }  // not normal
-  print_vec(_p_d_src_emb_wei[0], "token embedding weight", 10);
-  print_vec(_p_d_src_emb_wei[1], "position embedding weight", 10);
+  print_vec(_p_device_emb[0], "token embedding weight", 10);
+  print_vec(_p_device_emb[1], "position embedding weight", 10);
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;
@@ -374,8 +395,8 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max;
   if (_layer_id == _tw._n_enc_layer - 1) {
-    scale_ptr = _p_d_src_emb_wei[2];
-    bias_ptr = _p_d_src_emb_wei[3];
+    scale_ptr = _p_device_emb[2];
+    bias_ptr = _p_device_emb[3];
 
     ker_residual_bias_ln_i32I_launcher<_DataType>(
         _int32_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
