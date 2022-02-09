@@ -81,7 +81,7 @@ __global__ void ker_enc_emb_i8I<__half>(const int8_t *token_emb,
     __half2 *value_h2 = (__half2 *)(&value);
     char2 *value_i2 = (char2 *)(&value_i8);
     __half2 *pemb_h2 = (__half2 *)(&pemb);
-#pragma unrollcd
+#pragma unroll
     for (int i = 0; i < 4; i++) {
       float2 value_f2;
       float2 pemb_f2 = __half22float2(pemb_h2[i]);
