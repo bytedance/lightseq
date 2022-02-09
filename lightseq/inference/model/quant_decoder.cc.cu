@@ -180,7 +180,7 @@ void QuantDecoder<OpType_>::init_buffer() {
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_bottom_wei,
                   _tw._hidden_size, _tw._trg_vocab_size,
                   _quant_range / _trg_scaled_emb_clip_max, _stream,
-                  _cublas_lt_handle, false, false);
+                  _cublas_lt_handle, kRowMajor);
   _p_device_emb.push_back(nullptr);
   _p_device_emb.push_back(
       to_gpu(_p_d_trg_emb_wei[1], _tw._max_step * _tw._hidden_size, _stream));
@@ -302,7 +302,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6 + 1], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 1], _stream,
-                    _cublas_lt_handle, false);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 8],
                     _int8_p_d_dec_wei[_layer_id * 6 + 2], _tw._hidden_size,
@@ -314,7 +314,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6 + 3], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 3], _stream,
-                    _cublas_lt_handle, false);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 14],
                     _int8_p_d_dec_wei[_layer_id * 6 + 4], _tw._hidden_size,
@@ -326,7 +326,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6 + 5], _tw._inner_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 5], _stream,
-                    _cublas_lt_handle, false);
+                    _cublas_lt_handle, kColMajor);
 
     if (_tw._use_gelu) {
       _scaled_ffn2_colsum[_layer_id] = nullptr;

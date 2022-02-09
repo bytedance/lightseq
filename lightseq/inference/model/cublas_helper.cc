@@ -399,8 +399,7 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
 template <typename T>
 void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
                      int cols, float quant_scale, cudaStream_t stream,
-                     cublasLtHandle_t handle, bool layout_col32t,
-                     bool transform) {
+                     cublasLtHandle_t handle, Layout layout) {
   int8_t* temp1;
   T* temp2;
   CHECK_GPU_ERROR(cudaMalloc(&temp1, rows * cols * sizeof(int8_t)));
@@ -408,7 +407,7 @@ void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
   CHECK_GPU_ERROR(cudaMemcpyAsync(temp2, origin_weight, rows * cols * sizeof(T),
                                   cudaMemcpyHostToDevice, stream));
 
-  if (transform) {
+  if (layout != kRowMajor) {
     launch_quantize_tensor(temp2, temp1, rows, cols, quant_scale, stream);
   } else {
     launch_quantize_tensor(temp2, quantized_weight, rows, cols, quant_scale,
@@ -417,14 +416,9 @@ void quantize_weight(const T* origin_weight, int8_t* quantized_weight, int rows,
 
   CHECK_GPU_ERROR(cudaGetLastError());
 
-  if (transform) {
-    if (layout_col32t) {
-      transform_weight_layout(temp1, quantized_weight, rows, cols, kColMajor32,
-                              handle, stream);
-    } else {
-      transform_weight_layout(temp1, quantized_weight, rows, cols, kColMajor,
-                              handle, stream);
-    }
+  if (layout != kRowMajor) {
+    transform_weight_layout(temp1, quantized_weight, rows, cols, layout, handle,
+                            stream);
   }
 
   CHECK_GPU_ERROR(cudaFree(temp1));
@@ -435,15 +429,13 @@ template void quantize_weight<float>(const float* origin_weight,
                                      int8_t* quantized_weight, int rows,
                                      int cols, float quant_scale,
                                      cudaStream_t stream,
-                                     cublasLtHandle_t handle,
-                                     bool layout_col32t, bool transform);
+                                     cublasLtHandle_t handle, Layout layout);
 
 template void quantize_weight<half>(const half* origin_weight,
                                     int8_t* quantized_weight, int rows,
                                     int cols, float quant_scale,
                                     cudaStream_t stream,
-                                    cublasLtHandle_t handle, bool layout_col32t,
-                                    bool transform);
+                                    cublasLtHandle_t handle, Layout layout);
 
 }  // namespace cuda
 }  // namespace lightseq
