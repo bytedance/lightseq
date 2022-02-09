@@ -5,7 +5,7 @@ from lightseq.training import LSTransformerEncoderLayer, LSTransformerDecoderLay
 
 
 quant_range = 127
-weight_clip_max = 0.3
+weight_clip_max = 0.5
 act_clip_max = 16.0
 
 

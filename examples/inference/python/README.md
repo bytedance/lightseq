@@ -31,6 +31,11 @@ Export LightSeq Transformer models to protobuf/hdf5 format. Refer to the `exampl
 ```shell
 python export/ls_transformer_export.py
 ```
+6. LightSeq Transformer using int8 quantization
+Export LightSeq FP16/FP32 Transformer models to int8 protobuf format, and then using int8 quantization to speedup inference. Refer to the `examples/training/custom` directory for more training details. Note that in this example, we do not need to finetune the models using fake-quantization.
+```shell
+python export/ls_ptq_transformer_export.py
+```
 
 ### Inference using LightSeq
 1. BART
