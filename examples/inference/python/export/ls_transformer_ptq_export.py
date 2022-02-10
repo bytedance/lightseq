@@ -1,5 +1,6 @@
 """
-Export LightSeq Transformer models to protobuf/hdf5 format.
+Export LightSeq fp16/fp32 Transformer models to int8 protobuf format,
+and then using int8 quantization to speedup inference.
 Refer to the `examples/training/custom` directory for more training details.
 """
 import time
@@ -16,6 +17,10 @@ from lightseq.training import (
     LSTransformer,
 )
 import lightseq.inference as lsi
+
+
+global_weight_clip_max = 1.0
+global_act_clip_max = 16.0
 
 
 def _extract_weight(state_dict):
@@ -51,16 +56,26 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
     ls_infer_model = QuantTransformer()
 
     export_ls_embedding_ptq(
-        ls_infer_model, encoder_state_dict, config.max_seq_len, True
+        ls_infer_model,
+        encoder_state_dict,
+        config.max_seq_len,
+        True,
+        clip_max=global_act_clip_max,
     )
     export_ls_embedding_ptq(
-        ls_infer_model, decoder_state_dict, config.max_seq_len, False
+        ls_infer_model,
+        decoder_state_dict,
+        config.max_seq_len,
+        is_encoder=False,
+        clip_max=global_act_clip_max,
     )
     export_ls_encoder_ptq(
         ls_infer_model,
         encoder_state_dict,
         config.hidden_size,
         config.intermediate_size,
+        weight_clip_max=global_weight_clip_max,
+        act_clip_max=global_act_clip_max,
     )
     export_ls_decoder_ptq(
         ls_infer_model,
@@ -68,6 +83,8 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         config.hidden_size,
         config.intermediate_size,
         config.num_decoder_layer,
+        weight_clip_max=global_weight_clip_max,
+        act_clip_max=global_act_clip_max,
     )
     export_other_weights(ls_infer_model, state_dict)
     export_ls_config(
