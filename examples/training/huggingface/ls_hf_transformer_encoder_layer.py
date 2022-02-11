@@ -10,9 +10,9 @@ class LSHFTransformerEncoderLayer(LSTransformerEncoderLayer):
         super(LSHFTransformerEncoderLayer, self).__init__(*args, **kwargs)
 
     def forward(self, hidden_states, encoder_padding_mask, *args, **kwargs):
-        encoder_padding_mask /= -10000.0
-        encoder_padding_mask = encoder_padding_mask.squeeze()
-        output = super().forward(hidden_states, encoder_padding_mask)
+        ls_encoder_padding_mask = encoder_padding_mask / -10000.0
+        ls_encoder_padding_mask = ls_encoder_padding_mask.squeeze()
+        output = super().forward(hidden_states, ls_encoder_padding_mask)
         return (output, None, None, None)
 
 
