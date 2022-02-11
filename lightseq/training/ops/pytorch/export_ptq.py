@@ -6,7 +6,6 @@ from lightseq.training.ops.pytorch.export import apply_rule
 
 
 global_quant_range = 127
-global_weight_clip_max = 0.5
 global_act_clip_max = 16.0
 
 
@@ -17,6 +16,12 @@ def quantize(tensor, quant_range, clip_max):
             + quant_range
         )
     ).astype(np.ubyte)
+
+
+def get_kth_value(tensor, k=None):
+    if k is None:
+        k = max(int(tensor.size / 50000.0), 1)
+    return max(np.partition(tensor.flatten(), -int(k))[-int(k)], 0.0)
 
 
 def gather_token_embedding(tensor_names, state_dict, tn_pattern, clip_max, scale=True):
@@ -34,23 +39,30 @@ def gather_token_embedding(tensor_names, state_dict, tn_pattern, clip_max, scale
 
 
 def fill_pb_layer(
-    tensor_names, state_dict, layer, mapping_dict, weight_clip_max, act_clip_max
+    tensor_names,
+    state_dict,
+    layer,
+    mapping_dict,
+    act_clip_max,
+    nlayer=None,
 ):
     for proto_name, ckpt_rule in mapping_dict.items():
-        if "clip_max" in proto_name:
-            if proto_name == "encode_output_project_kernel_kv_clip_max":
-                clip_maxs = [weight_clip_max] * int(ckpt_rule)
-                exec("layer.%s[:]=clip_maxs" % proto_name)
-            elif "kernel" in proto_name:
-                exec("layer.%s=weight_clip_max" % proto_name)
-            else:
-                exec("layer.%s=act_clip_max" % proto_name)
+        if "clip_max" in proto_name and "kernel" not in proto_name:
+            exec("layer.%s=act_clip_max" % proto_name)
             print("%s convert finished!" % proto_name)
             continue
         target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         if "kernel" in proto_name:
+            weight_clip_max = get_kth_value(target_tensor)
             target_tensor = quantize(target_tensor, global_quant_range, weight_clip_max)
             exec("layer.%s=bytes(target_tensor.flatten().tolist())" % proto_name)
+            if proto_name == "encode_output_project_kernel_kv":
+                assert nlayer is not None
+                clip_maxs = [weight_clip_max] * int(nlayer)
+                exec("layer.%s_clip_max[:]=clip_maxs" % proto_name)
+            else:
+                exec("layer.%s_clip_max=weight_clip_max" % proto_name)
+            print("%s_clip_max convert finished!" % proto_name)
         else:
             exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
@@ -59,11 +71,11 @@ def fill_encdec_weight(
     file,
     state_dict,
     mapping_dict,
-    weight_clip_max,
     act_clip_max,
     is_encoder,
     save_pb,
     enc_out_mapping_dict=None,
+    nlayer=None,
 ):
     var_name_list = list(state_dict.keys())
 
@@ -89,7 +101,6 @@ def fill_encdec_weight(
             state_dict,
             layer,
             mapping_dict,
-            weight_clip_max,
             act_clip_max,
         )
 
@@ -99,8 +110,8 @@ def fill_encdec_weight(
             state_dict,
             file.trg_embedding,
             enc_out_mapping_dict,
-            weight_clip_max,
             act_clip_max,
+            nlayer,
         )
 
 
@@ -148,7 +159,6 @@ def export_ls_encoder_ptq(
     state_dict,
     hidden_size,
     intermediate_size,
-    weight_clip_max=global_weight_clip_max,
     act_clip_max=global_act_clip_max,
     save_pb=True,
 ):
@@ -192,10 +202,6 @@ def export_ls_encoder_ptq(
             "ffn_norm_bias": "para&&expression_[{0}:{1}]".format(
                 offsets[11], offsets[12]
             ),
-            "multihead_project_kernel_qkv_clip_max": "None",
-            "multihead_project_kernel_output_clip_max": "None",
-            "ffn_first_kernel_clip_max": "None",
-            "ffn_second_kernel_clip_max": "None",
             "multihead_ln_clip_max": "None",
             "multihead_project_output_clip_max": "None",
             "ffn_ln_clip_max": "None",
@@ -205,9 +211,7 @@ def export_ls_encoder_ptq(
             "ffn_first_output_clip_max": "None",
         }
     )
-    fill_encdec_weight(
-        file, state_dict, mapping_dict, weight_clip_max, act_clip_max, True, save_pb
-    )
+    fill_encdec_weight(file, state_dict, mapping_dict, act_clip_max, True, save_pb)
 
 
 def export_ls_decoder_ptq(
@@ -216,7 +220,6 @@ def export_ls_decoder_ptq(
     hidden_size,
     intermediate_size,
     nlayer,
-    weight_clip_max=global_weight_clip_max,
     act_clip_max=global_act_clip_max,
     save_pb=True,
 ):
@@ -278,12 +281,6 @@ def export_ls_decoder_ptq(
             "ffn_norm_bias": "para&&expression_[{0}:{1}]".format(
                 offsets[17], offsets[18]
             ),
-            "self_project_kernel_qkv_clip_max": "None",
-            "self_project_kernel_output_clip_max": "None",
-            "encdec_project_kernel_q_clip_max": "None",
-            "encdec_project_kernel_output_clip_max": "None",
-            "ffn_first_kernel_clip_max": "None",
-            "ffn_second_kernel_clip_max": "None",
             "self_ln_clip_max": "None",
             "self_project_output_clip_max": "None",
             "encdec_ln_clip_max": "None",
@@ -306,7 +303,6 @@ def export_ls_decoder_ptq(
             "encode_output_project_bias_kv": "para&&expression_[{0}:{1}]".format(
                 offsets[19], offsets[20]
             ),
-            "encode_output_project_kernel_kv_clip_max": "{0}".format(nlayer),
             "output_ln_clip_max": "None",
             "logits_clip_max": "None",
         }
@@ -315,9 +311,9 @@ def export_ls_decoder_ptq(
         file,
         state_dict,
         mapping_dict,
-        weight_clip_max,
         act_clip_max,
         False,
         save_pb,
         enc_out_mapping_dict,
+        nlayer,
     )

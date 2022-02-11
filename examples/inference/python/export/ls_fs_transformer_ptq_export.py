@@ -15,8 +15,8 @@ from lightseq.training import (
 import lightseq.inference as lsi
 
 
-global_weight_clip_max = 1.0
-global_act_clip_max = 16.0
+# adjust this value to achieve better performance
+global_act_clip_max = 45.0
 
 
 def _extract_weight(state_dict):
@@ -76,7 +76,6 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         encoder_state_dict,
         args.encoder_embed_dim,
         args.encoder_ffn_embed_dim,
-        weight_clip_max=global_weight_clip_max,
         act_clip_max=global_act_clip_max,
         save_pb=save_pb,
     )
@@ -86,7 +85,6 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         args.decoder_embed_dim,
         args.decoder_ffn_embed_dim,
         args.decoder_layers,
-        weight_clip_max=global_weight_clip_max,
         act_clip_max=global_act_clip_max,
         save_pb=save_pb,
     )
@@ -114,4 +112,5 @@ if __name__ == "__main__":
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
     pb_model = lsi.QuantTransformer(pb_path, 8)
     pb_output = pb_model.infer(src)
+    # FP16 result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6]
     print("pb results:", pb_output)

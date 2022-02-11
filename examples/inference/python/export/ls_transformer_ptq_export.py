@@ -19,7 +19,7 @@ from lightseq.training import (
 import lightseq.inference as lsi
 
 
-global_weight_clip_max = 1.0
+# adjust this value to achieve better performance
 global_act_clip_max = 16.0
 
 
@@ -74,7 +74,6 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         encoder_state_dict,
         config.hidden_size,
         config.intermediate_size,
-        weight_clip_max=global_weight_clip_max,
         act_clip_max=global_act_clip_max,
     )
     export_ls_decoder_ptq(
@@ -83,7 +82,6 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         config.hidden_size,
         config.intermediate_size,
         config.num_decoder_layer,
-        weight_clip_max=global_weight_clip_max,
         act_clip_max=global_act_clip_max,
     )
     export_other_weights(ls_infer_model, state_dict)
