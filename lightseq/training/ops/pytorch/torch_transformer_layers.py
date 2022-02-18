@@ -201,19 +201,12 @@ class MultiheadAttention(nn.Module):
             .transpose(0, 1)
         )
         if k is not None:
-            # support transformer inference
-            if k.shape[1] != bsz:
-                beam_size = bsz / k.shape[1]
-                k.repeat_interleave(beam_size, 1)
             k = (
                 k.contiguous()
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
         if v is not None:
-            if v.shape[1] != bsz:
-                beam_size = bsz / v.shape[1]
-                v.x.repeat_interleave(beam_size, 1)
             v = (
                 v.contiguous()
                 .view(-1, bsz * self.num_heads, self.head_dim)
@@ -754,6 +747,16 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             x = self.self_attn_layer_norm(x)
 
         if self.encodec_attn is not None and encoder_out is not None:
+            if (
+                encoder_out.shape[1] != x.shape[1]
+                and x.shape[1] % encoder_out.shape[1] == 0
+            ):
+                beam_size = int(x.shape[1] / encoder_out.shape[1])
+                encoder_out = encoder_out.repeat_interleave(beam_size, 1)
+                encoder_padding_mask = encoder_padding_mask.repeat_interleave(
+                    beam_size, 0
+                )
+
             residual = x
             if self.normalize_before:
                 x = self.encodec_attn_layer_norm(x)
@@ -901,7 +904,7 @@ class SinusoidalPositionalEmbedding(nn.Module):
             .expand(bsz, seq_len, self.embedding_dim)
         )
         return (
-            self.weights.to(input)
+            self.weights.to(input.device)
             .index_select(0, positions.view(-1))
             .view(bsz, seq_len, -1)
             * mask
