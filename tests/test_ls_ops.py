@@ -220,10 +220,10 @@ def generate_emb_layer(config, initial_weights=None):
 
 
 custom_emb_layer_fp32 = generate_emb_layer(
-    ls_emb_config_fp32, fs_emb_layer_fp32.embeddings.weight.detach().clone()
+    ls_emb_config_fp32, fs_emb_layer_fp32.embeddings.detach().clone()
 )
 custom_emb_layer_fp16 = generate_emb_layer(
-    ls_emb_config_fp16, fs_emb_layer_fp16.embeddings.weight.detach().clone()
+    ls_emb_config_fp16, fs_emb_layer_fp16.embeddings.detach().clone()
 )
 custom_emb_layer_fp32.train()
 custom_emb_layer_fp16.train()
@@ -271,11 +271,11 @@ def test_encoder_layer_forward():
         ]
 
     def baseline():
-        res = hidden_states.transpose(0, 1).contiguous().clone()
+        res = hidden_states.contiguous().clone()
         for i in range(num_layers):
             res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
         return [
-            res.transpose(0, 1).contiguous().detach(),
+            res.contiguous().detach(),
         ]
 
     return custom, baseline
@@ -333,7 +333,7 @@ def test_encoder_layer_backward():
     def baseline():
         for i in range(num_layers):
             fairseq_enc_layer_list[i].zero_grad()
-        res = hidden_states.transpose(0, 1).clone()
+        res = hidden_states.clone()
         for i in range(num_layers):
             res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
         fairseq_loss = (res / 1000).sum()
@@ -385,13 +385,11 @@ def test_bert_encoder_layer_forward():
         ]
 
     def baseline():
-        res = hidden_states.transpose(0, 1).contiguous().clone()
+        res = hidden_states.contiguous().clone()
         for i in range(num_layers):
-            res = fairseq_bert_enc_layer_list[i](
-                res, self_attn_padding_mask=self_attn_padding_mask
-            )[0]
+            res = fairseq_bert_enc_layer_list[i](res, self_attn_padding_mask)
         return [
-            res.transpose(0, 1).contiguous().detach(),
+            res.contiguous().detach(),
         ]
 
     return custom, baseline
@@ -412,12 +410,10 @@ def test_bert_encoder_layer_backward():
         cus_x = custom_bert_enc_layer_list[i](cus_x, self_attn_padding_mask)
     custom_loss = (cus_x / 1000).sum()
 
-    base_x = hidden_states.transpose(0, 1).clone()
+    base_x = hidden_states.clone()
     for i in range(num_layers):
-        base_x = fairseq_bert_enc_layer_list[i](
-            base_x, self_attn_padding_mask=self_attn_padding_mask
-        )[0]
-    fairseq_loss = (base_x.transpose(0, 1) / 1000).sum()
+        base_x = fairseq_bert_enc_layer_list[i](base_x, self_attn_padding_mask)
+    fairseq_loss = (base_x / 1000).sum()
 
     def custom():
         custom_bert_enc_layer_list.zero_grad()
@@ -511,7 +507,7 @@ def test_decoder_layer_forward():
         ]
 
     def baseline():
-        res = hidden_states.transpose(0, 1).clone()
+        res = hidden_states.clone()
         for i in range(num_layers):
             res, _, _ = fairseq_dec_layer_list[i](
                 res,
@@ -521,7 +517,7 @@ def test_decoder_layer_forward():
                 incremental_state=incremental_state,
             )
         return [
-            res.transpose(0, 1).contiguous().detach(),
+            res.contiguous().detach(),
         ]
 
     return custom, baseline
@@ -608,7 +604,7 @@ def test_decoder_layer_backward():
     def baseline():
         for i in range(num_layers):
             fairseq_dec_layer_list[i].zero_grad()
-        res = hidden_states.transpose(0, 1).clone()
+        res = hidden_states.clone()
         for i in range(num_layers):
             res, _, _ = fairseq_dec_layer_list[i](
                 res,
@@ -752,7 +748,7 @@ def test_decoder_layer_forward_inference():
         incremental_state = {}
         res_list = []
         for i in range(max_step):
-            res = hidden_states_list[i].clone().transpose(0, 1)
+            res = hidden_states_list[i].clone()
             for i in range(num_layers):
                 res, _, _ = fairseq_dec_layer_list[i](
                     res,
@@ -761,7 +757,7 @@ def test_decoder_layer_forward_inference():
                     incremental_state=incremental_state,
                 )
             res_list.append(res)
-        return [x.transpose(0, 1).contiguous().detach() for x in res_list]
+        return [x.contiguous().detach() for x in res_list]
 
     return custom, baseline
 
@@ -789,13 +785,13 @@ def test_embedding_layer_forward():
         fs_layer = fs_emb_layer_fp16
 
     def custom():
-        res = custom_layer(input)
+        res = custom_layer(input, step=1)
         return [
             res.contiguous().detach(),
         ]
 
     def baseline():
-        x = fs_layer(input)
+        x = fs_layer(input, step=1)
         return [
             x.contiguous().detach(),
         ]
@@ -845,7 +841,7 @@ def test_embedding_layer_backward():
         fs_loss.data.copy_(loss_data)
         fs_loss.backward()
         return [
-            fs_layer.embeddings.weight.grad.contiguous().detach(),
+            fs_layer.embeddings.grad.contiguous().detach(),
         ]
 
     return custom, baseline

@@ -6,6 +6,7 @@ from torch import nn
 from torch.autograd import Function
 
 
+from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -73,7 +74,7 @@ class LSTransformerEncoderFunc(Function):
         return (grad_input, None, grad, None)
 
 
-class LSTransformerEncoderLayer(nn.Module):
+class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
     """Initialize the Lightseq Transformer Encoder Layer.
 
     Static variable:
@@ -282,7 +283,8 @@ class LSTransformerEncoderLayer(nn.Module):
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(

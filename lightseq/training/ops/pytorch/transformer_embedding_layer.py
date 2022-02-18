@@ -8,6 +8,7 @@ from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import state_dict, get_pos_embedding
+from lightseq.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
 
 
 transformer_cuda_module = None
@@ -53,7 +54,7 @@ class LSTransformerEmbeddingFunc(Function):
         return (None, None, grad, None)
 
 
-class LSTransformerEmbeddingLayer(nn.Module):
+class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
     """Initialize the Lightseq Embedding Layer.
 
     Static variable:
@@ -118,21 +119,6 @@ class LSTransformerEmbeddingLayer(nn.Module):
             self.config.padding_idx,
         )
 
-    @staticmethod
-    def get_config(**kwargs):
-        @dataclass
-        class Config:
-            vocab_size: int  # vocabulary size
-            embedding_dim: int  # embedding size
-            max_batch_tokens: int  # max batch token numbers
-            max_seq_len: int  # max sequence length
-            padding_idx: int  # padding token id in vocabulary
-            dropout: float  # embedding dropout ration
-            fp16: bool  # fp16 presion
-            local_rank: int  # rank in local node
-
-        return Config(**kwargs)
-
     def reset_parameters(self):
         nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim ** -0.5)
         nn.init.constant_(self.embeddings[self.config.padding_idx], 0)
@@ -177,7 +163,8 @@ class LSTransformerEmbeddingLayer(nn.Module):
         bs, sl = input.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(
@@ -185,7 +172,8 @@ class LSTransformerEmbeddingLayer(nn.Module):
             )
         if step >= self.config.max_seq_len:
             raise ValueError(
-                f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
+                f"Target sequence length {sl} exceeds the limit"
+                f" {self.config.max_seq_len}."
             )
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
         return x.to(self.embeddings)

@@ -10,14 +10,7 @@ from fairseq.models import (
 )
 from fairseq.models.fairseq_encoder import EncoderOut
 from fairseq.modules import LayerNorm
-from lightseq.training.ops.pytorch.transformer_embedding_layer import (
-    LSTransformerEmbeddingLayer,
-)
-from lightseq.training.ops.pytorch.transformer_encoder_layer import (
-    LSTransformerEncoderLayer,
-)
 
-from .ls_fs_transformer_decoder_layer import LSFSTransformerDecoderLayer
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
 MAX_SEQ_LENGTH = 300
@@ -146,7 +139,14 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
 
     @classmethod
     def build_embedding(cls, args, dictionary, embed_dim, max_positions, **kwargs):
-        config = LSTransformerEmbeddingLayer.get_config(
+        # from lightseq.training.ops.pytorch.transformer_embedding_layer import (
+        #     LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
+        # )
+        from lightseq.training.ops.pytorch.torch_transformer_layers import (
+            TransformerEmbeddingLayer,
+        )
+
+        config = TransformerEmbeddingLayer.get_config(
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
             max_batch_tokens=args.max_tokens,
@@ -156,7 +156,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             fp16=args.fp16,
             local_rank=args.device_id,
         )
-        emb = LSTransformerEmbeddingLayer(config)
+        emb = TransformerEmbeddingLayer(config)
         return emb
 
     @classmethod
@@ -190,7 +190,12 @@ class LSTransformerEncoder(FairseqEncoder):
         self.layer_norm = LayerNorm(embed_dim)
 
     def build_encoder_layer(self, args):
-        config = LSTransformerEncoderLayer.get_config(
+        # from lightseq.training.ops.pytorch.transformer_encoder_layer import (
+        #     LSTransformerEncoderLayer,
+        # ) as TransformerEncoderLayer
+        from lightseq.training.ops.pytorch import TransformerEncoderLayer
+
+        config = TransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
             max_seq_len=MAX_SEQ_LENGTH,
             hidden_size=args.encoder_embed_dim,
@@ -204,7 +209,7 @@ class LSTransformerEncoder(FairseqEncoder):
             local_rank=args.device_id,
             activation_fn=args.activation_fn,
         )
-        return LSTransformerEncoderLayer(config)
+        return TransformerEncoderLayer(config)
 
     def forward_embedding(self, src_tokens):
         x = self.embed_tokens(src_tokens)
@@ -239,7 +244,24 @@ class LSTransformerEncoder(FairseqEncoder):
         """Maximum input length supported by the encoder."""
         return self.args.max_source_positions
 
-    def reorder_encoder_out(self, encoder_out, new_order):
+    @torch.jit.export
+    def reorder_encoder_out(self, encoder_out: EncoderOut, new_order):
+        """
+        Reorder encoder output according to *new_order*.
+
+        Args:
+            encoder_out: output from the ``forward()`` method
+            new_order (LongTensor): desired order
+
+        Returns:
+            *encoder_out* rearranged according to *new_order*
+        """
+        """
+        Since encoder_padding_mask and encoder_embedding are both of type
+        Optional[Tensor] in EncoderOut, they need to be copied as local
+        variables for Torchscript Optional refinement
+        """
+
         if self.beam_size < 0:
             self.beam_size = int(new_order.shape[0] / self.batch_size)
         else:
@@ -249,6 +271,38 @@ class LSTransformerEncoder(FairseqEncoder):
         new_encoder_padding_mask = encoder_out.encoder_padding_mask.index_select(
             0, new_order
         )
+
+        # encoder_padding_mask: Optional[Tensor] = encoder_out.encoder_padding_mask
+        # encoder_embedding: Optional[Tensor] = encoder_out.encoder_embedding
+
+        # new_encoder_out = (
+        #     encoder_out.encoder_out
+        #     if encoder_out.encoder_out is None
+        #     else encoder_out.encoder_out.index_select(1, new_order)
+        # )
+        # new_encoder_padding_mask = (
+        #     encoder_padding_mask
+        #     if encoder_padding_mask is None
+        #     else encoder_padding_mask.index_select(0, new_order)
+        # )
+        # new_encoder_embedding = (
+        #     encoder_embedding
+        #     if encoder_embedding is None
+        #     else encoder_embedding.index_select(0, new_order)
+        # )
+        # src_tokens = encoder_out.src_tokens
+        # if src_tokens is not None:
+        #     src_tokens = src_tokens.index_select(0, new_order)
+
+        # src_lengths = encoder_out.src_lengths
+        # if src_lengths is not None:
+        #     src_lengths = src_lengths.index_select(0, new_order)
+
+        # encoder_states = encoder_out.encoder_states
+        # if encoder_states is not None:
+        #     for idx, state in enumerate(encoder_states):
+        #         encoder_states[idx] = state.index_select(1, new_order)
+
         return EncoderOut(
             encoder_out=new_encoder_out,  # T x B x C
             encoder_padding_mask=new_encoder_padding_mask,  # B x T
@@ -285,7 +339,15 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
         self.output_projection.weight = self.embed_tokens.embeddings
 
     def build_decoder_layer(self, args):
-        config = LSFSTransformerDecoderLayer.get_config(
+        from .ls_fs_transformer_decoder_layer import (
+            LSFSTransformerDecoderLayer as TransformerDecoderLayer,
+        )
+
+        # from lightseq.training.ops.pytorch.torch_transformer_layers import (
+        #     TransformerDecoderLayer,
+        # )
+
+        config = TransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
             max_seq_len=MAX_SEQ_LENGTH,
             hidden_size=args.decoder_embed_dim,
@@ -300,7 +362,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             nlayer=args.decoder_layers,
             activation_fn=args.activation_fn,
         )
-        return LSFSTransformerDecoderLayer(config)
+        return TransformerDecoderLayer(config)
 
     def forward_embedding(self, prev_output_tokens, incremental_state=None):
         step = 0
@@ -320,11 +382,17 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
         # x: [batch_size, seq_len, hidden_size]
         for _, layer in enumerate(self.layers):
+            if incremental_state is None:
+                self_attn_mask = self.buffered_future_mask(x)
+            else:
+                self_attn_mask = None
+
             x, _, _ = layer(
                 x,
-                encoder_out.encoder_out,
-                encoder_out.encoder_padding_mask,
-                incremental_state,
+                encoder_out=encoder_out.encoder_out,
+                encoder_padding_mask=encoder_out.encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
             )
 
         x = self.layer_norm(x)
@@ -335,6 +403,21 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
     def max_positions(self):
         """Maximum output length supported by the decoder."""
         return self.args.max_target_positions
+
+    def buffered_future_mask(self, tensor):
+        tensor = tensor.transpose(0, 1)
+        dim = tensor.size(0)
+        # self._future_mask.device != tensor.device is not working in TorchScript. This is a workaround.
+        if (
+            self._future_mask.size(0) == 0
+            or (not self._future_mask.device == tensor.device)
+            or self._future_mask.size(0) < dim
+        ):
+            self._future_mask = torch.triu(
+                utils.fill_with_neg_inf(torch.zeros([dim, dim])), 1
+            )
+        self._future_mask = self._future_mask.to(tensor)
+        return self._future_mask[:dim, :dim]
 
 
 @register_model_architecture("ls_transformer", "ls_transformer_tiny")
