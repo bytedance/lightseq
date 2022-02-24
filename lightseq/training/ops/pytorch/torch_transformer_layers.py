@@ -19,6 +19,12 @@ from lightseq.training.ops.pytorch.layer_base import (
     TransformerEncoderLayerBase,
     TransformerDecoderLayerBase,
 )
+from .quantization import (
+    QuantLinear,
+    TensorQuantizer,
+    act_quant_config,
+    weight_quant_config,
+)
 
 
 class MultiheadAttention(nn.Module):
@@ -39,6 +45,7 @@ class MultiheadAttention(nn.Module):
         add_zero_attn=False,
         self_attention=False,
         encoder_decoder_attention=False,
+        is_decoder=False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -57,14 +64,25 @@ class MultiheadAttention(nn.Module):
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
+        self.is_decoder = is_decoder
 
         assert (
             not self.self_attention or self.qkv_same_dim
         ), "Self-attention requires query, key and value to be of the same size"
 
-        self.k_proj = Linear(self.kdim, embed_dim, bias=bias)
-        self.v_proj = Linear(self.vdim, embed_dim, bias=bias)
-        self.q_proj = Linear(embed_dim, embed_dim, bias=bias)
+        self.attention_quant = None
+        if self.self_attention:
+            # self.qkv_proj = Linear(embed_dim, 3*embed_dim, bias=bias)
+            self.qkv_proj = QuantLinear(embed_dim, 3 * embed_dim, bias=bias)
+
+            self.attention_quant = (
+                TensorQuantizer(act_quant_config) if self.is_decoder else None
+            )
+
+        else:
+            self.k_proj = Linear(self.kdim, embed_dim, bias=bias)
+            self.v_proj = Linear(self.vdim, embed_dim, bias=bias)
+            self.q_proj = Linear(embed_dim, embed_dim, bias=bias)
 
         self.out_proj = Linear(embed_dim, embed_dim, bias=bias)
 
@@ -92,9 +110,12 @@ class MultiheadAttention(nn.Module):
         if self.qkv_same_dim:
             # Empirically observed the convergence to be much better with
             # the scaled initialization
-            nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
-            nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
+            if self.self_attention:
+                nn.init.xavier_uniform_(self.qkv_proj.weight, gain=1 / math.sqrt(2))
+            else:
+                nn.init.xavier_uniform_(self.k_proj.weight, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.v_proj.weight, gain=1 / math.sqrt(2))
+                nn.init.xavier_uniform_(self.q_proj.weight, gain=1 / math.sqrt(2))
         else:
             nn.init.xavier_uniform_(self.k_proj.weight)
             nn.init.xavier_uniform_(self.v_proj.weight)
@@ -158,9 +179,11 @@ class MultiheadAttention(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            q = self.q_proj(query)
-            k = self.k_proj(query)
-            v = self.v_proj(query)
+            qkv = self.qkv_proj(query)
+            q, k, v = qkv.split(self.embed_dim, dim=-1)
+            # q = self.q_proj(query)
+            # k = self.k_proj(query)
+            # v = self.v_proj(query)
         elif self.encoder_decoder_attention:
             # encoder-decoder attention
             q = self.q_proj(query)
@@ -176,7 +199,7 @@ class MultiheadAttention(nn.Module):
             q = self.q_proj(query)
             k = self.k_proj(key)
             v = self.v_proj(value)
-        q *= self.scaling
+        q = q * self.scaling
 
         if self.bias_k is not None:
             assert self.bias_v is not None
@@ -284,6 +307,8 @@ class MultiheadAttention(nn.Module):
                 )
 
         attn_weights = torch.bmm(q, k.transpose(1, 2))
+        if self.attention_quant is not None:
+            attn_weights = self.attention_quant(attn_weights)
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
@@ -502,13 +527,12 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
         self.activation_fn = util.get_activation_fn(activation=config.activation_fn)
         self.activation_dropout_module = Dropout(float(config.activation_dropout_ratio))
         self.normalize_before = config.pre_layer_norm
-        self.fc1 = Linear(
+        self.fc1 = QuantLinear(
             self.embed_dim,
             config.intermediate_size,
         )
-        self.fc2 = Linear(
-            config.intermediate_size,
-            self.embed_dim,
+        self.fc2 = QuantLinear(
+            config.intermediate_size, self.embed_dim, pre_activation="relu"
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
@@ -620,11 +644,11 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         )
         self.encodec_attn_layer_norm = LayerNorm(self.embed_dim)
 
-        self.fc1 = Linear(
+        self.fc1 = QuantLinear(
             self.embed_dim,
             config.intermediate_size,
         )
-        self.fc2 = Linear(
+        self.fc2 = QuantLinear(
             config.intermediate_size,
             self.embed_dim,
         )
@@ -644,6 +668,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
             self_attention=not self.cross_self_attention,
+            is_decoder=True,
         )
 
     def build_encoder_attention(
@@ -656,6 +681,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             vdim=encoder_embed_dim,
             dropout=attn_dropout,
             encoder_decoder_attention=True,
+            is_decoder=True,
         )
 
     def prepare_for_onnx_export_(self):
@@ -833,10 +859,12 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
+        self.scaled_emb_quant = TensorQuantizer(weight_quant_config)
         self.config = config
 
     def forward(self, input, step=0):
         x = self.emb_lookup(input)
+        x = self.scaled_emb_quant(x)
         x = math.sqrt(self.embedding_dim) * x
         x += self.embed_positions(input, step)
         x = self.dropout(x)

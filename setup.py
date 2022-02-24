@@ -113,7 +113,12 @@ setup_kwargs = dict(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
     ],
-    install_requires=["ninja"],
+    install_requires=[
+        "ninja",
+        "numpy",
+        "absl-py>=0.7.0",
+        "scipy",
+    ],
     python_requires=">=3.6",
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,

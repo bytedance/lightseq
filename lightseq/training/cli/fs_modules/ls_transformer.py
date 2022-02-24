@@ -11,6 +11,14 @@ from fairseq.models import (
 from fairseq.models.fairseq_encoder import EncoderOut
 from fairseq.modules import LayerNorm
 
+from lightseq.training.ops.pytorch.quantization import (
+    QuantLinear,
+    enable_quant,
+    disable_quant,
+    qat_mode,
+    ptq_mode,
+)
+
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
 MAX_SEQ_LENGTH = 300
@@ -108,6 +116,10 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='block size of quantization noise at training time')
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--enable-ls-quant', type=bool,  default=False,
+                            help='enable quantization')
+        parser.add_argument('--quant-mode', type=str,  default="",
+                            help='quantization mode')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
             '--min-params-to-wrap', type=int, metavar='D', default=DEFAULT_MIN_PARAMS_TO_WRAP,
@@ -135,16 +147,30 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+
+        if args.enable_ls_quant:
+            if args.quant_mode == "qat":
+                encoder.apply(qat_mode)
+                decoder.apply(qat_mode)
+            elif args.quant_mode == "ptq":
+                encoder.apply(ptq_mode)
+                decoder.apply(ptq_mode)
+            else:
+                encoder.apply(disable_quant)
+                decoder.apply(disable_quant)
+
         return cls(args, encoder, decoder)
 
     @classmethod
     def build_embedding(cls, args, dictionary, embed_dim, max_positions, **kwargs):
-        # from lightseq.training.ops.pytorch.transformer_embedding_layer import (
-        #     LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
-        # )
-        from lightseq.training.ops.pytorch.torch_transformer_layers import (
-            TransformerEmbeddingLayer,
-        )
+        if args.enable_ls_quant:
+            from lightseq.training.ops.pytorch.torch_transformer_layers import (
+                TransformerEmbeddingLayer,
+            )
+        else:
+            from lightseq.training.ops.pytorch.transformer_embedding_layer import (
+                LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
+            )
 
         config = TransformerEmbeddingLayer.get_config(
             vocab_size=len(dictionary),
@@ -157,6 +183,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             local_rank=args.device_id,
         )
         emb = TransformerEmbeddingLayer(config)
+
         return emb
 
     @classmethod
@@ -190,10 +217,12 @@ class LSTransformerEncoder(FairseqEncoder):
         self.layer_norm = LayerNorm(embed_dim)
 
     def build_encoder_layer(self, args):
-        # from lightseq.training.ops.pytorch.transformer_encoder_layer import (
-        #     LSTransformerEncoderLayer,
-        # ) as TransformerEncoderLayer
-        from lightseq.training.ops.pytorch import TransformerEncoderLayer
+        if args.enable_ls_quant:
+            from lightseq.training.ops.pytorch import TransformerEncoderLayer
+        else:
+            from lightseq.training.ops.pytorch.transformer_encoder_layer import (
+                LSTransformerEncoderLayer as TransformerEncoderLayer,
+            )
 
         config = TransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
@@ -209,6 +238,7 @@ class LSTransformerEncoder(FairseqEncoder):
             local_rank=args.device_id,
             activation_fn=args.activation_fn,
         )
+
         return TransformerEncoderLayer(config)
 
     def forward_embedding(self, src_tokens):
@@ -272,37 +302,6 @@ class LSTransformerEncoder(FairseqEncoder):
             0, new_order
         )
 
-        # encoder_padding_mask: Optional[Tensor] = encoder_out.encoder_padding_mask
-        # encoder_embedding: Optional[Tensor] = encoder_out.encoder_embedding
-
-        # new_encoder_out = (
-        #     encoder_out.encoder_out
-        #     if encoder_out.encoder_out is None
-        #     else encoder_out.encoder_out.index_select(1, new_order)
-        # )
-        # new_encoder_padding_mask = (
-        #     encoder_padding_mask
-        #     if encoder_padding_mask is None
-        #     else encoder_padding_mask.index_select(0, new_order)
-        # )
-        # new_encoder_embedding = (
-        #     encoder_embedding
-        #     if encoder_embedding is None
-        #     else encoder_embedding.index_select(0, new_order)
-        # )
-        # src_tokens = encoder_out.src_tokens
-        # if src_tokens is not None:
-        #     src_tokens = src_tokens.index_select(0, new_order)
-
-        # src_lengths = encoder_out.src_lengths
-        # if src_lengths is not None:
-        #     src_lengths = src_lengths.index_select(0, new_order)
-
-        # encoder_states = encoder_out.encoder_states
-        # if encoder_states is not None:
-        #     for idx, state in enumerate(encoder_states):
-        #         encoder_states[idx] = state.index_select(1, new_order)
-
         return EncoderOut(
             encoder_out=new_encoder_out,  # T x B x C
             encoder_padding_mask=new_encoder_padding_mask,  # B x T
@@ -331,21 +330,28 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
         self.layer_norm = LayerNorm(embed_dim)
 
-        self.output_projection = nn.Linear(
+        # self.output_projection = nn.Linear(
+        #     self.embed_tokens.embeddings.shape[1],
+        #     self.embed_tokens.embeddings.shape[0],
+        #     bias=False,
+        # )
+        self.output_projection = QuantLinear(
             self.embed_tokens.embeddings.shape[1],
             self.embed_tokens.embeddings.shape[0],
             bias=False,
         )
         self.output_projection.weight = self.embed_tokens.embeddings
+        self.output_projection.weight_quant = self.embed_tokens.scaled_emb_quant
 
     def build_decoder_layer(self, args):
-        # from .ls_fs_transformer_decoder_layer import (
-        #     LSFSTransformerDecoderLayer as TransformerDecoderLayer,
-        # )
-
-        from lightseq.training.ops.pytorch.torch_transformer_layers import (
-            TransformerDecoderLayer,
-        )
+        if args.enable_ls_quant:
+            from lightseq.training.ops.pytorch.torch_transformer_layers import (
+                TransformerDecoderLayer,
+            )
+        else:
+            from .ls_fs_transformer_decoder_layer import (
+                LSFSTransformerDecoderLayer as TransformerDecoderLayer,
+            )
 
         config = TransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
