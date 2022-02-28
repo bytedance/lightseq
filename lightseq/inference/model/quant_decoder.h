@@ -132,7 +132,7 @@ class QuantDecoder {
   int8_t* _int8_p_d_trg_emb_wei;
   int8_t* _int8_p_d_trg_emb_bottom_wei;
   const float _quant_range = 127;
-  const float _trg_scaled_emb_clip_max;
+  const float _trg_emb_clip_max;
   const float _output_ln_clip_max;
   const float _logits_clip_max;
   const std::vector<float> _encode_output_project_kernel_kv_clip_max;
@@ -147,9 +147,7 @@ class QuantDecoder {
 
   const float _fzero;
   const _DataType
-      _atten_scaler;          // scaling factor of Scaled Dot-Product Attention
-  const float _logit_scaler;  // output scaling factor of the liner project
-                              // after decoder
+      _atten_scaler;  // scaling factor of Scaled Dot-Product Attention
   const long _layer_size_encdec_k;
   const long _layer_size_self_k;
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",

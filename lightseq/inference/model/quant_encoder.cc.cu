@@ -34,7 +34,7 @@ QuantEncoder<OpType_>::QuantEncoder(int max_batch_size, int *p_d_token_id,
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
 
-      _src_scaled_emb_clip_max(tw.get_src_scaled_emb_clip_max()),
+      _src_emb_clip_max(tw.get_src_emb_clip_max()),
       _enc_clip_max(tw.get_enc_clip_max()),
       _ione((int32_t)1),
       _izero((int32_t)0),
@@ -90,7 +90,7 @@ void QuantEncoder<OpType_>::init_buffer() {
       cudaMalloc(&_int8_p_d_src_emb_wei,
                  _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei, _tw._hidden_size,
-                  _tw._src_vocab_size, _quant_range / _src_scaled_emb_clip_max,
+                  _tw._src_vocab_size, _quant_range / _src_emb_clip_max,
                   _stream, _cublas_lt_handle, kRowMajor);
 
   _p_device_emb.push_back(nullptr);
@@ -247,7 +247,7 @@ void QuantEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
       _int8_p_d_src_emb_wei, _p_device_emb[1], _p_d_token_id, _p_d_output,
       _p_d_padding_mask, _tw._padding_id, batch_size, batch_seq_len,
       _tw._hidden_size, _stream, _p_device_emb[4], _p_d_lang_id,
-      _tw._multilg_type, _src_scaled_emb_clip_max / _quant_range);
+      _tw._multilg_type, _src_emb_clip_max / _quant_range);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
