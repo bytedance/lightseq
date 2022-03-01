@@ -2,7 +2,6 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-# python3 run_clm.py \
 python3 -m torch.distributed.launch \
     --nproc_per_node=1 \
     $THIS_DIR/run_clm.py \
