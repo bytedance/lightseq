@@ -127,11 +127,6 @@ class LSTransformerDecoderLayer(nn.Module):
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
-            # Load cuda modules if needed
-        # global transformer_cuda_module
-        # if transformer_cuda_module is None:
-        #     transformer_cuda_module = TransformerBuilder().load()
-
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
         create_layer_func = (
@@ -427,7 +422,8 @@ class LSTransformerDecoderLayer(nn.Module):
         bs, sl, dim = decoder_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(

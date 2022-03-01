@@ -181,10 +181,6 @@ class LSTransformerEncoderLayer(nn.Module):
         return offsets
 
     def create_cpp_layer(self):
-        # Load cuda modules if needed
-        # global transformer_cuda_module
-        # if transformer_cuda_module is None:
-        #     transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
