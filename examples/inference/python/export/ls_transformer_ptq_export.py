@@ -60,14 +60,12 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         encoder_state_dict,
         config.max_seq_len,
         True,
-        clip_max=global_act_clip_max,
     )
     export_ls_embedding_ptq(
         ls_infer_model,
         decoder_state_dict,
         config.max_seq_len,
         is_encoder=False,
-        clip_max=global_act_clip_max,
     )
     export_ls_encoder_ptq(
         ls_infer_model,

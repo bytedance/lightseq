@@ -60,7 +60,6 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         encoder_state_dict,
         1024,
         True,
-        clip_max=global_act_clip_max,
         save_pb=save_pb,
     )
     export_ls_embedding_ptq(
@@ -68,7 +67,6 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         decoder_state_dict,
         1024,
         False,
-        clip_max=global_act_clip_max,
         save_pb=save_pb,
     )
     export_ls_encoder_ptq(

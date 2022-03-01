@@ -24,7 +24,7 @@ def get_kth_value(tensor, k=None):
     return max(np.partition(tensor.flatten(), -int(k))[-int(k)], 0.0)
 
 
-def gather_token_embedding(tensor_names, state_dict, tn_pattern, clip_max, scale=True):
+def gather_token_embedding(tensor_names, state_dict, tn_pattern):
     target_tn = []
     for tn in tensor_names:
         if tn_pattern in tn.split("."):
@@ -32,10 +32,10 @@ def gather_token_embedding(tensor_names, state_dict, tn_pattern, clip_max, scale
             continue
     target_tensor = [state_dict[name] for name in target_tn]
     target_tensor = np.concatenate(target_tensor, axis=0)
-    if scale:
-        target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+    target_tensor = target_tensor.astype(np.float16).astype(np.float32)
+    clip_max = get_kth_value(target_tensor)
     target_tensor = quantize(target_tensor, global_quant_range, clip_max)
-    return target_tensor, target_tn
+    return target_tensor, clip_max, target_tn
 
 
 def fill_pb_layer(
@@ -120,26 +120,25 @@ def export_ls_embedding_ptq(
     state_dict,
     max_length,
     is_encoder,
-    clip_max=global_act_clip_max,
     save_pb=True,
 ):
     var_name_list = list(state_dict.keys())
-    emb, target_tn = gather_token_embedding(
-        var_name_list, state_dict, "embeddings", clip_max
+    emb, clip_max, target_tn = gather_token_embedding(
+        var_name_list, state_dict, "embeddings"
     )
     if is_encoder:
         emb_list = emb.flatten().tolist()
         file.src_embedding.token_embedding = bytes(emb_list)
-        file.src_embedding.scaled_emb_clip_max = clip_max
+        file.src_embedding.emb_clip_max = clip_max
     else:
         emb_list = emb.transpose().flatten().tolist()
         file.trg_embedding.token_embedding = bytes(emb_list)
-        file.trg_embedding.scaled_emb_clip_max = clip_max
+        file.trg_embedding.emb_clip_max = clip_max
     print(
         "%s -> %s_embedding.token_embedding, convert finished!"
         % (target_tn, "src" if is_encoder else "trg")
     )
-    print("%s scaled_emb_clip_max convert finished!" % target_tn)
+    print("%s emb_clip_max convert finished!" % target_tn)
 
     pos_emb = get_pos_embedding(max_length, emb.shape[-1])
     pos_emb_list = pos_emb.flatten().tolist()
