@@ -206,6 +206,7 @@ class LSTransformerEncoderLayer(nn.Module):
             self.config.hidden_dropout_ratio,
             self.config.pre_layer_norm,
             self.config.activation_fn,
+            False,  # mask_future_tokens
         )
 
     def _get_weights(self, i):

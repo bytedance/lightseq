@@ -26,7 +26,7 @@ int create_transformer_encoder_layer(
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens = false) {
+    bool mask_future_tokens) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   auto layer = std::make_shared<TransformerEncoderLayer<T>>(
