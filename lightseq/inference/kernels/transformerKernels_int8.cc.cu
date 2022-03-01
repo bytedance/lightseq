@@ -13,7 +13,7 @@ namespace lightseq {
 namespace cuda {
 __forceinline__ __device__ int8_t float2int8(float x, float quant_scale) {
   float i8_f = x * quant_scale;
-  int32_t i8 = __float2int_rn(i8_f);
+  int32_t i8 = floorf(i8_f + 0.5);
   i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
   return int8_t(i8);
 }
@@ -21,7 +21,7 @@ __forceinline__ __device__ int8_t float2int8(float x, float quant_scale) {
 __forceinline__ __device__ int8_t posfloat2int8(float x, float quant_scale,
                                                 float clip_max) {
   float i8_f = x * 2 * quant_scale - quant_scale * clip_max;
-  int32_t i8 = __float2int_rn(i8_f);
+  int32_t i8 = floorf(i8_f + 0.5);
   i8 = i8 < -127 ? -127 : (i8 > 127 ? 127 : i8);
   return int8_t(i8);
 }
