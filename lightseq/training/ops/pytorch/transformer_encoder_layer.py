@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-
+from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -15,7 +15,7 @@ from lightseq.training.ops.pytorch.util import (
     calc_offset,
 )
 
-transformer_cuda_module = None
+
 _all_layer_grads = dict()
 
 
@@ -101,32 +101,7 @@ class LSTransformerEncoderLayer(nn.Module):
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
-        # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
-
-        # create the layer in cuda kernels.
-        cuda_module = transformer_cuda_module
-        create_layer_func = (
-            cuda_module.create_transformer_encoder_layer_fp16
-            if self.config.fp16
-            else cuda_module.create_transformer_encoder_layer_fp32
-        )
-
-        create_layer_func(
-            self.config.layer_id,
-            self.config.max_batch_tokens,
-            self.config.max_seq_len,
-            self.config.hidden_size,
-            self.config.nhead,
-            self.config.intermediate_size,
-            self.config.attn_prob_dropout_ratio,
-            self.config.activation_dropout_ratio,
-            self.config.hidden_dropout_ratio,
-            self.config.pre_layer_norm,
-            self.config.activation_fn,
-        )
+        self.create_cpp_layer()
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
@@ -205,6 +180,34 @@ class LSTransformerEncoderLayer(nn.Module):
         offsets = calc_offset(sizes)
         return offsets
 
+    def create_cpp_layer(self):
+        # Load cuda modules if needed
+        # global transformer_cuda_module
+        # if transformer_cuda_module is None:
+        #     transformer_cuda_module = TransformerBuilder().load()
+
+        # create the layer in cuda kernels.
+        cuda_module = transformer_cuda_module
+        create_layer_func = (
+            cuda_module.create_transformer_encoder_layer_fp16
+            if self.config.fp16
+            else cuda_module.create_transformer_encoder_layer_fp32
+        )
+
+        create_layer_func(
+            self.config.layer_id,
+            self.config.max_batch_tokens,
+            self.config.max_seq_len,
+            self.config.hidden_size,
+            self.config.nhead,
+            self.config.intermediate_size,
+            self.config.attn_prob_dropout_ratio,
+            self.config.activation_dropout_ratio,
+            self.config.hidden_dropout_ratio,
+            self.config.pre_layer_norm,
+            self.config.activation_fn,
+        )
+
     def _get_weights(self, i):
         return self.para.data.narrow(
             0, self.para_offset[i], self.para_offset[i + 1] - self.para_offset[i]
@@ -250,6 +253,7 @@ class LSTransformerEncoderLayer(nn.Module):
         )
         if self.config.layer_id in _all_layer_grads:
             return
+        global transformer_cuda_module
         cuda_module = transformer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
@@ -266,6 +270,10 @@ class LSTransformerEncoderLayer(nn.Module):
         return destination
 
     def forward(self, hidden_states, encoder_padding_mask, **kwargs):
+        # encoder_padding_mask is a mask for the input sequence
+        # sizes are [batch_size, seq_len] or [seq_len] when batch_size = 1
+        # masked value should be 1.0, unmasked value should be 0.0
+
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
         hidden_states = hidden_states.contiguous()
@@ -282,7 +290,8 @@ class LSTransformerEncoderLayer(nn.Module):
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(

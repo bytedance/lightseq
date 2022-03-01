@@ -8,7 +8,8 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn)
+    bool pre_or_postLayerNorm, std::string activation_fn,
+    bool mask_future_tokens)
     : _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -28,7 +29,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
               _max_batch_tokens),
       _ff1(typename FeedForward<T>::Config(_intermediate_size, hidden_size)),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),
-      _softmax(typename Softmax<T>::Config(num_heads)),
+      _softmax(typename Softmax<T>::Config(num_heads, mask_future_tokens)),
       _attn_prob_dropout(typename Dropout<T>::Config(attn_prob_dropout_ratio),
                          _max_batch_tokens * _heads * _max_seq_len),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),

@@ -15,7 +15,9 @@ class Softmax {
  public:
   struct Config {
     size_t nhead;
-    Config(size_t nhead) : nhead(nhead) {}
+    bool mask_future;
+    Config(size_t nhead, bool mask_future = false)
+        : nhead(nhead), mask_future(mask_future) {}
   };
 
   Softmax(Config config) : config_(config) {}
@@ -25,7 +27,7 @@ class Softmax {
   void Forward(T *vals, const T *attn_mask, int batch_size, int from_len,
                int to_len, cudaStream_t &stream, bool mask_future = true) {
     launch_attn_softmax<T>(vals, attn_mask, batch_size, config_.nhead, from_len,
-                           to_len, mask_future, stream);
+                           to_len, config_.mask_future | mask_future, stream);
   }
 
   void Backward(T *out_grad, const T *soft_out, int batch_size, int from_len,

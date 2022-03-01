@@ -147,8 +147,9 @@ def test_launch_attn_softmax():
 
     nhead = kt.nhead
     print(
-        "(batch_size, nhead, from_len, to_len, is_dec_self_attn): "
-        f"({batch_size}, {nhead}, {from_len}, {to_len}, {is_dec_self_attn})"
+        "(batch_size, nhead, from_len, to_len, is_dec_self_attn,"
+        f" is_dec_self_attn_infer): ({batch_size}, {nhead}, {from_len}, {to_len},"
+        f" {is_dec_self_attn}, {is_dec_self_attn_infer})"
     )
 
     inp = kt.rand((batch_size, nhead, from_len, to_len))
@@ -177,7 +178,7 @@ def test_launch_attn_softmax():
             from_len,
             to_len,
             is_dec_self_attn,
-            not is_dec_self_attn_infer,
+            is_dec_self_attn and (not is_dec_self_attn_infer),
         )
         return [
             inp_dup,
@@ -244,9 +245,7 @@ def test_launch_attn_softmax_bw():
 def test_launch_fused_add2():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
-    print(
-        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
-    )
+    print(f"(batch_size, seq_len, hidden_dim): ({batch_size}, {seq_len}, {hidden_dim})")
 
     val1 = kt.rand((batch_size, seq_len, hidden_dim))
     val2 = kt.rand((batch_size, seq_len, hidden_dim))
@@ -401,7 +400,7 @@ def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
     coef = random.randint(1, 4)
-    print("(rows, cols): " f"({batch_size*seq_len}, {coef*hidden_dim})")
+    print(f"(rows, cols): ({batch_size*seq_len}, {coef*hidden_dim})")
 
     val = kt.rand((batch_size * seq_len, coef * hidden_dim))
     custom_res = kt.rand((coef * hidden_dim))
@@ -442,7 +441,8 @@ def test_launch_concat3_dim1():
     sl2 = seq_len - sl1
     beam_size = random.randint(1, 8)
     print(
-        f"(batch_size, beam_size, nhead, sl1, sl2, head_dim): {batch_size}, {beam_size}, {nhead}, {sl1}, {sl2}, {head_dim}"
+        f"(batch_size, beam_size, nhead, sl1, sl2, head_dim): {batch_size},"
+        f" {beam_size}, {nhead}, {sl1}, {sl2}, {head_dim}"
     )
 
     inp1 = kt.rand((batch_size, beam_size, nhead, sl1, head_dim))
@@ -721,20 +721,20 @@ def test_launch_dropout_gelu_bias_bwd():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
+        # "test_launch_transform_0213",
+        # "test_launch_bias_add_transform_20314",
+        # "test_launch_transform4d_0213",
+        # "test_launch_fused_add2",
+        # "test_launch_ffn_bias_bwd",
         "test_launch_attn_softmax",
         "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
+        # "test_launch_layer_norm",
+        # "test_launch_ln_bw",
+        # "test_launch_concat3_dim1",
+        # "test_adam",
+        # "test_launch_dropout_gelu_bias",
+        # "test_launch_dropout_relu_bias",
+        # "test_launch_dropout_relu_bias_bwd",
+        # "test_launch_dropout_gelu_bias_bwd",
     ]
     kt.run(kernel_list)

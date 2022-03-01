@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
+from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -14,7 +15,7 @@ from lightseq.training.ops.pytorch.util import (
     calc_offset,
 )
 
-transformer_cuda_module = None
+
 _all_layer_grads = dict()
 _shared_encdec_attn_kv_params = dict()
 
@@ -127,9 +128,9 @@ class LSTransformerDecoderLayer(nn.Module):
             torch.cuda.set_device(self.config.local_rank)
 
             # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
+        # global transformer_cuda_module
+        # if transformer_cuda_module is None:
+        #     transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
