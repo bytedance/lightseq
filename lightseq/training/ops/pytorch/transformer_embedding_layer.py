@@ -94,11 +94,6 @@ class LSTransformerEmbeddingLayer(nn.Module):
         if self.config.fp16:
             self.pos_embeddings = self.pos_embeddings.to(torch.half)
 
-        # Load cuda modules if needed
-        # global transformer_cuda_module
-        # if transformer_cuda_module is None:
-        #     transformer_cuda_module = TransformerBuilder().load()
-
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
         create_layer_func = (
@@ -176,7 +171,8 @@ class LSTransformerEmbeddingLayer(nn.Module):
         bs, sl = input.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(
@@ -184,7 +180,8 @@ class LSTransformerEmbeddingLayer(nn.Module):
             )
         if step >= self.config.max_seq_len:
             raise ValueError(
-                f"Target sequence length {sl} exceeds the limit {self.config.max_seq_len}."
+                f"Target sequence length {sl} exceeds the limit"
+                f" {self.config.max_seq_len}."
             )
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.embeddings, step)
         return x.to(self.embeddings)
