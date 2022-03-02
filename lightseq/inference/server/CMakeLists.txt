@@ -88,3 +88,18 @@ set_target_properties(
   PROPERTIES
     LINK_FLAGS
     "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+
+add_library(moe_server SHARED moe_server.cc.cu custom.h ${CONFIG_PROTO_SRC}
+                              ${CONFIG_PROTO_HEADER})
+target_link_libraries(moe_server PUBLIC moe_model)
+target_include_directories(moe_server INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(moe_server INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(
+  moe_server PROPERTIES LINK_DEPENDS
+                        ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript)
+set_target_properties(
+  moe_server
+  PROPERTIES
+    LINK_FLAGS
+    "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
+
