@@ -102,4 +102,3 @@ set_target_properties(
   PROPERTIES
     LINK_FLAGS
     "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libserver.ldscript")
-
