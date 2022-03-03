@@ -44,7 +44,7 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
       _type_zero(0.f),
       _fzero(0.f),
 
-      _trg_scaled_emb_clip_max(tw.get_trg_scaled_emb_clip_max()),
+      _trg_emb_clip_max(tw.get_trg_emb_clip_max()),
       _output_ln_clip_max(tw.get_output_ln_clip_max()),
       _logits_clip_max(tw.get_logits_clip_max()),
       _encode_output_project_kernel_kv_clip_max(
@@ -54,8 +54,6 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
       _izero((int32_t)0),
 
       _atten_scaler(sqrt(1.f / tw._dim_per_head)),
-      _logit_scaler(_tw._no_scale_embedding ? 1.f
-                                            : sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
@@ -172,15 +170,15 @@ void QuantDecoder<OpType_>::init_buffer() {
       cudaMalloc(&_int8_p_d_trg_emb_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei, _tw._hidden_size,
-                  _tw._trg_vocab_size, _quant_range / _trg_scaled_emb_clip_max,
+                  _tw._trg_vocab_size, _quant_range / _trg_emb_clip_max,
                   _stream, _cublas_lt_handle);
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_trg_emb_bottom_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_bottom_wei,
                   _tw._hidden_size, _tw._trg_vocab_size,
-                  _quant_range / _trg_scaled_emb_clip_max, _stream,
-                  _cublas_lt_handle, kRowMajor);
+                  _quant_range / _trg_emb_clip_max, _stream, _cublas_lt_handle,
+                  kRowMajor);
   _p_device_emb.push_back(nullptr);
   _p_device_emb.push_back(
       to_gpu(_p_d_trg_emb_wei[1], _tw._max_step * _tw._hidden_size, _stream));
@@ -531,8 +529,7 @@ bool QuantDecoder<OpType_>::run_step() {
 
   cublasLtMM_withAlgo_i8IO(_int8_ffn_out_buf, 1, _step_token_num,
                            _tw._trg_vocab_size, _tw._hidden_size, 0, 0, 0,
-                           _output_ln_clip_max * _trg_scaled_emb_clip_max *
-                               _logit_scaler /
+                           _output_ln_clip_max * _trg_emb_clip_max /
                                (_logits_clip_max * _quant_range),
                            _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
                            _cublas_lt_handle, _stream, false);
@@ -576,7 +573,7 @@ void QuantDecoder<OpType_>::embedding() {
       _p_device_emb[7], _p_d_lang_id, _p_d_cur_step_query, _batch_size,
       _tw._beam_size, _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
       _tw._max_step, _tw._multilg_type, _stream,
-      _trg_scaled_emb_clip_max / _quant_range);
+      _trg_emb_clip_max / _quant_range);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id

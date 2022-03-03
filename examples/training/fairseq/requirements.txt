@@ -1,0 +1,6 @@
+numpy==1.19.5
+sacrebleu==1.5.1
+sacremoses
+fairseq
+lightseq
+ninja
