@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
+from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
@@ -73,7 +74,7 @@ class LSTransformerEncoderFunc(Function):
         return (grad_input, None, grad, None)
 
 
-class LSTransformerEncoderLayer(nn.Module):
+class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
     """Initialize the Lightseq Transformer Encoder Layer.
 
     Static variable:
