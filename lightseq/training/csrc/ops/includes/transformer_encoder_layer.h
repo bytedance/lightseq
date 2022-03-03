@@ -22,7 +22,8 @@ class TransformerEncoderLayer {
                           float attn_dropout_ratio,
                           float hidden_output_dropout_ratio,
                           float layer_norm_eps, bool pre_or_postLayerNorm,
-                          std::string activation_fn);
+                          std::string activation_fn,
+                          bool mask_future_tokens = false);
 
   virtual ~TransformerEncoderLayer();
 
