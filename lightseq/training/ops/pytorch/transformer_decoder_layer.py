@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
+from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -14,7 +15,7 @@ from lightseq.training.ops.pytorch.util import (
     calc_offset,
 )
 
-transformer_cuda_module = None
+
 _all_layer_grads = dict()
 _shared_encdec_attn_kv_params = dict()
 
@@ -125,11 +126,6 @@ class LSTransformerDecoderLayer(nn.Module):
 
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
-
-            # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -426,7 +422,8 @@ class LSTransformerDecoderLayer(nn.Module):
         bs, sl, dim = decoder_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit"
+                f" {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(

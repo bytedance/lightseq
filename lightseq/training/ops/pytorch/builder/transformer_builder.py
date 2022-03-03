@@ -5,6 +5,7 @@
 import torch
 import pathlib
 from .builder import CUDAOpBuilder
+from .builder import installed_cuda_version
 
 
 class TransformerBuilder(CUDAOpBuilder):
@@ -36,11 +37,14 @@ class TransformerBuilder(CUDAOpBuilder):
         ]
 
     def include_paths(self):
-        return [
+        paths = [
             "csrc/kernels/includes",
             "csrc/ops/includes",
-            str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),
         ]
+        cuda_major, cuda_minor = installed_cuda_version()
+        if cuda_major < 11:
+            paths.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"))
+        return paths
 
     def nvcc_args(self):
         args = [
