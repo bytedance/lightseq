@@ -4,9 +4,11 @@
 
 #define CUB_NS_PREFIX namespace ls {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::ls::cub
 #include "cub/cub.cuh"
 #include "cub/util_allocator.cuh"
 #undef CUB_NS_POSTFIX
 #undef CUB_NS_PREFIX
+#undef CUB_NS_QUALIFIER
 
 #endif
