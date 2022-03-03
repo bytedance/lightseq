@@ -19,7 +19,7 @@
 import copy
 import inspect
 
-from absl import logging
+import logging
 
 from torch import nn
 
@@ -29,6 +29,7 @@ from lightseq.training.pytorch_quantization.tensor_quant import (
     QUANT_DESC_8BIT_PER_TENSOR,
 )
 
+logger = logging.getLogger(__name__)
 
 class QuantMixin:
     """Mixin class for adding basic quantization logic to quantized modules"""
@@ -76,14 +77,14 @@ class QuantMixin:
         if (not quant_desc_input.fake_quant) or (not quant_desc_weight.fake_quant):
             raise ValueError("Only fake quantization is supported!")
 
-        logging.info(
+        logger.info(
             "Input is %squantized to %d bits in %s with axis %s!",
             "" if not quant_desc_input.fake_quant else "fake ",
             quant_desc_input.num_bits,
             self.__class__.__name__,
             quant_desc_input.axis,
         )
-        logging.info(
+        logger.info(
             "Weight is %squantized to %d bits in %s with axis %s!",
             "" if not quant_desc_weight.fake_quant else "fake ",
             quant_desc_weight.num_bits,
@@ -147,7 +148,7 @@ class QuantInputMixin:
         if not quant_desc_input.fake_quant:
             raise ValueError("Only fake quantization is supported!")
 
-        logging.info(
+        logger.info(
             "Input is %squantized to %d bits in %s with axis %s!",
             "" if not quant_desc_input.fake_quant else "fake ",
             quant_desc_input.num_bits,

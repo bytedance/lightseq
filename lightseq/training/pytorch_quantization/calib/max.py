@@ -16,12 +16,13 @@
 #
 
 """Calibrator that returns the absolute max of all collected tensors"""
-from absl import logging
+import logging
 import torch
 
 from lightseq.training.pytorch_quantization.calib.calibrator import _Calibrator
 from lightseq.training.pytorch_quantization import utils as quant_utils
 
+logger = logging.getLogger(__name__)
 
 class MaxCalibrator(_Calibrator):
     """Max calibrator, tracks the maximum value globally
@@ -60,14 +61,6 @@ class MaxCalibrator(_Calibrator):
             RuntimeError: If amax shape changes
         """
         if torch.min(x) < 0.0:
-            logging.log_first_n(
-                logging.INFO,
-                (
-                    "Calibrator encountered negative values. It shouldn't happen after ReLU. "
-                    "Make sure this is the right tensor to calibrate."
-                ),
-                1,
-            )
             x = x.abs()
 
         # Swap axis to reduce.

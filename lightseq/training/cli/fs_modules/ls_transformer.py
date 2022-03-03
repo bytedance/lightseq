@@ -330,19 +330,20 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
         self.layer_norm = LayerNorm(embed_dim)
 
-        # self.output_projection = nn.Linear(
-        #     self.embed_tokens.embeddings.shape[1],
-        #     self.embed_tokens.embeddings.shape[0],
-        #     bias=False,
-        # )
-        self.output_projection = QuantLinear(
-            self.embed_tokens.embeddings.shape[1],
-            self.embed_tokens.embeddings.shape[0],
-            bias=False,
-        )
-        self.output_projection.weight = self.embed_tokens.embeddings
-        self.output_projection.weight_quant = self.embed_tokens.scaled_emb_quant
-
+        if args.enable_ls_quant:
+            self.output_projection = QuantLinear(
+                self.embed_tokens.embeddings.shape[1],
+                self.embed_tokens.embeddings.shape[0],
+                bias=False,
+            )
+            self.output_projection.weight = self.embed_tokens.embeddings
+            self.output_projection.weight_quant = self.embed_tokens.scaled_emb_quant
+        else:
+            self.output_projection = nn.Linear(
+                self.embed_tokens.embeddings.shape[1],
+                self.embed_tokens.embeddings.shape[0],
+                bias=False,
+            )
     def build_decoder_layer(self, args):
         if args.enable_ls_quant:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (

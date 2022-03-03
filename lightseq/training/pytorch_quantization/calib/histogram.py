@@ -21,7 +21,7 @@ from collections import Counter
 import numpy as np
 from scipy.stats import entropy
 
-from absl import logging
+import logging
 
 import torch
 
@@ -32,6 +32,7 @@ from lightseq.training.pytorch_quantization import utils as quant_utils
 
 __all__ = ["HistogramCalibrator", "calibrate_weights"]
 
+logger = logging.getLogger(__name__)
 
 class HistogramCalibrator(_Calibrator):
     """Unified histogram calibrator
@@ -75,19 +76,11 @@ class HistogramCalibrator(_Calibrator):
             )
 
         if grow_method is not None:
-            logging.warning("grow_method is deprecated. Got %s, ingored!", grow_method)
+            logger.warning("grow_method is deprecated. Got %s, ingored!", grow_method)
 
     def collect(self, x):
         """Collect histogram"""
         if torch.min(x) < 0.0:
-            logging.log_first_n(
-                logging.INFO,
-                (
-                    "Calibrator encountered negative values. It shouldn't happen after ReLU. "
-                    "Make sure this is the right tensor to calibrate."
-                ),
-                1,
-            )
             x = x.abs()
 
         x = x.float()
@@ -310,7 +303,7 @@ def _compute_amax_entropy(
         arguments.append(i)
 
     divergences = np.array(divergences)
-    logging.debug("divergences={}".format(divergences))
+    logger.debug("divergences={}".format(divergences))
     last_argmin = len(divergences) - 1 - np.argmin(divergences[::-1])
     calib_amax = calib_bin_edges[last_argmin * stride + starting]
     calib_amax = torch.tensor(calib_amax.item())  # pylint: disable=not-callable
@@ -344,7 +337,7 @@ def _compute_amax_mse(
         mses.append(mse)
         arguments.append(i)
 
-    logging.debug("mses={}".format(mses))
+    logger.debug("mses={}".format(mses))
     argmin = np.argmin(mses)
     calib_amax = centers[arguments[argmin]]
 
@@ -394,7 +387,7 @@ def calibrate_weights(
     """
     for name, module in model.named_modules():
         if hasattr(module, "weight") and hasattr(module, "weight_quantizer"):
-            logging.info("Calibrate weight of %s", name)
+            logger.info("Calibrate weight of %s", name)
             num_bits = module.weight_quantizer.num_bits
             unsigned = module.weight_quantizer.unsigned
             channel_second_modules = (

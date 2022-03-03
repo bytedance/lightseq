@@ -20,7 +20,7 @@
 
 import re
 
-from absl import logging
+import logging
 
 
 def match_parameters(model, patterns):
@@ -112,7 +112,7 @@ def freeze_parameters(model, patterns):
     for name, param in model.named_parameters():
         for pattern in patterns:
             if re.search(pattern, name):
-                logging.warning("Freeze %s.", name)
+                logger.warning("Freeze %s.", name)
                 param.requires_grad = False
 
 
@@ -131,11 +131,11 @@ def quant_weight_inplace(model):
     for name, module in model.named_modules():
         if hasattr(module, "_weight_quantizer") and module.weight_quantizer is not None:
             if not module.weight_quantizer.fake_quant:
-                logging.warning(
+                logger.warning(
                     (
                         "In-place real quantization is VERY dangerous and should be used for inference only. "
                         "Make sure that is the desired behavior."
                     )
                 )
-            logging.warning("In-place quantize weight of %s", name)
+            logger.warning("In-place quantize weight of %s", name)
             module.weight.data.copy_(module.weight_quantizer(module.weight))
