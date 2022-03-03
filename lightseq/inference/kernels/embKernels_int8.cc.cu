@@ -39,10 +39,11 @@ __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
     }
     char4 value_i4 = ((char4 *)token_emb)[token * hidden_dim + dim_idx];
     float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
-    value.x = float(value_i4.x) * dequant_scale + pemb.x;
-    value.y = float(value_i4.y) * dequant_scale + pemb.y;
-    value.z = float(value_i4.z) * dequant_scale + pemb.z;
-    value.w = float(value_i4.w) * dequant_scale + pemb.w;
+    float scale = dequant_scale * sqrtf(hidden_dim << 2);
+    value.x = float(value_i4.x) * scale + pemb.x;
+    value.y = float(value_i4.y) * scale + pemb.y;
+    value.z = float(value_i4.z) * scale + pemb.z;
+    value.w = float(value_i4.w) * scale + pemb.w;
   }
   ((float4 *)output)[idx] = value;
 }
@@ -81,14 +82,13 @@ __global__ void ker_enc_emb_i8I<__half>(const int8_t *token_emb,
     __half2 *value_h2 = (__half2 *)(&value);
     char2 *value_i2 = (char2 *)(&value_i8);
     __half2 *pemb_h2 = (__half2 *)(&pemb);
+    float scale = dequant_scale * sqrtf(hidden_dim << 3);
 #pragma unroll
     for (int i = 0; i < 4; i++) {
       float2 value_f2;
       float2 pemb_f2 = __half22float2(pemb_h2[i]);
-      value_f2.x =
-          float(__half(float(value_i2[i].x) * dequant_scale)) + pemb_f2.x;
-      value_f2.y =
-          float(__half(float(value_i2[i].y) * dequant_scale)) + pemb_f2.y;
+      value_f2.x = float(value_i2[i].x) * scale + pemb_f2.x;
+      value_f2.y = float(value_i2[i].y) * scale + pemb_f2.y;
       value_h2[i] = __float22half2_rn(value_f2);
     }
   }
@@ -170,7 +170,7 @@ __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
   int8_t emb;
   int token = tokens[flat_3dim(batch_idx, beam_idx, step, beam_size, max_step)];
   emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
-  float value = float(T(float(emb) * dequant_scale)) +
+  float value = float(emb) * dequant_scale * sqrtf(hidden_dim) +
                 float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
   output[idx] = T(value);
 }

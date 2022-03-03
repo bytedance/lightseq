@@ -109,13 +109,13 @@ std::string QuantTransformerWeight<OpType_>::proto_parse_emb_wei(
   if (layer.token_embedding().size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (unsigned char ele : layer.token_embedding())
-    value.push_back(dequantize(ele, _quant_range, layer.scaled_emb_clip_max()));
+    value.push_back(dequantize(ele, _quant_range, layer.emb_clip_max()));
   idx += vocab_size * _hidden_size;
 
   if (source == "src")
-    _src_scaled_emb_clip_max = layer.scaled_emb_clip_max();
+    _src_emb_clip_max = layer.emb_clip_max();
   else {
-    _trg_scaled_emb_clip_max = layer.scaled_emb_clip_max();
+    _trg_emb_clip_max = layer.emb_clip_max();
     _output_ln_clip_max = layer.output_ln_clip_max();
     _logits_clip_max = layer.logits_clip_max();
   }
