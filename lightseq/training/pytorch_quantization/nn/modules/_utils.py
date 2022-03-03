@@ -31,6 +31,7 @@ from lightseq.training.pytorch_quantization.tensor_quant import (
 
 logger = logging.getLogger(__name__)
 
+
 class QuantMixin:
     """Mixin class for adding basic quantization logic to quantized modules"""
 

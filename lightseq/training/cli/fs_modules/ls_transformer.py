@@ -344,6 +344,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 self.embed_tokens.embeddings.shape[0],
                 bias=False,
             )
+
     def build_decoder_layer(self, args):
         if args.enable_ls_quant:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (

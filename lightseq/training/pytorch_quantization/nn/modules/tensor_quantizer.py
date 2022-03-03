@@ -37,6 +37,7 @@ __all__ = ["TensorQuantizer"]
 
 logger = logging.getLogger(__name__)
 
+
 class TensorQuantizer(nn.Module):
     """Tensor quantizer module
 

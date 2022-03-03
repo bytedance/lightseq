@@ -34,6 +34,7 @@ __all__ = ["HistogramCalibrator", "calibrate_weights"]
 
 logger = logging.getLogger(__name__)
 
+
 class HistogramCalibrator(_Calibrator):
     """Unified histogram calibrator
 

@@ -24,6 +24,7 @@ from lightseq.training.pytorch_quantization import utils as quant_utils
 
 logger = logging.getLogger(__name__)
 
+
 class MaxCalibrator(_Calibrator):
     """Max calibrator, tracks the maximum value globally
 

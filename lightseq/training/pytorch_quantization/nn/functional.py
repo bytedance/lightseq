@@ -24,6 +24,7 @@ from torch.autograd import Function
 
 logger = logging.getLogger(__name__)
 
+
 class ClipFunction(Function):
     """An universal tensor clip function
 

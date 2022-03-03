@@ -27,6 +27,7 @@ from torch.autograd import Function
 
 logger = logging.getLogger(__name__)
 
+
 class ScaledQuantDescriptor:
     """Supportive descriptor of quantization
 
@@ -88,9 +89,7 @@ class ScaledQuantDescriptor:
         self._fake_quant = kwargs.pop("fake_quant", True)
         self._axis = kwargs.pop("axis", None)
         if self._axis is not None:
-            logger.debug(
-                "Meaning of axis has changed since v2.0. Make sure to update."
-            )
+            logger.debug("Meaning of axis has changed since v2.0. Make sure to update.")
         self._learn_amax = kwargs.pop("learn_amax", False)
         if self._learn_amax and self._axis is not None:
             raise TypeError(
