@@ -17,10 +17,12 @@
 
 
 """Some supportive functions"""
-from absl import logging
+import logging
 
 import torch
 from torch.autograd import Function
+
+logger = logging.getLogger(__name__)
 
 
 class ClipFunction(Function):
@@ -45,12 +47,6 @@ class ClipFunction(Function):
         max_mask = (input < clip_value_max).to(grad_output.dtype)
         grad_input = grad_output * min_mask * max_mask
 
-        if clip_value_min.requires_grad or clip_value_max.requires_grad:
-            logging.log_first_n(
-                logging.WARNING,
-                "Learning clip min/max is experimental, use at your own risk :).",
-                1,
-            )
         if clip_value_min.numel() != 1 or clip_value_max.numel() != 1:
             raise ValueError(
                 "Learnable min/max can only be scalar, got size %s and %s."

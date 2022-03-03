@@ -17,7 +17,7 @@
 
 """TensorQuantizer Module"""
 import math
-from absl import logging
+import logging
 
 import torch
 from torch import nn
@@ -34,6 +34,8 @@ from lightseq.training.pytorch_quantization import calib
 import lightseq.training.pytorch_quantization.utils as quant_utils
 
 __all__ = ["TensorQuantizer"]
+
+logger = logging.getLogger(__name__)
 
 
 class TensorQuantizer(nn.Module):
@@ -110,12 +112,10 @@ class TensorQuantizer(nn.Module):
             self.enable_clip()
 
         if quant_desc.calib_method == "histogram":
-            logging.info("Creating histogram calibrator")
             self._calibrator = calib.HistogramCalibrator(
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned
             )
         elif quant_desc.calib_method == "max":
-            logging.info("Creating Max calibrator")
             self._calibrator = calib.MaxCalibrator(
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned
             )
@@ -132,9 +132,9 @@ class TensorQuantizer(nn.Module):
     @property
     def scale(self):
         if self._fake_quant:
-            logging.error("Fake quantize mode doesn't use scale explicitly!")
+            logger.error("Fake quantize mode doesn't use scale explicitly!")
         if self._scale is None:
-            logging.critical("Accessing scale before quantizing any tensor!")
+            logger.critical("Accessing scale before quantizing any tensor!")
         return self._scale
 
     @property
@@ -146,7 +146,7 @@ class TensorQuantizer(nn.Module):
     @property
     def step_size(self):
         if not hasattr(self, "_amax"):
-            logging.error("step_size is undefined under dynamic amax mode!")
+            logger.error("step_size is undefined under dynamic amax mode!")
             return None
         return self._amax / (2.0 ** (self._num_bits - 1 + int(self._unsigned)) - 1.0)
 
@@ -177,7 +177,7 @@ class TensorQuantizer(nn.Module):
 
     def enable_clip(self):
         """Enable clip stage"""
-        # logging.warning("Enable `clip` stage for amax learning.")
+        # logger.warning("Enable `clip` stage for amax learning.")
         if not self._learn_amax:
             raise ValueError("learn_amax is False. Cannot enable clip.")
         # self.clip.clip_value_min.required_grad = True
@@ -185,30 +185,26 @@ class TensorQuantizer(nn.Module):
         self._if_clip = True
 
     def disable_calib(self):
-        logging.warning("Disable {}".format(self._calibrator.__class__.__name__))
         self._if_calib = False
 
     def enable_calib(self):
         if self._calibrator is None:
             raise ValueError("Calibrator was not created, cannot enable calibration.")
-        logging.info("Enable {}".format(self._calibrator.__class__.__name__))
         self._if_calib = True
 
     def disable_quant(self):
-        logging.info("Disable `quant` stage.")
         self._if_quant = False
 
     def enable_quant(self):
-        logging.info("Enable `quant` stage.")
         self._if_quant = True
 
     @amax.setter
     def amax(self, value):
         if value is None:
-            logging.error("Setting amax no None is meaningless.")
+            logger.error("Setting amax no None is meaningless.")
         else:
             if isinstance(value, torch.Tensor):
-                logging.warning("amax setter is not designed to take tensor.")
+                logger.warning("amax setter is not designed to take tensor.")
             if not hasattr(self, "_amax"):
                 self.register_buffer("_amax", torch.tensor(value))
             else:
@@ -247,8 +243,8 @@ class TensorQuantizer(nn.Module):
                 " seen any tensor."
             )
             if not strict:
-                logging.warning(err_msg)
-                logging.warning("Set amax to NaN!")
+                logger.warning(err_msg)
+                logger.warning("Set amax to NaN!")
                 calib_amax = torch.tensor(math.nan)
             else:
                 raise RuntimeError(
@@ -256,12 +252,8 @@ class TensorQuantizer(nn.Module):
                     + " Passing 'strict=False' to `load_calib_amax()` will ignore the"
                     " error."
                 )
-        logging.warning("Load calibrated amax, shape={}.".format(calib_amax.shape))
-        logging.log_first_n(
-            logging.WARNING,
-            "Call .cuda() if running on GPU after loading calibrated amax.",
-            1,
-        )
+        logger.warning("Load calibrated amax, shape={}.".format(calib_amax.shape))
+
         if not hasattr(self, "_amax"):
             self.register_buffer("_amax", calib_amax.data)
         else:
@@ -271,9 +263,9 @@ class TensorQuantizer(nn.Module):
         """Initialize learned amax from fixed amax"""
         if self._learn_amax is False:
             raise RuntimeError("Called init_learn_amax with learn_amax=False.")
-        logging.warning("Load amax as initial value for amax learning!")
+        logger.warning("Load amax as initial value for amax learning!")
         if self._amax.numel() != 1:
-            logging.warning(
+            logger.warning(
                 "Per channel learned amax not supported. Initializing with max(amax)."
             )
             init_amax = torch.max(self._amax)
@@ -310,9 +302,7 @@ class TensorQuantizer(nn.Module):
 
     def _fb_fake_quant(self, inputs, amax):
         """Native pytorch fake quantization."""
-        logging.log_first_n(
-            logging.WARNING, "Use Pytorch's native experimental fake quantization.", 1
-        )
+
         bound = (1 << (self._num_bits - 1 + int(self._unsigned))) - 1
         # To be consistent with ONNX, full range is used. e.g. range is [-128, 127] in int8
         if amax.numel() == 1:
@@ -456,9 +446,9 @@ class TensorQuantizer(nn.Module):
         src_has_amax = prefix + "_amax" in state_dict
 
         if not src_has_amax and dst_has_amax:
-            logging.error("{}: No amax in state_dict.".format(prefix[:-1]))
+            logger.error("{}: No amax in state_dict.".format(prefix[:-1]))
         elif src_has_amax and not dst_has_amax:
-            logging.debug(
+            logger.debug(
                 (
                     "{}: No '_amax' buffer to load amax into."
                     " '_amax` will be created as WAR for now. "
@@ -467,7 +457,7 @@ class TensorQuantizer(nn.Module):
             )
             self.register_buffer("_amax", state_dict[prefix + "_amax"].data.cuda())
         elif src_has_amax and dst_has_amax:
-            logging.warning("{}: Overwriting amax.".format(prefix[:-1]))
+            logger.warning("{}: Overwriting amax.".format(prefix[:-1]))
 
         super(TensorQuantizer, self)._load_from_state_dict(
             state_dict, prefix, *args, **kwargs

@@ -20,10 +20,12 @@
 import numpy as np
 import yaml
 
-from absl import logging
+import logging
 
 import torch
 from torch.autograd import Function
+
+logger = logging.getLogger(__name__)
 
 
 class ScaledQuantDescriptor:
@@ -75,7 +77,7 @@ class ScaledQuantDescriptor:
         if num_bits < 0:
             raise ValueError("num_bits must be >= 0, not {}.".format(num_bits))
         if num_bits == 0:
-            logging.error(
+            logger.error(
                 "num_bits is 0. This will result in the tensor being quantized to all"
                 " zeros. This mode should only be used for debugging purposes."
             )
@@ -87,9 +89,7 @@ class ScaledQuantDescriptor:
         self._fake_quant = kwargs.pop("fake_quant", True)
         self._axis = kwargs.pop("axis", None)
         if self._axis is not None:
-            logging.debug(
-                "Meaning of axis has changed since v2.0. Make sure to update."
-            )
+            logger.debug("Meaning of axis has changed since v2.0. Make sure to update.")
         self._learn_amax = kwargs.pop("learn_amax", False)
         if self._learn_amax and self._axis is not None:
             raise TypeError(
@@ -348,14 +348,14 @@ def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
     """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""
     # Fine scale, per channel scale will be handled by broadcasting, which could be tricky. Pop a warning.
     if isinstance(amax, torch.Tensor) and inputs.dim() != amax.dim():
-        logging.debug(
+        logger.debug(
             "amax %s has different shape than inputs %s. Make sure broadcast works as"
             " expected!",
             amax.size(),
             inputs.size(),
         )
 
-    logging.debug(
+    logger.debug(
         "{} bits quantization on shape {} tensor.".format(num_bits, inputs.size())
     )
 
@@ -434,7 +434,7 @@ class FakeAffineTensorQuantFunction(Function):
         Returns:
             outputs: A Tensor of type output_dtype
         """
-        logging.debug(
+        logger.debug(
             "{} bits quantization on shape {} tensor.".format(num_bits, inputs.size())
         )
         ctx.save_for_backward(inputs, min_range, max_range)

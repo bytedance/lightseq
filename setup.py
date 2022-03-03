@@ -14,7 +14,7 @@ from distutils.version import LooseVersion
 from lightseq import __version__
 
 logging.basicConfig()
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
 ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
@@ -116,7 +116,6 @@ setup_kwargs = dict(
     install_requires=[
         "ninja",
         "numpy",
-        "absl-py>=0.7.0",
         "scipy",
     ],
     python_requires=">=3.6",

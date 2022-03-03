@@ -18,7 +18,4 @@
 # we modified pytorch_quantization in TensorRT(https://github.com/NVIDIA/TensorRT)
 # of commit 42805f0
 
-from absl import logging
 from .version import __version__
-
-# logging.use_absl_handler()
