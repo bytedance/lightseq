@@ -5,13 +5,12 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-
+from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import state_dict, get_pos_embedding
 from lightseq.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
 
 
-transformer_cuda_module = None
 _all_layer_grads = dict()
 
 
@@ -95,11 +94,6 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         ).to(self.config.local_rank)
         if self.config.fp16:
             self.pos_embeddings = self.pos_embeddings.to(torch.half)
-
-        # Load cuda modules if needed
-        global transformer_cuda_module
-        if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module

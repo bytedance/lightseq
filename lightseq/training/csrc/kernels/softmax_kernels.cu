@@ -68,16 +68,17 @@ __global__ void ker_attn_softmax(T *inp, const T *attn_mask, int from_len,
     for (int i = 0; i < token_per_reduce; i++) {
       l_max[i] = REDUCE_FLOAT_INF_NEG;
       for (int j = 0; j < ele_per_thread; j++) {
-        if (attn_mask) {
-          val[i][j] = (float)inp_val[i][j] + (float)mval[j];
+        float temp_val;
+        if (mask_future && ele_per_thread * threadIdx.x + j > token_id + i) {
+          temp_val = REDUCE_FLOAT_INF_NEG;
         } else {
-          if (mask_future && ele_per_thread * threadIdx.x + j > token_id + i) {
-            val[i][j] = REDUCE_FLOAT_INF_NEG;
-          } else {
-            val[i][j] = (float)inp_val[i][j];
+          temp_val = (float)inp_val[i][j];
+          if (attn_mask) {
+            temp_val += (float)mval[j];
           }
         }
-        l_max[i] = fmaxf(l_max[i], val[i][j]);
+        val[i][j] = temp_val;
+        l_max[i] = fmaxf(l_max[i], temp_val);
       }
     }
     // block reduce max
@@ -161,16 +162,17 @@ __global__ void ker_attn_softmax_lt32(T *inp, const T *attn_mask, int from_len,
     for (int i = 0; i < token_per_reduce; i++) {
       l_max[i] = REDUCE_FLOAT_INF_NEG;
       for (int j = 0; j < ele_per_thread; j++) {
-        if (attn_mask) {
-          val[i][j] = (float)inp_val[i][j] + (float)mval[j];
+        float temp_val;
+        if (mask_future && ele_per_thread * threadIdx.x + j > token_id + i) {
+          temp_val = REDUCE_FLOAT_INF_NEG;
         } else {
-          if (mask_future && ele_per_thread * threadIdx.x + j > token_id + i) {
-            val[i][j] = REDUCE_FLOAT_INF_NEG;
-          } else {
-            val[i][j] = (float)inp_val[i][j];
+          temp_val = (float)inp_val[i][j];
+          if (attn_mask) {
+            temp_val += (float)mval[j];
           }
         }
-        l_max[i] = fmaxf(l_max[i], val[i][j]);
+        val[i][j] = temp_val;
+        l_max[i] = fmaxf(l_max[i], temp_val);
       }
     }
     // warp reduce max

@@ -119,9 +119,21 @@ If you use LightSeq in your research, please cite the following paper.
     publisher = "Association for Computational Linguistics",
     pages = "113--120",
 }
+
+@article{wang2021lightseq2,
+  title={LightSeq2: Accelerated Training for Transformer-based Models on GPUs},
+  author={Wang, Xiaohui and Xiong, Ying and Qian, Xian and Wei, Yang and Li, Lei and Wang, Mingxuan},
+  journal={arXiv preprint arXiv:2110.05722},
+  year={2021}
+}
 ```
 
 ## Contact
 
 Any questions or suggestions, please feel free to contact us at
 wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, qian.xian@bytedance.com, weiyang.god@bytedance.com, wangmingxuan.89@bytedance.com, lilei@cs.ucsb.edu
+
+## Hiring
+
+The LightSeq team is hiring Interns/FTEs with backgrounds in deep learning system/natural language processing/computer vision/speech.
+We are based in Beijing and Shanghai. If you are interested, please send your resume to wangxiaohui.neo@bytedance.com.
