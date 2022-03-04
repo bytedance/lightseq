@@ -180,6 +180,8 @@ class MultiheadAttention(nn.Module):
 
         if self.self_attention:
             qkv = self.qkv_proj(query)
+            if self.attention_quant is not None:
+                qkv = self.attention_quant(qkv)
             q, k, v = qkv.split(self.embed_dim, dim=-1)
             # q = self.q_proj(query)
             # k = self.k_proj(query)
@@ -307,8 +309,6 @@ class MultiheadAttention(nn.Module):
                 )
 
         attn_weights = torch.bmm(q, k.transpose(1, 2))
-        if self.attention_quant is not None:
-            attn_weights = self.attention_quant(attn_weights)
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
