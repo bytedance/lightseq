@@ -80,11 +80,11 @@ class MultiheadAttention(nn.Module):
             )
 
         else:
-            self.k_proj = Linear(self.kdim, embed_dim, bias=bias)
-            self.v_proj = Linear(self.vdim, embed_dim, bias=bias)
-            self.q_proj = Linear(embed_dim, embed_dim, bias=bias)
+            self.k_proj = QuantLinear(self.kdim, embed_dim, bias=bias)
+            self.v_proj = QuantLinear(self.vdim, embed_dim, bias=bias)
+            self.q_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
-        self.out_proj = Linear(embed_dim, embed_dim, bias=bias)
+        self.out_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
         if add_bias_kv:
             self.bias_k = Parameter(torch.Tensor(1, 1, embed_dim))
@@ -651,6 +651,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.fc2 = QuantLinear(
             config.intermediate_size,
             self.embed_dim,
+            pre_activation="relu",
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
@@ -859,12 +860,12 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
-        self.scaled_emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(weight_quant_config)
         self.config = config
 
     def forward(self, input, step=0):
         x = self.emb_lookup(input)
-        x = self.scaled_emb_quant(x)
+        x = self.emb_quant(x)
         x = math.sqrt(self.embedding_dim) * x
         x += self.embed_positions(input, step)
         x = self.dropout(x)

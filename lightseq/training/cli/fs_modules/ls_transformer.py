@@ -337,7 +337,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 bias=False,
             )
             self.output_projection.weight = self.embed_tokens.embeddings
-            self.output_projection.weight_quant = self.embed_tokens.scaled_emb_quant
+            self.output_projection.weight_quant = self.embed_tokens.emb_quant
         else:
             self.output_projection = nn.Linear(
                 self.embed_tokens.embeddings.shape[1],
