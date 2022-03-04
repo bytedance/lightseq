@@ -116,9 +116,11 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='block size of quantization noise at training time')
         parser.add_argument('--quant-noise-scalar', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
-        parser.add_argument('--enable-ls-quant', type=bool,  default=False,
+        parser.add_argument('--use-torch-layer', default=False, action='store_true',
+                            help='use custom torch layer instead of LightSeq cuda layer')
+        parser.add_argument('--enable-quant', default=False, action='store_true',
                             help='enable quantization')
-        parser.add_argument('--quant-mode', type=str,  default="",
+        parser.add_argument('--quant-mode', type=str,  default="qat", choices=["qat", "ptq"],
                             help='quantization mode')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
@@ -148,22 +150,28 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
-        if args.enable_ls_quant:
-            if args.quant_mode == "qat":
-                encoder.apply(qat_mode)
-                decoder.apply(qat_mode)
-            elif args.quant_mode == "ptq":
-                encoder.apply(ptq_mode)
-                decoder.apply(ptq_mode)
+        if args.enable_quant:
+            if args.use_torch_layer:
+                if args.quant_mode == "qat":
+                    encoder.apply(qat_mode)
+                    decoder.apply(qat_mode)
+                elif args.quant_mode == "ptq":
+                    encoder.apply(ptq_mode)
+                    decoder.apply(ptq_mode)
             else:
+                raise NotImplementedError
+        else:
+            if args.use_torch_layer:
                 encoder.apply(disable_quant)
                 decoder.apply(disable_quant)
+            else:
+                pass
 
         return cls(args, encoder, decoder)
 
     @classmethod
     def build_embedding(cls, args, dictionary, embed_dim, max_positions, **kwargs):
-        if args.enable_ls_quant:
+        if args.use_torch_layer:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (
                 TransformerEmbeddingLayer,
             )
@@ -217,7 +225,7 @@ class LSTransformerEncoder(FairseqEncoder):
         self.layer_norm = LayerNorm(embed_dim)
 
     def build_encoder_layer(self, args):
-        if args.enable_ls_quant:
+        if args.use_torch_layer:
             from lightseq.training.ops.pytorch import TransformerEncoderLayer
         else:
             from lightseq.training.ops.pytorch.transformer_encoder_layer import (
@@ -330,23 +338,26 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
         self.layer_norm = LayerNorm(embed_dim)
 
-        if args.enable_ls_quant:
+        if args.use_torch_layer:
             self.output_projection = QuantLinear(
                 self.embed_tokens.embeddings.shape[1],
                 self.embed_tokens.embeddings.shape[0],
                 bias=False,
             )
-            self.output_projection.weight = self.embed_tokens.embeddings
             self.output_projection.weight_quant = self.embed_tokens.emb_quant
         else:
-            self.output_projection = nn.Linear(
-                self.embed_tokens.embeddings.shape[1],
-                self.embed_tokens.embeddings.shape[0],
-                bias=False,
-            )
+            if args.enable_quant:
+                raise NotImplementedError
+            else:
+                self.output_projection = nn.Linear(
+                    self.embed_tokens.embeddings.shape[1],
+                    self.embed_tokens.embeddings.shape[0],
+                    bias=False,
+                )
+        self.output_projection.weight = self.embed_tokens.embeddings
 
     def build_decoder_layer(self, args):
-        if args.enable_ls_quant:
+        if args.use_torch_layer:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (
                 TransformerDecoderLayer,
             )
