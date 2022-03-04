@@ -25,4 +25,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --best-checkpoint-metric bleu \
     --maximize-best-checkpoint-metric \
     --fp16 \
-    --use-torch-layer
+    --use-torch-layer \
+    --find-unused-parameters
