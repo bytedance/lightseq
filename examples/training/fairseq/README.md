@@ -49,5 +49,6 @@ lightseq-generate /tmp/wmt14_en_de/ \
     --beam 5 \
     --lenpen 0.6 \
     --fp16 \
-    --quiet
+    --quiet \
+    --scoring sacrebleu
 ```
