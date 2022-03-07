@@ -10,31 +10,31 @@ cd examples/inference/python
 
 Export Hugging Face BART models to protobuf/hdf5 format.
 ```shell
-python export/hf_bart_export.py
+python export/huggingface/hf_bart_export.py
 ```
 2. Hugging Face BERT
 
 Export Hugging Face BERT models to hdf5 format.
 ```shell
-python export/hf_bert_export.py
+python export/huggingface/hf_bert_export.py
 ```
 3. Hugging Face GPT2
 
 Export Hugging Face GPT2 models to hdf5 format.
 ```shell
-python export/hf_gpt2_export.py
+python export/huggingface/hf_gpt2_export.py
 ```
 4. Fairseq Transformer using LightSeq training library
 
 Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
 ```shell
-python export/ls_fs_transformer_export.py
+python export/fairseq/ls_fs_transformer_export.py
 ```
 5. Fairseq Transformer using LightSeq training library with int8 quantization
 
 Export Fairseq Transformer models training with LightSeq to protobuf format, and then using int8 quantization to speedup inference. Refer to the `examples/training/fairseq` directory for more training details.
 ```shell
-python export/ls_fs_transformer_ptq_export.py
+python export/fairseq/ls_fs_transformer_ptq_export.py
 ```
 **You can compare the speeds between fp16 and int8 inference using above 4th and 5th examples.**
 

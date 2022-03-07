@@ -46,7 +46,7 @@ lightseq-generate /tmp/wmt14_en_de/ \
     --path checkpoints/checkpoint_best.pt \
     --task translation \
     --max-tokens 8192 \
-    --beam 5 \
+    --beam 4 \
     --lenpen 0.6 \
     --fp16 \
     --quiet \
