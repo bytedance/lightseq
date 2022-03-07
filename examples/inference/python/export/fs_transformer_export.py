@@ -68,6 +68,7 @@ trg_emb_mapping_dict = OrderedDict(
     }
 )
 
+
 def save_proto_to_hdf5(transformer, f):
     """Convert bart protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
@@ -191,15 +192,17 @@ def save_proto_to_hdf5(transformer, f):
 
     print(f"proto to hdf5 conversion completed.")
 
+
 def check_rule(tensor_name, rule):
     if "Adam" in tensor_name or "adam" in tensor_name:
         return False
     assert isinstance(rule, str) and rule
-    r_size = len(rule.split(' '))
-    t = tensor_name.split('.')
+    r_size = len(rule.split(" "))
+    t = tensor_name.split(".")
     if len(t) < r_size:
         return False
-    return rule == ' '.join(t[-r_size:])
+    return rule == " ".join(t[-r_size:])
+
 
 def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
@@ -226,7 +229,8 @@ def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
             for tn in tensor_names:
                 if check_rule(tn, cr):
                     tmp.append(tn)
-            if len(tmp)==0: print(f" cr: {cr}, proto_name: {proto_name}")
+            if len(tmp) == 0:
+                print(f" cr: {cr}, proto_name: {proto_name}")
             assert len(tmp) == 1
             target_tn.extend(tmp)
         target_tensor = [stete_dict[name] for name in target_tn]
@@ -295,7 +299,7 @@ def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale
 
 
 def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
-    """ use pattern to diff source and target. """
+    """use pattern to diff source and target."""
     target_tn = []
     for tn in tensor_names:
         if (tn_pattern in tn.split(".")) and ("weight" in tn.split(".")):
@@ -394,15 +398,17 @@ def extract_transformer_weights(
     transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
     # encoder position embedding
     pos_emb = None
-    if 'encoder.embed_positions.weight' in encoder_state_dict:
+    if "encoder.embed_positions.weight" in encoder_state_dict:
         pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
         transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]).numpy()
-        pos_emb = pos_emb[pad_id + 1: max_step + pad_id + 1, :]
+        pos_emb = _get_position_encoding(
+            length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]
+        ).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         transformer.src_embedding.position_embedding[:] = pos_emb_list
-    
+
     print(
         "encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
@@ -430,20 +436,22 @@ def extract_transformer_weights(
     )
     # decoder position embedding
     pos_emb = None
-    if 'decoder.embed_positions.weight' in decoder_state_dict:
+    if "decoder.embed_positions.weight" in decoder_state_dict:
         pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
         transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]).numpy()
-        pos_emb = pos_emb[pad_id + 1: max_step + pad_id + 1, :]
+        pos_emb = _get_position_encoding(
+            length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]
+        ).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         transformer.trg_embedding.position_embedding[:] = pos_emb_list
-    
+
     print(
         "decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
         )
-    )  
+    )
 
     # fill in conf
     transformer.model_conf.head_num = head_num
@@ -466,6 +474,7 @@ def extract_transformer_weights(
 
     _write(transformer, output_file)
 
+
 def _write(transformer, path):
     print("Wrting to {0}".format(path))
 
@@ -473,25 +482,36 @@ def _write(transformer, path):
         with tf.io.gfile.GFile(path, "wb") as fout:
             fout.write(transformer.SerializeToString())
     except Exception:
-        print('Saving PB fails. Save HDF5 instead!')
+        print("Saving PB fails. Save HDF5 instead!")
         if os.path.exists(path):
             os.remove(path)
-        path = path.replace('pb', 'hdf5')
+        path = path.replace("pb", "hdf5")
         import h5py
+
         f = h5py.File(path, "w")
         save_proto_to_hdf5(transformer, f)
         f.close()
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="create data for post-model training", usage="")
-    parser.add_argument('--input', type=str, default='checkpoint.pt', help='input fairseq checkpoint')
-    parser.add_argument('--output', type=str, default='transformer.pb', help='output lightseq model file')
-    parser.add_argument('--beam_size', type=int, default=4, help='beam size')
-    parser.add_argument('--max-step', type=int, default=1024, help='max step to decode')
-    parser.add_argument('--head-num', type=int, default=16, help='head num')
-    parser.add_argument('--bos_id', type=int, default=2, help='bos id')
-    parser.add_argument('--eos_id', type=int, default=2, help='eos id')
-    parser.add_argument('--pad_id', type=int, default=1, help='pad id')
+    parser = argparse.ArgumentParser(
+        description="create data for post-model training", usage=""
+    )
+    parser.add_argument(
+        "--input", type=str, default="checkpoint.pt", help="input fairseq checkpoint"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="transformer.pb",
+        help="output lightseq model file",
+    )
+    parser.add_argument("--beam_size", type=int, default=4, help="beam size")
+    parser.add_argument("--max-step", type=int, default=1024, help="max step to decode")
+    parser.add_argument("--head-num", type=int, default=16, help="head num")
+    parser.add_argument("--bos_id", type=int, default=2, help="bos id")
+    parser.add_argument("--eos_id", type=int, default=2, help="eos id")
+    parser.add_argument("--pad_id", type=int, default=1, help="pad id")
 
     args = parser.parse_args()
     return args
@@ -515,8 +535,8 @@ if __name__ == "__main__":
     model_path = None
     if os.path.exists(args.output):
         model_path = args.output
-    elif os.path.exists(args.output.replace('pb', 'hdf5')):
-        model_path = args.output.replace('pb', 'hdf5')
+    elif os.path.exists(args.output.replace("pb", "hdf5")):
+        model_path = args.output.replace("pb", "hdf5")
     if model_path:
         ls_model = lsi.Transformer(model_path, 8)
         # Note that pad_id (1) should be on the right side

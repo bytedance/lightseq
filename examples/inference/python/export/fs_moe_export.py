@@ -78,6 +78,7 @@ trg_emb_mapping_dict = OrderedDict(
     }
 )
 
+
 def save_proto_to_hdf5(moe, f):
     """Convert bart protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
@@ -195,7 +196,7 @@ def save_proto_to_hdf5(moe, f):
     # load encoder_stack
     for layer_id, layer in enumerate(moe.encoder_stack):
         for key in ENCODER_LAYER_KEYS:
-            if key=="gate_kernel" and layer_id not in moe.model_conf.moe_list_encoder:
+            if key == "gate_kernel" and layer_id not in moe.model_conf.moe_list_encoder:
                 continue
             hdf5_key = f"encoder_stack/{layer_id}/{key}"
             proto_attr = key
@@ -205,7 +206,7 @@ def save_proto_to_hdf5(moe, f):
     # load decoder_stack
     for layer_id, layer in enumerate(moe.decoder_stack):
         for key in DECODER_LAYER_KEYS:
-            if key=="gate_kernel" and layer_id not in moe.model_conf.moe_list_decoder:
+            if key == "gate_kernel" and layer_id not in moe.model_conf.moe_list_decoder:
                 continue
             hdf5_key = f"decoder_stack/{layer_id}/{key}"
             proto_attr = key
@@ -214,15 +215,17 @@ def save_proto_to_hdf5(moe, f):
 
     print(f"proto to hdf5 conversion completed.")
 
+
 def check_rule(tensor_name, rule):
     if "Adam" in tensor_name or "adam" in tensor_name:
         return False
     assert isinstance(rule, str) and rule
-    r_size = len(rule.split(' '))
-    t = tensor_name.split('.')
+    r_size = len(rule.split(" "))
+    t = tensor_name.split(".")
     if len(t) < r_size:
         return False
-    return rule == ' '.join(t[-r_size:])
+    return rule == " ".join(t[-r_size:])
+
 
 def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
     for proto_name, ckpt_rule in mapping_dict.items():
@@ -251,7 +254,7 @@ def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
                     tmp.append(tn)
             assert len(tmp) <= 1
             target_tn.extend(tmp)
-        if not target_tn:
+        if not target_tn and proto_name == "gate_kernel":
             continue
         target_tensor = [stete_dict[name] for name in target_tn]
         tt = {}
@@ -319,7 +322,7 @@ def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale
 
 
 def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
-    """ use pattern to diff source and target. """
+    """use pattern to diff source and target."""
     target_tn = []
     for tn in tensor_names:
         if (tn_pattern in tn.split(".")) and ("weight" in tn.split(".")):
@@ -424,15 +427,17 @@ def export_moe(
     moe.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
     # encoder position embedding
     pos_emb = None
-    if 'encoder.embed_positions.weight' in encoder_state_dict:
+    if "encoder.embed_positions.weight" in encoder_state_dict:
         pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
         moe.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]).numpy()
-        pos_emb = pos_emb[pad_id + 1: max_step + pad_id + 1, :]
+        pos_emb = _get_position_encoding(
+            length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]
+        ).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         moe.src_embedding.position_embedding[:] = pos_emb_list
-    
+
     print(
         "encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
@@ -460,20 +465,22 @@ def export_moe(
     )
     # decoder position embedding
     pos_emb = None
-    if 'decoder.embed_positions.weight' in decoder_state_dict:
+    if "decoder.embed_positions.weight" in decoder_state_dict:
         pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
         moe.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]).numpy()
-        pos_emb = pos_emb[pad_id + 1: max_step + pad_id + 1, :]
+        pos_emb = _get_position_encoding(
+            length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]
+        ).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         moe.trg_embedding.position_embedding[:] = pos_emb_list
-    
+
     print(
         "decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
         )
-    )  
+    )
 
     # fill in conf
     moe.model_conf.head_num = head_num
@@ -493,7 +500,7 @@ def export_moe(
     moe.model_conf.is_post_ln = False
     moe.model_conf.no_scale_embedding = False
     moe.model_conf.use_gelu = False
-    
+
     moe.model_conf.moe_list_encoder[:] = moe_list_encoder
     moe.model_conf.moe_list_decoder[:] = moe_list_decoder
     moe.model_conf.expert_num_encoder = expert_num_encoder
@@ -503,6 +510,7 @@ def export_moe(
 
     _write(moe, output_file)
 
+
 def _write(moe, path):
     print("Wrting to {0}".format(path))
 
@@ -510,32 +518,64 @@ def _write(moe, path):
         with tf.io.gfile.GFile(path, "wb") as fout:
             fout.write(moe.SerializeToString())
     except Exception:
-        print('Saving PB fails. Save HDF5 instead!')
+        print("Saving PB fails. Save HDF5 instead!")
         if os.path.exists(path):
             os.remove(path)
-        path = path.replace('pb', 'hdf5')
+        path = path.replace("pb", "hdf5")
         import h5py
+
         f = h5py.File(path, "w")
         save_proto_to_hdf5(moe, f)
         f.close()
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="create data for post-model training", usage="")
-    parser.add_argument('--input', type=str, default='checkpoint.pt', help='input fairseq checkpoint')
-    parser.add_argument('--output', type=str, default='moe.pb', help='output lightseq model file')
-    parser.add_argument('--beam_size', type=int, default=4, help='beam size')
-    parser.add_argument('--max-step', type=int, default=1024, help='max step to decode')
-    parser.add_argument('--head-num', type=int, default=16, help='head num')
-    parser.add_argument('--bos_id', type=int, default=2, help='bos id')
-    parser.add_argument('--eos_id', type=int, default=2, help='eos id')
-    parser.add_argument('--pad_id', type=int, default=1, help='pad id')
+    parser = argparse.ArgumentParser(
+        description="create data for post-model training", usage=""
+    )
+    parser.add_argument(
+        "--input", type=str, default="checkpoint.pt", help="input fairseq checkpoint"
+    )
+    parser.add_argument(
+        "--output", type=str, default="moe.pb", help="output lightseq model file"
+    )
+    parser.add_argument("--beam_size", type=int, default=4, help="beam size")
+    parser.add_argument("--max-step", type=int, default=1024, help="max step to decode")
+    parser.add_argument("--head-num", type=int, default=16, help="head num")
+    parser.add_argument("--bos_id", type=int, default=2, help="bos id")
+    parser.add_argument("--eos_id", type=int, default=2, help="eos id")
+    parser.add_argument("--pad_id", type=int, default=1, help="pad id")
     # newly added for MoE
-    parser.add_argument('--moe_list_encoder', type=list, default=[0,1,2,3,4,5], help='list of encoder layers that enable MoE module')
-    parser.add_argument('--moe_list_decoder', type=list, default=[], help='list of decoder layers that enable MoE module')
-    parser.add_argument('--expert_num_encoder', type=int, default=8, help='number of experts in encoder')
-    parser.add_argument('--expert_num_decoder', type=int, default=8, help='number of experts in decoder')
-    parser.add_argument('--moe_topk_encoder', type=int, default=2, help='topk of MoE gate in encoder, support k=1 or 2')
-    parser.add_argument('--moe_topk_decoder', type=int, default=2, help='topk of MoE gate in decoder, support k=1 or 2')
+    parser.add_argument(
+        "--moe_list_encoder",
+        type=list,
+        default=[0, 1, 2, 3, 4, 5],
+        help="list of encoder layers that enable MoE module",
+    )
+    parser.add_argument(
+        "--moe_list_decoder",
+        type=list,
+        default=[],
+        help="list of decoder layers that enable MoE module",
+    )
+    parser.add_argument(
+        "--expert_num_encoder", type=int, default=8, help="number of experts in encoder"
+    )
+    parser.add_argument(
+        "--expert_num_decoder", type=int, default=8, help="number of experts in decoder"
+    )
+    parser.add_argument(
+        "--moe_topk_encoder",
+        type=int,
+        default=2,
+        help="topk of MoE gate in encoder, support k=1 or 2",
+    )
+    parser.add_argument(
+        "--moe_topk_decoder",
+        type=int,
+        default=2,
+        help="topk of MoE gate in decoder, support k=1 or 2",
+    )
 
     args = parser.parse_args()
     return args
@@ -565,8 +605,8 @@ if __name__ == "__main__":
     model_path = None
     if os.path.exists(args.output):
         model_path = args.output
-    elif os.path.exists(args.output.replace('pb', 'hdf5')):
-        model_path = args.output.replace('pb', 'hdf5')
+    elif os.path.exists(args.output.replace("pb", "hdf5")):
+        model_path = args.output.replace("pb", "hdf5")
     if model_path:
         ls_model = lsi.Moe(model_path, 8)
         # Note that pad_id (1) should be on the right side
