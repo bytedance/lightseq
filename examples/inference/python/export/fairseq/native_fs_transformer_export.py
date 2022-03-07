@@ -235,11 +235,11 @@ def export_native_fs_transformer(
         save_pb=True,
     )
 
-    print("Wrting to {0}".format(pb_path))
+    print("Writing to {0}".format(pb_path))
     with tf.io.gfile.GFile(pb_path, "wb") as fout:
         fout.write(transformer.SerializeToString())
 
-    print("Wrting to {0}".format(hdf5_path))
+    print("Writing to {0}".format(hdf5_path))
     f = h5py.File(hdf5_path, "w")
     export_pb2hdf5(transformer, f)
     f.close()

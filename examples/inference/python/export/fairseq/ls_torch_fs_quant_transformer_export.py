@@ -313,7 +313,7 @@ def export_ls_torch_fs_quant_transformer(
         save_pb=True,
     )
 
-    print("Wrting to {0}".format(pb_path))
+    print("Writing to {0}".format(pb_path))
     with tf.io.gfile.GFile(pb_path, "wb") as fout:
         fout.write(transformer.SerializeToString())
 
