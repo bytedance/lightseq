@@ -24,6 +24,7 @@ from lightseq.training.ops.pytorch.export import (
     export_ls_embedding,
     export_ls_encoder,
     export_ls_decoder,
+    export_pb2hdf5,
 )
 
 from lightseq.training.ops.pytorch.export_ptq import (

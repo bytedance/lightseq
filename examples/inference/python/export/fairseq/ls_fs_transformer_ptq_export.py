@@ -48,7 +48,7 @@ def export_fs_weights(file, state_dict, save_pb=True):
     file.trg_embedding.shared_bias[:] = dec_shared_b
 
 
-def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
+def export_ls_fs_transformer_ptq(ckpt_path, out_path, save_pb=True):
     with open(ckpt_path, "rb") as fin:
         ckpt_file = torch.load(fin)
     args = ckpt_file["args"]
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     args = parse_args()
     pb_path = "quant_transformer.pb"
     print("export to pb model >>>>>>")
-    export_ls_fs_transformer(args.model, pb_path)
+    export_ls_fs_transformer_ptq(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.QuantTransformer(pb_path, 8)
     pb_output = pb_model.infer(src)

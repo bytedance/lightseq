@@ -91,7 +91,7 @@ def _get_encode_output_mapping_dict(dec_layer_num):
     }
 
 
-def extract_transformer_weights(
+def export_ls_torch_fs_transformer(
     model_dir,
     pb_path,
     max_step=512,
@@ -257,7 +257,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     pb_path = "transformer.pb"
-    extract_transformer_weights(args.model, pb_path)
+    export_ls_torch_fs_transformer(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.Transformer(pb_path, 8)
     pb_output = pb_model.infer(src)
