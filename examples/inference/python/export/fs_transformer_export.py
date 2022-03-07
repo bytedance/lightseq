@@ -229,8 +229,6 @@ def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
             for tn in tensor_names:
                 if check_rule(tn, cr):
                     tmp.append(tn)
-            if len(tmp) == 0:
-                print(f" cr: {cr}, proto_name: {proto_name}")
             assert len(tmp) == 1
             target_tn.extend(tmp)
         target_tensor = [stete_dict[name] for name in target_tn]
