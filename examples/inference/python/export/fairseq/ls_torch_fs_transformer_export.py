@@ -1,5 +1,5 @@
 """
-Export native Fairseq Transformer models to protobuf/hdf5 format.
+Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 from collections import OrderedDict
@@ -21,8 +21,8 @@ enc_layer_mapping_dict = OrderedDict(
     {
         "multihead_norm_scale": "self_attn_layer_norm weight",
         "multihead_norm_bias": "self_attn_layer_norm bias",
-        "multihead_project_kernel_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",
-        "multihead_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",
+        "multihead_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_qkv": "self_attn qkv_proj bias",
         "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
         "multihead_project_bias_output": "self_attn out_proj bias",
         "ffn_norm_scale": "final_layer_norm weight",
@@ -38,8 +38,8 @@ dec_layer_mapping_dict = OrderedDict(
     {
         "self_norm_scale": "self_attn_layer_norm weight",
         "self_norm_bias": "self_attn_layer_norm bias",
-        "self_project_kernel_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",
-        "self_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",
+        "self_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
+        "self_project_bias_qkv": "self_attn qkv_proj bias",
         "self_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
         "self_project_bias_output": "self_attn out_proj bias",
         "encdec_norm_scale": "encoder_attn_layer_norm weight",
@@ -107,7 +107,7 @@ def extract_transformer_weights(
 
     trg_emb_mapping_dict["shared_bias"] = (
         "expression_np.zeros(%d)"
-        % model_dict["decoder.embed_tokens.weight"].numpy().shape[0]
+        % model_dict["decoder.embed_tokens.emb_lookup.weight"].numpy().shape[0]
     )
 
     encoder_state_dict = {}
@@ -162,13 +162,15 @@ def extract_transformer_weights(
     )
     # encoder token embedding
     src_tb, _ = gather_token_embedding(
-        enc_var_name_list, encoder_state_dict, "embed_tokens"
+        enc_var_name_list, encoder_state_dict, "emb_lookup"
     )
     transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
     # encoder position embedding
     pos_emb = None
-    if "encoder.embed_positions.weight" in encoder_state_dict:
-        pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
+    if "encoder.embed_tokens.embed_positions.weight" in encoder_state_dict:
+        pos_emb = encoder_state_dict[
+            "encoder.embed_tokens.embed_positions.weight"
+        ].numpy()
         transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
         pos_emb = get_pos_embedding(max_step + pad_id + 1, src_tb.shape[-1]).numpy()
@@ -178,7 +180,7 @@ def extract_transformer_weights(
         transformer.src_embedding.position_embedding[:] = pos_emb_list
 
     print(
-        "encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
+        "encoder.embed_tokens.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
         )
     )
@@ -194,7 +196,7 @@ def extract_transformer_weights(
     )
     # decoder token embedding
     trg_tb, _ = gather_token_embedding(
-        dec_var_name_list, decoder_state_dict, "embed_tokens"
+        dec_var_name_list, decoder_state_dict, "emb_lookup"
     )
     transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(
@@ -204,8 +206,10 @@ def extract_transformer_weights(
     )
     # decoder position embedding
     pos_emb = None
-    if "decoder.embed_positions.weight" in decoder_state_dict:
-        pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
+    if "decoder.embed_tokens.embed_positions.weight" in decoder_state_dict:
+        pos_emb = decoder_state_dict[
+            "decoder.embed_tokens.embed_positions.weight"
+        ].numpy()
         transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
         pos_emb = get_pos_embedding(max_step + pad_id + 1, trg_tb.shape[-1]).numpy()
@@ -215,7 +219,7 @@ def extract_transformer_weights(
         transformer.trg_embedding.position_embedding[:] = pos_emb_list
 
     print(
-        "decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
+        "decoder.embed_tokens.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
             pos_emb.shape
         )
     )

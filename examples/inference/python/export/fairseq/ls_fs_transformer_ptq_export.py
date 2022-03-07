@@ -3,6 +3,7 @@ Export Fairseq Transformer models training with LightSeq to protobuf format,
 and then using int8 quantization to speedup inference.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
+import argparse
 import torch
 import h5py
 from export.proto.quant_transformer_pb2 import QuantTransformer
@@ -102,11 +103,24 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         fout.write(file.SerializeToString())
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        default="checkpoint_best.pt",
+        help="path of fairseq checkpoint",
+    )
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
-    ckpt_path = "checkpoint_best.pt"
+    args = parse_args()
     pb_path = "quant_transformer.pb"
     print("export to pb model >>>>>>")
-    export_ls_fs_transformer(ckpt_path, pb_path)
+    export_ls_fs_transformer(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.QuantTransformer(pb_path, 8)
     pb_output = pb_model.infer(src)

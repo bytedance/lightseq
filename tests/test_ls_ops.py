@@ -662,22 +662,22 @@ def test_decoder_layer_backward():
                     .detach(),
                     # encdec weights grad
                     fairseq_dec_layer_list[i]
-                    .encodec_attn.q_proj.weight.grad.contiguous()
+                    .encoder_attn.q_proj.weight.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .encodec_attn.q_proj.bias.grad.contiguous()
+                    .encoder_attn.q_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .encodec_attn.out_proj.weight.grad.contiguous()
+                    .encoder_attn.out_proj.weight.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .encodec_attn.out_proj.bias.grad.contiguous()
+                    .encoder_attn.out_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .encodec_attn_layer_norm.weight.grad.contiguous()
+                    .encoder_attn_layer_norm.weight.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .encodec_attn_layer_norm.bias.grad.contiguous()
+                    .encoder_attn_layer_norm.bias.grad.contiguous()
                     .detach(),
                 ]
             )
@@ -686,16 +686,16 @@ def test_decoder_layer_backward():
                     [
                         # encdec kv grad
                         fairseq_dec_layer_list[i]
-                        .encodec_attn.k_proj.weight.grad.contiguous()
+                        .encoder_attn.k_proj.weight.grad.contiguous()
                         .detach(),
                         fairseq_dec_layer_list[i]
-                        .encodec_attn.k_proj.bias.grad.contiguous()
+                        .encoder_attn.k_proj.bias.grad.contiguous()
                         .detach(),
                         fairseq_dec_layer_list[i]
-                        .encodec_attn.v_proj.weight.grad.contiguous()
+                        .encoder_attn.v_proj.weight.grad.contiguous()
                         .detach(),
                         fairseq_dec_layer_list[i]
-                        .encodec_attn.v_proj.bias.grad.contiguous()
+                        .encoder_attn.v_proj.bias.grad.contiguous()
                         .detach(),
                     ]
                 )

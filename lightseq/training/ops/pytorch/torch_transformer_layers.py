@@ -636,13 +636,13 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
 
-        self.encodec_attn = self.build_encoder_attention(
+        self.encoder_attn = self.build_encoder_attention(
             self.embed_dim,
             config.hidden_size,
             config.attn_prob_dropout_ratio,
             config.nhead,
         )
-        self.encodec_attn_layer_norm = LayerNorm(self.embed_dim)
+        self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
 
         self.fc1 = QuantLinear(
             self.embed_dim,
@@ -773,7 +773,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
-        if self.encodec_attn is not None and encoder_out is not None:
+        if self.encoder_attn is not None and encoder_out is not None:
             if (
                 encoder_out.shape[1] != x.shape[1]
                 and x.shape[1] % encoder_out.shape[1] == 0
@@ -786,7 +786,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
             residual = x
             if self.normalize_before:
-                x = self.encodec_attn_layer_norm(x)
+                x = self.encoder_attn_layer_norm(x)
             if prev_attn_state is not None:
                 prev_key, prev_value = prev_attn_state[:2]
                 saved_state: Dict[str, Optional[Tensor]] = {
@@ -796,9 +796,9 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
                 if len(prev_attn_state) >= 3:
                     saved_state["prev_key_padding_mask"] = prev_attn_state[2]
                 assert incremental_state is not None
-                self.encodec_attn._set_input_buffer(incremental_state, saved_state)
+                self.encoder_attn._set_input_buffer(incremental_state, saved_state)
 
-            x, attn = self.encodec_attn(
+            x, attn = self.encoder_attn(
                 query=x,
                 key=encoder_out,
                 value=encoder_out,
@@ -811,7 +811,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             x = self.dropout_module(x)
             x = self.residual_connection(x, residual)
             if not self.normalize_before:
-                x = self.encodec_attn_layer_norm(x)
+                x = self.encoder_attn_layer_norm(x)
 
         residual = x
         if self.normalize_before:
