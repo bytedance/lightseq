@@ -68,7 +68,10 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
             expression = [expression]
         exec("tt['save'] = [%s]" % ",".join(expression))
 
-    target_tensor = np.concatenate(tt["save"], axis=-1)
+    try:
+        target_tensor = np.concatenate(tt["save"], axis=-1)
+    except:
+        target_tensor = tt["save"]
     print(
         "%s -> %s, convert finished!"
         % (target_tn if target_tn else "created", proto_name)

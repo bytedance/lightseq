@@ -28,13 +28,13 @@ python export/huggingface/hf_gpt2_export.py
 
 Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
 ```shell
-python export/fairseq/ls_fs_transformer_export.py
+python export/fairseq/ls_fs_transformer_export.py -m checkpoint_best.pt
 ```
 5. Fairseq Transformer using LightSeq training library with int8 quantization
 
 Export Fairseq Transformer models training with LightSeq to protobuf format, and then using int8 quantization to speedup inference. Refer to the `examples/training/fairseq` directory for more training details.
 ```shell
-python export/fairseq/ls_fs_transformer_ptq_export.py
+python export/fairseq/ls_fs_transformer_ptq_export.py -m checkpoint_best.pt
 ```
 **You can compare the speeds between fp16 and int8 inference using above 4th and 5th examples.**
 
@@ -51,6 +51,20 @@ Export LightSeq fp16/fp32 Transformer models to int8 protobuf format, and then u
 python export/ls_transformer_ptq_export.py
 ```
 **You can compare the speeds between fp16 and int8 inference using above 6th and 7th examples.**
+
+8. Fairseq Transformer using custom Torch layers
+
+Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
+```shell
+python export/fairseq/ls_torch_fs_transformer_export.py -m checkpoint_best.pt
+```
+
+9. Native Fairseq Transformer
+
+Export native Fairseq Transformer models to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
+```shell
+python export/fairseq/native_fs_transformer_export.py -m checkpoint_best.pt
+```
 
 ### Inference using LightSeq
 1. BART
