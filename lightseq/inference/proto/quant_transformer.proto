@@ -128,7 +128,7 @@ message QuantEmbeddingLayer {
   repeated float lang_emb = 8;
 
   // clip max
-  float scaled_emb_clip_max = 9;
+  float emb_clip_max = 9;
   repeated float encode_output_project_kernel_kv_clip_max = 10;
   float output_ln_clip_max = 11;
   float logits_clip_max = 12;

@@ -58,8 +58,8 @@ class QuantTransformerWeight {
   std::vector<_DataType> _d_src_lang_emb;
 
   // store the clip_max of weights and activations
-  float _src_scaled_emb_clip_max;
-  float _trg_scaled_emb_clip_max;
+  float _src_emb_clip_max;
+  float _trg_emb_clip_max;
   float _output_ln_clip_max;
   float _logits_clip_max;
   std::vector<float> _encode_output_project_kernel_kv_clip_max;
@@ -99,9 +99,9 @@ class QuantTransformerWeight {
     return _p_d_dec_wei;
   }
 
-  float get_src_scaled_emb_clip_max() const { return _src_scaled_emb_clip_max; }
+  float get_src_emb_clip_max() const { return _src_emb_clip_max; }
 
-  float get_trg_scaled_emb_clip_max() const { return _trg_scaled_emb_clip_max; }
+  float get_trg_emb_clip_max() const { return _trg_emb_clip_max; }
 
   float get_output_ln_clip_max() const { return _output_ln_clip_max; }
 

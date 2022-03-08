@@ -24,4 +24,4 @@ lightseq-train /tmp/wmt14_en_de/ \
     --eval-bleu-print-samples \
     --best-checkpoint-metric bleu \
     --maximize-best-checkpoint-metric \
-    --fp16
+    --fp16 \

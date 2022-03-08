@@ -97,9 +97,9 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
 
 
 if __name__ == "__main__":
-    ckpt_path = "checkpoints/checkpoint_best.pt"
-    pb_path = "checkpoints/transformer.pb"
-    hdf5_path = "checkpoints/transformer.hdf5"
+    ckpt_path = "checkpoint_best.pt"
+    pb_path = "transformer.pb"
+    hdf5_path = "transformer.hdf5"
     print("export to pb model >>>>>>")
     export_ls_fs_transformer(ckpt_path, pb_path)
     print("export to hdf5 model >>>>>>")
@@ -109,5 +109,6 @@ if __name__ == "__main__":
     pb_output = pb_model.infer(src)
     hdf5_model = lsi.Transformer(hdf5_path, 8)
     hdf5_output = hdf5_model.infer(src)
+    # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6]
     print("pb results:", pb_output)
     print("hdf5 results:", hdf5_output)

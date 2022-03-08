@@ -25,13 +25,15 @@ int create_transformer_encoder_layer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn) {
+    bool pre_or_postLayerNorm, std::string activation_fn,
+    bool mask_future_tokens) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   auto layer = std::make_shared<TransformerEncoderLayer<T>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn);
+      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
+      mask_future_tokens);
 
   s_transformer_encoder_layers[layer_id] = layer;
 

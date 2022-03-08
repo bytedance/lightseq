@@ -30,31 +30,40 @@ Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format
 ```shell
 python export/ls_fs_transformer_export.py
 ```
-5. LightSeq Transformer
+5. Fairseq Transformer using LightSeq training library with int8 quantization
+
+Export Fairseq Transformer models training with LightSeq to protobuf format, and then using int8 quantization to speedup inference. Refer to the `examples/training/fairseq` directory for more training details.
+```shell
+python export/ls_fs_transformer_ptq_export.py
+```
+**You can compare the speeds between fp16 and int8 inference using above 4th and 5th examples.**
+
+6. LightSeq Transformer
 
 Export LightSeq Transformer models to protobuf/hdf5 format. Refer to the `examples/training/custom` directory for more training details.
 ```shell
 python export/ls_transformer_export.py
 ```
-6. LightSeq Transformer using int8 quantization
+7. LightSeq Transformer using int8 quantization
 
 Export LightSeq fp16/fp32 Transformer models to int8 protobuf format, and then using int8 quantization to speedup inference. Refer to the `examples/training/custom` directory for more training details. Note that in this example, we do not need to finetune the models using fake-quantization.
 ```shell
-python export/ls_ptq_transformer_export.py
+python export/ls_transformer_ptq_export.py
 ```
-7. Fairseq Transformer
+**You can compare the speeds between fp16 and int8 inference using above 6th and 7th examples.**
+
+8. Fairseq Transformer
 
 Export Fairseq Transformer models to protobuf/hdf5 format.
 ```shell
 python export/fs_transformer_export.py
 ```
-8. Fairseq MoE
+9. Fairseq MoE
 
 Export Fairseq MoE models to protobuf/hdf5 format.
 ```shell
 python export/fs_moe_export.py
 ```
-**You can compare the speeds between fp16 and int8 inference using above 5th and 6th examples.**
 
 ### Inference using LightSeq
 1. BART
