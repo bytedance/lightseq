@@ -52,6 +52,19 @@ python export/ls_transformer_ptq_export.py
 ```
 **You can compare the speeds between fp16 and int8 inference using above 6th and 7th examples.**
 
+8. Fairseq Transformer
+
+Export Fairseq Transformer models to protobuf/hdf5 format.
+```shell
+python export/fs_transformer_export.py
+```
+9. Fairseq MoE
+
+Export Fairseq MoE models to protobuf/hdf5 format.
+```shell
+python export/fs_moe_export.py
+```
+
 ### Inference using LightSeq
 1. BART
 ```shell

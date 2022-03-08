@@ -51,3 +51,14 @@ else()
   target_link_libraries(bert_model PRIVATE CUDA::cublas_static
                                            CUDA::cublasLt_static)
 endif()
+
+set(moe_files moe_decoder.cc.cu moe_encoder.cc.cu)
+add_library(moe_model STATIC ${moe_files})
+target_link_libraries(moe_model PUBLIC cuda_kernels)
+target_link_libraries(moe_model PUBLIC moe_weight)
+if(DYNAMIC_API)
+  target_link_libraries(moe_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(moe_model PRIVATE CUDA::cublas_static
+                                          CUDA::cublasLt_static)
+endif()
