@@ -257,7 +257,7 @@ void QuantEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
                 "emb out", 10);
     }
   }  // not normal
-  print_vec(_p_device_emb[0], "token embedding weight", 10);
+  print_vec(_int8_p_d_src_emb_wei, "token embedding weight", 10);
   print_vec(_p_device_emb[1], "position embedding weight", 10);
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {

@@ -166,11 +166,6 @@ def export_ls_torch_fs_quant_transformer(
             model_dict[name[:-26]] = quantize(
                 model_dict[name[:-26]].numpy(), 127, model_dict[name].numpy()
             )
-        elif name.endswith("emb_quant.clip.clip_value_max"):
-            weight_name = name[:-29] + "emb_lookup.weight"
-            model_dict[weight_name] = quantize(
-                model_dict[weight_name].numpy(), 127, model_dict[name].numpy()
-            )
 
     trg_emb_mapping_dict["shared_bias"] = (
         "expression_np.zeros(%d)"
@@ -246,11 +241,8 @@ def export_ls_torch_fs_quant_transformer(
         ].numpy()
         transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = get_pos_embedding(max_step + pad_id + 1, src_tb.shape[-1]).numpy()
-        pos_emb_list = (
-            pos_emb[pad_id + 1 : max_step + pad_id + 1, :].reshape([-1]).tolist()
-        )
-        transformer.src_embedding.position_embedding[:] = pos_emb_list
+        pos_emb = get_pos_embedding(max_step, src_tb.shape[-1]).numpy()
+        transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
 
     print(
         "encoder.embed_tokens.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
@@ -289,11 +281,8 @@ def export_ls_torch_fs_quant_transformer(
         ].numpy()
         transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = get_pos_embedding(max_step + pad_id + 1, trg_tb.shape[-1]).numpy()
-        pos_emb_list = (
-            pos_emb[pad_id + 1 : max_step + pad_id + 1, :].reshape([-1]).tolist()
-        )
-        transformer.trg_embedding.position_embedding[:] = pos_emb_list
+        pos_emb = get_pos_embedding(max_step, trg_tb.shape[-1]).numpy()
+        transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
 
     print(
         "decoder.embed_tokens.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
