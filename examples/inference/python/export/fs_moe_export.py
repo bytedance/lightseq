@@ -2,7 +2,9 @@
 Export Fairseq MoE models to protobuf/hdf5 format.
 Pytorch implementation of MoE can be referred to https://github.com/pytorch/fairseq/tree/moe
 Note that capacity is not used in LightSeq, the computational graph is dynamic.
-Kernel and bias of ffn are stacked by expert_num times at the first dimension if the layer is in add_moe_list.
+If some layer is in add_moe_list:
+1. Kernel and bias of ffn are stacked by expert_num times at the first dimension.
+2. Add parameter "gate_kernel" (shape [hidden_size, expert_num]) into this layer.
 For example:
     the shape of ffn_first_kernel will be:
         [expert_num, hidden_size, inner_size]
@@ -10,16 +12,18 @@ For example:
         [hidden_size, inner_size]
 """
 import os
-import math
+import torch
+import argparse
+import numpy as np
 from collections import OrderedDict
 
-import numpy as np
-import torch
-import tensorflow as tf
-from proto.moe_pb2 import Moe
-import argparse
 import lightseq.inference as lsi
-
+from proto.moe_pb2 import Moe
+from lightseq.training.ops.pytorch.export import (
+    gather_token_embedding,
+    export_ls_config,
+)
+from lightseq.training.ops.pytorch.util import get_pos_embedding
 
 enc_layer_mapping_dict = OrderedDict(
     {
@@ -291,51 +295,6 @@ def _get_encode_output_mapping_dict(dec_layer_num):
     }
 
 
-def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
-    """Return positional encoding.
-
-    Calculates the position encoding as a mix of sine and cosine functions with
-    geometrically increasing wavelengths.
-    Defined and formulized in Attention is All You Need, section 3.5.
-
-    Args:
-      length: Sequence length.
-      hidden_size: Size of the
-      min_timescale: Minimum scale that will be applied at each position
-      max_timescale: Maximum scale that will be applied at each position
-
-    Returns:
-      Tensor with shape [length, hidden_size]
-    """
-    with tf.device("/cpu:0"):
-        position = tf.cast(tf.range(length), tf.float32)
-        num_timescales = hidden_size // 2
-        log_timescale_increment = math.log(
-            float(max_timescale) / float(min_timescale)
-        ) / (tf.cast(num_timescales, tf.float32) - 1)
-        inv_timescales = min_timescale * tf.exp(
-            tf.cast(tf.range(num_timescales), tf.float32) * -log_timescale_increment
-        )
-        scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(inv_timescales, 0)
-        signal = tf.concat([tf.math.sin(scaled_time), tf.math.cos(scaled_time)], axis=1)
-    return signal
-
-
-def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
-    """use pattern to diff source and target."""
-    target_tn = []
-    for tn in tensor_names:
-        if (tn_pattern in tn.split(".")) and ("weight" in tn.split(".")):
-            target_tn.append(tn)
-            continue
-    target_tensor = [name2var_dict[name] for name in target_tn]
-    target_tensor = np.concatenate(target_tensor, axis=0)
-    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
-    print("token embedding shape is {}".format(target_tensor.shape))
-
-    return target_tensor
-
-
 def export_moe(
     output_file,
     model_dir,
@@ -347,13 +306,7 @@ def export_moe(
     expert_num_decoder,
     moe_topk_encoder,
     moe_topk_decoder,
-    sampling_method="beam_search",
-    extra_decode_length=50,
     beam_size=4,
-    length_penalty=0.6,
-    topk=1,
-    topp=0.75,
-    lang="en",
     bos_id=2,
     eos_id=2,
     pad_id=1,
@@ -421,7 +374,7 @@ def export_moe(
         src_emb_mapping_dict,
     )
     # encoder token embedding
-    src_tb = _gather_token_embedding(
+    src_tb, _ = gather_token_embedding(
         enc_var_name_list, encoder_state_dict, "embed_tokens"
     )
     moe.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
@@ -431,9 +384,7 @@ def export_moe(
         pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
         moe.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(
-            length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]
-        ).numpy()
+        pos_emb = get_pos_embedding(max_step + pad_id + 1, src_tb.shape[-1]).numpy()
         pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         moe.src_embedding.position_embedding[:] = pos_emb_list
@@ -454,8 +405,8 @@ def export_moe(
         trg_emb_mapping_dict,
     )
     # decoder token embedding
-    trg_tb = _gather_token_embedding(
-        dec_var_name_list, decoder_state_dict, "embed_tokens", lang=lang
+    trg_tb, _ = gather_token_embedding(
+        dec_var_name_list, decoder_state_dict, "embed_tokens"
     )
     moe.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(
@@ -469,9 +420,7 @@ def export_moe(
         pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
         moe.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(
-            length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]
-        ).numpy()
+        pos_emb = get_pos_embedding(max_step + pad_id + 1, trg_tb.shape[-1]).numpy()
         pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         moe.trg_embedding.position_embedding[:] = pos_emb_list
@@ -483,24 +432,17 @@ def export_moe(
     )
 
     # fill in conf
-    moe.model_conf.head_num = head_num
-
-    moe.model_conf.beam_size = beam_size
-    moe.model_conf.length_penalty = length_penalty
-
-    moe.model_conf.extra_decode_length = extra_decode_length
-    moe.model_conf.src_padding_id = pad_id
-    moe.model_conf.trg_start_id = bos_id
-    moe.model_conf.trg_end_id = eos_id
-
-    moe.model_conf.sampling_method = sampling_method
-    moe.model_conf.topk = topk
-    moe.model_conf.topp = topp
-    moe.model_conf.diverse_lambda = 0
-    moe.model_conf.is_post_ln = False
-    moe.model_conf.no_scale_embedding = False
-    moe.model_conf.use_gelu = False
-
+    export_ls_config(
+        moe,
+        head_num,
+        pad_id,
+        bos_id,
+        eos_id,
+        0,
+        0,
+        beam_size=beam_size,
+        save_pb=True,
+    )
     moe.model_conf.moe_list_encoder[:] = moe_list_encoder
     moe.model_conf.moe_list_decoder[:] = moe_list_decoder
     moe.model_conf.expert_num_encoder = expert_num_encoder
@@ -515,7 +457,7 @@ def _write(moe, path):
     print("Wrting to {0}".format(path))
 
     try:
-        with tf.io.gfile.GFile(path, "wb") as fout:
+        with open(path, "wb") as fout:
             fout.write(moe.SerializeToString())
     except Exception:
         print("Saving PB fails. Save HDF5 instead!")
@@ -590,7 +532,6 @@ if __name__ == "__main__":
         args.head_num,
         beam_size=args.beam_size,
         max_step=args.max_step,
-        lang="en",
         bos_id=args.bos_id,
         eos_id=args.eos_id,
         pad_id=args.pad_id,

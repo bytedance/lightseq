@@ -70,8 +70,8 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
 
     target_tensor = np.concatenate(tt["save"], axis=-1)
     print(
-        "%s -> %s, convert finished!"
-        % (target_tn if target_tn else "created", proto_name)
+        "%s -> %s, shape: %s, convert finished."
+        % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
     )
     return target_tensor
 

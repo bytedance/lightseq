@@ -2,15 +2,19 @@
 Export Fairseq Transformer models to protobuf/hdf5 format.
 """
 import os
-import math
+import torch
+import argparse
+import numpy as np
 from collections import OrderedDict
 
-import numpy as np
-import torch
-import tensorflow as tf
-from proto.transformer_pb2 import Transformer
-import argparse
 import lightseq.inference as lsi
+from proto.transformer_pb2 import Transformer
+from lightseq.training.ops.pytorch.export import (
+    gather_token_embedding,
+    fill_pb_layer,
+    export_ls_config,
+)
+from lightseq.training.ops.pytorch.util import get_pos_embedding
 
 
 enc_layer_mapping_dict = OrderedDict(
@@ -193,61 +197,6 @@ def save_proto_to_hdf5(transformer, f):
     print(f"proto to hdf5 conversion completed.")
 
 
-def check_rule(tensor_name, rule):
-    if "Adam" in tensor_name or "adam" in tensor_name:
-        return False
-    assert isinstance(rule, str) and rule
-    r_size = len(rule.split(" "))
-    t = tensor_name.split(".")
-    if len(t) < r_size:
-        return False
-    return rule == " ".join(t[-r_size:])
-
-
-def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
-    for proto_name, ckpt_rule in mapping_dict.items():
-        expression = [
-            ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
-        ]
-
-        ckpt_rule = [
-            ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
-        ]
-
-        assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
-            len(ckpt_rule) == 0 and len(expression) > 0
-        )
-
-        if len(expression) < 2:
-            expression = "" if not expression else expression[0].split("_")[1]
-        else:
-            expression = [exp.split("_")[1] for exp in expression]
-
-        target_tn = []
-        for cr in ckpt_rule:
-            tmp = []
-            for tn in tensor_names:
-                if check_rule(tn, cr):
-                    tmp.append(tn)
-            assert len(tmp) == 1
-            target_tn.extend(tmp)
-        target_tensor = [stete_dict[name] for name in target_tn]
-        tt = {}
-        if target_tensor:
-            exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
-        else:
-            if not isinstance(expression, list):
-                expression = [expression]
-            exec("tt['save'] = [%s]" % ",".join(expression))
-
-        target_tensor = np.concatenate(tt["save"], axis=-1)
-        print(
-            "%s -> %s, shape: %s, convert finished."
-            % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
-        )
-        exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
-
-
 def _get_encode_output_mapping_dict(dec_layer_num):
     encode_output_kernel_pattern = [
         "{0} encoder_attn k_proj weight&&{0} encoder_attn v_proj weight".format(ele)
@@ -266,66 +215,10 @@ def _get_encode_output_mapping_dict(dec_layer_num):
     }
 
 
-def _get_position_encoding(length, hidden_size, min_timescale=1.0, max_timescale=1.0e4):
-    """Return positional encoding.
-
-    Calculates the position encoding as a mix of sine and cosine functions with
-    geometrically increasing wavelengths.
-    Defined and formulized in Attention is All You Need, section 3.5.
-
-    Args:
-      length: Sequence length.
-      hidden_size: Size of the
-      min_timescale: Minimum scale that will be applied at each position
-      max_timescale: Maximum scale that will be applied at each position
-
-    Returns:
-      Tensor with shape [length, hidden_size]
-    """
-    with tf.device("/cpu:0"):
-        position = tf.cast(tf.range(length), tf.float32)
-        num_timescales = hidden_size // 2
-        log_timescale_increment = math.log(
-            float(max_timescale) / float(min_timescale)
-        ) / (tf.cast(num_timescales, tf.float32) - 1)
-        inv_timescales = min_timescale * tf.exp(
-            tf.cast(tf.range(num_timescales), tf.float32) * -log_timescale_increment
-        )
-        scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(inv_timescales, 0)
-        signal = tf.concat([tf.math.sin(scaled_time), tf.math.cos(scaled_time)], axis=1)
-    return signal
-
-
-def _gather_token_embedding(tensor_names, name2var_dict, tn_pattern, lang="en"):
-    """use pattern to diff source and target."""
-    target_tn = []
-    for tn in tensor_names:
-        if (tn_pattern in tn.split(".")) and ("weight" in tn.split(".")):
-            target_tn.append(tn)
-            continue
-    target_tensor = [name2var_dict[name] for name in target_tn]
-    target_tensor = np.concatenate(target_tensor, axis=0)
-    target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
-    print("token embedding shape is {}".format(target_tensor.shape))
-
-    return target_tensor
-
-
-def extract_transformer_weights(
+def export_native_fs_transformer(
     output_file,
     model_dir,
-    head_num,
-    max_step,
-    sampling_method="beam_search",
-    extra_decode_length=50,
-    beam_size=4,
-    length_penalty=0.6,
-    topk=1,
-    topp=0.75,
-    lang="en",
-    bos_id=2,
-    eos_id=2,
-    pad_id=1,
+    args,
 ):
     transformer = Transformer()
     # load var names
@@ -358,7 +251,7 @@ def extract_transformer_weights(
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(enc_tensor_names.keys()):
-        fill_layer(
+        fill_pb_layer(
             enc_tensor_names[layer_id],
             encoder_state_dict,
             transformer.encoder_stack.add(),
@@ -375,7 +268,7 @@ def extract_transformer_weights(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_layer(
+        fill_pb_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
             transformer.decoder_stack.add(),
@@ -383,14 +276,14 @@ def extract_transformer_weights(
         )
 
     # fill src_embedding
-    fill_layer(
+    fill_pb_layer(
         enc_var_name_list,
         encoder_state_dict,
         transformer.src_embedding,
         src_emb_mapping_dict,
     )
     # encoder token embedding
-    src_tb = _gather_token_embedding(
+    src_tb, _ = gather_token_embedding(
         enc_var_name_list, encoder_state_dict, "embed_tokens"
     )
     transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
@@ -400,10 +293,10 @@ def extract_transformer_weights(
         pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
         transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(
-            length=max_step + pad_id + 1, hidden_size=src_tb.shape[-1]
+        pos_emb = get_pos_embedding(
+            args.max_step + args.pad_id + 1, src_tb.shape[-1]
         ).numpy()
-        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
+        pos_emb = pos_emb[args.pad_id + 1 : args.max_step + args.pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         transformer.src_embedding.position_embedding[:] = pos_emb_list
 
@@ -416,15 +309,15 @@ def extract_transformer_weights(
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_layer(
+    fill_pb_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,
         trg_emb_mapping_dict,
     )
     # decoder token embedding
-    trg_tb = _gather_token_embedding(
-        dec_var_name_list, decoder_state_dict, "embed_tokens", lang=lang
+    trg_tb, _ = gather_token_embedding(
+        dec_var_name_list, decoder_state_dict, "embed_tokens"
     )
     transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(
@@ -438,10 +331,10 @@ def extract_transformer_weights(
         pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
         transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = _get_position_encoding(
-            length=max_step + pad_id + 1, hidden_size=trg_tb.shape[-1]
+        pos_emb = get_pos_embedding(
+            args.max_step + args.pad_id + 1, trg_tb.shape[-1]
         ).numpy()
-        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
+        pos_emb = pos_emb[args.pad_id + 1 : args.max_step + args.pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
         transformer.trg_embedding.position_embedding[:] = pos_emb_list
 
@@ -452,23 +345,17 @@ def extract_transformer_weights(
     )
 
     # fill in conf
-    transformer.model_conf.head_num = head_num
-
-    transformer.model_conf.beam_size = beam_size
-    transformer.model_conf.length_penalty = length_penalty
-
-    transformer.model_conf.extra_decode_length = extra_decode_length
-    transformer.model_conf.src_padding_id = pad_id
-    transformer.model_conf.trg_start_id = bos_id
-    transformer.model_conf.trg_end_id = eos_id
-
-    transformer.model_conf.sampling_method = sampling_method
-    transformer.model_conf.topk = topk
-    transformer.model_conf.topp = topp
-    transformer.model_conf.diverse_lambda = 0
-    transformer.model_conf.is_post_ln = False
-    transformer.model_conf.no_scale_embedding = False
-    transformer.model_conf.use_gelu = False
+    export_ls_config(
+        transformer,
+        args.head_num,
+        args.pad_id,
+        args.bos_id,
+        args.eos_id,
+        0,
+        0,
+        beam_size=args.beam_size,
+        save_pb=True,
+    )
 
     _write(transformer, output_file)
 
@@ -477,7 +364,7 @@ def _write(transformer, path):
     print("Wrting to {0}".format(path))
 
     try:
-        with tf.io.gfile.GFile(path, "wb") as fout:
+        with open(path, "wb") as fout:
             fout.write(transformer.SerializeToString())
     except Exception:
         print("Saving PB fails. Save HDF5 instead!")
@@ -505,8 +392,8 @@ def parse_args():
         help="output lightseq model file",
     )
     parser.add_argument("--beam_size", type=int, default=4, help="beam size")
-    parser.add_argument("--max-step", type=int, default=1024, help="max step to decode")
-    parser.add_argument("--head-num", type=int, default=16, help="head num")
+    parser.add_argument("--max_step", type=int, default=1024, help="max step to decode")
+    parser.add_argument("--head_num", type=int, default=16, help="head num")
     parser.add_argument("--bos_id", type=int, default=2, help="bos id")
     parser.add_argument("--eos_id", type=int, default=2, help="eos id")
     parser.add_argument("--pad_id", type=int, default=1, help="pad id")
@@ -518,16 +405,10 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     # export
-    extract_transformer_weights(
+    export_native_fs_transformer(
         args.output,
         args.input,
-        args.head_num,
-        beam_size=args.beam_size,
-        max_step=args.max_step,
-        lang="en",
-        bos_id=args.bos_id,
-        eos_id=args.eos_id,
-        pad_id=args.pad_id,
+        args,
     )
     # test
     model_path = None
