@@ -29,7 +29,7 @@ weight_quant_config = QuantDescriptor(
 class QuantLinear(Linear):
     def __init__(self, in_features, out_features, pre_activation=None, *args, **kwargs):
         super(QuantLinear, self).__init__(in_features, out_features, *args, **kwargs)
-        if pre_activation is None:
+        if pre_activation is None or pre_activation == "encoder_out":
             input_quant_config = act_quant_config
         elif pre_activation == "relu":
             input_quant_config = relu_quant_config
@@ -38,14 +38,18 @@ class QuantLinear(Linear):
                 f"pre_activation {pre_activation} is not supported"
             )
 
-        self.input_quant = TensorQuantizer(input_quant_config)
+        self.input_quant = None
+        if pre_activation != "encoder_out":
+            self.input_quant = TensorQuantizer(input_quant_config)
         self.output_quant = None
-        if pre_activation != "relu":
+        if pre_activation != "relu" and pre_activation != "encoder_out":
             self.output_quant = TensorQuantizer(act_quant_config)
         self.weight_quant = TensorQuantizer(weight_quant_config)
 
     def forward(self, input):
-        qinput = self.input_quant(input)
+        qinput = input
+        if self.input_quant is not None:
+            qinput = self.input_quant(input)
         qweight = self.weight_quant(self.weight)
         output = F.linear(qinput, qweight)
         if self.output_quant is not None:

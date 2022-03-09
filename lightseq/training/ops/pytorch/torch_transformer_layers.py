@@ -78,10 +78,13 @@ class MultiheadAttention(nn.Module):
             self.attention_quant = (
                 TensorQuantizer(act_quant_config) if self.is_decoder else None
             )
-
-        else:
-            self.k_proj = QuantLinear(self.kdim, embed_dim, bias=bias)
-            self.v_proj = QuantLinear(self.vdim, embed_dim, bias=bias)
+        elif self.encoder_decoder_attention and self.is_decoder:
+            self.k_proj = QuantLinear(
+                self.kdim, embed_dim, pre_activation="encoder_out", bias=bias
+            )
+            self.v_proj = QuantLinear(
+                self.vdim, embed_dim, pre_activation="encoder_out", bias=bias
+            )
             self.q_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
         self.out_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
