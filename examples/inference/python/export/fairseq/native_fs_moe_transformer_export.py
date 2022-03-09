@@ -78,7 +78,6 @@ trg_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "layer_norm weight",
         "norm_bias": "layer_norm bias",
-        "shared_bias": "pred_layer bias",
     }
 )
 
