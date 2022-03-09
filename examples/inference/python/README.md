@@ -66,6 +66,13 @@ Export native Fairseq Transformer models to protobuf/hdf5 format. Refer to the `
 python export/fairseq/native_fs_transformer_export.py -m checkpoint_best.pt
 ```
 
+10. Native Fairseq MoE Transformer
+
+Export Fairseq MoE models to protobuf/hdf5 format.
+```shell
+python export/fairseq/fs_moe_export.py
+```
+
 ### Inference using LightSeq
 1. BART
 ```shell
