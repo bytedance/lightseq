@@ -1,5 +1,5 @@
 """
-Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
+Export PTQ Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 from collections import OrderedDict
@@ -18,7 +18,7 @@ import lightseq.inference as lsi
 
 
 # adjust this value to achieve better performance
-global_act_clip_max = 45.0
+global_act_clip_max = 16.0
 
 
 enc_layer_mapping_dict = OrderedDict(
@@ -36,13 +36,13 @@ enc_layer_mapping_dict = OrderedDict(
         "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
         "ffn_second_bias": "fc2 bias",
         # act_clip_max
-        "multihead_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
-        "multihead_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
-        "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
-        "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
-        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
-        "multihead_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
-        "ffn_first_output_clip_max": "fc1 output_quant clip_value_max",
+        "multihead_ln_clip_max": "None",
+        "multihead_project_output_clip_max": "None",
+        "ffn_ln_clip_max": "None",
+        "ffn_first_act_clip_max": "None",
+        "multihead_qkv_dense_clip_max": "None",
+        "multihead_output_dense_clip_max": "None",
+        "ffn_first_output_clip_max": "None",
     }
 )
 
@@ -67,18 +67,18 @@ dec_layer_mapping_dict = OrderedDict(
         "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
         "ffn_second_bias": "fc2 bias",
         # act_clip_max
-        "self_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
-        "self_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
-        "encdec_ln_clip_max": "encoder_attn q_proj input_quant clip_value_max",
-        "encdec_project_output_clip_max": "encoder_attn out_proj input_quant clip_value_max",
-        "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
-        "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
-        "self_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
-        "self_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
-        "encdec_q_dense_clip_max": "encoder_attn q_proj output_quant clip_value_max",
-        "encdec_output_dense_clip_max": "encoder_attn out_proj output_quant clip_value_max",
-        "ffn_first_output_clip_max": "fc1 output_quant clip_value_max",
-        "self_qkv_bias_out_clip_max": "self_attn attention_quant clip_value_max",
+        "self_ln_clip_max": "None",
+        "self_project_output_clip_max": "None",
+        "encdec_ln_clip_max": "None",
+        "encdec_project_output_clip_max": "None",
+        "ffn_ln_clip_max": "None",
+        "ffn_first_act_clip_max": "None",
+        "self_qkv_dense_clip_max": "None",
+        "self_output_dense_clip_max": "None",
+        "encdec_q_dense_clip_max": "None",
+        "encdec_output_dense_clip_max": "None",
+        "ffn_first_output_clip_max": "None",
+        "self_qkv_bias_out_clip_max": "None",
     }
 )
 
@@ -116,7 +116,7 @@ def _get_encode_output_mapping_dict(dec_layer_num):
     }
 
 
-def export_ls_torch_fs_quant_transformer(
+def export_ls_torch_fs_transformer_ptq(
     model_dir,
     pb_path,
     max_step=512,
@@ -228,7 +228,9 @@ def export_ls_torch_fs_quant_transformer(
     trg_tb, trg_tb_clip_max, _ = gather_quant_token_embedding(
         dec_var_name_list, decoder_state_dict, "emb_lookup"
     )
-    transformer.trg_embedding.token_embedding = bytes(trg_tb.flatten().tolist())
+    transformer.trg_embedding.token_embedding = bytes(
+        trg_tb.transpose().flatten().tolist()
+    )
     transformer.trg_embedding.emb_clip_max = trg_tb_clip_max
     print(
         "token_embedding.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
@@ -285,7 +287,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     pb_path = "quant_transformer.pb"
-    export_ls_torch_fs_quant_transformer(args.model, pb_path)
+    export_ls_torch_fs_transformer_ptq(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.QuantTransformer(pb_path, 8)
     pb_output = pb_model.infer(src)

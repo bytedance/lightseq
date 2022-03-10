@@ -1,5 +1,5 @@
 """
-Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
+Export quantized Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 from collections import OrderedDict
@@ -160,11 +160,12 @@ def export_ls_torch_fs_quant_transformer(
     args = reloaded["args"]
     model_dict = reloaded["model"]
 
-    for name in model_dict:
+    var_names = list(model_dict.keys())
+    for name in var_names:
         if name.endswith("weight_quant.clip.clip_value_max"):
-            model_dict[name[:-26]] = quantize(
-                model_dict[name[:-26]].numpy(), 127, model_dict[name].numpy()
-            )
+            model_dict[name[:-26]] = torch.Tensor(
+                quantize(model_dict[name[:-26]].numpy(), 127, model_dict[name].numpy())
+            ).int()
 
     trg_emb_mapping_dict["shared_bias"] = (
         "expression_np.zeros(%d)"
@@ -265,7 +266,9 @@ def export_ls_torch_fs_quant_transformer(
     trg_tb, _, _ = gather_quant_token_embedding(
         dec_var_name_list, decoder_state_dict, "emb_lookup", trg_tb_clip_max
     )
-    transformer.trg_embedding.token_embedding = bytes(trg_tb.flatten().tolist())
+    transformer.trg_embedding.token_embedding = bytes(
+        trg_tb.transpose().flatten().tolist()
+    )
     transformer.trg_embedding.emb_clip_max = trg_tb_clip_max
     print(
         "token_embedding.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(

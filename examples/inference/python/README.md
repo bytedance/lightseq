@@ -73,6 +73,20 @@ Export Fairseq MoE models to protobuf/hdf5 format.
 python export/fairseq/fs_moe_export.py
 ```
 
+11. Quantized Fairseq Transformer using custom Torch layers
+
+Export quantized Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
+```shell
+python export/fairseq/ls_torch_fs_quant_transformer_export.py -m checkpoint_best.pt
+```
+
+12. Fairseq Transformer using custom Torch layers and PTQ
+
+Export PTQ Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
+```shell
+python export/fairseq/ls_torch_fs_transformer_ptq_export.py -m checkpoint_best.pt
+```
+
 ### Inference using LightSeq
 1. BART
 ```shell
