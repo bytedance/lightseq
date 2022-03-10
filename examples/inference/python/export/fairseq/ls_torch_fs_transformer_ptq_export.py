@@ -18,7 +18,7 @@ import lightseq.inference as lsi
 
 
 # adjust this value to achieve better performance
-global_act_clip_max = 16.0
+global_act_clip_max = 45.0
 
 
 enc_layer_mapping_dict = OrderedDict(
