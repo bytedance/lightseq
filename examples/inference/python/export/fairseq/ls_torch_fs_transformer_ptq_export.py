@@ -119,7 +119,7 @@ def _get_encode_output_mapping_dict(dec_layer_num):
 def export_ls_torch_fs_transformer_ptq(
     model_dir,
     pb_path,
-    max_step=512,
+    max_step=300,
     bos_id=2,
     eos_id=2,
     pad_id=1,
@@ -286,7 +286,8 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    pb_path = "quant_transformer.pb"
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}_ptq.pb"
     export_ls_torch_fs_transformer_ptq(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.QuantTransformer(pb_path, 8)

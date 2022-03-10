@@ -61,8 +61,8 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
     else:
         file = h5py.File(out_path, "w")
     encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
-    export_ls_embedding(file, encoder_state_dict, 1024, True, save_pb)
-    export_ls_embedding(file, decoder_state_dict, 1024, False, save_pb)
+    export_ls_embedding(file, encoder_state_dict, 300, True, save_pb)
+    export_ls_embedding(file, decoder_state_dict, 300, False, save_pb)
     export_ls_encoder(
         file,
         encoder_state_dict,
@@ -112,8 +112,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    pb_path = "transformer.pb"
-    hdf5_path = "transformer.hdf5"
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}.pb"
+    hdf5_path = f"{model_name}.hdf5"
     print("export to pb model >>>>>>")
     export_ls_fs_transformer(args.model, pb_path)
     print("export to hdf5 model >>>>>>")

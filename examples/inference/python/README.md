@@ -100,3 +100,8 @@ python test/ls_bert.py
 ```shell
 python test/ls_gpt2.py
 ```
+
+4. Fairseq based models using LightSeq inference
+```shell
+bash test/ls_fairseq.sh --model ${model_path}
+```

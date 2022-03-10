@@ -59,14 +59,14 @@ def export_ls_fs_transformer_ptq(ckpt_path, out_path, save_pb=True):
     export_ls_embedding_ptq(
         file,
         encoder_state_dict,
-        1024,
+        300,
         True,
         save_pb=save_pb,
     )
     export_ls_embedding_ptq(
         file,
         decoder_state_dict,
-        1024,
+        300,
         False,
         save_pb=save_pb,
     )
@@ -118,7 +118,8 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    pb_path = "quant_transformer.pb"
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}_ptq.pb"
     print("export to pb model >>>>>>")
     export_ls_fs_transformer_ptq(args.model, pb_path)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
