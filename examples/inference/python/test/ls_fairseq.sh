@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-THIS_DIR="$( cd "$( dirname "$0" )" && pwd )"
-cd ${THIS_DIR}
-
 until [[ -z "$1" ]]
 do
     case $1 in
