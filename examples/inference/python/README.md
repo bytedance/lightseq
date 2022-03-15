@@ -1,105 +1,32 @@
-# Examples of exporting models for LightSeq inference
+# Model export and LightSeq inference
+This repo contains examples of exporting models (LightSeq, Fairseq based, Hugging Face, etc.) to protobuf/hdf5 format, and then use LightSeq for fast inference. For each model, we provide normal float model export, quantized model export (QAT, quantization aware training) and PTQ (post training quantization) model export.
 
-## Switch to the current directory
+Before doing anything, you need to switch to the current directory:
 ```shell
 cd examples/inference/python
 ```
 
-## Export models
-### Hugging Face
-1. Hugging Face BART
+## Model export
+We provide the following export examples. All Fairseq based models are trained using the scripts in [examples/training/fairseq](../../../examples/training/fairseq). The first two LightSeq Transformer models are trained using the scripts in [examples/training/custom](../../../examples/training/custom).
 
-Export Hugging Face BART models to protobuf/hdf5 format.
-```shell
-python export/huggingface/hf_bart_export.py
-```
-2. Hugging Face BERT
+| Model                                | Type  | Command                                                                                               | Resource                                                                                                                     | Description                                                                                                                                              |
+|--------------------------------------|-------|-------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| LightSeq Transformer                 | Float | python export/ls_transformer_export.py -m ckpt_ls_custom.pt                                           | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/ckpt_ls_custom.pt                            | Export LightSeq Transformer models to protobuf format.                                                                                                   |
+| LightSeq Transformer + PTQ           | Int8  | python export/ls_transformer_ptq_export.py -m ckpt_ls_custom.pt                                       | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/ckpt_ls_custom.pt                            | Export LightSeq Transformer models to int8 protobuf format using post training quantization.                                                             |
+| Hugging Face BART                    | Float | python export/huggingface/hf_bart_export.py                                                           | /                                                                                                                            | Export Hugging Face BART models to protobuf/hdf5 format.                                                                                                 |
+| Hugging Face BERT                    | Float | python export/huggingface/hf_bert_export.py                                                           | /                                                                                                                            | Export Hugging Face BERT models to hdf5 format.                                                                                                          |
+| Hugging Face GPT2                    | Float | python export/huggingface/hf_gpt2_export.py                                                           | /                                                                                                                            | Export Hugging Face GPT2 models to hdf5 format.                                                                                                          |
+| Native Fairseq Transformer           | Float | python export/fairseq/native_fs_transformer_export.py -m ckpt_native_fairseq_31.06.pt                 | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_native_fairseq_31.06.pt         | Export native Fairseq Transformer models to protobuf/hdf5 format.                                                                                        |
+| Native Fairseq Transformer + PTQ     | Int8  | python export/fairseq/native_fs_transformer_export.py -m ckpt_native_fairseq_31.06.pt                 | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_native_fairseq_31.06.pt         | Export native Fairseq Transformer models to int8 protobuf format using post training quantization.                                                       |
+| Fairseq + LightSeq Transformer       | Float | python export/fairseq/ls_fs_transformer_export.py -m ckpt_ls_fairseq_31.17.pt                         | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_fairseq_31.17.pt             | Export Fairseq Transformer models training with LightSeq modules to protobuf/hdf5 format.                                                                |
+| Fairseq + LightSeq Transformer + PTQ | Int8  | python export/fairseq/ls_fs_transformer_ptq_export.py -m ckpt_ls_fairseq_31.17.pt                     | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_fairseq_31.17.pt             | Export Fairseq Transformer models training with LightSeq modules to int8 protobuf format using post training quantization.                               |
+| Fairseq + custom Torch layer         | Float | python export/fairseq/ls_torch_fs_transformer_export.py -m ckpt_ls_torch_fairseq_31.16.pt             | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_torch_fairseq_31.16.pt       | Export Fairseq Transformer models training with custom Torch layers and other LightSeq modules to protobuf format.                                       |
+| Fairseq + custom Torch layer + PTQ   | Int8  | python export/fairseq/ls_torch_fs_transformer_ptq_export.py -m ckpt_ls_torch_fairseq_31.16.pt         | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_torch_fairseq_31.16.pt       | Export Fairseq Transformer models training with custom Torch layers and other LightSeq modules to int8 protobuf format using post training quantization. |
+| Fairseq + custom Torch layer + QAT   | Int8  | python export/fairseq/ls_torch_fs_quant_transformer_export.py -m ckpt_ls_torch_fairseq_quant_31.09.pt | http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_torch_fairseq_quant_31.09.pt | Export quantized Fairseq Transformer models training with custom Torch layers and other LightSeq modules to int8 protobuf format.                        |
+| Native Fairseq MoE Transformer       | Float | python export/fairseq/native_fs_moe_transformer_export.py                                             | /                                                                                                                            | Export Fairseq MoE Transformer models to protobuf/hdf5 format.                                                                                           |
 
-Export Hugging Face BERT models to hdf5 format.
-```shell
-python export/huggingface/hf_bert_export.py
-```
-3. Hugging Face GPT2
-
-Export Hugging Face GPT2 models to hdf5 format.
-```shell
-python export/huggingface/hf_gpt2_export.py
-```
-### Native Fairseq
-1. Native Fairseq Transformer
-
-Export native Fairseq Transformer models to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/native_fs_transformer_export.py -m checkpoint_best.pt
-```
-
-2. Native Fairseq Transformer using PTQ
-
-Export native Fairseq Transformer models using PTQ to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/native_fs_transformer_export.py -m checkpoint_best.pt
-```
-
-3. Native Fairseq MoE Transformer
-
-Export Fairseq MoE models to protobuf/hdf5 format.
-```shell
-python export/fairseq/fs_moe_export.py
-```
-
-### Fairseq Transformer + LightSeq
-1. Fairseq Transformer using LightSeq training library
-
-Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/ls_fs_transformer_export.py -m checkpoint_best.pt
-```
-
-2. Fairseq Transformer using LightSeq training library with PTQ
-
-Export Fairseq Transformer models training with LightSeq to protobuf format, and then using PTQ to speedup inference. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/ls_fs_transformer_ptq_export.py -m checkpoint_best.pt
-```
-
-### LightSeq Transformer
-
-1. LightSeq Transformer
-
-Export LightSeq Transformer models to protobuf/hdf5 format. Refer to the `examples/training/custom` directory for more training details.
-```shell
-python export/ls_transformer_export.py
-```
-2. LightSeq Transformer using PTQ
-
-Export LightSeq fp16/fp32 Transformer models to int8 protobuf format, and then using PTQ to speedup inference. Refer to the `examples/training/custom` directory for more training details. Note that in this example, we do not need to finetune the models using fake-quantization.
-```shell
-python export/ls_transformer_ptq_export.py
-```
-
-### Fairseq Transformer + custom Torch layers
-1. Fairseq Transformer using custom Torch layers
-
-Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/ls_torch_fs_transformer_export.py -m checkpoint_best.pt
-```
-
-2. Fairseq Transformer using custom Torch layers and PTQ
-
-Export PTQ Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/ls_torch_fs_transformer_ptq_export.py -m checkpoint_best.pt
-```
-
-3. Quantized Fairseq Transformer using custom Torch layers
-
-Export quantized Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format. Refer to the `examples/training/fairseq` directory for more training details.
-```shell
-python export/fairseq/ls_torch_fs_quant_transformer_export.py -m checkpoint_best.pt
-```
-
-## Inference using LightSeq
+## LightSeq inference
+### Hugging Face models
 1. BART
 ```shell
 python test/ls_bart.py
@@ -113,7 +40,8 @@ python test/ls_bert.py
 python test/ls_gpt2.py
 ```
 
-4. Fairseq based models using LightSeq inference
+### Fairseq based models
+After exporting the Fairseq based models to protobuf/hdf5 format using above scripts, we can use the following script for fast LightSeq inference on wmt14 en2de dateset, compatible with fp16 and int8 models:
 ```shell
 bash test/ls_fairseq.sh --model ${model_path}
 ```

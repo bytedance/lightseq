@@ -1,8 +1,8 @@
 """
-Export LightSeq fp16/fp32 Transformer models to int8 protobuf format,
-and then using int8 quantization to speedup inference.
+Export LightSeq Transformer models to int8 protobuf format using post training quantization.
 Refer to the `examples/training/custom` directory for more training details.
 """
+import argparse
 import time
 import numpy as np
 import torch
@@ -183,6 +183,19 @@ def ls_predict(ls_infer_model, src_tokens):
     return ls_output, end_time - start_time
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="export LightSeq checkpoint", usage="")
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        default="checkpoint_best.pt",
+        help="path of LightSeq checkpoint",
+    )
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
     (
         tokenizer,
@@ -200,10 +213,11 @@ if __name__ == "__main__":
         trg_seq_len,
     ) = create_data()
 
-    ckpt_path = "checkpoint.pt"
-    pb_path = "quant_transformer.pb"
+    args = parse_args()
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}_ptq.pb"
 
-    with open(ckpt_path, "rb") as fin:
+    with open(args.model, "rb") as fin:
         state_dict = torch.load(fin, map_location=torch.device("cpu"))
 
     config = create_config(vocab_size)

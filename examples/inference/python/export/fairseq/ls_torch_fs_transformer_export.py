@@ -1,5 +1,6 @@
 """
-Export Fairseq Transformer models training using custom Torch layers to protobuf/hdf5 format.
+Export Fairseq Transformer models training with custom Torch layers
+and other LightSeq modules to protobuf format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 from collections import OrderedDict

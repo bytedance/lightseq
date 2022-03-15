@@ -1,5 +1,5 @@
 """
-Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format.
+Export Fairseq Transformer models training with LightSeq modules to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 import argparse

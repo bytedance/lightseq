@@ -1,11 +1,10 @@
 """
-Export Fairseq Transformer models training with LightSeq to protobuf format,
-and then using int8 quantization to speedup inference.
+Export Fairseq Transformer models training with LightSeq modules
+to int8 protobuf format using post training quantization.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 import argparse
 import torch
-import h5py
 from export.proto.quant_transformer_pb2 import QuantTransformer
 from lightseq.training import (
     export_ls_config,
