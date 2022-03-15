@@ -1,5 +1,15 @@
 """
-Export Fairseq Transformer models to protobuf/hdf5 format.
+Export Fairseq MoE models to protobuf/hdf5 format.
+Pytorch implementation of MoE can be referred to https://github.com/pytorch/fairseq/tree/moe
+Note that capacity is not used in LightSeq, the computational graph is dynamic.
+If some layer is in add_moe_list:
+1. Kernel and bias of ffn are stacked by expert_num times at the first dimension.
+2. Add parameter "gate_kernel" (shape [hidden_size, expert_num]) into this layer.
+For example:
+    the shape of ffn_first_kernel will be:
+        [expert_num, hidden_size, inner_size]
+    if some layer is in add_moe_list, otherwise still be:
+        [hidden_size, inner_size]
 """
 import os
 import torch
@@ -8,14 +18,12 @@ import numpy as np
 from collections import OrderedDict
 
 import lightseq.inference as lsi
-from proto.transformer_pb2 import Transformer
+from proto.moe_pb2 import Moe
 from lightseq.training.ops.pytorch.export import (
     gather_token_embedding,
-    fill_pb_layer,
     export_ls_config,
 )
 from lightseq.training.ops.pytorch.util import get_pos_embedding
-
 
 enc_layer_mapping_dict = OrderedDict(
     {
@@ -27,10 +35,11 @@ enc_layer_mapping_dict = OrderedDict(
         "multihead_project_bias_output": "self_attn out_proj bias",
         "ffn_norm_scale": "final_layer_norm weight",
         "ffn_norm_bias": "final_layer_norm bias",
-        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
+        "ffn_first_kernel": "fc1 weight&&expression_.transpose(-2, -1)",
         "ffn_first_bias": "fc1 bias",
-        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
+        "ffn_second_kernel": "fc2 weight&&expression_.transpose(-2, -1)",
         "ffn_second_bias": "fc2 bias",
+        "gate_kernel": "moe moe gate wg weight&&expression_.transpose(0, 1)",
     }
 )
 
@@ -50,10 +59,11 @@ dec_layer_mapping_dict = OrderedDict(
         "encdec_project_bias_output": "encoder_attn out_proj bias",
         "ffn_norm_scale": "final_layer_norm weight",
         "ffn_norm_bias": "final_layer_norm bias",
-        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
+        "ffn_first_kernel": "fc1 weight&&expression_.transpose(-2, -1)",
         "ffn_first_bias": "fc1 bias",
-        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
+        "ffn_second_kernel": "fc2 weight&&expression_.transpose(-2, -1)",
         "ffn_second_bias": "fc2 bias",
+        "gate_kernel": "moe moe gate wg weight&&expression_.transpose(0, 1)",
     }
 )
 
@@ -68,12 +78,11 @@ trg_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "layer_norm weight",
         "norm_bias": "layer_norm bias",
-        "shared_bias": "pred_layer bias",
     }
 )
 
 
-def save_proto_to_hdf5(transformer, f):
+def save_proto_to_hdf5(moe, f):
     """Convert bart protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
         # model_conf
@@ -92,6 +101,12 @@ def save_proto_to_hdf5(transformer, f):
         "no_scale_embedding",
         "use_gelu",
         "multilg_type",
+        "moe_list_encoder",
+        "moe_list_decoder",
+        "expert_num_encoder",
+        "expert_num_decoder",
+        "moe_topk_encoder",
+        "moe_topk_decoder",
     ]
 
     EMBEDDING_KEYS = [
@@ -122,6 +137,7 @@ def save_proto_to_hdf5(transformer, f):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
+        "gate_kernel",
     ]
 
     DECODER_LAYER_KEYS = [
@@ -144,7 +160,9 @@ def save_proto_to_hdf5(transformer, f):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
+        "gate_kernel",
     ]
+
     base_attr_to_keys = {
         "src_embedding": EMBEDDING_KEYS,
         "trg_embedding": EMBEDDING_KEYS,
@@ -160,12 +178,12 @@ def save_proto_to_hdf5(transformer, f):
             hdf5_key = f"{base_attr}/{key}"
             proto_attr = f"{base_attr}.{key}"
 
-            if key not in dir(attrgetter(base_attr)(transformer)):
+            if key not in dir(attrgetter(base_attr)(moe)):
                 print(f"key {key} not found in {base_attr}, skipping")
                 continue
 
-            print(f"loading transformer {proto_attr} -> {hdf5_key}")
-            _data = attrgetter(proto_attr)(transformer)
+            print(f"loading moe {proto_attr} -> {hdf5_key}")
+            _data = attrgetter(proto_attr)(moe)
             if type(_data) is str:
                 print(
                     f"find type str, explicitly convert string to ascii encoded array."
@@ -175,26 +193,87 @@ def save_proto_to_hdf5(transformer, f):
             f.create_dataset(hdf5_key, data=_data)
 
     # save number of layers metadata
-    f.create_dataset("model_conf/n_encoder_stack", data=len(transformer.encoder_stack))
-    f.create_dataset("model_conf/n_decoder_stack", data=len(transformer.decoder_stack))
+    f.create_dataset("model_conf/n_encoder_stack", data=len(moe.encoder_stack))
+    f.create_dataset("model_conf/n_decoder_stack", data=len(moe.decoder_stack))
 
     # load encoder_stack
-    for layer_id, layer in enumerate(transformer.encoder_stack):
+    for layer_id, layer in enumerate(moe.encoder_stack):
         for key in ENCODER_LAYER_KEYS:
+            if key == "gate_kernel" and layer_id not in moe.model_conf.moe_list_encoder:
+                continue
             hdf5_key = f"encoder_stack/{layer_id}/{key}"
             proto_attr = key
-            print(f"loading transformer.encoder_stack {proto_attr} -> {hdf5_key}")
+            print(f"loading moe.encoder_stack {proto_attr} -> {hdf5_key}")
             f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
 
     # load decoder_stack
-    for layer_id, layer in enumerate(transformer.decoder_stack):
+    for layer_id, layer in enumerate(moe.decoder_stack):
         for key in DECODER_LAYER_KEYS:
+            if key == "gate_kernel" and layer_id not in moe.model_conf.moe_list_decoder:
+                continue
             hdf5_key = f"decoder_stack/{layer_id}/{key}"
             proto_attr = key
-            print(f"loading transformer.decoder_stack {proto_attr} -> {hdf5_key}")
+            print(f"loading moe.decoder_stack {proto_attr} -> {hdf5_key}")
             f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
 
     print(f"proto to hdf5 conversion completed.")
+
+
+def check_rule(tensor_name, rule):
+    if "Adam" in tensor_name or "adam" in tensor_name:
+        return False
+    assert isinstance(rule, str) and rule
+    r_size = len(rule.split(" "))
+    t = tensor_name.split(".")
+    if len(t) < r_size:
+        return False
+    return rule == " ".join(t[-r_size:])
+
+
+def fill_layer(tensor_names, stete_dict, layer, mapping_dict):
+    for proto_name, ckpt_rule in mapping_dict.items():
+        expression = [
+            ele for ele in ckpt_rule.split("&&") if ele.startswith("expression_")
+        ]
+
+        ckpt_rule = [
+            ele for ele in ckpt_rule.split("&&") if not ele.startswith("expression_")
+        ]
+
+        assert (len(ckpt_rule) > 0 and len(expression) < 2) or (
+            len(ckpt_rule) == 0 and len(expression) > 0
+        )
+
+        if len(expression) < 2:
+            expression = "" if not expression else expression[0].split("_")[1]
+        else:
+            expression = [exp.split("_")[1] for exp in expression]
+
+        target_tn = []
+        for cr in ckpt_rule:
+            tmp = []
+            for tn in tensor_names:
+                if check_rule(tn, cr):
+                    tmp.append(tn)
+            assert len(tmp) <= 1
+            target_tn.extend(tmp)
+        if not target_tn and proto_name == "gate_kernel":
+            continue
+        target_tensor = [stete_dict[name] for name in target_tn]
+        tt = {}
+        if target_tensor:
+            exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
+        else:
+            if not isinstance(expression, list):
+                expression = [expression]
+            exec("tt['save'] = [%s]" % ",".join(expression))
+
+        target_tensor = np.concatenate(tt["save"], axis=-1)
+        print(
+            "%s -> %s, shape: %s, convert finished."
+            % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
+        )
+        exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
 
 def _get_encode_output_mapping_dict(dec_layer_num):
@@ -215,12 +294,23 @@ def _get_encode_output_mapping_dict(dec_layer_num):
     }
 
 
-def export_native_fs_transformer(
+def export_moe(
     output_file,
     model_dir,
-    args,
+    head_num,
+    max_step,
+    moe_list_encoder,
+    moe_list_decoder,
+    expert_num_encoder,
+    expert_num_decoder,
+    moe_topk_encoder,
+    moe_topk_decoder,
+    beam_size=4,
+    bos_id=2,
+    eos_id=2,
+    pad_id=1,
 ):
-    transformer = Transformer()
+    moe = Moe()
     # load var names
     reloaded = torch.load(model_dir, "cpu")
     model_dict = reloaded["model"]
@@ -251,10 +341,10 @@ def export_native_fs_transformer(
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(enc_tensor_names.keys()):
-        fill_pb_layer(
+        fill_layer(
             enc_tensor_names[layer_id],
             encoder_state_dict,
-            transformer.encoder_stack.add(),
+            moe.encoder_stack.add(),
             enc_layer_mapping_dict,
         )
 
@@ -268,37 +358,35 @@ def export_native_fs_transformer(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_pb_layer(
+        fill_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
-            transformer.decoder_stack.add(),
+            moe.decoder_stack.add(),
             dec_layer_mapping_dict,
         )
 
     # fill src_embedding
-    fill_pb_layer(
+    fill_layer(
         enc_var_name_list,
         encoder_state_dict,
-        transformer.src_embedding,
+        moe.src_embedding,
         src_emb_mapping_dict,
     )
     # encoder token embedding
     src_tb, _ = gather_token_embedding(
         enc_var_name_list, encoder_state_dict, "embed_tokens"
     )
-    transformer.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
+    moe.src_embedding.token_embedding[:] = src_tb.flatten().tolist()
     # encoder position embedding
     pos_emb = None
     if "encoder.embed_positions.weight" in encoder_state_dict:
         pos_emb = encoder_state_dict["encoder.embed_positions.weight"].numpy()
-        transformer.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+        moe.src_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = get_pos_embedding(
-            args.max_step + args.pad_id + 1, src_tb.shape[-1]
-        ).numpy()
-        pos_emb = pos_emb[args.pad_id + 1 : args.max_step + args.pad_id + 1, :]
+        pos_emb = get_pos_embedding(max_step + pad_id + 1, src_tb.shape[-1]).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
-        transformer.src_embedding.position_embedding[:] = pos_emb_list
+        moe.src_embedding.position_embedding[:] = pos_emb_list
 
     print(
         "encoder.embed_positions.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
@@ -309,17 +397,17 @@ def export_native_fs_transformer(
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_pb_layer(
+    fill_layer(
         dec_var_name_list,
         decoder_state_dict,
-        transformer.trg_embedding,
+        moe.trg_embedding,
         trg_emb_mapping_dict,
     )
     # decoder token embedding
     trg_tb, _ = gather_token_embedding(
         dec_var_name_list, decoder_state_dict, "embed_tokens"
     )
-    transformer.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
+    moe.trg_embedding.token_embedding[:] = trg_tb.transpose().flatten().tolist()
     print(
         "token_embedding.weight -> trg_embedding.token_embedding, shape: {}, conversion finished!".format(
             trg_tb.transpose().shape
@@ -329,14 +417,12 @@ def export_native_fs_transformer(
     pos_emb = None
     if "decoder.embed_positions.weight" in decoder_state_dict:
         pos_emb = decoder_state_dict["decoder.embed_positions.weight"].numpy()
-        transformer.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
+        moe.trg_embedding.position_embedding[:] = pos_emb.flatten().tolist()
     else:
-        pos_emb = get_pos_embedding(
-            args.max_step + args.pad_id + 1, trg_tb.shape[-1]
-        ).numpy()
-        pos_emb = pos_emb[args.pad_id + 1 : args.max_step + args.pad_id + 1, :]
+        pos_emb = get_pos_embedding(max_step + pad_id + 1, trg_tb.shape[-1]).numpy()
+        pos_emb = pos_emb[pad_id + 1 : max_step + pad_id + 1, :]
         pos_emb_list = pos_emb.reshape([-1]).tolist()
-        transformer.trg_embedding.position_embedding[:] = pos_emb_list
+        moe.trg_embedding.position_embedding[:] = pos_emb_list
 
     print(
         "decoder.embed_positions.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
@@ -346,26 +432,32 @@ def export_native_fs_transformer(
 
     # fill in conf
     export_ls_config(
-        transformer,
-        args.head_num,
-        args.pad_id,
-        args.bos_id,
-        args.eos_id,
+        moe,
+        head_num,
+        pad_id,
+        bos_id,
+        eos_id,
         0,
         0,
-        beam_size=args.beam_size,
+        beam_size=beam_size,
         save_pb=True,
     )
+    moe.model_conf.moe_list_encoder[:] = moe_list_encoder
+    moe.model_conf.moe_list_decoder[:] = moe_list_decoder
+    moe.model_conf.expert_num_encoder = expert_num_encoder
+    moe.model_conf.expert_num_decoder = expert_num_decoder
+    moe.model_conf.moe_topk_encoder = moe_topk_encoder
+    moe.model_conf.moe_topk_decoder = moe_topk_decoder
 
-    _write(transformer, output_file)
+    _write(moe, output_file)
 
 
-def _write(transformer, path):
+def _write(moe, path):
     print("Wrting to {0}".format(path))
 
     try:
         with open(path, "wb") as fout:
-            fout.write(transformer.SerializeToString())
+            fout.write(moe.SerializeToString())
     except Exception:
         print("Saving PB fails. Save HDF5 instead!")
         if os.path.exists(path):
@@ -374,7 +466,7 @@ def _write(transformer, path):
         import h5py
 
         f = h5py.File(path, "w")
-        save_proto_to_hdf5(transformer, f)
+        save_proto_to_hdf5(moe, f)
         f.close()
 
 
@@ -386,17 +478,45 @@ def parse_args():
         "--input", type=str, default="checkpoint.pt", help="input fairseq checkpoint"
     )
     parser.add_argument(
-        "--output",
-        type=str,
-        default="transformer.pb",
-        help="output lightseq model file",
+        "--output", type=str, default="moe.pb", help="output lightseq model file"
     )
     parser.add_argument("--beam_size", type=int, default=4, help="beam size")
-    parser.add_argument("--max_step", type=int, default=1024, help="max step to decode")
-    parser.add_argument("--head_num", type=int, default=16, help="head num")
+    parser.add_argument("--max-step", type=int, default=1024, help="max step to decode")
+    parser.add_argument("--head-num", type=int, default=16, help="head num")
     parser.add_argument("--bos_id", type=int, default=2, help="bos id")
     parser.add_argument("--eos_id", type=int, default=2, help="eos id")
     parser.add_argument("--pad_id", type=int, default=1, help="pad id")
+    # newly added for MoE
+    parser.add_argument(
+        "--moe_list_encoder",
+        type=list,
+        default=[0, 1, 2, 3, 4, 5],
+        help="list of encoder layers that enable MoE module",
+    )
+    parser.add_argument(
+        "--moe_list_decoder",
+        type=list,
+        default=[],
+        help="list of decoder layers that enable MoE module",
+    )
+    parser.add_argument(
+        "--expert_num_encoder", type=int, default=8, help="number of experts in encoder"
+    )
+    parser.add_argument(
+        "--expert_num_decoder", type=int, default=8, help="number of experts in decoder"
+    )
+    parser.add_argument(
+        "--moe_topk_encoder",
+        type=int,
+        default=2,
+        help="topk of MoE gate in encoder, support k=1 or 2",
+    )
+    parser.add_argument(
+        "--moe_topk_decoder",
+        type=int,
+        default=2,
+        help="topk of MoE gate in decoder, support k=1 or 2",
+    )
 
     args = parser.parse_args()
     return args
@@ -405,10 +525,21 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     # export
-    export_native_fs_transformer(
+    export_moe(
         args.output,
         args.input,
-        args,
+        args.head_num,
+        beam_size=args.beam_size,
+        max_step=args.max_step,
+        bos_id=args.bos_id,
+        eos_id=args.eos_id,
+        pad_id=args.pad_id,
+        moe_list_encoder=args.moe_list_encoder,
+        moe_list_decoder=args.moe_list_decoder,
+        expert_num_encoder=args.expert_num_encoder,
+        expert_num_decoder=args.expert_num_decoder,
+        moe_topk_encoder=args.moe_topk_encoder,
+        moe_topk_decoder=args.moe_topk_decoder,
     )
     # test
     model_path = None
@@ -417,19 +548,9 @@ if __name__ == "__main__":
     elif os.path.exists(args.output.replace("pb", "hdf5")):
         model_path = args.output.replace("pb", "hdf5")
     if model_path:
-        ls_model = lsi.Transformer(model_path, 8)
+        ls_model = lsi.Moe(model_path, 8)
         # Note that pad_id (1) should be on the right side
         # wmt14 en2de translation
         src_tokens = np.array([[10827, 27, 2081, 2], [1478, 6, 2, 1]])
         trg_out = ls_model.infer(src_tokens)
         print(trg_out)
-        # reference result:
-        # [[[ 4112,  6176,    12,  3380,     2],
-        # [  399,  7572,    12,  3380,     2],
-        # [ 4112,  6176,    12, 18882,     2],
-        # [  740,  3380,  4331,     2,     2]],
-
-        # [[ 1515,     5,     2,     2,     2],
-        # [   71,  1515,     5,     2,     2],
-        # [   22,  1515,     5,     2,     2],
-        # [    5,     2,     2,     2,     2]]]

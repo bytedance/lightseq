@@ -3,9 +3,10 @@ Export Fairseq Transformer models training with LightSeq to protobuf format,
 and then using int8 quantization to speedup inference.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
+import argparse
 import torch
 import h5py
-from proto.quant_transformer_pb2 import QuantTransformer
+from export.proto.quant_transformer_pb2 import QuantTransformer
 from lightseq.training import (
     export_ls_config,
     export_ls_embedding_ptq,
@@ -47,7 +48,7 @@ def export_fs_weights(file, state_dict, save_pb=True):
     file.trg_embedding.shared_bias[:] = dec_shared_b
 
 
-def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
+def export_ls_fs_transformer_ptq(ckpt_path, out_path, save_pb=True):
     with open(ckpt_path, "rb") as fin:
         ckpt_file = torch.load(fin)
     args = ckpt_file["args"]
@@ -58,14 +59,14 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
     export_ls_embedding_ptq(
         file,
         encoder_state_dict,
-        1024,
+        300,
         True,
         save_pb=save_pb,
     )
     export_ls_embedding_ptq(
         file,
         decoder_state_dict,
-        1024,
+        300,
         False,
         save_pb=save_pb,
     )
@@ -90,9 +91,9 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
     export_ls_config(
         file,
         args.encoder_attention_heads,
+        1,
         2,
         2,
-        6,
         args.encoder_layers,
         args.decoder_layers,
         save_pb=save_pb,
@@ -102,13 +103,27 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         fout.write(file.SerializeToString())
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        default="checkpoint_best.pt",
+        help="path of fairseq checkpoint",
+    )
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
-    ckpt_path = "checkpoint_best.pt"
-    pb_path = "quant_transformer.pb"
+    args = parse_args()
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}_ptq.pb"
     print("export to pb model >>>>>>")
-    export_ls_fs_transformer(ckpt_path, pb_path)
-    src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
+    export_ls_fs_transformer_ptq(args.model, pb_path)
+    src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.QuantTransformer(pb_path, 8)
     pb_output = pb_model.infer(src)
-    # FP16 result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6]
+    # FP16 result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6, 224, 10, 179, 5, 2]
     print("pb results:", pb_output)

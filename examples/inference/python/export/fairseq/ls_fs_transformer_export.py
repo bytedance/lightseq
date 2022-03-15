@@ -2,9 +2,10 @@
 Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
+import argparse
 import torch
 import h5py
-from proto.transformer_pb2 import Transformer
+from export.proto.transformer_pb2 import Transformer
 from lightseq.training import (
     export_ls_config,
     export_ls_embedding,
@@ -60,8 +61,8 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
     else:
         file = h5py.File(out_path, "w")
     encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
-    export_ls_embedding(file, encoder_state_dict, 1024, True, save_pb)
-    export_ls_embedding(file, decoder_state_dict, 1024, False, save_pb)
+    export_ls_embedding(file, encoder_state_dict, 300, True, save_pb)
+    export_ls_embedding(file, decoder_state_dict, 300, False, save_pb)
     export_ls_encoder(
         file,
         encoder_state_dict,
@@ -81,9 +82,9 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
     export_ls_config(
         file,
         args.encoder_attention_heads,
+        1,
         2,
         2,
-        6,
         args.encoder_layers,
         args.decoder_layers,
         save_pb=save_pb,
@@ -96,19 +97,33 @@ def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
         file.close()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        default="checkpoint_best.pt",
+        help="path of fairseq checkpoint",
+    )
+    args = parser.parse_args()
+    return args
+
+
 if __name__ == "__main__":
-    ckpt_path = "checkpoint_best.pt"
-    pb_path = "transformer.pb"
-    hdf5_path = "transformer.hdf5"
+    args = parse_args()
+    model_name = ".".join(args.model.split(".")[:-1])
+    pb_path = f"{model_name}.pb"
+    hdf5_path = f"{model_name}.hdf5"
     print("export to pb model >>>>>>")
-    export_ls_fs_transformer(ckpt_path, pb_path)
+    export_ls_fs_transformer(args.model, pb_path)
     print("export to hdf5 model >>>>>>")
-    export_ls_fs_transformer(ckpt_path, hdf5_path, save_pb=False)
-    src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2]]
+    export_ls_fs_transformer(args.model, hdf5_path, save_pb=False)
+    src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
     pb_model = lsi.Transformer(pb_path, 8)
     pb_output = pb_model.infer(src)
     hdf5_model = lsi.Transformer(hdf5_path, 8)
     hdf5_output = hdf5_model.infer(src)
-    # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6]
+    # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6, 224, 10, 179, 5, 2]
     print("pb results:", pb_output)
     print("hdf5 results:", hdf5_output)

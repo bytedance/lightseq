@@ -78,13 +78,16 @@ class MultiheadAttention(nn.Module):
             self.attention_quant = (
                 TensorQuantizer(act_quant_config) if self.is_decoder else None
             )
+        elif self.encoder_decoder_attention and self.is_decoder:
+            self.k_proj = QuantLinear(
+                self.kdim, embed_dim, pre_activation="encoder_out", bias=bias
+            )
+            self.v_proj = QuantLinear(
+                self.vdim, embed_dim, pre_activation="encoder_out", bias=bias
+            )
+            self.q_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
-        else:
-            self.k_proj = Linear(self.kdim, embed_dim, bias=bias)
-            self.v_proj = Linear(self.vdim, embed_dim, bias=bias)
-            self.q_proj = Linear(embed_dim, embed_dim, bias=bias)
-
-        self.out_proj = Linear(embed_dim, embed_dim, bias=bias)
+        self.out_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
         if add_bias_kv:
             self.bias_k = Parameter(torch.Tensor(1, 1, embed_dim))
@@ -180,6 +183,8 @@ class MultiheadAttention(nn.Module):
 
         if self.self_attention:
             qkv = self.qkv_proj(query)
+            if self.attention_quant is not None:
+                qkv = self.attention_quant(qkv)
             q, k, v = qkv.split(self.embed_dim, dim=-1)
             # q = self.q_proj(query)
             # k = self.k_proj(query)
@@ -307,8 +312,6 @@ class MultiheadAttention(nn.Module):
                 )
 
         attn_weights = torch.bmm(q, k.transpose(1, 2))
-        if self.attention_quant is not None:
-            attn_weights = self.attention_quant(attn_weights)
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
@@ -636,13 +639,13 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
 
-        self.encodec_attn = self.build_encoder_attention(
+        self.encoder_attn = self.build_encoder_attention(
             self.embed_dim,
             config.hidden_size,
             config.attn_prob_dropout_ratio,
             config.nhead,
         )
-        self.encodec_attn_layer_norm = LayerNorm(self.embed_dim)
+        self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
 
         self.fc1 = QuantLinear(
             self.embed_dim,
@@ -651,6 +654,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.fc2 = QuantLinear(
             config.intermediate_size,
             self.embed_dim,
+            pre_activation="relu",
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
@@ -772,7 +776,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
-        if self.encodec_attn is not None and encoder_out is not None:
+        if self.encoder_attn is not None and encoder_out is not None:
             if (
                 encoder_out.shape[1] != x.shape[1]
                 and x.shape[1] % encoder_out.shape[1] == 0
@@ -785,7 +789,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
             residual = x
             if self.normalize_before:
-                x = self.encodec_attn_layer_norm(x)
+                x = self.encoder_attn_layer_norm(x)
             if prev_attn_state is not None:
                 prev_key, prev_value = prev_attn_state[:2]
                 saved_state: Dict[str, Optional[Tensor]] = {
@@ -795,9 +799,9 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
                 if len(prev_attn_state) >= 3:
                     saved_state["prev_key_padding_mask"] = prev_attn_state[2]
                 assert incremental_state is not None
-                self.encodec_attn._set_input_buffer(incremental_state, saved_state)
+                self.encoder_attn._set_input_buffer(incremental_state, saved_state)
 
-            x, attn = self.encodec_attn(
+            x, attn = self.encoder_attn(
                 query=x,
                 key=encoder_out,
                 value=encoder_out,
@@ -810,7 +814,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             x = self.dropout_module(x)
             x = self.residual_connection(x, residual)
             if not self.normalize_before:
-                x = self.encodec_attn_layer_norm(x)
+                x = self.encoder_attn_layer_norm(x)
 
         residual = x
         if self.normalize_before:
@@ -859,12 +863,12 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
-        self.scaled_emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(weight_quant_config)
         self.config = config
 
     def forward(self, input, step=0):
         x = self.emb_lookup(input)
-        x = self.scaled_emb_quant(x)
+        x = self.emb_quant(x)
         x = math.sqrt(self.embedding_dim) * x
         x += self.embed_positions(input, step)
         x = self.dropout(x)

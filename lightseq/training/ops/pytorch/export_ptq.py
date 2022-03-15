@@ -10,11 +10,12 @@ global_act_clip_max = 16.0
 
 
 def quantize(tensor, quant_range, clip_max):
-    return np.rint(
+    return np.floor(
         (
             np.clip(tensor * quant_range / clip_max, -quant_range, quant_range)
             + quant_range
         )
+        + 0.5
     ).astype(np.ubyte)
 
 
@@ -24,7 +25,7 @@ def get_kth_value(tensor, k=None):
     return max(np.partition(tensor.flatten(), -int(k))[-int(k)], 0.0)
 
 
-def gather_token_embedding(tensor_names, state_dict, tn_pattern):
+def gather_quant_token_embedding(tensor_names, state_dict, tn_pattern, clip_max=None):
     target_tn = []
     for tn in tensor_names:
         if tn_pattern in tn.split("."):
@@ -33,12 +34,13 @@ def gather_token_embedding(tensor_names, state_dict, tn_pattern):
     target_tensor = [state_dict[name] for name in target_tn]
     target_tensor = np.concatenate(target_tensor, axis=0)
     target_tensor = target_tensor.astype(np.float16).astype(np.float32)
-    clip_max = get_kth_value(target_tensor)
+    if clip_max is None:
+        clip_max = get_kth_value(target_tensor)
     target_tensor = quantize(target_tensor, global_quant_range, clip_max)
     return target_tensor, clip_max, target_tn
 
 
-def fill_pb_layer(
+def fill_quant_pb_layer(
     tensor_names,
     state_dict,
     layer,
@@ -96,7 +98,7 @@ def fill_encdec_weight(
             layer = file.encoder_stack.add()
         else:
             layer = file.decoder_stack.add()
-        fill_pb_layer(
+        fill_quant_pb_layer(
             tensor_names[layer_id],
             state_dict,
             layer,
@@ -105,7 +107,7 @@ def fill_encdec_weight(
         )
 
     if not is_encoder:
-        fill_pb_layer(
+        fill_quant_pb_layer(
             tensor_names[0],
             state_dict,
             file.trg_embedding,
@@ -123,7 +125,7 @@ def export_ls_embedding_ptq(
     save_pb=True,
 ):
     var_name_list = list(state_dict.keys())
-    emb, clip_max, target_tn = gather_token_embedding(
+    emb, clip_max, target_tn = gather_quant_token_embedding(
         var_name_list, state_dict, "embeddings"
     )
     if is_encoder:

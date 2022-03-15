@@ -334,6 +334,8 @@ class FakeTensorQuantFunction(Function):
     def forward(ctx, inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
         # ctx.save_for_backward(inputs, amax)
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
+        if unsigned:
+            outputs += 127
         return (outputs * scale).to(inputs.dtype)
 
     @staticmethod
@@ -373,19 +375,15 @@ def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
     if min_amax < 0:
         raise ValueError("Negative values in amax")
 
-    max_bound = torch.tensor(
-        (2.0 ** (num_bits - 1 + int(unsigned))) - 1.0, device=amax.device
-    )
-    if unsigned:
-        min_bound = 0
-        if narrow_range:
-            max_bound -= 1
-    elif narrow_range:
+    max_bound = torch.tensor((2.0 ** (num_bits - 1)) - 1.0, device=amax.device)
+    if narrow_range:
         min_bound = -max_bound
     else:
         min_bound = -max_bound - 1
     # scale = max_bound / amax
     scale = amax / max_bound
+    if unsigned:
+        scale = amax / (max_bound * 2)
 
     epsilon = 1.0 / (1 << 24)
     if min_amax <= epsilon:  # Treat amax smaller than minimum representable of fp16 0
@@ -394,7 +392,11 @@ def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
 
     # outputs = torch.clamp((inputs / scale).round_(), min_bound, max_bound)
     # (x + 0.5).floor() match the implementation of tensorflow fake_quant
-    outputs = torch.clamp(((inputs / scale) + 0.5).floor_(), min_bound, max_bound)
+    outputs = inputs / scale
+    if unsigned:
+        outputs -= 127
+    outputs = (outputs + 0.5).floor_()
+    outputs = torch.clamp(outputs, min_bound, max_bound)
 
     if min_amax <= epsilon:
         scale[
