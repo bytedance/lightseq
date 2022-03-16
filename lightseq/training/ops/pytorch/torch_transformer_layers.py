@@ -535,10 +535,29 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
             config.intermediate_size,
         )
         self.fc2 = QuantLinear(
-            config.intermediate_size, self.embed_dim, pre_activation="relu"
+            config.intermediate_size,
+            self.embed_dim,
+            pre_activation=config.activation_fn,
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
+
+        if initial_weights is None or initial_biases is None:
+            return
+
+        # load initial weights
+        self.self_attn.qkv_proj.weight = nn.Parameter(torch.cat(initial_weights[:3], 0))
+        self.self_attn.qkv_proj.bias = nn.Parameter(torch.cat(initial_biases[:3], 0))
+        self.self_attn.out_proj.weight = nn.Parameter(initial_weights[3])
+        self.self_attn.out_proj.bias = nn.Parameter(initial_biases[3])
+        self.self_attn_layer_norm.weight = nn.Parameter(initial_weights[4])
+        self.self_attn_layer_norm.bias = nn.Parameter(initial_biases[4])
+        self.fc1.weight = nn.Parameter(initial_weights[5])
+        self.fc1.bias = nn.Parameter(initial_biases[5])
+        self.fc2.weight = nn.Parameter(initial_weights[6])
+        self.fc2.bias = nn.Parameter(initial_biases[6])
+        self.final_layer_norm.weight = nn.Parameter(initial_weights[7])
+        self.final_layer_norm.bias = nn.Parameter(initial_biases[7])
 
     def build_self_attention(self, embed_dim, nhead, attn_dropout):
         return MultiheadAttention(
@@ -654,13 +673,40 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.fc2 = QuantLinear(
             config.intermediate_size,
             self.embed_dim,
-            pre_activation="relu",
+            pre_activation=config.activation_fn,
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
         self.need_attn = True
 
         self.onnx_trace = False
+
+        if initial_weights is None or initial_biases is None:
+            return
+
+        # load initial weights
+        self.self_attn.qkv_proj.weight = nn.Parameter(torch.cat(initial_weights[:3], 0))
+        self.self_attn.qkv_proj.bias = nn.Parameter(torch.cat(initial_biases[:3], 0))
+        self.self_attn.out_proj.weight = nn.Parameter(initial_weights[3])
+        self.self_attn.out_proj.bias = nn.Parameter(initial_biases[3])
+        self.self_attn_layer_norm.weight = nn.Parameter(initial_weights[4])
+        self.self_attn_layer_norm.bias = nn.Parameter(initial_biases[4])
+        self.encoder_attn.q_proj.weight = nn.Parameter(initial_weights[5])
+        self.encoder_attn.q_proj.bias = nn.Parameter(initial_weights[5])
+        self.encoder_attn.k_proj.weight = nn.Parameter(initial_weights[6])
+        self.encoder_attn.k_proj.bias = nn.Parameter(initial_weights[6])
+        self.encoder_attn.v_proj.weight = nn.Parameter(initial_weights[7])
+        self.encoder_attn.v_proj.bias = nn.Parameter(initial_weights[7])
+        self.encoder_attn.out_proj.weight = nn.Parameter(initial_weights[8])
+        self.encoder_attn.out_proj.bias = nn.Parameter(initial_biases[8])
+        self.encoder_attn_layer_norm.weight = nn.Parameter(initial_weights[9])
+        self.encoder_attn_layer_norm.bias = nn.Parameter(initial_biases[9])
+        self.fc1.weight = nn.Parameter(initial_weights[10])
+        self.fc1.bias = nn.Parameter(initial_biases[10])
+        self.fc2.weight = nn.Parameter(initial_weights[11])
+        self.fc2.bias = nn.Parameter(initial_biases[11])
+        self.final_layer_norm.weight = nn.Parameter(initial_weights[12])
+        self.final_layer_norm.bias = nn.Parameter(initial_biases[12])
 
     def build_self_attention(
         self, embed_dim, nhead, attn_dropout, add_bias_kv=False, add_zero_attn=False
@@ -847,7 +893,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
 
 class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
-    def __init__(self, config):
+    def __init__(self, config, initial_embeddings=None):
         super().__init__()
 
         self.emb_lookup = nn.Embedding(
@@ -855,9 +901,13 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.emb_lookup.to(dtype=(torch.half if config.fp16 else torch.float))
         self.embeddings = self.emb_lookup.weight
-
         nn.init.normal_(self.embeddings, mean=0, std=config.embedding_dim ** -0.5)
         nn.init.constant_(self.embeddings[config.padding_idx], 0)
+
+        # load initial weights
+        if initial_embeddings is not None:
+            self.emb_lookup.weight = nn.Parameter(initial_embeddings)
+
         self.embed_positions = SinusoidalPositionalEmbedding(
             config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16
         )

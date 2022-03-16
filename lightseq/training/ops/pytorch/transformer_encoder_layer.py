@@ -109,7 +109,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None and initial_biases is None:
+        if initial_weights is None or initial_biases is None:
             self.init_transformer_weights()
             return
 

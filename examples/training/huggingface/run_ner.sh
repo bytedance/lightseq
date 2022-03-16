@@ -19,14 +19,18 @@ if [ -d "/tmp/test-ner/" ]; then
 fi
 
 python3 -m torch.distributed.launch \
-  --nproc_per_node=1 \
+  --nproc_per_node=8 \
   $THIS_DIR/run_ner.py \
   --model_name_or_path bert-large-uncased \
-  --per_device_train_batch_size 16 \
   --dataset_name conll2003 \
-  --output_dir /tmp/test-ner \
   --do_train \
   --do_eval \
-  --num_train_epochs 1 \
-  --with_lightseq true \
+  --per_device_train_batch_size 16 \
+  --num_train_epochs 3 \
+  --output_dir /tmp/test-ner \
+  --overwrite_output_dir \
   --fp16 \
+  --seed 1234 \
+  --logging_steps 10 \
+  --with_lightseq true \
+  --enable_quant true

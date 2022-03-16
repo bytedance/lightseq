@@ -98,6 +98,10 @@ class ModelArguments:
         default=True,
         metadata={"help": "Whether to use lightseq TransformerEncoder"},
     )
+    enable_quant: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable quantization"},
+    )
 
 
 @dataclass
@@ -370,7 +374,7 @@ def main():
 
     # Replace with LightSeq encoder layers.
     if model_args.with_lightseq:
-        inject_ls_enc_layer(model, training_args, config)
+        inject_ls_enc_layer(model, training_args, config, model_args.enable_quant)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
