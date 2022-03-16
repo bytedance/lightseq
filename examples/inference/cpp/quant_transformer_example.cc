@@ -3,7 +3,7 @@
 
 /**
 @file
-Example of how to run transformer inference using our implementation.
+Example of how to run quantized transformer inference using our implementation.
 */
 
 int main(int argc, char* argv[]) {
@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
   int max_batch_size = 8;
 
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
-      "Transformer", model_weights_path, max_batch_size);
+      "QuantTransformer", model_weights_path, max_batch_size);
 
   int batch_size = 1;
   int batch_seq_len = 13;
