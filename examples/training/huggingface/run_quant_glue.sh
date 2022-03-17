@@ -26,11 +26,12 @@ python3 -m torch.distributed.launch \
   --do_eval \
   --max_seq_length 128 \
   --per_device_train_batch_size 32 \
-  --learning_rate 2e-5 \
-  --num_train_epochs 50 \
-  --output_dir /tmp/$TASK_NAME/ \
+  --num_train_epochs 100 \
+  --output_dir /tmp/quant/$TASK_NAME/ \
+  --overwrite_output_dir \
+  --resume_from_checkpoint /tmp/$TASK_NAME/ \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
   --model_type 2 \
-  --enable_quant false
+  --enable_quant true

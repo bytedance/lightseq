@@ -94,9 +94,11 @@ class ModelArguments:
             "with private models)."
         },
     )
-    with_lightseq: bool = field(
-        default=True,
-        metadata={"help": "Whether to use lightseq TransformerEncoder"},
+    model_type: int = field(
+        default=1,
+        metadata={
+            "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
+        },
     )
     enable_quant: bool = field(
         default=False,
@@ -373,8 +375,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    if model_args.with_lightseq:
-        inject_ls_enc_layer(model, training_args, config, model_args.enable_quant)
+    if model_args.model_type == 1 or model_args.model_type == 2:
+        inject_ls_enc_layer(model, training_args, model_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):

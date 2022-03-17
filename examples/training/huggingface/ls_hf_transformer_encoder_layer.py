@@ -1,4 +1,4 @@
-from lightseq.training.ops.pytorch.quantization import qat_mode
+from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
 
 
 def get_hf_bert_enc_layer_params(layer):
@@ -26,15 +26,17 @@ def get_hf_bert_enc_layer_params(layer):
     return init_ws, init_bs
 
 
-def inject_ls_enc_layer(model, training_args, config, enable_quant=False):
-    if enable_quant:
+def inject_ls_enc_layer(model, training_args, model_args, config):
+    if model_args.model_type == 2:
         from lightseq.training.ops.pytorch.torch_transformer_layers import (
             TransformerEncoderLayer,
         )
-    else:
+    elif model_args.model_type == 1:
         from lightseq.training.ops.pytorch.transformer_encoder_layer import (
             LSTransformerEncoderLayer as TransformerEncoderLayer,
         )
+    else:
+        raise NotImplementedError
 
     class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
         def __init__(self, *args, **kwargs):
@@ -69,5 +71,8 @@ def inject_ls_enc_layer(model, training_args, config, enable_quant=False):
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_config, init_ws, init_bs
         ).cuda()
-        if enable_quant:
-            model.bert.encoder.layer[i].apply(qat_mode)
+        if model_args.model_type == 2:
+            if model_args.enable_quant:
+                model.bert.encoder.layer[i].apply(qat_mode)
+            else:
+                model.bert.encoder.layer[i].apply(disable_quant)

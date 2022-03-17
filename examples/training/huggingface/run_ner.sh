@@ -14,10 +14,6 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-if [ -d "/tmp/test-ner/" ]; then
-  rm -rf /tmp/test-ner/
-fi
-
 python3 -m torch.distributed.launch \
   --nproc_per_node=8 \
   $THIS_DIR/run_ner.py \
@@ -32,5 +28,5 @@ python3 -m torch.distributed.launch \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
-  --with_lightseq true \
-  --enable_quant true
+  --model_type 2 \
+  --enable_quant false
