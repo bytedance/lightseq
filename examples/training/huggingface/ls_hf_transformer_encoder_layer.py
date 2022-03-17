@@ -1,12 +1,4 @@
-import random
-
-from lightseq.training.ops.pytorch.quantization import (
-    TensorQuantizer,
-    enable_quant,
-    disable_quant,
-    qat_mode,
-    ptq_mode,
-)
+from lightseq.training.ops.pytorch.quantization import qat_mode
 
 
 def get_hf_bert_enc_layer_params(layer):
@@ -78,4 +70,4 @@ def inject_ls_enc_layer(model, training_args, config, enable_quant=False):
             bert_config, init_ws, init_bs
         ).cuda()
         if enable_quant:
-            model.bert.encoder.layer[i].apply(disable_quant)
+            model.bert.encoder.layer[i].apply(qat_mode)

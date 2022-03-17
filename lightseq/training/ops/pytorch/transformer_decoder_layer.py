@@ -1,17 +1,13 @@
 import math
-from dataclasses import dataclass
 
 import torch
 from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch import transformer_cuda_module
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
-    MODEL_ARCH,
-    check_config,
     calc_offset,
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase

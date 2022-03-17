@@ -1,5 +1,4 @@
 import math
-from dataclasses import dataclass
 
 import torch
 from torch import nn
@@ -7,12 +6,9 @@ from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from lightseq.training.ops.pytorch import transformer_cuda_module
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
-    MODEL_ARCH,
-    check_config,
     calc_offset,
 )
 
@@ -133,33 +129,6 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             assert cur_para.numel() == b.numel()
             cur_para.copy_(b.view(-1))
             idx += 1
-
-    @staticmethod
-    def get_config(**kwargs):
-        @dataclass
-        class Config:
-            max_batch_tokens: int  # max batch token numbers
-            max_seq_len: int  # max sequence length
-            hidden_size: int  # size of transformer hidden layers
-            intermediate_size: int  # size of ffn inner size
-            nhead: int  # number of heads in attention
-            attn_prob_dropout_ratio: float  # attention score dropout ratio
-            activation_dropout_ratio: float  # ffn activation dropout ratio
-            hidden_dropout_ratio: float  # dropout ration before residual
-            pre_layer_norm: bool  # pre layer norm or post
-            fp16: bool  # fp16 presion
-            local_rank: int  # rank in local node
-            activation_fn: str = "relu"  # relu or gelu
-
-        if "model" in kwargs:
-            if kwargs["model"] not in MODEL_ARCH:
-                raise ValueError("{} architecture is not supported.")
-            MODEL_ARCH[kwargs["model"]](kwargs)
-            del kwargs["model"]
-
-        config = Config(**kwargs)
-        check_config(config)
-        return config
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):

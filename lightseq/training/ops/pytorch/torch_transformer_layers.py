@@ -6,12 +6,11 @@
 import math
 import uuid
 
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, List
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
-from torch.nn import Parameter, LayerNorm, Dropout, Linear
+from torch.nn import Parameter, LayerNorm, Dropout
 
 from lightseq.training.ops.pytorch import util
 from lightseq.training.ops.pytorch.layer_base import (
@@ -25,6 +24,11 @@ from .quantization import (
     act_quant_config,
     weight_quant_config,
 )
+
+
+def copy_para(x, fp16):
+    y = util.copy_para(x)
+    return y.half() if fp16 else y.float()
 
 
 class MultiheadAttention(nn.Module):
@@ -546,18 +550,32 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
             return
 
         # load initial weights
-        self.self_attn.qkv_proj.weight = nn.Parameter(torch.cat(initial_weights[:3], 0))
-        self.self_attn.qkv_proj.bias = nn.Parameter(torch.cat(initial_biases[:3], 0))
-        self.self_attn.out_proj.weight = nn.Parameter(initial_weights[3])
-        self.self_attn.out_proj.bias = nn.Parameter(initial_biases[3])
-        self.self_attn_layer_norm.weight = nn.Parameter(initial_weights[4])
-        self.self_attn_layer_norm.bias = nn.Parameter(initial_biases[4])
-        self.fc1.weight = nn.Parameter(initial_weights[5])
-        self.fc1.bias = nn.Parameter(initial_biases[5])
-        self.fc2.weight = nn.Parameter(initial_weights[6])
-        self.fc2.bias = nn.Parameter(initial_biases[6])
-        self.final_layer_norm.weight = nn.Parameter(initial_weights[7])
-        self.final_layer_norm.bias = nn.Parameter(initial_biases[7])
+        self.self_attn.qkv_proj.weight.data.copy_(
+            copy_para(torch.cat(initial_weights[:3], 0), config.fp16)
+        )
+        self.self_attn.qkv_proj.bias.data.copy_(
+            copy_para(torch.cat(initial_biases[:3], 0), config.fp16)
+        )
+        self.self_attn.out_proj.weight.data.copy_(
+            copy_para(initial_weights[3], config.fp16)
+        )
+        self.self_attn.out_proj.bias.data.copy_(
+            copy_para(initial_biases[3], config.fp16)
+        )
+        self.self_attn_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[4], config.fp16)
+        )
+        self.self_attn_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[4], config.fp16)
+        )
+        self.fc1.weight.data.copy_(copy_para(initial_weights[5], config.fp16))
+        self.fc1.bias.data.copy_(copy_para(initial_biases[5], config.fp16))
+        self.fc2.weight.data.copy_(copy_para(initial_weights[6], config.fp16))
+        self.fc2.bias.data.copy_(copy_para(initial_biases[6], config.fp16))
+        self.final_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[7], config.fp16)
+        )
+        self.final_layer_norm.bias.data.copy_(copy_para(initial_biases[7], config.fp16))
 
     def build_self_attention(self, embed_dim, nhead, attn_dropout):
         return MultiheadAttention(
@@ -685,28 +703,64 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             return
 
         # load initial weights
-        self.self_attn.qkv_proj.weight = nn.Parameter(torch.cat(initial_weights[:3], 0))
-        self.self_attn.qkv_proj.bias = nn.Parameter(torch.cat(initial_biases[:3], 0))
-        self.self_attn.out_proj.weight = nn.Parameter(initial_weights[3])
-        self.self_attn.out_proj.bias = nn.Parameter(initial_biases[3])
-        self.self_attn_layer_norm.weight = nn.Parameter(initial_weights[4])
-        self.self_attn_layer_norm.bias = nn.Parameter(initial_biases[4])
-        self.encoder_attn.q_proj.weight = nn.Parameter(initial_weights[5])
-        self.encoder_attn.q_proj.bias = nn.Parameter(initial_weights[5])
-        self.encoder_attn.k_proj.weight = nn.Parameter(initial_weights[6])
-        self.encoder_attn.k_proj.bias = nn.Parameter(initial_weights[6])
-        self.encoder_attn.v_proj.weight = nn.Parameter(initial_weights[7])
-        self.encoder_attn.v_proj.bias = nn.Parameter(initial_weights[7])
-        self.encoder_attn.out_proj.weight = nn.Parameter(initial_weights[8])
-        self.encoder_attn.out_proj.bias = nn.Parameter(initial_biases[8])
-        self.encoder_attn_layer_norm.weight = nn.Parameter(initial_weights[9])
-        self.encoder_attn_layer_norm.bias = nn.Parameter(initial_biases[9])
-        self.fc1.weight = nn.Parameter(initial_weights[10])
-        self.fc1.bias = nn.Parameter(initial_biases[10])
-        self.fc2.weight = nn.Parameter(initial_weights[11])
-        self.fc2.bias = nn.Parameter(initial_biases[11])
-        self.final_layer_norm.weight = nn.Parameter(initial_weights[12])
-        self.final_layer_norm.bias = nn.Parameter(initial_biases[12])
+        self.self_attn.qkv_proj.weight.data.copy_(
+            copy_para(torch.cat(initial_weights[:3], 0), config.fp16)
+        )
+        self.self_attn.qkv_proj.bias.data.copy_(
+            copy_para(torch.cat(initial_biases[:3], 0), config.fp16)
+        )
+        self.self_attn.out_proj.weight.data.copy_(
+            copy_para(initial_weights[3], config.fp16)
+        )
+        self.self_attn.out_proj.bias.data.copy_(
+            copy_para(initial_biases[3], config.fp16)
+        )
+        self.self_attn_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[4], config.fp16)
+        )
+        self.self_attn_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[4], config.fp16)
+        )
+        self.encoder_attn.q_proj.weight.data.copy_(
+            copy_para(initial_weights[5], config.fp16)
+        )
+        self.encoder_attn.q_proj.bias.data.copy_(
+            copy_para(initial_weights[5], config.fp16)
+        )
+        self.encoder_attn.k_proj.weight.data.copy_(
+            copy_para(initial_weights[6], config.fp16)
+        )
+        self.encoder_attn.k_proj.bias.data.copy_(
+            copy_para(initial_weights[6], config.fp16)
+        )
+        self.encoder_attn.v_proj.weight.data.copy_(
+            copy_para(initial_weights[7], config.fp16)
+        )
+        self.encoder_attn.v_proj.bias.data.copy_(
+            copy_para(initial_weights[7], config.fp16)
+        )
+        self.encoder_attn.out_proj.weight.data.copy_(
+            copy_para(initial_weights[8], config.fp16)
+        )
+        self.encoder_attn.out_proj.bias.data.copy_(
+            copy_para(initial_biases[8], config.fp16)
+        )
+        self.encoder_attn_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[9], config.fp16)
+        )
+        self.encoder_attn_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[9], config.fp16)
+        )
+        self.fc1.weight.data.copy_(copy_para(initial_weights[10], config.fp16))
+        self.fc1.bias.data.copy_(copy_para(initial_biases[10], config.fp16))
+        self.fc2.weight.data.copy_(copy_para(initial_weights[11], config.fp16))
+        self.fc2.bias.data.copy_(copy_para(initial_biases[11], config.fp16))
+        self.final_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[12], config.fp16)
+        )
+        self.final_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[12], config.fp16)
+        )
 
     def build_self_attention(
         self, embed_dim, nhead, attn_dropout, add_bias_kv=False, add_zero_attn=False
@@ -906,7 +960,9 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
 
         # load initial weights
         if initial_embeddings is not None:
-            self.emb_lookup.weight = nn.Parameter(initial_embeddings)
+            self.emb_lookup.weight.data.copy_(
+                copy_para(initial_embeddings, config.fp16)
+            )
 
         self.embed_positions = SinusoidalPositionalEmbedding(
             config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16

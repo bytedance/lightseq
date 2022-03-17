@@ -26,7 +26,7 @@ python3 -m torch.distributed.launch \
   --do_train \
   --do_eval \
   --per_device_train_batch_size 16 \
-  --num_train_epochs 3 \
+  --num_train_epochs 10 \
   --output_dir /tmp/test-ner \
   --overwrite_output_dir \
   --fp16 \

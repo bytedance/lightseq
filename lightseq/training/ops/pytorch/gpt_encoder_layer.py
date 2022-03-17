@@ -1,16 +1,9 @@
-import math
-from dataclasses import dataclass
-
 import torch
-from torch import nn
-from torch.autograd import Function
-from lightseq.training.ops.pytorch.builder.transformer_builder import TransformerBuilder
 
 from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
-from lightseq.training.ops.pytorch.util import copy_para
 
 
 class LSGptEncoderLayer(LSTransformerEncoderLayer):

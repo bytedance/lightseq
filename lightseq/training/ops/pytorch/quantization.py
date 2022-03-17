@@ -1,7 +1,5 @@
-from audioop import bias
-import torch
 import torch.nn.functional as F
-from torch.nn import Parameter, Linear
+from torch.nn import Linear
 from lightseq.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     QUANT_DESC_8BIT_PER_TENSOR,
