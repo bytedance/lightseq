@@ -16,18 +16,20 @@ THIS_DIR=$(dirname $(readlink -f $0))
 
 python3 -m torch.distributed.launch \
   --nproc_per_node=8 \
-  $THIS_DIR/run_ner.py \
-  --model_name_or_path bert-large-uncased \
-  --dataset_name conll2003 \
+  $THIS_DIR/run_qa.py \
+  --model_name_or_path bert-base-uncased \
+  --dataset_name squad \
   --do_train \
   --do_eval \
+  --max_seq_length 256 \
   --per_device_train_batch_size 16 \
-  --num_train_epochs 20 \
-  --output_dir /tmp/quant/test-ner \
+  --doc_stride 128 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 10 \
+  --output_dir /tmp/squad \
   --overwrite_output_dir \
-  --resume_from_checkpoint /tmp/test-ner/ \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
-  --module_type 2 \
-  --enable_quant true
+  --module_type 1 \
+  --enable_quant false
