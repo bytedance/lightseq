@@ -15,5 +15,5 @@ Before doing next training, you need to switch to the current directory:
 cd examples/training/huggingface/bert
 ```
 
-Then you can easily fine-tunes BERT on different task by running the bash scripts `run_ner.sh`
-or on GLUE by `run_glue.sh`. From our tests, speedup is about 1.6x.
+Then you can easily fine-tunes BERT on different tasks by running the bash scripts `task_ner/run_ner.sh`
+, `task_glue/run_glue.sh`, `task_qa/run_qa.sh`, etc. From our tests, speedup is about 1.6x.
