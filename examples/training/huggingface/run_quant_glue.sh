@@ -15,7 +15,7 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-export TASK_NAME=stsb
+export TASK_NAME=sst2
 
 python3 -m torch.distributed.launch \
   --nproc_per_node=8 \
@@ -26,12 +26,13 @@ python3 -m torch.distributed.launch \
   --do_eval \
   --max_seq_length 128 \
   --per_device_train_batch_size 32 \
-  --num_train_epochs 100 \
+  --learning_rate 2e-6 \
+  --num_train_epochs 20 \
   --output_dir /tmp/quant/$TASK_NAME/ \
   --overwrite_output_dir \
   --resume_from_checkpoint /tmp/$TASK_NAME/ \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
-  --model_type 2 \
+  --module_type 2 \
   --enable_quant true

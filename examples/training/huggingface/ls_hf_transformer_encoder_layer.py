@@ -1,4 +1,5 @@
 from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
+from lightseq.training.ops.pytorch.torch_transformer_layers import BertEmbeddingLayer
 
 
 def get_hf_bert_enc_layer_params(layer):
@@ -26,17 +27,54 @@ def get_hf_bert_enc_layer_params(layer):
     return init_ws, init_bs
 
 
-def inject_ls_enc_layer(model, training_args, model_args, config):
-    if model_args.model_type == 2:
+def get_hf_bert_emb_layer_params(layer):
+    init_ws = []
+
+    init_ws.append(layer.word_embeddings.weight.detach().clone())
+    init_ws.append(layer.position_embeddings.weight.detach().clone())
+    init_ws.append(layer.token_type_embeddings.weight.detach().clone())
+    init_ws.append(layer.LayerNorm.weight.detach().clone())
+    init_ws.append(layer.LayerNorm.bias.detach().clone())
+
+    return init_ws
+
+
+def gen_bert_emb_config(training_args, config):
+    bert_emb_config = BertEmbeddingLayer.get_config(
+        vocab_size=config.vocab_size,
+        embedding_dim=config.hidden_size,
+        max_batch_tokens=4096,
+        max_seq_len=config.max_position_embeddings,
+        padding_idx=config.pad_token_id,
+        dropout=config.hidden_dropout_prob,
+        fp16=training_args.fp16,
+        local_rank=training_args.local_rank,
+    )
+    bert_emb_config.type_vocab_size = config.type_vocab_size
+    bert_emb_config.layer_norm_eps = config.layer_norm_eps
+    return bert_emb_config
+
+
+def inject_ls_layer(model, training_args, model_args, config):
+    if model_args.module_type == 2:
         from lightseq.training.ops.pytorch.torch_transformer_layers import (
             TransformerEncoderLayer,
         )
-    elif model_args.model_type == 1:
+    elif model_args.module_type == 1:
         from lightseq.training.ops.pytorch.transformer_encoder_layer import (
             LSTransformerEncoderLayer as TransformerEncoderLayer,
         )
     else:
         raise NotImplementedError
+
+    if model_args.module_type == 2:
+        bert_emb_config = gen_bert_emb_config(training_args, config)
+        init_ws = get_hf_bert_emb_layer_params(model.bert.embeddings)
+        model.bert.embeddings = BertEmbeddingLayer(bert_emb_config, init_ws)
+        if model_args.enable_quant:
+            model.bert.embeddings.apply(qat_mode)
+        else:
+            model.bert.embeddings.apply(disable_quant)
 
     class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
         def __init__(self, *args, **kwargs):
@@ -48,8 +86,8 @@ def inject_ls_enc_layer(model, training_args, model_args, config):
             output = super().forward(hidden_states, ls_encoder_padding_mask)
             return (output, None, None, None)
 
-    def gen_bert_config(training_args, config):
-        bert_config = TransformerEncoderLayer.get_config(
+    def gen_bert_enc_config(training_args, config):
+        bert_enc_config = TransformerEncoderLayer.get_config(
             max_batch_tokens=4096,
             max_seq_len=config.max_position_embeddings,
             hidden_size=config.hidden_size,
@@ -63,15 +101,15 @@ def inject_ls_enc_layer(model, training_args, model_args, config):
             local_rank=training_args.local_rank,
             activation_fn="gelu",
         )
-        return bert_config
+        return bert_enc_config
 
     for i in range(config.num_hidden_layers):
-        bert_config = gen_bert_config(training_args, config)
+        bert_enc_config = gen_bert_enc_config(training_args, config)
         init_ws, init_bs = get_hf_bert_enc_layer_params(model.bert.encoder.layer[i])
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
-            bert_config, init_ws, init_bs
+            bert_enc_config, init_ws, init_bs
         ).cuda()
-        if model_args.model_type == 2:
+        if model_args.module_type == 2:
             if model_args.enable_quant:
                 model.bert.encoder.layer[i].apply(qat_mode)
             else:

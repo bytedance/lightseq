@@ -43,7 +43,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
-from ls_hf_transformer_encoder_layer import inject_ls_enc_layer
+from ls_hf_transformer_encoder_layer import inject_ls_layer
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -94,7 +94,7 @@ class ModelArguments:
             "with private models)."
         },
     )
-    model_type: int = field(
+    module_type: int = field(
         default=1,
         metadata={
             "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
@@ -375,8 +375,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    if model_args.model_type == 1 or model_args.model_type == 2:
-        inject_ls_enc_layer(model, training_args, model_args, config)
+    if model_args.module_type == 1 or model_args.module_type == 2:
+        inject_ls_layer(model, training_args, model_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
