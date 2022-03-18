@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
-module_typeS = tuple(conf.module_type for conf in MODEL_CONFIG_CLASSES)
+MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
 @dataclass
@@ -82,11 +82,11 @@ class ModelArguments:
             "Don't set if you want to train a model from scratch."
         },
     )
-    module_type: Optional[str] = field(
+    model_type: Optional[str] = field(
         default=None,
         metadata={
             "help": "If training from scratch, pass a model type from the list: "
-            + ", ".join(module_typeS)
+            + ", ".join(MODEL_TYPES)
         },
     )
     config_overrides: Optional[str] = field(
@@ -390,7 +390,7 @@ def main():
             model_args.model_name_or_path, **config_kwargs
         )
     else:
-        config = CONFIG_MAPPING[model_args.module_type]()
+        config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
         if model_args.config_overrides is not None:
             logger.info(f"Overriding config: {model_args.config_overrides}")
