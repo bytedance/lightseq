@@ -361,7 +361,7 @@ def export_ls_config(
 
 
 def export_pb2hdf5(transformer, f):
-    """Convert bart protobuf to hdf5 format to support larger weight."""
+    """Convert Transformer protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
         # model_conf
         "head_num",

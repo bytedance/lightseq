@@ -4,18 +4,17 @@ and other LightSeq modules to int8 protobuf format using post training quantizat
 Refer to the `examples/training/fairseq` directory for more training details.
 """
 from collections import OrderedDict
-import argparse
 
 import torch
-import tensorflow as tf
 from export.proto.quant_transformer_pb2 import QuantTransformer
 from lightseq.training.ops.pytorch.export import export_ls_config
-from lightseq.training.ops.pytorch.export_ptq import (
+from lightseq.training.ops.pytorch.export_quant import (
     gather_quant_token_embedding,
     fill_quant_pb_layer,
 )
 from lightseq.training.ops.pytorch.util import get_pos_embedding
 import lightseq.inference as lsi
+from export.fairseq.util import parse_args, save_model
 
 
 # adjust this value to achieve better performance
@@ -118,8 +117,10 @@ def _get_encode_output_mapping_dict(dec_layer_num):
 
 
 def export_ls_torch_fs_transformer_ptq(
-    model_dir,
+    model_path,
     pb_path,
+    hdf5_path,
+    hdf5,
     max_step=300,
     bos_id=2,
     eos_id=2,
@@ -127,7 +128,7 @@ def export_ls_torch_fs_transformer_ptq(
 ):
     transformer = QuantTransformer()
     # load var names
-    reloaded = torch.load(model_dir, "cpu")
+    reloaded = torch.load(model_path, "cpu")
     args = reloaded["args"]
     model_dict = reloaded["model"]
 
@@ -267,31 +268,18 @@ def export_ls_torch_fs_transformer_ptq(
         save_pb=True,
     )
 
-    print("Writing to {0}".format(pb_path))
-    with tf.io.gfile.GFile(pb_path, "wb") as fout:
-        fout.write(transformer.SerializeToString())
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
-    parser.add_argument(
-        "--model",
-        "-m",
-        type=str,
-        default="checkpoint_best.pt",
-        help="path of fairseq checkpoint",
-    )
-    args = parser.parse_args()
-    return args
+    save_path = save_model(transformer, pb_path, hdf5_path, hdf5)
+    return save_path
 
 
 if __name__ == "__main__":
     args = parse_args()
     model_name = ".".join(args.model.split(".")[:-1])
     pb_path = f"{model_name}_ptq.pb"
-    export_ls_torch_fs_transformer_ptq(args.model, pb_path)
+    hdf5_path = f"{model_name}_ptq.hdf5"
+    path = export_ls_torch_fs_transformer_ptq(args.model, pb_path, hdf5_path, args.hdf5)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
-    pb_model = lsi.QuantTransformer(pb_path, 8)
-    pb_output = pb_model.infer(src)
+    model = lsi.QuantTransformer(path, 8)
+    output = model.infer(src)
     # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6, 224, 10, 179, 5, 2]
-    print("pb results:", pb_output)
+    print("results:", output)
