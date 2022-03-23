@@ -277,9 +277,10 @@ if __name__ == "__main__":
     model_name = ".".join(args.model.split(".")[:-1])
     pb_path = f"{model_name}_ptq.pb"
     hdf5_path = f"{model_name}_ptq.hdf5"
-    export_native_fs_transformer(args.model, pb_path, hdf5_path, args.hdf5)
+    path = export_native_fs_transformer(args.model, pb_path, hdf5_path, args.hdf5)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
-    pb_model = lsi.QuantTransformer(pb_path, 8)
-    pb_output = pb_model.infer(src)
+    src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
+    model = lsi.QuantTransformer(path, 8)
+    output = model.infer(src)
     # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6, 224, 10, 179, 5, 2]
-    print("pb results:", pb_output)
+    print("results:", output)

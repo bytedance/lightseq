@@ -6,6 +6,7 @@ from export.proto.transformer_pb2 import Transformer
 from lightseq.training import export_pb2hdf5
 from lightseq.training import export_quant_pb2hdf5
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
     parser.add_argument(
@@ -18,7 +19,7 @@ def parse_args():
     parser.add_argument(
         "--hdf5",
         "-hdf5",
-        action='store_true',
+        action="store_true",
         help="whether to store hdf5",
     )
     args = parser.parse_args()
