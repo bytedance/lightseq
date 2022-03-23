@@ -98,10 +98,12 @@ def _main(args, output_file):
     )
 
     # Initialize LightSeq model
+    # NOTE: QuantTransformer can not load float models, but Transformer can load int8 models.
+    # So QuantTransformer must be initialized first.
     try:
-        model = lsi.Transformer(args.path, args.batch_size)
-    except:
         model = lsi.QuantTransformer(args.path, args.batch_size)
+    except:
+        model = lsi.Transformer(args.path, args.batch_size)
 
     gen_timer = StopwatchMeter()
 
