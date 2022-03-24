@@ -3,10 +3,13 @@ Export Hugging Face BERT models to hdf5 format.
 """
 import os
 import h5py
-import numpy as np
 from collections import OrderedDict
-from transformers import BertModel
-from lightseq.training.ops.pytorch.export import fill_hdf5_layer
+import numpy as np
+
+import torch
+from lightseq.training.ops.pytorch.export import apply_rule
+from lightseq.training.ops.pytorch.export_quant import quantize
+from export.fairseq.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -22,20 +25,31 @@ and the expression will finally be concatenated on axis = -1.
 enc_layer_mapping_dict = OrderedDict(
     {
         # BERT is post_layernorm
-        # NOTE: add an additional "final" at the beginning for some weight
-        # to distinguish them from "attention output *"
-        "multihead_norm_scale": "attention output LayerNorm weight",
-        "multihead_norm_bias": "attention output LayerNorm bias",
-        "multihead_project_kernel_qkv": "attention self query weight&&attention self key weight&&attention self value weight&&expression_.transpose(0, 1)",
-        "multihead_project_bias_qkv": "attention self query bias&&attention self key bias&&attention self value bias",
-        "multihead_project_kernel_output": "attention output dense weight&&expression_.transpose(0, 1)",
-        "multihead_project_bias_output": "attention output dense bias",
-        "ffn_norm_scale": "final output LayerNorm weight",
-        "ffn_norm_bias": "final output LayerNorm bias",
-        "ffn_first_kernel": "intermediate dense weight&&expression_.transpose(0, 1)",
-        "ffn_first_bias": "intermediate dense bias",
-        "ffn_second_kernel": "final output dense weight&&expression_.transpose(0, 1)",
-        "ffn_second_bias": "final output dense bias",
+        "multihead_norm_scale": "self_attn_layer_norm weight",
+        "multihead_norm_bias": "self_attn_layer_norm bias",
+        "multihead_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_qkv": "self_attn qkv_proj bias",
+        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_output": "self_attn out_proj bias",
+        "ffn_norm_scale": "final_layer_norm weight",
+        "ffn_norm_bias": "final_layer_norm bias",
+        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
+        "ffn_first_bias": "fc1 bias",
+        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
+        "ffn_second_bias": "fc2 bias",
+        # weight_clip_max
+        "multihead_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant clip_value_max",
+        "multihead_project_kernel_output_clip_max": "self_attn out_proj weight_quant clip_value_max",
+        "ffn_first_kernel_clip_max": "fc1 weight_quant clip_value_max",
+        "ffn_second_kernel_clip_max": "fc2 weight_quant clip_value_max",
+        # act_clip_max
+        "multihead_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
+        "multihead_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
+        "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
+        "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
+        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
+        "multihead_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
+        "ffn_first_output_clip_max": "fc1 output_quant clip_value_max",
     }
 )
 
@@ -44,10 +58,24 @@ src_emb_mapping_dict = OrderedDict(
         "norm_scale": "embeddings LayerNorm weight",
         "norm_bias": "embeddings LayerNorm bias",
         "position_embedding": "embeddings position_embeddings weight",
-        # manually process token_embedding due to "token_type_embeddings"
-        # "token_embedding": "embeddings word_embeddings weight",
     }
 )
+
+
+def fill_quant_hdf5_layer(
+    tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict
+):
+    for proto_name, ckpt_rule in mapping_dict.items():
+        target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
+        if proto_name.endswith("_clip_max"):
+            hdf5_file.create_dataset(
+                hdf5_dataset_prefix + proto_name, data=float(target_tensor[0])
+            )
+        else:
+            hdf5_file.create_dataset(
+                hdf5_dataset_prefix + proto_name,
+                data=target_tensor,
+            )
 
 
 def extract_bert_weights(
@@ -58,54 +86,44 @@ def extract_bert_weights(
     max_step=50,
 ):
     # load var names
-    encoder_state_dict = BertModel.from_pretrained(model_dir).state_dict()
+    state_dict = torch.load(model_dir, "cpu")
 
-    # Insert additional "final" to some weight to prevent ambiguous match
-    def _insert_final(key):
-        l = key.split(".")
-        l.insert(3, "final")
-        return ".".join(l)
+    var_name_list = list(state_dict.keys())
 
-    encoder_state_dict = OrderedDict(
-        [
-            (_insert_final(k), v)
-            if len(k.split(".")) > 3 and k.split(".")[3] == "output"
-            else (k, v)
-            for k, v in encoder_state_dict.items()
-        ]
-    )
-
-    enc_var_name_list = list(encoder_state_dict.keys())
+    for name in var_name_list:
+        if name.endswith("weight_quant.clip.clip_value_max"):
+            state_dict[name[:-26]] = torch.Tensor(
+                quantize(state_dict[name[:-26]].numpy(), 127, state_dict[name].numpy())
+            ).to(torch.uint8)
 
     # initialize output file
-    output_file += ".hdf5"
     print("Saving model to hdf5...")
     print("Writing to {0}".format(output_file))
     hdf5_file = h5py.File(output_file, "w")
 
     # fill each encoder layer's params
     enc_tensor_names = {}
-    for name in enc_var_name_list:
+    for name in var_name_list:
         name_split = name.split(".")
-        if len(name_split) <= 2 or not name_split[2].isdigit():
+        if len(name_split) <= 3 or not name_split[3].isdigit():
             continue
-        layer_id = int(name_split[2])
+        layer_id = int(name_split[3])
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
     # fill encoder_stack
     for layer_id in sorted(enc_tensor_names.keys()):
-        fill_hdf5_layer(
+        fill_quant_hdf5_layer(
             enc_tensor_names[layer_id],
-            encoder_state_dict,
+            state_dict,
             hdf5_file,
             f"encoder_stack/{layer_id}/",
             enc_layer_mapping_dict,
         )
 
     # fill src_embedding - except for position embedding
-    fill_hdf5_layer(
-        enc_var_name_list,
-        encoder_state_dict,
+    fill_quant_hdf5_layer(
+        var_name_list,
+        state_dict,
         hdf5_file,
         "src_embedding/",
         src_emb_mapping_dict,
@@ -113,13 +131,21 @@ def extract_bert_weights(
 
     # handling token_embeddings for BERT
     token_embedding = (
-        encoder_state_dict["embeddings.word_embeddings.weight"]
-        + encoder_state_dict["embeddings.token_type_embeddings.weight"][0]
+        state_dict["bert.embeddings.word_embeddings.weight"]
+        + state_dict["bert.embeddings.token_type_embeddings.weight"][0]
+    )
+    token_embedding = quantize(
+        token_embedding.numpy(),
+        127,
+        state_dict["bert.embeddings.emb_quant.clip.clip_value_max"].numpy(),
     )
     print(f"processed token_embedding, shape: {token_embedding.shape}")
-    token_embedding = token_embedding.flatten().tolist()
     hdf5_file.create_dataset(
-        "src_embedding/token_embedding", data=token_embedding, dtype="f4"
+        "src_embedding/token_embedding", data=token_embedding, dtype="uint8"
+    )
+    hdf5_file.create_dataset(
+        "src_embedding/src_emb_clip_max",
+        data=state_dict["bert.embeddings.emb_quant.clip.clip_value_max"],
     )
 
     # save number of layers metadata
@@ -167,15 +193,16 @@ def extract_bert_weights(
 
 
 if __name__ == "__main__":
-    output_lightseq_model_name = "lightseq_bert_base_uncased"
-    input_huggingface_bert_model = "bert-base-uncased"
-    head_number = 12
+    args = parse_args()
+    model_name = ".".join(args.model.split(".")[:-1])
+    hdf5_path = f"{model_name}.hdf5"
 
+    head_number = 12
     pad_id = 0
     max_step = 50
     extract_bert_weights(
-        output_lightseq_model_name,
-        input_huggingface_bert_model,
+        hdf5_path,
+        args.model,
         head_num=head_number,
         pad_id=pad_id,
         max_step=max_step,

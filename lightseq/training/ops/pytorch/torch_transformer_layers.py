@@ -1075,7 +1075,6 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
 
         self.emb_quant = TensorQuantizer(weight_quant_config)
-        self.pos_emb_quant = TensorQuantizer(weight_quant_config)
 
         if initial_weights is None:
             return
@@ -1120,7 +1119,6 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
         embeddings = inputs_embeds + token_type_embeddings
         embeddings = self.emb_quant(embeddings)
         position_embeddings = self.position_embeddings(position_ids)
-        position_embeddings = self.pos_emb_quant(position_embeddings)
         embeddings += position_embeddings
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
