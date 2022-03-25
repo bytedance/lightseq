@@ -1,10 +1,10 @@
-#include "bert_encoder.h"
+#include "vit_encoder.h"
 #include "../kernels/embKernels.h"
 #include "../kernels/transformerKernels.h"
 
 /**
 @file
-Bert encoder, composed by gemm lib and
+ViT encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
@@ -12,20 +12,17 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-BertEncoder<OpType_>::BertEncoder(int max_batch_size, const int *p_d_token_id,
+VitEncoder<OpType_>::VitEncoder(int max_batch_size, const float *p_d_pixel_input,
                                   int *p_d_padding_mask, _DataType *p_d_output,
-                                  const BertWeight<OpType_> &tw,
-                                  cudaStream_t stream, cublasHandle_t hd,
-                                  const int *p_d_lang_id)
+                                  const VitWeight<OpType_> &tw,
+                                  cudaStream_t stream, cublasHandle_t hd)
     : _max_batch_size(max_batch_size),
-      _p_d_token_id(p_d_token_id),
+      _p_d_pixel_input(p_d_pixel_input),
       _p_d_padding_mask(p_d_padding_mask),
       _p_d_output(p_d_output),
-      _p_d_lang_id(p_d_lang_id),
       _tw(tw),
       _stream(stream),
       _hd(hd),
-      _p_d_src_emb_wei(tw.get_src_emb_wei()),
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
@@ -38,7 +35,7 @@ Compute GPU memory size needed by transformer encoder,
   to see how these memory is used, checkout init_buffer() for detail
 */
 template <OperationType OpType_>
-long BertEncoder<OpType_>::compute_buffer_bytesize() {
+long VitEncoder<OpType_>::compute_buffer_bytesize() {
   long sz1 = _max_batch_dim * 6 +
              _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
   long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size;
@@ -52,7 +49,7 @@ These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
 template <OperationType OpType_>
-void BertEncoder<OpType_>::init_buffer(void *pbuf) {
+void VitEncoder<OpType_>::init_buffer(void *pbuf) {
   _DataType *p_d_buf = reinterpret_cast<_DataType *>(pbuf);
   _p_d_qkv_projected = p_d_buf;
   _p_d_q = _p_d_qkv_projected + _max_batch_dim * 3;
@@ -68,7 +65,7 @@ void BertEncoder<OpType_>::init_buffer(void *pbuf) {
 Some requirements needed by custom cuda kernel function
 */
 template <OperationType OpType_>
-std::string BertEncoder<OpType_>::check() {
+std::string VitEncoder<OpType_>::check() {
   // if (_max_thread_per_block < _tw._hidden_size) {
   //   return "violate hidden_size <= max_thread_per_block";
   // }
@@ -97,7 +94,7 @@ std::string BertEncoder<OpType_>::check() {
 Encoder inference
 */
 template <OperationType OpType_>
-void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
+void VitEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   if (batch_size > _max_batch_size) {
     throw std::runtime_error("batch size of input greater than max_batch_size");
   }
@@ -157,7 +154,7 @@ void BertEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 Encoder self attention
 */
 template <OperationType OpType_>
-void BertEncoder<OpType_>::self_attention() {
+void VitEncoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
@@ -250,7 +247,7 @@ void BertEncoder<OpType_>::self_attention() {
 }
 
 template <OperationType OpType_>
-void BertEncoder<OpType_>::ffn_add_norm() {
+void VitEncoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   ker_norm_layer_resual_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
@@ -300,8 +297,8 @@ void BertEncoder<OpType_>::ffn_add_norm() {
   return;
 }
 
-template class BertEncoder<OperationType::FP16>;
-template class BertEncoder<OperationType::FP32>;
+template class VitEncoder<OperationType::FP16>;
+template class VitEncoder<OperationType::FP32>;
 
 }  // namespace cuda
 }  // namespace lightseq
