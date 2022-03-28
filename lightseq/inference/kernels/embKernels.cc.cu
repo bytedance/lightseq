@@ -570,13 +570,13 @@ __global__ void ker_patch_emb(const T *conv_weight, const T *conv_bias,
                               int image_size) {
   if (blockIdx.y == 0) {
     output[flat_3dim(blockIdx.x, 0, blockIdx.z, gridDim.y, gridDim.z)] =
-        __ldg(&cls_emb[blockIdx.z]) + _ldg(&pos_emb[blockIdx.z]);
+        __ldg(&cls_emb[blockIdx.z]) + __ldg(&pos_emb[blockIdx.z]);
     return;
   }
   int num_patch_1d = image_size / patch_size;
   int patch_row_id, patch_col_id, value_row_id, value_col_id;
-  decompose_2dim(blockIdx.y - 1, num_patch_1d, patch_row_id, patch_col_id);
-  decompose_2dim(threadIdx.y, patch_size, value_row_id, value_col_id);
+  decompose_2dim(blockIdx.y - 1, num_patch_1d, &patch_row_id, &patch_col_id);
+  decompose_2dim(threadIdx.y, patch_size, &value_row_id, &value_col_id);
   int conv_weight_offset =
       flat_3dim(threadIdx.x, blockIdx.z, threadIdx.y, gridDim.z, blockDim.y);
   int in_offset = flat_4dim(blockIdx.x, threadIdx.x,
@@ -587,12 +587,12 @@ __global__ void ker_patch_emb(const T *conv_weight, const T *conv_bias,
       flat_3dim(blockIdx.x, blockIdx.y, blockIdx.z, gridDim.y, gridDim.z);
 
   float val =
-      __ldg(&input[in_offset]) * __ldg(&conv_weight[conv_weight_offset]);
+      __ldg(&input[in_offset]) * (float)__ldg(&conv_weight[conv_weight_offset]);
   float rsum = blockReduceSum(val);
   __shared__ float ssum;
   if (threadIdx.x == 0)
-    ssum = rsum + __ldg(&conv_bias[blockIdx.z]) +
-           __ldg(&pos_emb[flat_2dim(blockIdx.y, blockIdx.z, gridDim.z)]);
+    ssum = rsum + (float)__ldg(&conv_bias[blockIdx.z]) +
+           (float)__ldg(&pos_emb[flat_2dim(blockIdx.y, blockIdx.z, gridDim.z)]);
   __syncthreads();
 
   output[out_offset] = ssum;

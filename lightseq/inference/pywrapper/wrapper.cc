@@ -452,7 +452,7 @@ class PyVit {
   }
 
   py::array_t<float> infer(
-      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+      py::array_t<float, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<4>();
     const float *input_seq_data = input_seq_out.data(0, 0, 0, 0);
     int batch_size = input_seq_out.shape(0);
@@ -538,7 +538,7 @@ PYBIND11_MODULE(inference, m) {
       .def("infer", &PyMoe::infer, py::return_value_policy::reference_internal,
            py::arg("input_seq"));
 
-  py::class_<PyBert>(m, "Vit")
+  py::class_<PyVit>(m, "Vit")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
       .def("infer", &PyVit::infer, py::return_value_policy::reference_internal,

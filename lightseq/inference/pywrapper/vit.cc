@@ -29,8 +29,9 @@ Vit::Vit(const std::string weight_path, const int max_batch_size)
   */
 
   // register device memory for inputs and outputs
-  CHECK_GPU_ERROR(
-      cudaMalloc(&d_input_, _max_batch_size * tw_._channel_input * tw_._image_size * tw_._image_size * tw_.sizeof(float)));
+  CHECK_GPU_ERROR(cudaMalloc(&d_input_, _max_batch_size * tw_._channel_input *
+                                            tw_._image_size * tw_._image_size *
+                                            sizeof(float)));
   CHECK_GPU_ERROR(cudaMalloc(&d_padding_mask_,
                              _max_batch_size * tw_._max_step * sizeof(int)));
 
@@ -109,7 +110,8 @@ const void *Vit::get_output_ptr(int index) {
 std::vector<int> Vit::get_input_max_shape(int index) {
   switch (index) {
     case 0:
-      return {_max_batch_size, tw_._channel_input, tw_._image_size, tw_._image_size};
+      return {_max_batch_size, tw_._channel_input, tw_._image_size,
+              tw_._image_size};
 
     default:
       throw std::runtime_error("invalid input index");
