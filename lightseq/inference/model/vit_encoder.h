@@ -58,6 +58,8 @@ class VitEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
 
+  // {conv_weight, conv_bias, pos_emb, cls_embedding}
+  const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
   // multihead_qkv_bias multihead_output_kernel, multihead_output_bias
   // ffn_norm_scale, ffn_norm_bias}
@@ -72,14 +74,15 @@ class VitEncoder {
   int _weight_offset;
 
  public:
-  const float *_p_d_pixel_input;  // input pixels [batch_size, image_size, image_size, channel_num]
+  const float *_p_d_pixel_input;  // input pixels [batch_size, channel_input,
+                                  // image_size, image_size]
   _DataType
       *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
 
   VitEncoder(int max_batch_size, const float *p_d_pixel_input,
-              int *p_d_padding_mask, _DataType *p_d_output,
-              const VitWeight<OpType_> &tw, cudaStream_t stream,
-              cublasHandle_t hd);
+             int *p_d_padding_mask, _DataType *p_d_output,
+             const VitWeight<OpType_> &tw, cudaStream_t stream,
+             cublasHandle_t hd);
   long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();

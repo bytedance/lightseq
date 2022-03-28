@@ -45,7 +45,8 @@ void VitWeight<OpType_>::proto_get_model_config(const Vit &vit) {
   _use_gelu = vit.model_conf().use_gelu();
   _image_size = vit.model_conf().image_size();
   _patch_size = vit.model_conf().patch_size();
-  _channel_input = vit.src_embedding().conv_weight_size() / (_hidden_size * _patch_size * _patch_size);
+  _channel_input = vit.src_embedding().conv_weight_size() /
+                   (_hidden_size * _patch_size * _patch_size);
 }
 
 /**
@@ -59,14 +60,14 @@ std::string VitWeight<OpType_>::proto_parse_emb_wei(
   int idx = 0;
 
   offset.push_back(idx);
-  if (layer.conv_weight_size() != _channel_input * _hidden_size * _patch_size * _patch_size)
+  if (layer.conv_weight_size() !=
+      _channel_input * _hidden_size * _patch_size * _patch_size)
     return "wrong conv_weight_size !";
   for (float ele : layer.conv_weight()) value.push_back(ele);
   idx += _channel_input * _hidden_size * _patch_size * _patch_size;
 
   offset.push_back(idx);
-  if (layer.conv_bias_size() != _hidden_size)
-    return "wrong conv_bias_size !";
+  if (layer.conv_bias_size() != _hidden_size) return "wrong conv_bias_size !";
   for (float ele : layer.conv_bias()) value.push_back(ele);
   idx += _hidden_size;
 
@@ -198,7 +199,8 @@ Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
 void VitWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
-  _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/cls_embedding");
+  _hidden_size =
+      get_hdf5_dataset_size(hdf5_file, "src_embedding/cls_embedding");
 
   _inner_size =
       get_hdf5_dataset_size(hdf5_file, "encoder_stack/0/ffn_first_kernel") /
@@ -222,11 +224,13 @@ void VitWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/image_size", H5T_NATIVE_INT,
                            &_image_size);
-  
+
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/patch_size", H5T_NATIVE_INT,
                            &_patch_size);
 
-  _channel_input = get_hdf5_dataset_size(hdf5_file, "src_embedding/conv_weight") / (_hidden_size * _patch_size * _patch_size);                         
+  _channel_input =
+      get_hdf5_dataset_size(hdf5_file, "src_embedding/conv_weight") /
+      (_hidden_size * _patch_size * _patch_size);
 }
 
 /**
@@ -236,8 +240,9 @@ template <OperationType OpType_>
 void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
 
-  size_t value_size = _channel_input * _hidden_size * _patch_size * _patch_size +
-                      _max_step * _hidden_size + 2 * _hidden_size;
+  size_t value_size =
+      _channel_input * _hidden_size * _patch_size * _patch_size +
+      _max_step * _hidden_size + 2 * _hidden_size;
 
   std::vector<int> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
@@ -249,15 +254,17 @@ void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/conv_weight", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [=](int size) { return size != _channel_input * _hidden_size * _patch_size * _patch_size; },
+      [=](int size) {
+        return size !=
+               _channel_input * _hidden_size * _patch_size * _patch_size;
+      },
       "Wrong conv_weight_size !");
   idx += _channel_input * _hidden_size * _patch_size * _patch_size;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/conv_bias", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) { return size != _hidden_size; },
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
       "Wrong conv_bias_size !");
   idx += _hidden_size;
 
@@ -272,8 +279,7 @@ void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   offset.push_back(idx);
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/cls_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) { return size != _hidden_size; },
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
       "Wrong cls_embedding_size !");
   idx += _hidden_size;
 

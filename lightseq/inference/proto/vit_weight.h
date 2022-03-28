@@ -47,7 +47,7 @@ class VitWeight {
   std::string initializing(std::string proto_path);
 
   const std::vector<const _DataType *> &get_src_emb_wei() const {
-    // {token_emb, pos_emb, norm_scale, norm_bias}
+    // {conv_weight, conv_bias, pos_emb, cls_embedding}
     return _p_d_src_emb_wei;
   }
 

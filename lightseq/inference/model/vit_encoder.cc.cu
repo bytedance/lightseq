@@ -12,10 +12,11 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-VitEncoder<OpType_>::VitEncoder(int max_batch_size, const float *p_d_pixel_input,
-                                  int *p_d_padding_mask, _DataType *p_d_output,
-                                  const VitWeight<OpType_> &tw,
-                                  cudaStream_t stream, cublasHandle_t hd)
+VitEncoder<OpType_>::VitEncoder(int max_batch_size,
+                                const float *p_d_pixel_input,
+                                int *p_d_padding_mask, _DataType *p_d_output,
+                                const VitWeight<OpType_> &tw,
+                                cudaStream_t stream, cublasHandle_t hd)
     : _max_batch_size(max_batch_size),
       _p_d_pixel_input(p_d_pixel_input),
       _p_d_padding_mask(p_d_padding_mask),
@@ -23,6 +24,7 @@ VitEncoder<OpType_>::VitEncoder(int max_batch_size, const float *p_d_pixel_input
       _tw(tw),
       _stream(stream),
       _hd(hd),
+      _p_d_src_emb_wei(tw.get_src_emb_wei()),
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
@@ -75,17 +77,11 @@ std::string VitEncoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_tw._multilg_type == 0 && _p_d_src_emb_wei.size() != 4) {
+  if (_p_d_src_emb_wei.size() != 4) {
     return "violate p_d_src_emb_wei.size() = 4";
-  }
-  if (_tw._multilg_type != 0 && _p_d_src_emb_wei.size() != 5) {
-    return "violate p_d_src_emb_wei.size() = 5";
   }
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
-  }
-  if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
-    return "lang id should not be null when multilg";
   }
   return "";
 }
@@ -105,11 +101,6 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
-#ifdef DEBUG_RESULT
-  std::cout << "batch_size-" << batch_size << " batch_seq_len-" << batch_seq_len
-            << std::endl;
-  print_vec(_p_d_token_id, "batch_token_ids", batch_size * batch_seq_len);
-#endif
 
   /* ---step2. encoder feedforward--- */
   launch_enc_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_src_emb_wei[1],

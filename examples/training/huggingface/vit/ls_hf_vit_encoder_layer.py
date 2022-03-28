@@ -16,9 +16,12 @@ class LSVITTransformerEncoderLayer(LSTransformerEncoderLayer):
 
 def gen_vit_config(training_args, config):
     num_patches = (config.image_size // config.patch_size) ** 2 + 1
-    max_batch_size = max(training_args.per_device_train_batch_size, training_args.per_device_eval_batch_size)
+    max_batch_size = max(
+        training_args.per_device_train_batch_size,
+        training_args.per_device_eval_batch_size,
+    )
     vit_config = LSTransformerEncoderLayer.get_config(
-        max_batch_tokens=num_patches*max_batch_size,
+        max_batch_tokens=num_patches * max_batch_size,
         max_seq_len=num_patches,
         hidden_size=config.hidden_size,
         intermediate_size=config.intermediate_size,
@@ -33,6 +36,7 @@ def gen_vit_config(training_args, config):
     )
     return vit_config
 
+
 def inject_ls_enc_layer(model, training_args, config):
     for i in range(config.num_hidden_layers):
         vit_config = gen_vit_config(training_args, config)
@@ -40,6 +44,7 @@ def inject_ls_enc_layer(model, training_args, config):
         model.vit.encoder.layer[i] = LSVITTransformerEncoderLayer(
             vit_config, init_ws, init_bs
         ).cuda()
+
 
 def get_hf_vit_enc_layer_params(layer):
     init_ws = []

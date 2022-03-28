@@ -543,5 +543,84 @@ template void launch_dec_emb<__half>(const __half *token_emb,
                                      int beam_size, int hidden_dim,
                                      int vocab_size, int step, int max_step,
                                      int multilg_type, cudaStream_t stream);
+
+/**
+@brief: ker_patch_emb
+patch embedding by conv2d, concat cls embedding, add position embedding
+
+@thread
+gridDim.x = batch_size
+gridDim.y = max_step
+gridDim.z = hidden_dim
+blockDim.x = channel_input;
+blockDim.y = patch_size * patch_size;
+
+@param
+conv_weight: [channel_input, hidden_dim, patch_size, patch_size]
+conv_bias: [hidden_dim]
+pos_emb: [max_step, hidden_dim]
+cls_emb: [hidden_dim]
+input: [batch_size, channel_input, image_size, image_size]
+output: result, [batch_size, max_step, hidden_dim]
+*/
+template <typename T>
+__global__ void ker_patch_emb(const T *conv_weight, const T *conv_bias,
+                              const T *pos_emb, const T *cls_emb,
+                              const float *input, T *output, int patch_size,
+                              int image_size) {
+  if (blockIdx.y == 0) {
+    output[flat_3dim(blockIdx.x, 0, blockIdx.z, gridDim.y, gridDim.z)] =
+        __ldg(&cls_emb[blockIdx.z]) + _ldg(&pos_emb[blockIdx.z]);
+    return;
+  }
+  int num_patch_1d = image_size / patch_size;
+  int patch_row_id, patch_col_id, value_row_id, value_col_id;
+  decompose_2dim(blockIdx.y - 1, num_patch_1d, patch_row_id, patch_col_id);
+  decompose_2dim(threadIdx.y, patch_size, value_row_id, value_col_id);
+  int conv_weight_offset =
+      flat_3dim(threadIdx.x, blockIdx.z, threadIdx.y, gridDim.z, blockDim.y);
+  int in_offset = flat_4dim(blockIdx.x, threadIdx.x,
+                            patch_row_id * num_patch_1d + value_row_id,
+                            patch_col_id * num_patch_1d + value_col_id,
+                            blockDim.x, image_size, image_size);
+  int out_offset =
+      flat_3dim(blockIdx.x, blockIdx.y, blockIdx.z, gridDim.y, gridDim.z);
+
+  float val =
+      __ldg(&input[in_offset]) * __ldg(&conv_weight[conv_weight_offset]);
+  float rsum = blockReduceSum(val);
+  __shared__ float ssum;
+  if (threadIdx.x == 0)
+    ssum = rsum + __ldg(&conv_bias[blockIdx.z]) +
+           __ldg(&pos_emb[flat_2dim(blockIdx.y, blockIdx.z, gridDim.z)]);
+  __syncthreads();
+
+  output[out_offset] = ssum;
+}
+
+template <typename T>
+void launch_patch_emb(const T *conv_weight, const T *conv_bias,
+                      const T *pos_emb, const T *cls_emb, const float *input,
+                      T *output, int patch_size, int image_size, int batch_size,
+                      int max_step, int hidden_dim, int channel_input,
+                      cudaStream_t stream) {
+  ker_patch_emb<T><<<dim3(batch_size, max_step, hidden_dim),
+                     dim3(channel_input, patch_size * patch_size), 0, stream>>>(
+      conv_weight, conv_bias, pos_emb, cls_emb, input, output, patch_size,
+      image_size);
+}
+
+template void launch_patch_emb<float>(
+    const float *conv_weight, const float *conv_bias, const float *pos_emb,
+    const float *cls_emb, const float *input, float *output, int patch_size,
+    int image_size, int batch_size, int max_step, int hidden_dim,
+    int channel_input, cudaStream_t stream);
+
+template void launch_patch_emb<__half>(
+    const __half *conv_weight, const __half *conv_bias, const __half *pos_emb,
+    const __half *cls_emb, const float *input, __half *output, int patch_size,
+    int image_size, int batch_size, int max_step, int hidden_dim,
+    int channel_input, cudaStream_t stream);
+
 }  // namespace cuda
 }  // namespace lightseq
