@@ -159,7 +159,6 @@ class QuantDecoder {
                QuantTransformerWeight<OpType_>& tw, cudaStream_t stream,
                cublasHandle_t hd, bool output_topk = false,
                const int* p_d_lang_id = nullptr);
-  long compute_buffer_bytesize();
   void init_buffer();
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);

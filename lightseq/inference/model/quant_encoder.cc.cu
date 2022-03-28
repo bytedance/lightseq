@@ -46,19 +46,6 @@ QuantEncoder<OpType_>::QuantEncoder(int max_batch_size, int *p_d_token_id,
 }
 
 /**
-Compute GPU memory size needed by transformer encoder,
-  to see how these memory is used, checkout init_buffer() for detail
-*/
-template <OperationType OpType_>
-long QuantEncoder<OpType_>::compute_buffer_bytesize() {
-  // long sz1 = _max_batch_dim * 6 +
-  //            _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  // long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step *
-  // _tw._inner_size; return max(sz1, sz2) * sizeof(_DataType);
-  return 0;
-}
-
-/**
 Init the GPU memory pointer which point to
   the memory buffer needed by encoder.
 These buffer are used during custom cuda kernel function,

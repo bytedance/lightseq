@@ -28,17 +28,6 @@ __half QuantTransformerWeight<OperationType::FP16>::float2required(
   return __float2half_rn(value);
 }
 
-__inline__ float dequantize(unsigned char i, float scale, float clip_max) {
-  return (float(i) - scale) * clip_max / scale;
-}
-
-void copy_i8_to_float(std::vector<unsigned char> &i8, std::vector<float> &f,
-                      float clip_max, float quant_range, int start, int num) {
-  for (int i = start; i < start + num; ++i) {
-    f[i] = dequantize(i8[i], quant_range, clip_max);
-  }
-}
-
 /**
 Read model config stored in custom proto file.
 */
@@ -670,7 +659,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
       "Wrong token_embedding_size !");
   read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/emb_clip_max",
                            H5T_NATIVE_FLOAT, &clip_max);
-  copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+  dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                    vocab_size * _hidden_size);
   if (source == "src")
     _src_emb_clip_max = clip_max;
@@ -730,7 +719,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
         [=](int size) { return size != _n_dec_layer; },
         "Wrong encode_output_project_kernel_kv_clip_max_size !");
     for (int i = 0; i < _n_dec_layer; ++i) {
-      copy_i8_to_float(value_i8, value,
+      dequantize_array(value_i8, value,
                        _encode_output_project_kernel_kv_clip_max[i],
                        _quant_range, idx + _hidden_size * _hidden_size * 2 * i,
                        _hidden_size * _hidden_size * 2);
@@ -831,7 +820,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size * 3);
     _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size * 3;
@@ -853,7 +842,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_output_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size);
     _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size;
@@ -889,7 +878,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(hdf5_file,
                              dataset_prefix + "/ffn_first_kernel_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _inner_size);
     _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;
@@ -910,7 +899,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(hdf5_file,
                              dataset_prefix + "/ffn_second_kernel_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _inner_size);
     _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;
@@ -1008,7 +997,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/self_project_kernel_qkv_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size * 3);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size * 3;
@@ -1029,7 +1018,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/self_project_kernel_output_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size;
@@ -1065,7 +1054,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/encdec_project_kernel_q_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size;
@@ -1086,7 +1075,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(
         hdf5_file, dataset_prefix + "/encdec_project_kernel_output_clip_max",
         H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _hidden_size);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size;
@@ -1122,7 +1111,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(hdf5_file,
                              dataset_prefix + "/ffn_first_kernel_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _inner_size);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;
@@ -1143,7 +1132,7 @@ void QuantTransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     read_hdf5_dataset_scalar(hdf5_file,
                              dataset_prefix + "/ffn_second_kernel_clip_max",
                              H5T_NATIVE_FLOAT, &clip_max);
-    copy_i8_to_float(value_i8, value, clip_max, _quant_range, idx,
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
                      _hidden_size * _inner_size);
     _dec_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;

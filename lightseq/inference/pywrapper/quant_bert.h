@@ -25,7 +25,6 @@ class QuantBert : public LSModel {
   int _max_batch_size;
   cudaStream_t stream_;
   cublasHandle_t hd_;
-  void *d_buf_;
   QuantBertWeight<bert_optype> tw_;
 
  public:

@@ -71,15 +71,6 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
 }
 
 /**
-Compute GPU memory size needed by transformer decoder,
-  to see how these memory is used, checkout init_buffer() for detail
-*/
-template <OperationType OpType_>
-long QuantDecoder<OpType_>::compute_buffer_bytesize() {
-  return 0;
-}
-
-/**
 Init the GPU memory pointer which point to
   the memory buffer needed by decoder.
 These buffer are used during custom cuda kernel function,

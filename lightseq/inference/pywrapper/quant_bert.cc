@@ -46,12 +46,7 @@ QuantBert::QuantBert(const std::string weight_path, const int max_batch_size)
     throw std::runtime_error(res);
   }
 
-  long buf_bytesize = encoder_->compute_buffer_bytesize();
-  std::cout << "Bert buf_bytesize: " << buf_bytesize << std::endl;
-
-  // encoder and decoder use the same buffer to save gpu memory useage
-  CHECK_GPU_ERROR(cudaMalloc(&d_buf_, (size_t)buf_bytesize));
-  encoder_->init_buffer(d_buf_);
+  encoder_->init_buffer();
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 }
 
@@ -59,7 +54,6 @@ QuantBert::~QuantBert() {
   CHECK_GPU_ERROR(cudaFree(d_input_));
   CHECK_GPU_ERROR(cudaFree(d_padding_mask_));
   CHECK_GPU_ERROR(cudaFree(d_encoder_output_));
-  CHECK_GPU_ERROR(cudaFree(d_buf_));
   CHECK_GPU_ERROR(cublasDestroy(hd_));
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
 }

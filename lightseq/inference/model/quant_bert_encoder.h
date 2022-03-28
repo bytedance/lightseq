@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
+#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -45,8 +46,11 @@ class QuantBertEncoder {
   const QuantBertWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
+  cublasLtHandle_t _cublas_lt_handle;
   const _DataType _fone;
   const _DataType _fzero;
+  const int32_t _ione;
+  const int32_t _izero;
   const _DataType _atten_scaler;
   const int _max_batch_dim;
   const int _max_thread_per_block;
@@ -59,6 +63,10 @@ class QuantBertEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
 
+  int8_t *_int8_ffn_in_buf;
+  int32_t *_int32_ffn_out_buf;
+  int8_t *_int8_ffn_out_buf;
+
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
@@ -67,6 +75,15 @@ class QuantBertEncoder {
   // ffn_first_kernel, ffn_first_bias, ffn_second_kernel, ffn_second_bias} *
   // encoder_layer_num
   const std::vector<const _DataType *> &_p_d_enc_wei;
+  std::vector<const _DataType *> _p_device_wei;
+  std::vector<const _DataType *> _p_device_emb;
+
+  std::vector<int8_t *> _int8_p_d_enc_wei;
+  int8_t *_int8_p_d_src_emb_wei;
+  const float _quant_range = 127;
+  const float _src_emb_clip_max;
+  const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
+  std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;
   int _batch_seq_len;
@@ -83,8 +100,7 @@ class QuantBertEncoder {
                    int *p_d_padding_mask, _DataType *p_d_output,
                    const QuantBertWeight<OpType_> &tw, cudaStream_t stream,
                    cublasHandle_t hd, const int *p_d_lang_id = nullptr);
-  long compute_buffer_bytesize();
-  void init_buffer(void *pbuf);
+  void init_buffer();
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
 };

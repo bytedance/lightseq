@@ -5,7 +5,6 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <thrust/device_vector.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -39,9 +38,13 @@ class QuantBertWeight {
   std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
 
-  // store the weights on gpu memory
-  thrust::device_vector<_DataType> _d_src_emb_wei;
-  thrust::device_vector<_DataType> _d_enc_wei;
+  // store the weights on cpu memory
+  std::vector<_DataType> _d_src_emb_wei;
+  std::vector<_DataType> _d_enc_wei;
+
+  // store the clip_max of weights and activations
+  float _src_emb_clip_max;
+  std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
 
  public:
   std::string initializing(std::string proto_path);
@@ -60,6 +63,10 @@ class QuantBertWeight {
     return _p_d_enc_wei;
   }
 
+  float get_src_emb_clip_max() const { return _src_emb_clip_max; }
+
+  std::vector<float> get_enc_clip_max() const { return _enc_clip_max; }
+
   int _hidden_size;
   int _inner_size;
   int _max_step;
@@ -73,6 +80,8 @@ class QuantBertWeight {
   bool _is_post_ln;
   bool _use_gelu;
   int _multilg_type;
+
+  const float _quant_range = 127;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
