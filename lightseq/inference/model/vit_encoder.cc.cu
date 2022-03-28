@@ -83,6 +83,11 @@ std::string VitEncoder<OpType_>::check() {
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
   }
+  if (_tw._max_step != (_tw._image_size / _tw._patch_size) *
+                               (_tw._image_size / _tw._patch_size) +
+                           1) {
+    return "violate max_step = (image_size / patch_size) ** 2 + 1";
+  }
   return "";
 }
 
@@ -90,28 +95,26 @@ std::string VitEncoder<OpType_>::check() {
 Encoder inference
 */
 template <OperationType OpType_>
-void VitEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
+void VitEncoder<OpType_>::run_one_infer(int batch_size) {
   if (batch_size > _max_batch_size) {
     throw std::runtime_error("batch size of input greater than max_batch_size");
   }
-  if (batch_seq_len > _tw._max_step) {
-    throw std::runtime_error("seq len of input greater than max_step");
-  }
   /* ---step1. init--- */
   _batch_size = batch_size;
-  _batch_seq_len = batch_seq_len;
-  _batch_token_num = batch_size * batch_seq_len;
+  _batch_seq_len = _tw._max_step;
+  _batch_token_num = batch_size * _batch_seq_len;
 
   /* ---step2. encoder feedforward--- */
-  launch_enc_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_src_emb_wei[1],
-                            _p_d_token_id, _p_d_output, _p_d_padding_mask,
-                            _tw._padding_id, batch_size, batch_seq_len,
-                            _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
-                            _p_d_lang_id, _tw._multilg_type);
+  launch_patch_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_src_emb_wei[1],
+                              _p_d_src_emb_wei[2], _p_d_src_emb_wei[3],
+                              _p_d_pixel_input, _p_d_output, _tw._patch_size,
+                              _tw._image_size, _batch_size, _tw._max_step,
+                              _tw._hidden_size, _tw._channel_input, _stream);
+
 #ifdef DEBUG_RESULT
-  for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
-      std::cout << "emb out: token-" << j << std::endl;
+  for (int i = 0; i < _batch_size; i++) {  // batch_id
+    for (int j = 0; j < 20; j++) {         // patch_id
+      std::cout << "emb out: patch-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "emb out", 10);

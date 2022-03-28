@@ -86,7 +86,7 @@ class VitEncoder {
   long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
-  void run_one_infer(int batch_size, int batch_seq_len);
+  void run_one_infer(int batch_size);
 };
 
 }  // namespace cuda
