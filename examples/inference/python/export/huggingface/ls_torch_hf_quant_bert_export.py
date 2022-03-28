@@ -144,7 +144,7 @@ def extract_bert_weights(
         "src_embedding/token_embedding", data=token_embedding, dtype="uint8"
     )
     hdf5_file.create_dataset(
-        "src_embedding/src_emb_clip_max",
+        "src_embedding/emb_clip_max",
         data=state_dict["bert.embeddings.emb_quant.clip.clip_value_max"],
     )
 
