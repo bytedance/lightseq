@@ -229,7 +229,7 @@ void QuantBertEncoder<OpType_>::run_one_infer(int batch_size,
       _int8_p_d_src_emb_wei, _p_device_emb[1], _p_d_token_id, _p_d_output,
       _p_d_padding_mask, _tw._padding_id, batch_size, batch_seq_len,
       _tw._hidden_size, _stream, _p_device_emb[4], _p_d_lang_id,
-      _tw._multilg_type, _src_emb_clip_max / _quant_range);
+      _tw._multilg_type, _src_emb_clip_max / _quant_range, false);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
@@ -276,11 +276,14 @@ void QuantBertEncoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_enc_wei[_weight_offset], "layer norm scale(head): ", 5);
-  print_vec(_p_d_enc_wei[_weight_offset + 1], "layer norm bias(head): ", 5);
-  print_vec(_p_d_q, "layer norm out(head): ", 5);
-  print_vec(_p_d_q + _batch_token_num * _tw._hidden_size - 5,
-            "layer norm out(tail): ", 5);
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "qkv_attn input: token-" << j << std::endl;
+      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "qkv_attn input", 10);
+    }
+  }
 #endif
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
@@ -292,12 +295,6 @@ void QuantBertEncoder<OpType_>::self_attention() {
           (_enc_clip_max[_layer_id * 12 + 8] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4], _cublas_lt_handle,
       _stream, false);
-
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_qkv_projected, "self qkv(head): ", 5);
-  print_vec(_p_d_qkv_projected + _batch_token_num * _tw._hidden_size * 3 - 5,
-            "self qkv(tail): ", 5);
-#endif
 
   // get q, k, v by split and reshape qkv
   ker_arrange_encself_qkv_i8I_launcher<_DataType>(
@@ -319,12 +316,6 @@ void QuantBertEncoder<OpType_>::self_attention() {
       _batch_size, _batch_seq_len, _tw._head_num, _stream, _p_d_c,
       _p_d_padding_mask);
 
-#ifdef DEBUG_RESULT
-  print_vec(_p_d_c, "self attn correlation(head): ", 5);
-  print_vec(_p_d_c + _batch_token_num * _tw._head_num * _batch_seq_len - 5,
-            "self attn correlation(tail): ", 5);
-#endif
-
   /* ---step 3. new_q = correlation * v--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._dim_per_head, _batch_seq_len,
@@ -342,7 +333,14 @@ void QuantBertEncoder<OpType_>::self_attention() {
       _quant_range / _enc_clip_max[_layer_id * 12 + 5], true);
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_v, "self attn before ffn(head): ", 5);
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "out_attn input: token-" << j << std::endl;
+      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "out_attn input", 10);
+    }
+  }
 #endif
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
@@ -353,6 +351,17 @@ void QuantBertEncoder<OpType_>::self_attention() {
           (_enc_clip_max[_layer_id * 12 + 9] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1], _cublas_lt_handle,
       _stream, false);
+
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "attn_ln input: token-" << j << std::endl;
+      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "attn_ln input", 10);
+    }
+  }
+#endif
 
   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
       _int8_ffn_out_buf, _p_device_wei[_weight_offset + 6],
@@ -367,6 +376,17 @@ void QuantBertEncoder<OpType_>::self_attention() {
 
 template <OperationType OpType_>
 void QuantBertEncoder<OpType_>::ffn_add_norm() {
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "ffn1 input: token-" << j << std::endl;
+      print_vec(_int8_ffn_out_buf + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "ffn1 input", 10);
+    }
+  }
+#endif
+
   /* ---step 1. first ffn layer--- */
   cublasLtMM_withAlgo_i8IO(
       _int8_ffn_out_buf, 1, _batch_token_num, _tw._inner_size, _tw._hidden_size,
@@ -391,6 +411,17 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
         _enc_clip_max[_layer_id * 12 + 7], true, true, true);
   }
 
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "ffn2 input: token-" << j << std::endl;
+      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._inner_size +
+                    j * _tw._inner_size,
+                "ffn2 input", 10);
+    }
+  }
+#endif
+
   /* ---step 2. second ffn layer--- */
   cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
                       _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
@@ -398,16 +429,23 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
                       _stream, false);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
-  float clip_max;
+  float clip_max, dequant_scale;
+  if (_tw._use_gelu) {
+    dequant_scale = _enc_clip_max[_layer_id * 12 + 3] *
+                    _enc_clip_max[_layer_id * 12 + 7] /
+                    (_quant_range * _quant_range);
+  } else {
+    dequant_scale = _enc_clip_max[_layer_id * 12 + 3] *
+                    _enc_clip_max[_layer_id * 12 + 7] /
+                    (2 * _quant_range * _quant_range);
+  }
   if (_layer_id == _tw._n_enc_layer - 1) {
     scale_ptr = _p_device_emb[2];
     bias_ptr = _p_device_emb[3];
 
     ker_residual_bias_ln_i32I_launcher<_DataType>(
         _int32_ffn_out_buf, scale_ptr, bias_ptr, _p_d_output, _p_d_output,
-        _batch_token_num, _tw._hidden_size,
-        _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
-            (2 * _quant_range * _quant_range),
+        _batch_token_num, _tw._hidden_size, dequant_scale,
         _max_thread_per_block, _stream, true, _scaled_ffn2_colsum[_layer_id]);
   } else {
     scale_ptr = _p_device_wei[(_layer_id + 1) * _tw._weight_per_enc_layer];
@@ -418,11 +456,20 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
 
     ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
         _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-        _p_d_output, _batch_token_num, _tw._hidden_size,
-        _enc_clip_max[_layer_id * 12 + 3] * _enc_clip_max[_layer_id * 12 + 7] /
-            (2 * _quant_range * _quant_range),
+        _p_d_output, _batch_token_num, _tw._hidden_size, dequant_scale,
         _quant_range / clip_max, _max_thread_per_block, _stream,
         _tw._is_post_ln, true, true, _scaled_ffn2_colsum[_layer_id]);
+
+#ifdef DEBUG_RESULT
+    for (int i = 0; i < _batch_size; i++) {       // batch_id
+      for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+        std::cout << "encoder layer out: token-" << j << std::endl;
+        print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
+                      j * _tw._hidden_size,
+                  "encoder layer out", 10);
+      }
+    }
+#endif
   }
 
   return;

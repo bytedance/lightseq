@@ -564,7 +564,7 @@ void QuantDecoder<OpType_>::embedding() {
       _p_device_emb[7], _p_d_lang_id, _p_d_cur_step_query, _batch_size,
       _tw._beam_size, _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
       _tw._max_step, _tw._multilg_type, _stream,
-      _trg_emb_clip_max / _quant_range);
+      _trg_emb_clip_max / _quant_range, true);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
@@ -862,7 +862,16 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
                 _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
-  float clip_max;
+  float clip_max, dequant_scale;
+  if (_tw._use_gelu) {
+    dequant_scale = _dec_clip_max[_layer_id * 19 + 5] *
+                    _dec_clip_max[_layer_id * 19 + 11] /
+                    (_quant_range * _quant_range);
+  } else {
+    dequant_scale = _dec_clip_max[_layer_id * 19 + 5] *
+                    _dec_clip_max[_layer_id * 19 + 11] /
+                    (2 * _quant_range * _quant_range);
+  }
   if (_layer_id == _tw._n_dec_layer - 1) {
     scale_ptr = _p_device_emb[2];
     bias_ptr = _p_device_emb[3];
@@ -878,9 +887,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-      _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-      _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
-          (2 * _quant_range * _quant_range),
+      _p_d_cur_step_query, _step_token_num, _tw._hidden_size, dequant_scale,
       _quant_range / clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
       false, true, _scaled_ffn2_colsum[_layer_id]);
 

@@ -366,6 +366,12 @@ void QuantBertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_UCHAR, value_i8.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
+    read_hdf5_dataset_scalar(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv_clip_max",
+        H5T_NATIVE_FLOAT, &clip_max);
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                     _hidden_size * _hidden_size * 3);
+    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -374,12 +380,6 @@ void QuantBertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * 3; },
         "Wrong multihead_project_bias_qkv_size !");
-    read_hdf5_dataset_scalar(
-        hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv_clip_max",
-        H5T_NATIVE_FLOAT, &clip_max);
-    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
-                     _hidden_size * _hidden_size * 3);
-    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * 3;
 
     offset.push_back(idx);

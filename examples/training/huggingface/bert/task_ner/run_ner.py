@@ -28,6 +28,7 @@ from typing import Optional
 
 import numpy as np
 from datasets import ClassLabel, load_dataset, load_metric
+import torch
 
 import transformers
 from transformers import (
@@ -518,6 +519,12 @@ def main():
         data_collator=data_collator,
         compute_metrics=compute_metrics,
     )
+
+    if not training_args.do_train:
+        state_dict = torch.load(
+            training_args.resume_from_checkpoint, map_location="cpu"
+        )
+        trainer._load_state_dict_in_model(state_dict)
 
     # Training
     if training_args.do_train:
