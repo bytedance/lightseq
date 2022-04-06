@@ -81,6 +81,7 @@ def main():
     print("creating huggingface model...")
     hf_model = GPT2LMHeadModel.from_pretrained("gpt2")
     hf_model.to("cuda:0")
+    hf_model.eval()
 
     # lightseq gpt perplexity supports batch infer with different lengths,
     # but sampling doesn't support

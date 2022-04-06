@@ -71,6 +71,7 @@ def main():
     # change to "facebook/bart-large" for large model
     hf_model = BartForConditionalGeneration.from_pretrained("facebook/bart-base")
     hf_model.to("cuda:0")
+    hf_model.eval()
 
     sentences = [
         "I love that girl, but <mask> does not <mask> me.",

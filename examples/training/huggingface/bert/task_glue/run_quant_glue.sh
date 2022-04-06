@@ -18,7 +18,7 @@ THIS_DIR=$(dirname $(readlink -f $0))
 export TASK_NAME=sst2
 
 python3 -m torch.distributed.launch \
-  --nproc_per_node=8 \
+  --nproc_per_node=1 \
   $THIS_DIR/run_glue.py \
   --model_name_or_path bert-base-cased \
   --task_name $TASK_NAME \

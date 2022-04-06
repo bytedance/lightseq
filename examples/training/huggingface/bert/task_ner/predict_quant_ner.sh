@@ -12,6 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+until [[ -z "$1" ]]
+do
+    case $1 in
+        -m)
+            shift; MODEL=$1;
+            shift;;
+        *)
+            shift;;
+    esac
+done
+
 THIS_DIR=$(dirname $(readlink -f $0))
 
 python3 -m torch.distributed.launch \
@@ -19,14 +30,13 @@ python3 -m torch.distributed.launch \
   $THIS_DIR/run_ner.py \
   --model_name_or_path bert-base-uncased \
   --dataset_name conll2003 \
-  --do_train \
-  --do_eval \
-  --per_device_train_batch_size 16 \
-  --num_train_epochs 10 \
-  --output_dir /tmp/test-ner \
+  --do_predict \
+  --per_device_train_batch_size 4 \
+  --output_dir /tmp/quant/test-ner \
   --overwrite_output_dir \
+  --resume_from_checkpoint $MODEL \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
   --module_type 2 \
-  --enable_quant false
+  --enable_quant true
