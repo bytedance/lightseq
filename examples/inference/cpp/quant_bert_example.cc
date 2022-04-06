@@ -15,7 +15,8 @@ int main(int argc, char* argv[]) {
 
   int batch_size = 1;
   int batch_seq_len = 10;
-  std::vector<int> host_input = {101, 2859, 2758, 2051, 2157, 2005, 6629, 7566, 1012, 102};
+  std::vector<int> host_input = {101,  2859, 2758, 2051, 2157,
+                                 2005, 6629, 7566, 1012, 102};
 
   void* d_input;
   lightseq::cuda::CHECK_GPU_ERROR(
