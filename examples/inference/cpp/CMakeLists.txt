@@ -9,6 +9,9 @@ target_link_libraries(quant_transformer_example PUBLIC liblightseq)
 add_executable(bert_example bert_example.cc)
 target_link_libraries(bert_example PUBLIC liblightseq)
 
+add_executable(quant_bert_example quant_bert_example.cc)
+target_link_libraries(quant_bert_example PUBLIC liblightseq)
+
 add_executable(gpt_example gpt_example.cc)
 target_link_libraries(gpt_example PUBLIC liblightseq)
 
