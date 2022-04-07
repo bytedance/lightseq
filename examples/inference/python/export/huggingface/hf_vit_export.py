@@ -21,6 +21,8 @@ and the expression will finally be concatenated on axis = -1.
 enc_layer_mapping_dict = OrderedDict(
     {
         # VIT is pre_layernorm
+        # NOTE: add an additional "final" at the beginning for some weight
+        # to distinguish them from "attention output *"
         "multihead_norm_scale": "layernorm_before weight",
         "multihead_norm_bias": "layernorm_before bias",
         "multihead_project_kernel_qkv": "attention attention query weight&&attention attention key weight&&attention attention value weight&&expression_.transpose(0, 1)",
@@ -41,7 +43,7 @@ src_emb_mapping_dict = OrderedDict(
         "conv_weight": "embeddings patch_embeddings projection weight",
         "conv_bias": "embeddings patch_embeddings projection bias",
         "position_embedding": "embeddings position_embeddings",
-        "cls_embedding": "cls_embedding"
+        "cls_embedding": "cls_token"
     }
 )
 
@@ -55,6 +57,21 @@ def extract_vit_weights(
 ):
     # load var names
     encoder_state_dict = ViTModel.from_pretrained(model_dir).state_dict()
+
+    # Insert additional "final" to some weight to prevent ambiguous match
+    def _insert_final(key):
+        l = key.split(".")
+        l.insert(3, "final")
+        return ".".join(l)
+
+    encoder_state_dict = OrderedDict(
+        [
+            (_insert_final(k), v)
+            if len(k.split(".")) > 3 and k.split(".")[3] == "output"
+            else (k, v)
+            for k, v in encoder_state_dict.items()
+        ]
+    )
 
     enc_var_name_list = list(encoder_state_dict.keys())
 
