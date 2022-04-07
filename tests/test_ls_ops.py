@@ -29,6 +29,13 @@ from lightseq.training.cli.fs_modules.ls_fs_transformer_decoder_layer import (
     LSFSTransformerDecoderLayer,
 )
 
+from lightseq.training.ops.pytorch.quantization import (
+    enable_quant,
+    disable_quant,
+    qat_mode,
+    ptq_mode,
+)
+
 kt = TestDecorator()
 
 num_layers = 1
@@ -484,7 +491,8 @@ def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len}, {dec_seq_len})"
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
     )
 
     hidden_states = kt.rand((batch_size, dec_seq_len, 1024))
@@ -528,7 +536,8 @@ def test_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len}, {dec_seq_len})"
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
     )
     hidden_size = 1024
     shs = hidden_size * hidden_size
@@ -709,7 +718,8 @@ def test_decoder_layer_forward_inference():
     batch_size, enc_seq_len = kt.bs_sl()
     beam_size = random.randint(2, 5)
     print(
-        f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len}, {beam_size})"
+        f"(batch_size, enc_seq_len, beam_size): ({batch_size}, {enc_seq_len},"
+        f" {beam_size})"
     )
 
     ls_encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
@@ -783,6 +793,50 @@ def test_embedding_layer_forward():
     else:
         custom_layer = custom_emb_layer_fp16
         fs_layer = fs_emb_layer_fp16
+    fs_layer.apply(disable_quant)
+    custom_layer.apply(disable_quant)
+
+    def custom():
+        res = custom_layer(input, step=1)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        x = fs_layer(input, step=1)
+        return [
+            x.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], ntest=10)
+def test_quant_embedding_layer_forward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
+    # TODO: can not generate PAD in the middle of the sentences.
+    config = ls_emb_config_fp16
+    input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
+    pad_left = random.choice([True, False])
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_emb_layer_fp32
+        fs_layer = fs_emb_layer_fp32
+    else:
+        custom_layer = custom_emb_layer_fp16
+        fs_layer = fs_emb_layer_fp16
+
+    fs_layer.apply(qat_mode)
+    custom_layer.apply(enable_quant)
+    torch.nn.init.constant_(custom_layer.embeddings[-1], 0.1)
+    torch.nn.init.constant_(fs_layer.emb_quant.clip.clip_value_max, 0.1)
 
     def custom():
         res = custom_layer(input, step=1)
@@ -821,6 +875,8 @@ def test_embedding_layer_backward():
         fs_layer = fs_emb_layer_fp16
 
     loss_data = torch.randn(1, dtype=kt.dtype).sum()
+    fs_layer.apply(disable_quant)
+    custom_layer.apply(disable_quant)
 
     def custom():
         custom_layer.zero_grad()
@@ -830,7 +886,9 @@ def test_embedding_layer_backward():
         custom_loss.data.copy_(loss_data)
         custom_loss.backward()
         return [
-            custom_layer.embeddings.grad.contiguous().detach(),
+            custom_layer.embeddings.grad.contiguous().detach()[
+                : custom_layer.embeddings.grad.numel() - 1
+            ],
         ]
 
     def baseline():
@@ -842,6 +900,63 @@ def test_embedding_layer_backward():
         fs_loss.backward()
         return [
             fs_layer.embeddings.grad.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+# grad of clip_max diff is non trival because torch.sum() of half is accumulated by float
+@kt.case(dtypes=[torch.half], ntest=10, rtol=1e-1)
+def test_quant_embedding_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
+    config = ls_emb_config_fp16
+    input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
+    pad_left = random.choice([True, False])
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_emb_layer_fp32
+        fs_layer = fs_emb_layer_fp32
+    else:
+        custom_layer = custom_emb_layer_fp16
+        fs_layer = fs_emb_layer_fp16
+
+    loss_data = torch.randn(1, dtype=kt.dtype).sum()
+    fs_layer.apply(qat_mode)
+    custom_layer.apply(enable_quant)
+    torch.nn.init.constant_(custom_layer.embeddings[-1], 0.1)
+    torch.nn.init.constant_(fs_layer.emb_quant.clip.clip_value_max, 0.1)
+
+    def custom():
+        custom_layer.zero_grad()
+        custom_input = input.clone()
+        res = custom_layer(custom_input)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        return [
+            custom_layer.embeddings.grad.contiguous().detach()[
+                : custom_layer.embeddings.grad.numel() - 1
+            ],
+            custom_layer.embeddings.grad.contiguous().detach()[-1],
+        ]
+
+    def baseline():
+        fs_layer.zero_grad()
+        fs_input = input.clone()
+        res = fs_layer(fs_input)
+        fs_loss = (res / 1000).sum()
+        fs_loss.data.copy_(loss_data)
+        fs_loss.backward()
+        return [
+            fs_layer.embeddings.grad.contiguous().detach(),
+            fs_layer.emb_quant.clip.clip_value_max.grad.contiguous().detach(),
         ]
 
     return custom, baseline
@@ -964,7 +1079,9 @@ if __name__ == "__main__":
             "test_decoder_layer_backward",
             "test_decoder_layer_forward_inference",
             "test_embedding_layer_forward",
+            "test_quant_embedding_layer_forward",
             "test_embedding_layer_backward",
+            "test_quant_embedding_layer_backward",
             "test_cross_entropy_layer_forward",
             "test_cross_entropy_layer_backward",
         ]

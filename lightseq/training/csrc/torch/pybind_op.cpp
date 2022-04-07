@@ -245,7 +245,8 @@ int create_transformer_embedding_layer(int layer_id,
 
 template <typename T>
 std::vector<torch::Tensor> transformer_embedding_layer_fw(
-    int layer_id, const torch::Tensor &input, int step, bool training_mode) {
+    int layer_id, const torch::Tensor &input, int step, bool training_mode,
+    bool quant_mode) {
   CHECK_INPUT(input);
   const int *input_ptr = (const int *)input.data_ptr();
 
@@ -267,6 +268,7 @@ std::vector<torch::Tensor> transformer_embedding_layer_fw(
 
   layer->set_cur_batch_shape(input.size(0), input.size(1));
   layer->SetTrainingMode(training_mode);
+  layer->SetQuantMode(quant_mode);
   layer->Forward(input_ptr, out_ptr, step);
 
   return {output};

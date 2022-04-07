@@ -173,7 +173,8 @@ class TensorQuantizer(nn.Module):
         """Disable clip stage"""
         self._if_clip = False
         # self.clip.clip_value_min.required_grad = False
-        self.clip.clip_value_max.required_grad = False
+        if hasattr(self.clip, "clip_value_max"):
+            self.clip.clip_value_max.required_grad = False
 
     def enable_clip(self):
         """Enable clip stage"""
@@ -181,7 +182,8 @@ class TensorQuantizer(nn.Module):
         if not self._learn_amax:
             raise ValueError("learn_amax is False. Cannot enable clip.")
         # self.clip.clip_value_min.required_grad = True
-        self.clip.clip_value_max.required_grad = True
+        if hasattr(self.clip, "clip_value_max"):
+            self.clip.clip_value_max.required_grad = True
         self._if_clip = True
 
     def disable_calib(self):
@@ -467,6 +469,9 @@ class TensorQuantizer(nn.Module):
 def enable_quant(m):
     if isinstance(m, TensorQuantizer):
         m.enable()
+    else:
+        if hasattr(m, "enable_quant"):
+            m.enable_quant()
 
 
 def disable_quant(m):
@@ -475,6 +480,9 @@ def disable_quant(m):
         m.disable_quant()
         m.disable_calib()
         m.disable_clip()
+    else:
+        if hasattr(m, "disable_quant"):
+            m.disable_quant()
 
 
 def qat_mode(m):

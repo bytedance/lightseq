@@ -183,9 +183,7 @@ class TestDecorator(object):
             for i in range(ntest):
                 for dtype in dtypes:
                     self.dtype = dtype
-                    print(
-                        ">>>>>>>>>>>>>>>>>>>>>>" f"{cn}, ntest [{i}], dtype [{dtype}]:"
-                    )
+                    print(f">>>>>>>>>>>>>>>>>>>>>>{cn}, ntest [{i}], dtype [{dtype}]:")
                     custom, baseline = func()
                     torch.cuda.synchronize(device=self.device)
                     self.test(custom, baseline, nrepeat, rtol, atol)
@@ -220,13 +218,23 @@ def expand_dim(idx, dims):
 def get_fairseq_enc_params(fairseq_layer):
     initial_weights = []
     initial_biases = []
-
-    initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
+    if hasattr(fairseq_layer.self_attn, "qkv_proj"):
+        hidden_size = fairseq_layer.self_attn.out_proj.weight.shape[0]
+        initial_weights.extend(
+            fairseq_layer.self_attn.qkv_proj.weight.detach()
+            .clone()
+            .split(hidden_size, 0)
+        )
+        initial_biases.extend(
+            fairseq_layer.self_attn.qkv_proj.bias.detach().clone().split(hidden_size, 0)
+        )
+    else:
+        initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
+        initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
+        initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
     initial_weights.append(fairseq_layer.self_attn.out_proj.weight.detach().clone())
     initial_biases.append(fairseq_layer.self_attn.out_proj.bias.detach().clone())
     initial_weights.append(fairseq_layer.self_attn_layer_norm.weight.detach().clone())
@@ -245,12 +253,23 @@ def get_fairseq_dec_params(fairseq_layer):
     initial_weights = []
     initial_biases = []
 
-    initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
-    initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
-    initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
+    if hasattr(fairseq_layer.self_attn, "qkv_proj"):
+        hidden_size = fairseq_layer.self_attn.out_proj.weight.shape[0]
+        initial_weights.extend(
+            fairseq_layer.self_attn.qkv_proj.weight.detach()
+            .clone()
+            .split(hidden_size, 0)
+        )
+        initial_biases.extend(
+            fairseq_layer.self_attn.qkv_proj.bias.detach().clone().split(hidden_size, 0)
+        )
+    else:
+        initial_weights.append(fairseq_layer.self_attn.q_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.q_proj.bias.detach().clone())
+        initial_weights.append(fairseq_layer.self_attn.k_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.k_proj.bias.detach().clone())
+        initial_weights.append(fairseq_layer.self_attn.v_proj.weight.detach().clone())
+        initial_biases.append(fairseq_layer.self_attn.v_proj.bias.detach().clone())
     initial_weights.append(fairseq_layer.self_attn.out_proj.weight.detach().clone())
     initial_biases.append(fairseq_layer.self_attn.out_proj.bias.detach().clone())
     initial_weights.append(fairseq_layer.self_attn_layer_norm.weight.detach().clone())

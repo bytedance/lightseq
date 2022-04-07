@@ -28,6 +28,7 @@ class TransformerEmbeddingLayer {
   }
 
   void SetTrainingMode(bool training);
+  void SetQuantMode(bool enable_quant);
   inline bool IsTrainingMode() const { return _training; }
   inline float DropoutRatio() const { return _training ? _dropout_ratio : 0.0; }
   inline int EmbeddingDim() const { return _embedding_dim; }
@@ -35,11 +36,13 @@ class TransformerEmbeddingLayer {
   void assign_weight_ptr(const T *weights_ptr) {
     // assign weights ptr, [_vocab_size, _embedding_dim]
     _embeddings_ptr = weights_ptr;
+    _clip_max_ptr = weights_ptr + _vocab_size * _embedding_dim;
   }
 
   void assign_grad_ptr(T *grads_ptr) {
     // assign grads ptr, [_vocab_size, _embedding_dim]
     _grad_embeddings_ptr = grads_ptr;
+    _grad_clip_max_ptr = grads_ptr + _vocab_size * _embedding_dim;
   }
 
  private:
@@ -65,12 +68,15 @@ class TransformerEmbeddingLayer {
   size_t _batch_size;
   size_t _seq_len;
   bool _training;
+  bool _enable_quant;
   uint8_t *_dropout_mask;
 
   // weights ptr
   const T *_pos_embeddings_ptr;
   const T *_embeddings_ptr;
+  const T *_clip_max_ptr;
 
   // grads ptr
   T *_grad_embeddings_ptr;
+  T *_grad_clip_max_ptr;
 };

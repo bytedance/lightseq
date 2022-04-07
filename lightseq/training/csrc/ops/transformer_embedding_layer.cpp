@@ -14,7 +14,8 @@ TransformerEmbeddingLayer<T>::TransformerEmbeddingLayer(
       _vocab_size(vocab_size),
       _padding_idx(padding_idx),
       _dropout_ratio(dropout_ratio),
-      _training(true) {
+      _training(true),
+      _enable_quant(false) {
   allocate_mem_buffer();
 }
 
@@ -28,25 +29,30 @@ void TransformerEmbeddingLayer<T>::Forward(const int *input_ptr, T *out_ptr,
                                            int step) {
   cudaStream_t stream = Context::Instance().get_stream();
   launch_lookup_scale_pos_dropout<T>(
-      out_ptr, input_ptr, _embeddings_ptr, _pos_embeddings_ptr, _dropout_mask,
-      _batch_size, _seq_len, _embedding_dim, _padding_idx, DropoutRatio(), step,
-      stream);
+      out_ptr, input_ptr, _embeddings_ptr, _pos_embeddings_ptr,
+      _enable_quant ? _clip_max_ptr : nullptr, _dropout_mask, _batch_size,
+      _seq_len, _embedding_dim, _padding_idx, DropoutRatio(), step, stream);
 }
 
 template <typename T>
 void TransformerEmbeddingLayer<T>::Backward(const T *grad_output_ptr,
                                             const int *input_ptr) {
   cudaStream_t stream = Context::Instance().get_stream();
-  launch_d_lookup_scale_pos_dropout<T>(_grad_embeddings_ptr, grad_output_ptr,
-                                       input_ptr, _dropout_mask, _batch_size,
-                                       _seq_len, _embedding_dim, _vocab_size,
-                                       _padding_idx, DropoutRatio(), stream);
+  launch_d_lookup_scale_pos_dropout<T>(
+      _grad_embeddings_ptr, _enable_quant ? _grad_clip_max_ptr : nullptr,
+      grad_output_ptr, input_ptr, _dropout_mask, _batch_size, _seq_len,
+      _embedding_dim, _vocab_size, _padding_idx, DropoutRatio(), stream);
 }
 
 template <typename T>
 void TransformerEmbeddingLayer<T>::SetTrainingMode(bool training) {
   // Dropout will be skipped when not in training model.
   _training = training;
+}
+
+template <typename T>
+void TransformerEmbeddingLayer<T>::SetQuantMode(bool enable_quant) {
+  _enable_quant = enable_quant;
 }
 
 template class TransformerEmbeddingLayer<float>;

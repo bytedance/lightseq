@@ -109,16 +109,22 @@ void launch_cross_entropy_bw(const float *grad_outputs_ptr, const T *inputs_ptr,
                              const int vocab_size, cudaStream_t stream);
 
 template <typename T>
-void launch_lookup_scale_pos_dropout(
-    T *output, const int *input, const T *embeddings, const T *pos_embeddings,
-    uint8_t *dropout_mask, int batch_size, int seq_len, int embedding_dim,
-    int padding_idx, float dropout_ratio, int step, cudaStream_t &stream);
+void launch_lookup_scale_pos_dropout(T *output, const int *input,
+                                     const T *embeddings,
+                                     const T *pos_embeddings, const T *clip_max,
+                                     uint8_t *dropout_mask, int batch_size,
+                                     int seq_len, int embedding_dim,
+                                     int padding_idx, float dropout_ratio,
+                                     int step, cudaStream_t &stream);
 
 template <typename T>
-void launch_d_lookup_scale_pos_dropout(
-    T *grad_embeddings, const T *grad_output, const int *input,
-    const uint8_t *dropout_mask, int batch_size, int seq_len, int embedding_dim,
-    int vocab_size, int padding_idx, float dropout_ratio, cudaStream_t &stream);
+void launch_d_lookup_scale_pos_dropout(T *grad_embeddings, T *grad_clip_max,
+                                       const T *grad_output, const int *input,
+                                       const uint8_t *dropout_mask,
+                                       int batch_size, int seq_len,
+                                       int embedding_dim, int vocab_size,
+                                       int padding_idx, float dropout_ratio,
+                                       cudaStream_t &stream);
 
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
