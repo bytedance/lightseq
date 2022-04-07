@@ -4,7 +4,7 @@ namespace lightseq {
 namespace cuda {
 
 Vit::Vit(const std::string weight_path, const int max_batch_size)
-    : LSModel({"image_pixels"}, {"encoder_output"}),
+    : LSModel({"pixel_values"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
   CHECK_GPU_ERROR(cudaSetDevice(0));

@@ -542,5 +542,5 @@ PYBIND11_MODULE(inference, m) {
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
       .def("infer", &PyVit::infer, py::return_value_policy::reference_internal,
-           py::arg("input_seq"));
+           py::arg("pixel_values"));
 }
