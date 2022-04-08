@@ -36,7 +36,7 @@ class QuantLinear(Linear):
         if pre_activation != "encoder_out":
             self.input_quant = TensorQuantizer(input_quant_config)
         self.output_quant = None
-        if pre_activation != "relu" and pre_activation != "encoder_out":
+        if pre_activation is None:
             self.output_quant = TensorQuantizer(act_quant_config)
         self.weight_quant = TensorQuantizer(weight_quant_config)
 
