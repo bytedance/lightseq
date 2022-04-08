@@ -72,7 +72,7 @@ cd examples/inference/python
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python export/hf_bart_export.py
+python export/huggingface/hf_bart_export.py
 python test/ls_bart.py
 ```
 

@@ -21,7 +21,7 @@ With only a few lines of code, you can enjoy the excellent performance provided 
 ## Features
 - **High performance**.
 In WMT14 English to German dataset, compared to [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex),
-LightSeq can provide **1.53** times speedup for transformer big model on NVIDIA Ampere A100 with 4096 batch size.
+LightSeq can provide **1.53** times speedup for transformer big model on NVIDIA Tesla A100 with 4096 batch size.
 - **Comprehensive operators**.
 LightSeq provides comprehensive efficient custom operators for PyTorch and TensorFlow, including embedding, encoder layer, decoder layer, criterion and optimizer. To the best of our knowledge, LightSeq is the first open source project that cover the entire training process for Transformer-based models.
 In contrast, [DeepSpeed](https://github.com/microsoft/DeepSpeed) only provides encoder layer.
@@ -38,7 +38,7 @@ The following is a support matrix of LightSeq compared with
 ## Performance
 Detailed experimental results is available [here](../../docs/training/performance.md). Here are the experimental results on WMT14 English to German task.
 
-We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
+We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Tesla A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
 ### Speedup for single training step
