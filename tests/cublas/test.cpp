@@ -1,7 +1,7 @@
 #include "gemm.h"
 
-vf _main(std::string name, int C, int B, int O, int H, int iteration,
-         bool debug) {
+void _main(std::string name, int C, int B, int O, int H, int iteration,
+           bool debug) {
   printf(
       ">>>>>>>>>>>>>>>>>>>> %s, shape: X(%d, %d, %d), W(%d, %d, %d) "
       ">>>>>>>>>>>>>>>>>>>>\n",
@@ -32,27 +32,39 @@ vf _main(std::string name, int C, int B, int O, int H, int iteration,
   checkCublasStatus(cublasLtCreate(&lt_handle));
 
   float cublas_ft = -1, cublas_ht = -1, cublas_it = -1;
-  float cublaslt_ft = -1, cublaslt_ht = -1, cublaslt_it = -1;
+  float lt_ft = -1, lt_ht = -1;
+  float lt_col_it = -1, lt_col4_4r2_8c_it = -1, lt_col32_2r_4r4_it = -1;
 
   printf(">>>>> test cublas gemm ex >>>>>\n");
   cublas_ft = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
                            iteration);
+  print_res(fY, fY, cublas_ft, C, B, O, H, "cublas fp32", false, debug);
   cublas_ht = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
                            iteration);
+  print_res(fY, hY, cublas_ht, C, B, O, H, "cublas fp16", false, debug);
   cublas_it = test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
                            iteration);
-  print_res(Y, fY, hY, iY, C, B, O, H, cublas_ft, cublas_ht, cublas_it, debug);
+  print_res(fY, iY, cublas_it, C, B, O, H, "cublas int8", true, debug);
 
   if (C == 1) {
     printf(">>>>> test cublas lt matmul >>>>>\n");
-    cublaslt_ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha,
-                                 &f_beta, iteration);
-    cublaslt_ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha,
-                                 &h_beta, iteration);
-    cublaslt_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
-                                      &i_alpha, &i_beta, iteration);
-    print_res(Y, fY, hY, iY, C, B, O, H, cublaslt_ft, cublaslt_ht, cublaslt_it,
-              debug);
+    lt_ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                           iteration);
+    print_res(fY, fY, lt_ft, C, B, O, H, "lt fp32", false, debug);
+    lt_ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                           iteration);
+    print_res(fY, hY, lt_ht, C, B, O, H, "lt fp16", false, debug);
+    lt_col_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY, &i_alpha,
+                                    &i_beta, iteration, 0);
+    print_res(fY, iY, lt_col_it, C, B, O, H, "lt_col int8", true, debug);
+    lt_col4_4r2_8c_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
+                                            &i_alpha, &i_beta, iteration, 1);
+    print_res(fY, iY, lt_col4_4r2_8c_it, C, B, O, H, "lt_col4_4r2_8c int8",
+              true, debug);
+    lt_col32_2r_4r4_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
+                                             &i_alpha, &i_beta, iteration, 2);
+    print_res(fY, iY, lt_col32_2r_4r4_it, C, B, O, H, "lt_col32_2r_4r4 int8",
+              true, debug);
   }
 
   // printf(">>>>> test tvm gemm >>>>>\n");
@@ -66,24 +78,10 @@ vf _main(std::string name, int C, int B, int O, int H, int iteration,
   // printf("  diff: %.5f\n", ie / C / B / O);
   // printf("  time: %.3f ms\n", tvm_it);
 
-  if (C == 1)
-    printf("SPEEDUP (cublas fp16 / lt fp16):     %.3f\n",
-           cublas_ht / cublaslt_ht);
-  printf("SPEEDUP (cublas fp16 / cublas int8): %.3f\n", cublas_ht / cublas_it);
-  if (C == 1)
-    printf("SPEEDUP (cublas fp16 / lt int8):     %.3f\n",
-           cublas_ht / cublaslt_it);
-
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
   free_memory(iX, iW, iY);
   if (debug) checkCudaStatus(cudaFree(Y));
-
-  if (C == 1)
-    return {cublas_ht / cublaslt_ht, cublas_ht / cublas_it,
-            cublas_ht / cublaslt_it};
-  else
-    return {0, cublas_ht / cublas_it, 0};
 }
 
 int main() {
@@ -139,19 +137,10 @@ int main() {
            {batch_beam_size * head_num, head_dim, 1, step});
   }
 
-  vf speedup = vf(3, 0);
   for (auto shape : shapes) {
-    vf su = _main(shape.first, shape.second[0], shape.second[1],
-                  shape.second[2], shape.second[3], iteration, debug);
-    for (int i = 0; i < 3; ++i) speedup[i] += su[i];
+    _main(shape.first, shape.second[0], shape.second[1], shape.second[2],
+          shape.second[3], iteration, debug);
   }
 
-  printf(">>>>>>>>>>>>>>>>>>>> SUMMARY >>>>>>>>>>>>>>>>>>>>\n");
-  printf("AVERAGE SPEEDUP (cublas fp16 / lt fp16):     %.3f\n",
-         speedup[0] / shapes.size());
-  printf("AVERAGE SPEEDUP (cublas fp16 / cublas int8): %.3f\n",
-         speedup[1] / shapes.size());
-  printf("AVERAGE SPEEDUP (cublas fp16 / lt int8):     %.3f\n",
-         speedup[2] / shapes.size());
   return 0;
 }
