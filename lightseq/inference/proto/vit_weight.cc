@@ -61,7 +61,7 @@ std::string VitWeight<OpType_>::proto_parse_emb_wei(
 
   offset.push_back(idx);
   if (layer.conv_weight_size() !=
-      _channel_input * _hidden_size * _patch_size * _patch_size)
+      _hidden_size * _channel_input * _patch_size * _patch_size)
     return "wrong conv_weight_size !";
   for (float ele : layer.conv_weight()) value.push_back(ele);
   idx += _channel_input * _hidden_size * _patch_size * _patch_size;
@@ -256,7 +256,7 @@ void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
       value.data() + idx,
       [=](int size) {
         return size !=
-               _channel_input * _hidden_size * _patch_size * _patch_size;
+               _hidden_size * _channel_input * _patch_size * _patch_size;
       },
       "Wrong conv_weight_size !");
   idx += _channel_input * _hidden_size * _patch_size * _patch_size;

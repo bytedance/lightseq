@@ -110,16 +110,15 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size) {
                               _p_d_pixel_input, _p_d_output, _tw._patch_size,
                               _tw._image_size, _batch_size, _tw._max_step,
                               _tw._hidden_size, _tw._channel_input, _stream);
-
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {  // batch_id
-    for (int j = 0; j < 20; j++) {         // patch_id
+    for (int j = 0; j < 10; j++) {         // patch_id
       std::cout << "emb out: patch-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
-                "emb out", 10);
+                "emb out", 20);
     }
-  }  // not normal
+  }
 #endif
   for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
     _weight_offset = _layer_id * _tw._weight_per_enc_layer;

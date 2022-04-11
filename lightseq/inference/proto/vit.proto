@@ -39,7 +39,7 @@ message VitEncoderLayer {
 
 message VitEmbeddingLayer {
   // weight and bias of convolution in patch embedding
-  repeated float conv_weight = 1; // [channel_input, hidden_size, patch_size, patch_size]
+  repeated float conv_weight = 1; // [hidden_size, channel_input, patch_size, patch_size]
   repeated float conv_bias = 2; // [hidden_size]
   // learnable position embedding
   repeated float position_embedding = 3; // [max_seq_len, hidden_size]
