@@ -43,7 +43,9 @@ src_emb_mapping_dict = OrderedDict(
         "conv_weight": "embeddings patch_embeddings projection weight",
         "conv_bias": "embeddings patch_embeddings projection bias",
         "position_embedding": "embeddings position_embeddings",
-        "cls_embedding": "cls_token"
+        "cls_embedding": "embeddings cls_token",
+        "norm_scale": "layernorm weight",
+        "norm_bias": "layernorm bias"
     }
 )
 
@@ -116,6 +118,7 @@ def extract_vit_weights(
     # fill in model_conf
     hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
     hdf5_file.create_dataset("model_conf/use_gelu", data=True, dtype="?")
+    hdf5_file.create_dataset("model_conf/is_post_ln", data=False, dtype="?")
     hdf5_file.create_dataset("model_conf/image_size", data=image_size, dtype="i4")
     hdf5_file.create_dataset("model_conf/patch_size", data=patch_size, dtype="i4")
 
