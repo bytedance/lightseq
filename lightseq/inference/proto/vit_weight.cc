@@ -47,6 +47,7 @@ void VitWeight<OpType_>::proto_get_model_config(const Vit &vit) {
   _patch_size = vit.model_conf().patch_size();
   _channel_input = vit.src_embedding().conv_weight_size() /
                    (_hidden_size * _patch_size * _patch_size);
+  _is_post_ln = vit.model_conf().is_post_ln();
 }
 
 /**
@@ -81,6 +82,16 @@ std::string VitWeight<OpType_>::proto_parse_emb_wei(
   if (layer.cls_embedding_size() != _hidden_size)
     return "wrong cls_embedding_size !";
   for (float ele : layer.cls_embedding()) value.push_back(ele);
+  idx += _hidden_size;
+
+  offset.push_back(idx);
+  if (layer.norm_scale_size() != _hidden_size) return "wrong norm_scale_size !";
+  for (float ele : layer.norm_scale()) value.push_back(ele);
+  idx += _hidden_size;
+
+  offset.push_back(idx);
+  if (layer.norm_bias_size() != _hidden_size) return "wrong norm_bias_size !";
+  for (float ele : layer.norm_bias()) value.push_back(ele);
   idx += _hidden_size;
 
   std::vector<_DataType> raw_value;
@@ -219,6 +230,9 @@ void VitWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
 
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/is_post_ln", H5T_NATIVE_HBOOL,
+                           &_is_post_ln);
+
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/use_gelu", H5T_NATIVE_HBOOL,
                            &_use_gelu);
 
@@ -231,6 +245,8 @@ void VitWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _channel_input =
       get_hdf5_dataset_size(hdf5_file, "src_embedding/conv_weight") /
       (_hidden_size * _patch_size * _patch_size);
+
+  _is_post_ln = false;
 }
 
 /**
@@ -242,7 +258,7 @@ void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
 
   size_t value_size =
       _channel_input * _hidden_size * _patch_size * _patch_size +
-      _max_step * _hidden_size + 2 * _hidden_size;
+      _max_step * _hidden_size + 4 * _hidden_size;
 
   std::vector<int> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
@@ -281,6 +297,20 @@ void VitWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
       hdf5_file, dataset_prefix + "/cls_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx, [=](int size) { return size != _hidden_size; },
       "Wrong cls_embedding_size !");
+  idx += _hidden_size;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_scale_size !");
+  idx += _hidden_size;
+
+  offset.push_back(idx);
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
+      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      "Wrong norm_bias_size !");
   idx += _hidden_size;
 
   std::vector<_DataType> raw_value;

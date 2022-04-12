@@ -44,6 +44,10 @@ message VitEmbeddingLayer {
   // learnable position embedding
   repeated float position_embedding = 3; // [max_seq_len, hidden_size]
   repeated float cls_embedding = 4; // [hidden_size]
+  // the last layer_norm of encoder,
+  // only for pre layer norm,
+  repeated float norm_scale = 5; // [hidden_size]
+  repeated float norm_bias = 6; // [hidden_size]
 }
 
 message VitModelConf {
@@ -51,6 +55,7 @@ message VitModelConf {
   bool use_gelu = 2; // use gelu for activation otherwise relu
   int32 image_size = 3; // width of input image
   int32 patch_size = 4; //width of patch and convolution kernel
+  bool is_post_ln = 5; // Pre-LN or Post-LN
 }
 
 message Vit {

@@ -77,8 +77,8 @@ std::string VitEncoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_p_d_src_emb_wei.size() != 4) {
-    return "violate p_d_src_emb_wei.size() = 4";
+  if (_p_d_src_emb_wei.size() != 6) {
+    return "violate p_d_src_emb_wei.size() = 6";
   }
   if (_p_d_enc_wei.size() != _tw._weight_per_enc_layer * _tw._n_enc_layer) {
     return "violate p_d_enc_wei.size() = weight_per_enc_layer * n_enc_layer";
@@ -128,17 +128,17 @@ void VitEncoder<OpType_>::run_one_infer(int batch_size) {
   // last layer norm
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output,
-      _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
+      _p_d_src_emb_wei[4], _p_d_src_emb_wei[5], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
-    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // patch_id
       std::cout << "encoder output: token-" << j << std::endl;
       print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "encoder_output", _tw._dim_per_head);
     }
-  }  // not normal
+  }
 #endif
   return;
 }
@@ -287,7 +287,11 @@ void VitEncoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  return;
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_output, "ffn output (head): ", 5);
+  print_vec(_p_d_output + _batch_token_num * _tw._hidden_size - 5,
+            "ffn output (tail): ", 5);
+#endif
 }
 
 template class VitEncoder<OperationType::FP16>;

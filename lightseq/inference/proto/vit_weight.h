@@ -36,7 +36,7 @@ class VitWeight {
   void hdf5_parse_emb_wei(hid_t hdf5_file);
   void hdf5_parse_enc_wei(hid_t hdf5_file);
   // store the weights pointer
-  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 4
+  std::vector<const _DataType *> _p_d_src_emb_wei;  // size: 6
   std::vector<const _DataType *> _p_d_enc_wei;      // size: 12 * enc_layer_num
 
   // store the weights on gpu memory
@@ -82,6 +82,7 @@ class VitWeight {
     std::cout << "head number: " << _head_num << std::endl;
     std::cout << "dim per head: " << _dim_per_head << std::endl;
     std::cout << "use_gelu: " << _use_gelu << std::endl;
+    std::cout << "is_post_ln: " << _is_post_ln << std::endl;
     std::cout << "image_size: " << _image_size << std::endl;
     std::cout << "patch_size: " << _patch_size << std::endl;
     std::cout << "channel_input: " << _channel_input << std::endl;
