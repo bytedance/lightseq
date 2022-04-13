@@ -245,8 +245,6 @@ void VitWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _channel_input =
       get_hdf5_dataset_size(hdf5_file, "src_embedding/conv_weight") /
       (_hidden_size * _patch_size * _patch_size);
-
-  _is_post_ln = false;
 }
 
 /**
