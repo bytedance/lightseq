@@ -12,15 +12,17 @@ void _main(std::string name, int C, int B, int O, int H, int iteration,
 
   float *fX, *fW, *fY;
   __half *hX, *hW, *hY;
-  int8_t *iX, *iW;
-  int32_t *iY;
+  int8_t *iX, *iW, *i8Y;
+  int32_t *i32Y;
   allocate_memory(C, B, O, H, &fX, &fW, &fY);
   allocate_memory(C, B, O, H, &hX, &hW, &hY);
-  allocate_memory(C, B, O, H, &iX, &iW, &iY);
+  allocate_memory(C, B, O, H, &iX, &iW, &i8Y);
+  checkCudaStatus(cudaMallocManaged(&i32Y, C * B * O * sizeof(int32_t)));
 
   float f_alpha = 1, f_beta = 0;
   __half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
   int32_t i_alpha = 1, i_beta = 0;
+  float i8_out_scale = 1.0 / (127 * H / 2.951);
 
   init_data(fX, hX, iX, fW, hW, iW, C, B, O, H);
 
@@ -31,56 +33,53 @@ void _main(std::string name, int C, int B, int O, int H, int iteration,
   checkCublasStatus(cublasCreate(&handle));
   checkCublasStatus(cublasLtCreate(&lt_handle));
 
-  float cublas_ft = -1, cublas_ht = -1, cublas_it = -1;
-  float lt_ft = -1, lt_ht = -1;
-  float lt_col_it = -1, lt_col4_4r2_8c_it = -1, lt_col32_2r_4r4_it = -1;
+  float t = -1;
 
   printf(">>>>> test cublas gemm ex >>>>>\n");
-  cublas_ft = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
-                           iteration);
-  print_res(fY, fY, cublas_ft, C, B, O, H, "cublas fp32", false, debug);
-  cublas_ht = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
-                           iteration);
-  print_res(fY, hY, cublas_ht, C, B, O, H, "cublas fp16", false, debug);
-  cublas_it = test_gemm_ex(handle, C, B, O, H, iX, iW, iY, &i_alpha, &i_beta,
-                           iteration);
-  print_res(fY, iY, cublas_it, C, B, O, H, "cublas int8", true, debug);
+  t = test_gemm_ex(handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                   iteration);
+  print_res(fY, fY, t, C, B, O, H, "cublas fp32", debug);
+  t = test_gemm_ex(handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                   iteration);
+  print_res(fY, hY, t, C, B, O, H, "cublas fp16", debug);
+  t = test_gemm_ex(handle, C, B, O, H, iX, iW, i32Y, &i_alpha, &i_beta,
+                   iteration);
+  print_res(fY, i32Y, t, C, B, O, H, "cublas int8", debug);
 
   if (C == 1) {
     printf(">>>>> test cublas lt matmul >>>>>\n");
-    lt_ft = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
-                           iteration);
-    print_res(fY, fY, lt_ft, C, B, O, H, "lt fp32", false, debug);
-    lt_ht = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
-                           iteration);
-    print_res(fY, hY, lt_ht, C, B, O, H, "lt fp16", false, debug);
-    lt_col_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY, &i_alpha,
-                                    &i_beta, iteration, 0);
-    print_res(fY, iY, lt_col_it, C, B, O, H, "lt_col int8", true, debug);
-    lt_col4_4r2_8c_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
-                                            &i_alpha, &i_beta, iteration, 1);
-    print_res(fY, iY, lt_col4_4r2_8c_it, C, B, O, H, "lt_col4_4r2_8c int8",
-              true, debug);
-    lt_col32_2r_4r4_it = test_lt_matmul_int8(lt_handle, C, B, O, H, iX, iW, iY,
-                                             &i_alpha, &i_beta, iteration, 2);
-    print_res(fY, iY, lt_col32_2r_4r4_it, C, B, O, H, "lt_col32_2r_4r4 int8",
-              true, debug);
+    t = test_lt_matmul(lt_handle, C, B, O, H, fX, fW, fY, &f_alpha, &f_beta,
+                       iteration);
+    print_res(fY, fY, t, C, B, O, H, "lt fp32", debug);
+    t = test_lt_matmul(lt_handle, C, B, O, H, hX, hW, hY, &h_alpha, &h_beta,
+                       iteration);
+    print_res(fY, hY, t, C, B, O, H, "lt fp16", debug);
+    t = test_lt_matmul_int8_col(lt_handle, C, B, O, H, iX, iW, i8Y,
+                                &i8_out_scale, &f_beta, iteration);
+    print_res(fY, i8Y, t, C, B, O, H, "lt_col int8", debug);
+    t = test_lt_matmul_int8_col32(lt_handle, C, B, O, H, iX, iW, i8Y,
+                                  &i8_out_scale, &f_beta, iteration, 0);
+    print_res(fY, i8Y, t, C, B, O, H, "lt_col4_4r2_8c int8", debug);
+    t = test_lt_matmul_int8_col32(lt_handle, C, B, O, H, iX, iW, i8Y,
+                                  &i8_out_scale, &f_beta, iteration, 1);
+    print_res(fY, i8Y, t, C, B, O, H, "lt_col32_2r_4r4 int8", debug);
   }
 
   // printf(">>>>> test tvm gemm >>>>>\n");
-  // float tvm_it = test_tvm_gemm(iX, iW, iY, iteration);
+  // float tvm_it = test_tvm_gemm(iX, iW, i32Y, iteration);
   // if (debug)
   //   for (int i = 0; i < 10; ++i)
-  //     printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+  //     printf("%.5f%c", float(i32Y[i]) / 127 / 127, " \n"[i == 9]);
   // float ie = 0;
   // for (int i = 0; i < C * B * O; ++i)
-  //   ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
+  //   ie += fabs((debug ? Y[i] : fY[i]) - float(i32Y[i]) / 127 / 127);
   // printf("  diff: %.5f\n", ie / C / B / O);
   // printf("  time: %.3f ms\n", tvm_it);
 
   free_memory(fX, fW, fY);
   free_memory(hX, hW, hY);
-  free_memory(iX, iW, iY);
+  free_memory(iX, iW, i8Y);
+  checkCudaStatus(cudaFree(i32Y));
   if (debug) checkCudaStatus(cudaFree(Y));
 }
 

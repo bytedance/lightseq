@@ -80,7 +80,13 @@ void init_data(float *fX, __half *hX, int8_t *iX, float *fW, __half *hW,
 
 template <typename T>
 void print_res(float *oracle, T *res, float time, int C, int B, int O, int H,
-               std::string name, bool dequant, bool debug) {
+               std::string name, bool debug) {
+  float dequant_scale = 1.0;
+  if (std::is_same<T, int32_t>::value) {
+    dequant_scale /= (127 * 127);
+  } else if (std::is_same<T, int8_t>::value) {
+    dequant_scale /= (127 * 2.951 / H);
+  }
   float e = 0;
   if (debug) {
     printf("oracle:\n");
@@ -90,11 +96,9 @@ void print_res(float *oracle, T *res, float time, int C, int B, int O, int H,
   printf("%s:\n", name.c_str());
   if (debug)
     for (int i = 0; i < 10; ++i)
-      printf("%.5f%c", (dequant ? (float(res[i]) / 127 / 127) : float(res[i])),
-             " \n"[i == 9]);
+      printf("%.5f%c", float(res[i]) * dequant_scale, " \n"[i == 9]);
   for (int i = 0; i < C * B * O; ++i)
-    e += fabs(oracle[i] -
-              (dequant ? (float(res[i]) / 127 / 127) : float(res[i])));
+    e += fabs(oracle[i] - float(res[i]) * dequant_scale);
   printf("  diff: %.3f\n", e / (C * B * O));
   printf("  time: %.3f ms\n", time);
 }
