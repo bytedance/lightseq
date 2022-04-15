@@ -18,4 +18,4 @@ python3 run_vit.py \
     --save_total_limit 3 \
     --seed 1337 \
     --fp16 \
-    --with_lightseq
+    --with_lightseq true
