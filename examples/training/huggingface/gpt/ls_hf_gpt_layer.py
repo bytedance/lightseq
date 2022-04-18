@@ -69,11 +69,11 @@ class LSHFGptEncoderLayer(TransformerDecoderLayer):
     def __init__(self, *args, **kwargs):
         super(LSHFGptEncoderLayer, self).__init__(*args, **kwargs)
 
-    def forward(
-        self, hidden_states, layer_past=None, attention_mask=None, *args, **kwargs
-    ):
-        ls_attention_mask = attention_mask / -10000.0
-        ls_attention_mask = ls_attention_mask.squeeze()
+    def forward(self, hidden_states, attention_mask=None, *args, **kwargs):
+        if attention_mask is not None:
+            ls_attention_mask = attention_mask.squeeze()
+        else:
+            ls_attention_mask = torch.zeros(hidden_states.size()[:2])
         output = super().forward(hidden_states, ls_attention_mask)
         return output
 

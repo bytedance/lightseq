@@ -71,7 +71,6 @@ class LSHFGptEncoderLayer(LSGptEncoderLayer):
         # masked value is -10000.0, unmasked value is 0.0
         if attention_mask is not None:
             ls_attention_mask = attention_mask.squeeze()
-            ls_attention_mask = ls_attention_mask / -10000
         else:
             ls_attention_mask = torch.zeros(hidden_states.size()[:2])
         output = super().forward(hidden_states, ls_attention_mask)
@@ -87,7 +86,7 @@ def gen_ls_gpt_enc_config(training_args, config):
         nhead=config.num_attention_heads,
         attn_prob_dropout_ratio=config.attn_pdrop,
         activation_dropout_ratio=config.resid_pdrop,
-        hidden_dropout_ratio=config.embd_pdrop,
+        hidden_dropout_ratio=config.resid_pdrop,
         pre_layer_norm=True,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,

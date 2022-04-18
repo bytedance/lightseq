@@ -50,12 +50,14 @@ class MultiheadAttention(nn.Module):
         self_attention=False,
         encoder_decoder_attention=False,
         is_decoder=False,
+        has_causal_mask=False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
         self.qkv_same_dim = self.kdim == embed_dim and self.vdim == embed_dim
+        self.has_causal_mask = has_causal_mask
 
         self.num_heads = num_heads
         self.dropout_module = Dropout(dropout)
@@ -69,6 +71,15 @@ class MultiheadAttention(nn.Module):
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
         self.is_decoder = is_decoder
+
+        max_positions = 1024
+        self.register_buffer(
+            "bias",
+            torch.tril(
+                torch.ones((max_positions, max_positions), dtype=torch.uint8)
+            ).view(1, max_positions, max_positions),
+        )
+        self.register_buffer("masked_bias", torch.tensor(-1e4))
 
         assert (
             not self.self_attention or self.qkv_same_dim
@@ -319,6 +330,15 @@ class MultiheadAttention(nn.Module):
         attn_weights = self.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
+
+        if self.has_causal_mask:
+            query_length, key_length = query.size(0), key.size(0)
+            causal_mask = self.bias[
+                :, key_length - query_length : key_length, :key_length
+            ].bool()
+            attn_weights = torch.where(
+                causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype)
+            )
 
         if attn_mask is not None:
             attn_mask = attn_mask.unsqueeze(0)
@@ -667,6 +687,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             self.embed_dim,
             config.nhead,
             config.attn_prob_dropout_ratio,
+            has_causal_mask=not config.has_cross_attn,
         )
 
         self.activation_fn = util.get_activation_fn(activation=config.activation_fn)
@@ -776,7 +797,13 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             )
 
     def build_self_attention(
-        self, embed_dim, nhead, attn_dropout, add_bias_kv=False, add_zero_attn=False
+        self,
+        embed_dim,
+        nhead,
+        attn_dropout,
+        add_bias_kv=False,
+        add_zero_attn=False,
+        has_causal_mask=False,
     ):
         return MultiheadAttention(
             embed_dim,
@@ -786,6 +813,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             add_zero_attn=add_zero_attn,
             self_attention=True,
             is_decoder=True,
+            has_causal_mask=has_causal_mask,
         )
 
     def build_encoder_attention(

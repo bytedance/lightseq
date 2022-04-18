@@ -10,7 +10,7 @@ python3 -m torch.distributed.launch \
     --dataset_config_name wikitext-103-raw-v1 \
     --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 8 \
-    --num_train_epochs 1 \
+    --num_train_epochs 2 \
     --do_train \
     --do_eval \
     --output_dir /tmp/quant/test-clm \
