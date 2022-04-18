@@ -35,7 +35,6 @@ ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs
 
-
 # install protobuf
 RUN curl -O -L -C - \
     https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
@@ -61,6 +60,12 @@ RUN curl -O -L -C - \
     cd hdf5-hdf5-1_12_0 && \
     ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
     make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
+
+# install rapidjson
+RUN curl -L -o rapidjson.tar.gz -C - https://github.com/Tencent/rapidjson/archive/refs/tags/v1.1.0.tar.gz && \
+    tar xf rapidjson.tar.gz && rm rapidjson.tar.gz && \
+    mkdir rapidjson-1.1.0/build && cd rapidjson-1.1.0/build && \
+    cmake .. && make install && cd ../.. && rm -rf rapidjson-1.1.0
 
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:${PATH}

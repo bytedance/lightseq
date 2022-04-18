@@ -1,0 +1,37 @@
+name: "bert_example"
+backend: "lightseq"
+max_batch_size: 8
+input [
+  {
+    name: "token_ids"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "encoder_output"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+default_model_filename: "lightseq_bert_base_uncased.hdf5"
+parameters: [
+    {
+        key: "model_type"
+        value: {
+            string_value: "Bert"
+        }
+    }
+]
+version_policy: {
+    specific: {
+        versions: [1]
+    }
+}
