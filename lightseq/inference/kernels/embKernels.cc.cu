@@ -579,19 +579,20 @@ __global__ void ker_patch_emb(const T *conv_weight, const T *conv_bias,
   int patch_row_id, patch_col_id, value_row_id, value_col_id, channel_id;
   decompose_2dim(blockIdx.y - 1, image_size / patch_size, &patch_row_id,
                  &patch_col_id);
-  decompose_3dim(threadIdx.x, patch_size, patch_size, &channel_id,
-                 &value_row_id, &value_col_id);
-  int conv_weight_offset =
-      flat_2dim(blockIdx.z, threadIdx.x, val_num_per_block);
-  int in_offset = flat_4dim(blockIdx.x, channel_id,
-                            patch_row_id * patch_size + value_row_id,
-                            patch_col_id * patch_size + value_col_id,
-                            channel_input, image_size, image_size);
 
-  float val = threadIdx.x < val_num_per_block
-                  ? __ldg(&input[in_offset]) *
-                        (float)__ldg(&conv_weight[conv_weight_offset])
-                  : 0.f;
+  float val = 0.f;
+  for (int idx = threadIdx.x; idx < val_num_per_block; idx += blockDim.x) {
+    decompose_3dim(idx, patch_size, patch_size, &channel_id, &value_row_id,
+                   &value_col_id);
+    int conv_weight_offset = flat_2dim(blockIdx.z, idx, val_num_per_block);
+    int in_offset = flat_4dim(blockIdx.x, channel_id,
+                              patch_row_id * patch_size + value_row_id,
+                              patch_col_id * patch_size + value_col_id,
+                              channel_input, image_size, image_size);
+    val += __ldg(&input[in_offset]) *
+           (float)__ldg(&conv_weight[conv_weight_offset]);
+  }
+
   float rsum = blockReduceSum(val);
   if (threadIdx.x == 0) {
     float out_float;
