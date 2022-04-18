@@ -48,6 +48,8 @@ include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/3rdparty/cub)
 
 link_directories(${COMMON_LIB_DIRS})
 
+add_compile_options(-Wno-unknown-pragmas)
+
 if(FP16_MODE)
   add_definitions(-DFP16_MODE)
   message(STATUS "Build using fp16 precision")
@@ -67,5 +69,6 @@ add_subdirectory(lightseq/inference/proto)
 add_subdirectory(lightseq/inference/model)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
+add_subdirectory(lightseq/inference/triton_backend)
 
 # add_subdirectory(examples/inference/cpp)
