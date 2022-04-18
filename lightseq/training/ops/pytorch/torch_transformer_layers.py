@@ -60,7 +60,7 @@ class MultiheadAttention(nn.Module):
         assert (
             self.head_dim * num_heads == self.embed_dim
         ), "embed_dim must be divisible by num_heads"
-        self.scaling = self.head_dim ** -0.5
+        self.scaling = self.head_dim**-0.5
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -856,7 +856,7 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         self.emb_lookup.to(dtype=(torch.half if config.fp16 else torch.float))
         self.embeddings = self.emb_lookup.weight
 
-        nn.init.normal_(self.embeddings, mean=0, std=config.embedding_dim ** -0.5)
+        nn.init.normal_(self.embeddings, mean=0, std=config.embedding_dim**-0.5)
         nn.init.constant_(self.embeddings[config.padding_idx], 0)
         self.embed_positions = SinusoidalPositionalEmbedding(
             config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16

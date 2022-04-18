@@ -45,7 +45,7 @@ src_emb_mapping_dict = OrderedDict(
         "position_embedding": "embeddings position_embeddings",
         "cls_embedding": "embeddings cls_token",
         "norm_scale": "layernorm weight",
-        "norm_bias": "layernorm bias"
+        "norm_bias": "layernorm bias",
     }
 )
 

@@ -61,17 +61,21 @@ class LightseqVitClassification:
 
 def main():
 
-    url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
+    url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
-    feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224-in21k')
+    feature_extractor = ViTFeatureExtractor.from_pretrained(
+        "google/vit-base-patch16-224-in21k"
+    )
     inputs = feature_extractor(images=image, return_tensors="pt")
-    inputs = inputs['pixel_values']
+    inputs = inputs["pixel_values"]
 
     print("creating huggingface model...")
-    hf_model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224-in21k').cuda()
+    hf_model = ViTForImageClassification.from_pretrained(
+        "google/vit-base-patch16-224-in21k"
+    ).cuda()
 
     print("creating lightseq model...")
-    ls_model = LightseqVitClassification('lightseq_vit.hdf5', hf_model)
+    ls_model = LightseqVitClassification("lightseq_vit.hdf5", hf_model)
 
     print("====================START warmup====================")
     one_infer(inputs, ls_model, hf_model)
