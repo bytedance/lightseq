@@ -15,7 +15,7 @@
 
 ​	Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`.
 
-​	You can find libliblightseq.so in this path 
+​	You can find libliblightseq.so in this path
 
 ​		`<lightseq_repository>/build/lightseq/inference/pywrapper/libliblightseq.so`
 
@@ -60,7 +60,7 @@
 
 - Get tritonserver Docker: [Tritonserver Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md#install-triton-docker-image)
 
-  ``` 
+  ```
   $ docker pull nvcr.io/nvidia/tritonserver:22.01-py3
   ```
 
@@ -84,4 +84,4 @@
 - [triton-inference-server/core](https://github.com/triton-inference-server/core)
 - [triton-inference-server/common](https://github.com/triton-inference-server/common)
 
-## 
+##

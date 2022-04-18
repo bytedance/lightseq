@@ -37,17 +37,21 @@ class ModelState : public BackendModel {
   const std::string& ModelFileName() const { return file_name_; }
 
   // Datatype of the input and output tensor
-  TRITONSERVER_DataType GetInputDataTypeByName(std::string input_name) { 
-    std::unordered_map<std::string, TRITONSERVER_DataType>::iterator iter = input_data_type_map_.find(input_name);
+  TRITONSERVER_DataType GetInputDataTypeByName(std::string input_name) {
+    std::unordered_map<std::string, TRITONSERVER_DataType>::iterator iter =
+        input_data_type_map_.find(input_name);
     if (iter == input_data_type_map_.end()) {
-         LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "input_name error, cannot found in input_data_type_map_");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR,
+                  "input_name error, cannot found in input_data_type_map_");
     }
-    return iter->second; 
+    return iter->second;
   }
-  TRITONSERVER_DataType GetOutputDataTypeByName(std::string output_name) { 
-    std::unordered_map<std::string, TRITONSERVER_DataType>::iterator iter = output_data_type_map_.find(output_name);
+  TRITONSERVER_DataType GetOutputDataTypeByName(std::string output_name) {
+    std::unordered_map<std::string, TRITONSERVER_DataType>::iterator iter =
+        output_data_type_map_.find(output_name);
     if (iter == output_data_type_map_.end()) {
-         LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "output_name error, cannot found in output_data_type_map_");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR,
+                  "output_name error, cannot found in output_data_type_map_");
     }
     return iter->second;
   }
@@ -274,10 +278,9 @@ ModelInstanceState::ModelInstanceState(
     ModelState* model_state, TRITONBACKEND_ModelInstance* triton_model_instance)
     : BackendModelInstance(model_state, triton_model_instance),
       model_state_(model_state) {
-  std::string file_name = model_state_->RepositoryPath() + "/" +
-                          model_state_->ModelFileName();
+  std::string file_name =
+      model_state_->RepositoryPath() + "/" + model_state_->ModelFileName();
   std::cout << file_name << std::endl;
-
 
   ::lightseq::cuda::CHECK_GPU_ERROR(cudaSetDevice(DeviceId()));
   lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(

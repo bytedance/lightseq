@@ -267,7 +267,6 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
     cudaSetDevice(device_id);
   }
 
-
   std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr =
       instance_state->LightseqModel();
 
@@ -348,11 +347,10 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
       // match triton client input with lightseq input by input_name.
       for (int lightseq_input_idx = 0;
-           lightseq_input_idx <
-           lightseq_model_ptr->get_input_size();
+           lightseq_input_idx < lightseq_model_ptr->get_input_size();
            lightseq_input_idx++) {
-        if (lightseq_model_ptr->get_input_name(
-                lightseq_input_idx) != input_name) {
+        if (lightseq_model_ptr->get_input_name(lightseq_input_idx) !=
+            input_name) {
           continue;
         }
         lightseq_model_ptr->set_input_shape(
@@ -364,26 +362,23 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
     // create response buffer
     TRITONBACKEND_Response* response = responses[idx];
-    for (int output_idx = 0;
-         output_idx < lightseq_model_ptr->get_output_size();
+    for (int output_idx = 0; output_idx < lightseq_model_ptr->get_output_size();
          output_idx++) {
       TRITONBACKEND_Output* output = nullptr;
       void* single_output_buffer = nullptr;
       const std::vector<int> lightseq_shape =
           lightseq_model_ptr->get_output_shape(output_idx);
-      std::string output_name =
-          lightseq_model_ptr->get_output_name(output_idx);
+      std::string output_name = lightseq_model_ptr->get_output_name(output_idx);
 
       const std::vector<int64_t> triton_shape(lightseq_shape.begin(),
-                                                 lightseq_shape.end());
+                                              lightseq_shape.end());
 
       TRITONSERVER_DataType triton_datatype_ =
           model_state->GetOutputDataTypeByName(output_name);
-      LOG_IF_ERROR(
-          TRITONBACKEND_ResponseOutput(response, &output, output_name.c_str(),
-                                       triton_datatype_, triton_shape.data(),
-                                       triton_shape.size()),
-          "failed create an TRITONBACKEND_OutputBuffer");
+      LOG_IF_ERROR(TRITONBACKEND_ResponseOutput(
+                       response, &output, output_name.c_str(), triton_datatype_,
+                       triton_shape.data(), triton_shape.size()),
+                   "failed create an TRITONBACKEND_OutputBuffer");
 
       uint32_t total_size = 1;
       for (long unsigned int j = 0; j < triton_shape.size(); j++) {
@@ -397,23 +392,22 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
                        output, &single_output_buffer, buffer_byte_size,
                        &output_memory_type, &output_memory_type_id),
                    "failed get a buffer to use to hold the tensor data for the "
-                   "output.");  
+                   "output.");
 
       for (int lightseq_output_idx = 0;
-           lightseq_output_idx <
-           lightseq_model_ptr->get_output_size();
+           lightseq_output_idx < lightseq_model_ptr->get_output_size();
            lightseq_output_idx++) {
-        if (lightseq_model_ptr->get_output_name(
-                lightseq_output_idx) != output_name) {
+        if (lightseq_model_ptr->get_output_name(lightseq_output_idx) !=
+            output_name) {
           continue;
         }
 
         const void* d_output = static_cast<const void*>(
             lightseq_model_ptr->get_output_ptr(output_idx));
 
-        ::lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(
-            single_output_buffer, d_output, buffer_byte_size,
-            cudaMemcpyDeviceToHost));
+        ::lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(single_output_buffer,
+                                                     d_output, buffer_byte_size,
+                                                     cudaMemcpyDeviceToHost));
       }
     }
   }
