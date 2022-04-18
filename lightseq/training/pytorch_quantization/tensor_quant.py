@@ -441,7 +441,7 @@ class FakeAffineTensorQuantFunction(Function):
         )
         ctx.save_for_backward(inputs, min_range, max_range)
 
-        step_size = (max_range - min_range) / (2.0 ** num_bits - 1)
+        step_size = (max_range - min_range) / (2.0**num_bits - 1)
 
         min_bound = -(2.0 ** (num_bits - 1))
         max_bound = 2.0 ** (num_bits - 1) - 1
