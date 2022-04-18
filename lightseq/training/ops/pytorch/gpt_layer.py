@@ -56,29 +56,29 @@ class LSGptEncoderLayer(LSTransformerEncoderLayer):
 
     @staticmethod
     def from_huggingface(layer, training_args, model_config):
-        ls_gpt_config = gen_ls_gpt_config(training_args, model_config)
-        init_ws, init_bs = get_hf_gpt_layer_params(layer, ls_gpt_config)
-        return LSHFGptLayer(ls_gpt_config, init_ws, init_bs).cuda()
+        ls_gpt_config = gen_ls_gpt_enc_config(training_args, model_config)
+        init_ws, init_bs = get_hf_gpt_enc_layer_params(layer, ls_gpt_config)
+        return LSHFGptEncoderLayer(ls_gpt_config, init_ws, init_bs).cuda()
 
 
-class LSHFGptLayer(LSGptEncoderLayer):
+class LSHFGptEncoderLayer(LSGptEncoderLayer):
     def __init__(self, *args, **kwargs):
-        super(LSHFGptLayer, self).__init__(*args, **kwargs)
+        super(LSHFGptEncoderLayer, self).__init__(*args, **kwargs)
 
     def forward(self, hidden_states, attention_mask=None, *args, **kwargs):
         # attention mask from transformers is a tensor.
         # sizes are[batch_size, 1, 1, to_seq_length]
         # masked value is -10000.0, unmasked value is 0.0
         if attention_mask is not None:
-            attention_mask = attention_mask.squeeze()
-            attention_mask = attention_mask / -10000
+            ls_attention_mask = attention_mask.squeeze()
+            ls_attention_mask = ls_attention_mask / -10000
         else:
-            attention_mask = torch.zeros(hidden_states.size()[:2])
-        output = super().forward(hidden_states, attention_mask)
+            ls_attention_mask = torch.zeros(hidden_states.size()[:2])
+        output = super().forward(hidden_states, ls_attention_mask)
         return (output, None, None, None)
 
 
-def gen_ls_gpt_config(training_args, config):
+def gen_ls_gpt_enc_config(training_args, config):
     gpt_config = LSGptEncoderLayer.get_config(
         max_batch_tokens=8192,
         max_seq_len=config.max_position_embeddings,
@@ -96,7 +96,7 @@ def gen_ls_gpt_config(training_args, config):
     return gpt_config
 
 
-def get_hf_gpt_layer_params(layer, gpt_config):
+def get_hf_gpt_enc_layer_params(layer, gpt_config):
     init_ws = []
     init_bs = []
 
@@ -122,8 +122,8 @@ def get_hf_gpt_layer_params(layer, gpt_config):
     return init_ws, init_bs
 
 
-def ls_hf_gpt_convert(model, training_args, config):
+def ls_hf_gpt_enc_convert(model, training_args, config):
     for i in range(config.num_hidden_layers):
-        model.transformer.h[i] = LSHFGptLayer.from_huggingface(
+        model.transformer.h[i] = LSHFGptEncoderLayer.from_huggingface(
             model.transformer.h[i], training_args, config
         ).cuda()

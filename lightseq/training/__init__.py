@@ -7,9 +7,9 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import (
 from lightseq.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer,
 )
-from lightseq.training.ops.pytorch.gpt_encoder_layer import (
+from lightseq.training.ops.pytorch.gpt_layer import (
     LSGptEncoderLayer,
-    ls_hf_gpt_convert,
+    ls_hf_gpt_enc_convert,
 )
 from lightseq.training.ops.pytorch.transformer import (
     LSTransformer,

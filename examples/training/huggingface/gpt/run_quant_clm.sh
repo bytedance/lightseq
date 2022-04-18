@@ -13,10 +13,11 @@ python3 -m torch.distributed.launch \
     --num_train_epochs 1 \
     --do_train \
     --do_eval \
-    --output_dir /tmp/test-clm \
+    --output_dir /tmp/quant/test-clm \
     --overwrite_output_dir \
+    --resume_from_checkpoint /tmp/test-clm \
     --fp16 \
     --logging_steps 10 \
     --block_size 512 \
     --module_type 2 \
-    --enable_quant false
+    --enable_quant true

@@ -662,7 +662,6 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         super().__init__()
         self.embed_dim = config.hidden_size
         self.dropout_module = Dropout(config.hidden_dropout_ratio)
-        self.cross_self_attention = False
 
         self.self_attn = self.build_self_attention(
             self.embed_dim,
@@ -673,16 +672,18 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.activation_fn = util.get_activation_fn(activation=config.activation_fn)
         self.activation_dropout_module = Dropout(float(config.activation_dropout_ratio))
         self.normalize_before = config.pre_layer_norm
+        self.has_cross_attn = config.has_cross_attn
 
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
 
-        self.encoder_attn = self.build_encoder_attention(
-            self.embed_dim,
-            config.hidden_size,
-            config.attn_prob_dropout_ratio,
-            config.nhead,
-        )
-        self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
+        if config.has_cross_attn:
+            self.encoder_attn = self.build_encoder_attention(
+                self.embed_dim,
+                config.hidden_size,
+                config.attn_prob_dropout_ratio,
+                config.nhead,
+            )
+            self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
 
         self.fc1 = QuantLinear(
             self.embed_dim,
@@ -721,46 +722,58 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.self_attn_layer_norm.bias.data.copy_(
             copy_para(initial_biases[4], config.fp16)
         )
-        self.encoder_attn.q_proj.weight.data.copy_(
-            copy_para(initial_weights[5], config.fp16)
-        )
-        self.encoder_attn.q_proj.bias.data.copy_(
-            copy_para(initial_weights[5], config.fp16)
-        )
-        self.encoder_attn.k_proj.weight.data.copy_(
-            copy_para(initial_weights[6], config.fp16)
-        )
-        self.encoder_attn.k_proj.bias.data.copy_(
-            copy_para(initial_weights[6], config.fp16)
-        )
-        self.encoder_attn.v_proj.weight.data.copy_(
-            copy_para(initial_weights[7], config.fp16)
-        )
-        self.encoder_attn.v_proj.bias.data.copy_(
-            copy_para(initial_weights[7], config.fp16)
-        )
-        self.encoder_attn.out_proj.weight.data.copy_(
-            copy_para(initial_weights[8], config.fp16)
-        )
-        self.encoder_attn.out_proj.bias.data.copy_(
-            copy_para(initial_biases[8], config.fp16)
-        )
-        self.encoder_attn_layer_norm.weight.data.copy_(
-            copy_para(initial_weights[9], config.fp16)
-        )
-        self.encoder_attn_layer_norm.bias.data.copy_(
-            copy_para(initial_biases[9], config.fp16)
-        )
-        self.fc1.weight.data.copy_(copy_para(initial_weights[10], config.fp16))
-        self.fc1.bias.data.copy_(copy_para(initial_biases[10], config.fp16))
-        self.fc2.weight.data.copy_(copy_para(initial_weights[11], config.fp16))
-        self.fc2.bias.data.copy_(copy_para(initial_biases[11], config.fp16))
-        self.final_layer_norm.weight.data.copy_(
-            copy_para(initial_weights[12], config.fp16)
-        )
-        self.final_layer_norm.bias.data.copy_(
-            copy_para(initial_biases[12], config.fp16)
-        )
+        if config.has_cross_attn:
+            self.encoder_attn.q_proj.weight.data.copy_(
+                copy_para(initial_weights[5], config.fp16)
+            )
+            self.encoder_attn.q_proj.bias.data.copy_(
+                copy_para(initial_weights[5], config.fp16)
+            )
+            self.encoder_attn.k_proj.weight.data.copy_(
+                copy_para(initial_weights[6], config.fp16)
+            )
+            self.encoder_attn.k_proj.bias.data.copy_(
+                copy_para(initial_weights[6], config.fp16)
+            )
+            self.encoder_attn.v_proj.weight.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.encoder_attn.v_proj.bias.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.encoder_attn.out_proj.weight.data.copy_(
+                copy_para(initial_weights[8], config.fp16)
+            )
+            self.encoder_attn.out_proj.bias.data.copy_(
+                copy_para(initial_biases[8], config.fp16)
+            )
+            self.encoder_attn_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[9], config.fp16)
+            )
+            self.encoder_attn_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[9], config.fp16)
+            )
+            self.fc1.weight.data.copy_(copy_para(initial_weights[10], config.fp16))
+            self.fc1.bias.data.copy_(copy_para(initial_biases[10], config.fp16))
+            self.fc2.weight.data.copy_(copy_para(initial_weights[11], config.fp16))
+            self.fc2.bias.data.copy_(copy_para(initial_biases[11], config.fp16))
+            self.final_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[12], config.fp16)
+            )
+            self.final_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[12], config.fp16)
+            )
+        else:
+            self.fc1.weight.data.copy_(copy_para(initial_weights[5], config.fp16))
+            self.fc1.bias.data.copy_(copy_para(initial_biases[5], config.fp16))
+            self.fc2.weight.data.copy_(copy_para(initial_weights[6], config.fp16))
+            self.fc2.bias.data.copy_(copy_para(initial_biases[6], config.fp16))
+            self.final_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.final_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[7], config.fp16)
+            )
 
     def build_self_attention(
         self, embed_dim, nhead, attn_dropout, add_bias_kv=False, add_zero_attn=False
@@ -771,7 +784,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             dropout=attn_dropout,
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
-            self_attention=not self.cross_self_attention,
+            self_attention=True,
             is_decoder=True,
         )
 
@@ -837,35 +850,11 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
                 saved_state["prev_key_padding_mask"] = prev_self_attn_state[2]
             assert incremental_state is not None
             self.self_attn._set_input_buffer(incremental_state, saved_state)
-        _self_attn_input_buffer = self.self_attn._get_input_buffer(incremental_state)
-        if self.cross_self_attention and not (
-            incremental_state is not None
-            and _self_attn_input_buffer is not None
-            and "prev_key" in _self_attn_input_buffer
-        ):
-            if self_attn_mask is not None:
-                assert encoder_out is not None
-                self_attn_mask = torch.cat(
-                    (x.new_zeros(x.size(0), encoder_out.size(0)), self_attn_mask), dim=1
-                )
-            if self_attn_padding_mask is not None:
-                if encoder_padding_mask is None:
-                    assert encoder_out is not None
-                    encoder_padding_mask = self_attn_padding_mask.new_zeros(
-                        encoder_out.size(1), encoder_out.size(0)
-                    )
-                self_attn_padding_mask = torch.cat(
-                    (encoder_padding_mask, self_attn_padding_mask), dim=1
-                )
-            assert encoder_out is not None
-            y = torch.cat((encoder_out, x), dim=0)
-        else:
-            y = x
 
         x, attn = self.self_attn(
             query=x,
-            key=y,
-            value=y,
+            key=x,
+            value=x,
             key_padding_mask=self_attn_padding_mask,
             incremental_state=incremental_state,
             need_weights=False,
@@ -876,7 +865,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
-        if self.encoder_attn is not None and encoder_out is not None:
+        if self.has_cross_attn and encoder_out is not None:
             if (
                 encoder_out.shape[1] != x.shape[1]
                 and x.shape[1] % encoder_out.shape[1] == 0
