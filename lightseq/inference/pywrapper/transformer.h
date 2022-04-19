@@ -38,8 +38,8 @@ class Transformer : public LSModel {
 
   const int *get_result_ptr();
   const float *get_score_ptr();
-  const int get_max_step() { return tw_._max_step; }
-  const int get_beam_size() { return tw_._beam_size; }
+  int get_max_step() { return tw_._max_step; }
+  int get_beam_size() { return tw_._beam_size; }
 
  public:
   Transformer(const std::string weight_path, const int max_batch_size);
