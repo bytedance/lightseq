@@ -48,7 +48,6 @@ message QuantBertEncoderLayer {
   float multihead_qkv_dense_clip_max = 21;
   float multihead_output_dense_clip_max = 22;
   float ffn_first_output_clip_max = 23;
-  float ffn_second_output_clip_max = 24;
 }
 
 message QuantBertEmbeddingLayer {

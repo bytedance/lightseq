@@ -42,6 +42,18 @@ endif()
 
 target_include_directories(gpt_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_library(quant_gpt_model STATIC quant_gpt_encoder.cc.cu)
+target_link_libraries(quant_gpt_model PUBLIC cuda_kernels)
+target_link_libraries(quant_gpt_model PUBLIC quant_gpt_weight)
+if(DYNAMIC_API)
+  target_link_libraries(quant_gpt_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(quant_gpt_model PRIVATE CUDA::cublas_static
+                                                CUDA::cublasLt_static)
+endif()
+
+target_include_directories(quant_gpt_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_library(bert_model STATIC bert_encoder.cc.cu)
 target_link_libraries(bert_model PUBLIC cuda_kernels)
 target_link_libraries(bert_model PUBLIC bert_weight)

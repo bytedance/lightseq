@@ -18,7 +18,7 @@
 
 /**
 @file
-Transformer decoder, composed by gemm lib and
+QuantBert encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
