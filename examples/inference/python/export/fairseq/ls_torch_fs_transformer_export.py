@@ -14,7 +14,7 @@ from lightseq.training.ops.pytorch.export import (
 )
 from lightseq.training.ops.pytorch.util import get_pos_embedding
 import lightseq.inference as lsi
-from export.fairseq.util import parse_args, save_model
+from export.util import parse_args, save_model
 
 
 enc_layer_mapping_dict = OrderedDict(

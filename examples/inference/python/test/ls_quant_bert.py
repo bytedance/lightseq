@@ -8,7 +8,7 @@ from lightseq.training.ops.pytorch.torch_transformer_layers import (
     BertEmbeddingLayer,
     TransformerEncoderLayer,
 )
-from export.fairseq.util import parse_args
+from export.util import parse_args
 
 
 def ls_bert(model, inputs):

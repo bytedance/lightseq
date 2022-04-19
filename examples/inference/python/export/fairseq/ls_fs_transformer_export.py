@@ -11,7 +11,7 @@ from lightseq.training import (
     export_ls_decoder,
 )
 import lightseq.inference as lsi
-from export.fairseq.util import parse_args, save_model
+from export.util import parse_args, save_model
 
 
 def _extract_weight(state_dict):
