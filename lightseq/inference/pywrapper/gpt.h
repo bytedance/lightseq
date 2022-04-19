@@ -38,7 +38,7 @@ class Gpt : public LSModel {
 
   const int* get_result_ptr();
   const float* get_score_ptr();
-  const int get_max_step() { return tw_._max_step; }
+  int get_max_step() { return tw_._max_step; }
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;
