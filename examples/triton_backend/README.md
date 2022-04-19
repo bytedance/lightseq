@@ -15,7 +15,7 @@
 
 ​	Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`, Which are needed by model repository.
 
-​	You can find libliblightseq.so in this path 
+​	You can find libliblightseq.so in this path
 
 ​		`<lightseq_repository>/build/lightseq/inference/pywrapper/libliblightseq.so`
 
@@ -27,11 +27,11 @@
 
 ```
 ├── <path_to_model_repository>/
-│  ├── libliblightseq.so          # dynamic link library of lightseq, which contains the almost  
+│  ├── libliblightseq.so          # dynamic link library of lightseq, which contains the almost
 │  │                                implement of lightseq, and should be included by LD_LIBRARY_PATH
-│  ├── libtriton_lightseq.so      # dynamic link library of lightseq's tritonbackend, 
+│  ├── libtriton_lightseq.so      # dynamic link library of lightseq's tritonbackend,
 │  │                                which should be included by <global_backend_directory>,
-│  │                                you can set <global_backend_directory> by tritonserver parameter 
+│  │                                you can set <global_backend_directory> by tritonserver parameter
 │  │                                --backend-directory
 │  ├── <model_name_1>/            # the directory of model, include parameters and configurations.
 │  │  ├── config.pbtxt            # the config of model, more detail is as below.
@@ -64,7 +64,7 @@
 
 - Get tritonserver Docker: [Tritonserver Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md#install-triton-docker-image)
 
-  ``` 
+  ```
   $ docker pull nvcr.io/nvidia/tritonserver:22.01-py3
   ```
 
@@ -87,4 +87,3 @@
 - [triton-inference-server/client](https://github.com/triton-inference-server/client)
 - [triton-inference-server/core](https://github.com/triton-inference-server/core)
 - [triton-inference-server/common](https://github.com/triton-inference-server/common)
-
