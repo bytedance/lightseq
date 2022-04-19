@@ -9,8 +9,8 @@
   ```
   $ cd <lightseq_repository>
   $ mkdir build && cd build && \
-  	cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON .. && \
-  	make -j${nproc}
+    cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON .. && \
+    make -j${nproc}
   ```
 
 ​	Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`, Which are needed by model repository.

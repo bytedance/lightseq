@@ -23,7 +23,7 @@ output [
 instance_group [
   {
     count: 1
-    kind: KIND_CPU
+    kind: KIND_GPU
   }
 ]
 default_model_filename: "lightseq_bart_base.hdf5"
@@ -35,8 +35,3 @@ parameters: [
         }
     }
 ]
-version_policy: {
-    specific: {
-        versions: [3]
-    }
-}
