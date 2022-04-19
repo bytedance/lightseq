@@ -13,7 +13,6 @@ Transformer::Transformer(const std::string weight_path,
       decoder_(nullptr),
       _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
-  CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
   CHECK_GPU_ERROR(cublasCreate(&hd_));
   CHECK_GPU_ERROR(cublasSetStream(hd_, stream_));
