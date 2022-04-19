@@ -27,21 +27,21 @@
 
 ```
 ├── <path_to_model_repository>/
-│  ├── libliblightseq.so        # dynamic link library of lightseq, which contains the almost  
-│  │                              implement of lightseq, and should be included by LD_LIBRARY_PATH
-│  ├── libtriton_lightseq.so    # dynamic link library of lightseq's tritonbackend, 
-│  │                              which should be included by <global_backend_directory>,
-│  │                              you can set <global_backend_directory> by tritonserver parameter 
-│  │                              --backend-directory
-│  ├── <model_name_1>/          # the directory of model, include parameters and configurations.
-│  │  ├── config.pbtxt 					# the config of model, more detail is as below.
-│  │  ├── <model_file> 					# the file of model parameters.
-│  │  ├── 1/                    # this empty directory is necessary, which is needed by tritonserver.
-│  ├── <model_name_2>/ 					# ...
-│  │  ├── config.pbtxt 					# ...
-│  │  ├── <model_file> 					# ...
-│  │  ├── 1/                    # ...
-│  ├──# <model_name_vid> 				# more models etc...
+│  ├── libliblightseq.so          # dynamic link library of lightseq, which contains the almost  
+│  │                                implement of lightseq, and should be included by LD_LIBRARY_PATH
+│  ├── libtriton_lightseq.so      # dynamic link library of lightseq's tritonbackend, 
+│  │                                which should be included by <global_backend_directory>,
+│  │                                you can set <global_backend_directory> by tritonserver parameter 
+│  │                                --backend-directory
+│  ├── <model_name_1>/            # the directory of model, include parameters and configurations.
+│  │  ├── config.pbtxt            # the config of model, more detail is as below.
+│  │  ├── <model_file>            # the file of model parameters.
+│  │  ├── 1/                      # this empty directory is necessary, which is needed by tritonserver.
+│  ├── <model_name_2>/            # ...
+│  │  ├── config.pbtxt            # ...
+│  │  ├── <model_file>            # ...
+│  │  ├── 1/                      # ...
+│  ├── #<model_name_vid>...       # more models etc...
 ```
 
 - The meaning of parameters in config.pbtxt, more information you can find in [Model config of tritonbackend](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
