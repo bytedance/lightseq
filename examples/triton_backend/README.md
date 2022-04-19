@@ -13,15 +13,15 @@
     make -j${nproc}
   ```
 
-​	Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`, Which are needed by model repository.
+   Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`, Which are needed by model repository.
 
-​	You can find libliblightseq.so in this path
+   You can find libliblightseq.so in this path
 
-​		`<lightseq_repository>/build/lightseq/inference/pywrapper/libliblightseq.so`
+  ​     `<lightseq_repository>/build/lightseq/inference/pywrapper/libliblightseq.so`
 
-​	While libtriton_lightseq.so is in
+   While libtriton_lightseq.so is in
 
-​		 `<lightseq_repository>/build/lightseq/inference/triton_backend/libtriton_lightseq.so`
+  ​      `<lightseq_repository>/build/lightseq/inference/triton_backend/libtriton_lightseq.so`
 
 ### How To Organize Model Repository
 
@@ -29,18 +29,16 @@
 ├── <path_to_model_repository>/
 │  ├── libliblightseq.so          # dynamic link library of lightseq, which contains the almost
 │  │                                implement of lightseq, and should be included by LD_LIBRARY_PATH
-│  ├── libtriton_lightseq.so      # dynamic link library of lightseq's tritonbackend,
-│  │                                which should be included by <global_backend_directory>,
-│  │                                you can set <global_backend_directory> by tritonserver parameter
-│  │                                --backend-directory
 │  ├── <model_name_1>/            # the directory of model, include parameters and configurations.
 │  │  ├── config.pbtxt            # the config of model, more detail is as below.
 │  │  ├── <model_file>            # the file of model parameters.
 │  │  ├── 1/                      # this empty directory is necessary, which is needed by tritonserver.
+│  │  ├── libtriton_lightseq.so   # dynamic link library of lightseq's tritonbackend
 │  ├── <model_name_2>/            # ...
 │  │  ├── config.pbtxt            # ...
 │  │  ├── <model_file>            # ...
 │  │  ├── 1/                      # ...
+│  │  ├── libtriton_lightseq.so   # ...
 │  ├── #<model_name_vid>...       # more models etc...
 ```
 
@@ -65,14 +63,18 @@
 - Get tritonserver Docker: [Tritonserver Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md#install-triton-docker-image)
 
   ```
-  $ docker pull nvcr.io/nvidia/tritonserver:22.01-py3
+  $ sudo docker pull nvcr.io/nvidia/tritonserver:22.01-py3
   ```
 
 - Docker Commands:
 
   ```
-  $ docker run --gpus=<num_of_gpus> --rm -e LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/models" -p8000:8000 -p8001:8001 -p8002:8002 -v<model_repository>:/models nvcr.io/nvidia/tritonserver:22.01-py3 tritonserver --model-repository=/models --backend-directory=/models
+  $ sudo docker run --gpus=<num_of_gpus> --rm -e LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/models" -p8000:8000 -p8001:8001 -p8002:8002 -v<model_repository>:/models nvcr.io/nvidia/tritonserver:22.01-py3 tritonserver --model-repository=/models
   ```
+
+  - <num_of_gpus>: int, the number of gpus which are needed by tritonserver.
+
+  - <model_repository>: str, the path of model repository which are organized by yourself.
 
 - Install client requirements:
 
