@@ -61,19 +61,19 @@
 
   ```
   $ sudo docker build -t <docker_image_name> - < Dockerfile
-  # Or you can simply pull image which is compiled by ourselves in advance, 
+  # Or you can simply pull image which is compiled by ourselves in advance,
   # and you can choose suitable version by replacing `22.01-1` with <tag_name>
   $ sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
   ```
 
   - We create a [Dockerfile](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend) ,because lightseq need a dynamic link library which is not contained by nvcr.io/nvidia/tritonserver:22.01-py3.
 
-    If necessary, you can add http_proxy/https_proxy to reduce compile time. 
+    If necessary, you can add http_proxy/https_proxy to reduce compile time.
 
   ```
   # file tree of tritonserver in docker image, user could ignore this part.
   ├── /opt/tritonserver/
-  │  ├── backends/                     # the directory of backends, which is used to store backends' 
+  │  ├── backends/                     # the directory of backends, which is used to store backends'
   │  │                                   dynamic link libraries by default.
   │  │  ├── lightseq/                  # the config of model, more detail is as below.
   │  │  │  ├── libtriton_lightseq.so   # the dynamic link library of lightseq's tritonbackend.
@@ -115,4 +115,3 @@
 - [triton-inference-server/client](https://github.com/triton-inference-server/client)
 - [triton-inference-server/core](https://github.com/triton-inference-server/core)
 - [triton-inference-server/common](https://github.com/triton-inference-server/common)
-

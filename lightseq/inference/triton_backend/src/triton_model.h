@@ -239,14 +239,7 @@ class ModelInstanceState : public BackendModelInstance {
 
     return nullptr;  // success
   }
-  virtual ~ModelInstanceState() {
-      for(auto iter: d_inputs_map) {
-          cudaFree(iter.second);
-      }
-      for(auto iter: d_outputs_map) {
-          cudaFree(iter.second);
-      }
-  }
+  virtual ~ModelInstanceState() = default;
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
