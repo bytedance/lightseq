@@ -2,6 +2,10 @@
 Export Hugging Face BART models to protobuf/hdf5 format.
 """
 import os
+import sys
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.abspath(__file__), "..", "..", ".."))
+)
 from collections import OrderedDict
 
 import tensorflow as tf
