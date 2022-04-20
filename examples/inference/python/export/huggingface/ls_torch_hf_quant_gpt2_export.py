@@ -24,12 +24,12 @@ and the expression will finally be concatenated on axis = -1.
 """
 enc_layer_mapping_dict = OrderedDict(
     {
-        "self_norm_scale": "self_attn_layer_norm weight",
-        "self_norm_bias": "self_attn_layer_norm bias",
-        "self_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
-        "self_project_bias_qkv": "self_attn qkv_proj bias",
-        "self_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
-        "self_project_bias_output": "self_attn out_proj bias",
+        "multihead_norm_scale": "self_attn_layer_norm weight",
+        "multihead_norm_bias": "self_attn_layer_norm bias",
+        "multihead_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_qkv": "self_attn qkv_proj bias",
+        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_output": "self_attn out_proj bias",
         "ffn_norm_scale": "final_layer_norm weight",
         "ffn_norm_bias": "final_layer_norm bias",
         "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
@@ -37,17 +37,17 @@ enc_layer_mapping_dict = OrderedDict(
         "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
         "ffn_second_bias": "fc2 bias",
         # weight_clip_max
-        "self_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant clip_value_max",
-        "self_project_kernel_output_clip_max": "self_attn out_proj weight_quant clip_value_max",
+        "multihead_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant clip_value_max",
+        "multihead_project_kernel_output_clip_max": "self_attn out_proj weight_quant clip_value_max",
         "ffn_first_kernel_clip_max": "fc1 weight_quant clip_value_max",
         "ffn_second_kernel_clip_max": "fc2 weight_quant clip_value_max",
         # act_clip_max
-        "self_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
-        "self_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
+        "multihead_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
+        "multihead_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
         "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
         "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
-        "self_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
-        "self_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
+        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
+        "multihead_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
         "ffn_first_output_clip_max": "fc1 output_quant clip_value_max",
         "self_qkv_bias_out_clip_max": "self_attn attention_quant clip_value_max",
     }

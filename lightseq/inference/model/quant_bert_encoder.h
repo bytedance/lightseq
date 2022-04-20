@@ -82,7 +82,7 @@ class QuantBertEncoder {
   int8_t *_int8_p_d_src_emb_wei;
   const float _quant_range = 127;
   const float _src_emb_clip_max;
-  const std::vector<float> _enc_clip_max;  // size: 12 * enc_layer_num
+  const std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
   std::vector<_DataType *> _scaled_ffn2_colsum;
 
   int _batch_size;

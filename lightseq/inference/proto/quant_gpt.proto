@@ -8,46 +8,49 @@ option optimize_for = LITE_RUNTIME;
 // plz see https://arxiv.org/abs/1706.03762 for details
 
 message QuantGptEncoderLayer {
-  // layer norm before "Multi-Head Attention"
-  repeated float multihead_norm_scale = 1;
-  repeated float multihead_norm_bias = 2;
-
-  // "Multi-Head Attention" linearly project weights kernel for query, key,
-  // value,
-  // before "Scaled Dot-Product Attention, with shape (hidden_size,
-  // hidden_size*3)
-  // is built by numpy.concatenate((query_kernel, key_kernel, value_kernel),
-  // axis=1)
-  // perform numpy.dot(input, multihead_project_kernel_qkv) will get the [query,
-  // key, value] of
-  // "Scaled Dot-Product Attention"
-  repeated float multihead_project_kernel_qkv = 3;
-  repeated float multihead_project_bias_qkv = 4;
-  // "Multi-Head Attention" linearly project weights kernel for output
-  // after "Scaled Dot-Product Attention", with shape (hidden_size, hidden_size)
-  repeated float multihead_project_kernel_output = 5;
-  repeated float multihead_project_bias_output = 6;
-
-  // layer norm before "Feed-Forward Networks"
-  repeated float ffn_norm_scale = 7;
-  repeated float ffn_norm_bias = 8;
+  // decoder-self-attention
+  repeated float multihead_norm_scale = 1;          // [hidden_size]
+  repeated float multihead_norm_bias = 2;           // [hidden_size]
+  bytes multihead_project_kernel_qkv = 3;  // [hidden_size, 3, hidden_size]
+  repeated float multihead_project_bias_qkv = 4;    // [3, hidden_size]
+  bytes multihead_project_kernel_output = 5;  // [hidden_size, hidden_size]
+  repeated float multihead_project_bias_output = 6;    // [hidden_size]
 
   // "Feed-Forward Networks"
-  repeated float ffn_first_kernel = 9;
-  repeated float ffn_first_bias = 10;
-  repeated float ffn_second_kernel = 11;
-  repeated float ffn_second_bias = 12;
+  repeated float ffn_norm_scale = 7;     // [hidden_size]
+  repeated float ffn_norm_bias = 8;      // [hidden_size]
+  bytes ffn_first_kernel = 9;   // [hidden_size, inner_size]
+  repeated float ffn_first_bias = 10;     // [inner_size]
+  bytes ffn_second_kernel = 11;  // [inner_size, hidden_size]
+  repeated float ffn_second_bias = 12;    // [hidden_size]
+
+  // clip max
+  float multihead_project_kernel_qkv_clip_max = 13;
+  float multihead_project_kernel_output_clip_max = 14;
+  float ffn_first_kernel_clip_max = 15;
+  float ffn_second_kernel_clip_max = 16;
+  float multihead_ln_clip_max = 17;
+  float multihead_project_output_clip_max = 18;
+  float ffn_ln_clip_max = 19;
+  float ffn_first_act_clip_max = 20;
+  float multihead_qkv_dense_clip_max = 21;
+  float multihead_output_dense_clip_max = 22;
+  float ffn_first_output_clip_max = 23;
+  float self_qkv_bias_out_clip_max = 24;
 }
 
 message QuantGptEmbeddingLayer {
   // token embedding table
   // for encoder, it is in [src_vocab_size, hidden_size]
   // so, look it up directly will get the input token embedding
-  repeated float token_embedding = 1;
+  bytes token_embedding = 1;
   repeated float position_embedding = 2;
   // the last layer_norm of encoder
   repeated float norm_scale = 3;
   repeated float norm_bias = 4;
+
+  // clip max
+  float emb_clip_max = 5;
 }
 
 message QuantGptModelConf {

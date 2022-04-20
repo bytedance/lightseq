@@ -166,7 +166,7 @@ std::string QuantBertWeight<OpType_>::proto_parse_enc_wei(
     offset.push_back(idx);
     if (enc_layer.ffn_first_kernel().size() != _hidden_size * _inner_size)
       return "wrong ffn_first_kernel_size !";
-    for (float ele : enc_layer.ffn_first_kernel())
+    for (unsigned char ele : enc_layer.ffn_first_kernel())
       value.push_back(
           dequantize(ele, _quant_range, enc_layer.ffn_first_kernel_clip_max()));
     idx += _hidden_size * _inner_size;

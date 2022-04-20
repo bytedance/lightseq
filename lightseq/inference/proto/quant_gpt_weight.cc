@@ -36,9 +36,9 @@ Read model config stored in custom proto file.
 template <OperationType OpType_>
 void QuantGptWeight<OpType_>::proto_get_model_config(const QuantGpt &gpt) {
   _hidden_size = gpt.src_embedding().norm_scale_size();
-  _inner_size = gpt.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+  _inner_size = gpt.encoder_stack()[0].ffn_first_kernel().size() / _hidden_size;
   _max_step = gpt.src_embedding().position_embedding_size() / _hidden_size;
-  _src_vocab_size = gpt.src_embedding().token_embedding_size() / _hidden_size;
+  _src_vocab_size = gpt.src_embedding().token_embedding().size() / _hidden_size;
   _n_enc_layer = gpt.encoder_stack_size();
   _head_num = gpt.model_conf().head_num();
   if (_hidden_size % _head_num != 0) {
@@ -74,10 +74,12 @@ std::string QuantGptWeight<OpType_>::proto_parse_emb_wei(
   int idx = 0;
 
   offset.push_back(idx);
-  if (layer.token_embedding_size() != _src_vocab_size * _hidden_size)
+  if (layer.token_embedding().size() != _src_vocab_size * _hidden_size)
     return "wrong token_embedding_size !";
-  for (float ele : layer.token_embedding()) value.push_back(ele);
+  for (unsigned char ele : layer.token_embedding())
+    value.push_back(dequantize(ele, _quant_range, layer.emb_clip_max()));
   idx += _src_vocab_size * _hidden_size;
+  _src_emb_clip_max = layer.emb_clip_max();
 
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
@@ -98,9 +100,7 @@ std::string QuantGptWeight<OpType_>::proto_parse_emb_wei(
   std::vector<_DataType> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset)
-    _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
-                               e);
+  for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
   return "";
@@ -129,11 +129,13 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_kernel_qkv_size() !=
+    if (enc_layer.multihead_project_kernel_qkv().size() !=
         _hidden_size * _hidden_size * 3)
       return "wrong multihead_project_kernel_qkv_size !";
-    for (float ele : enc_layer.multihead_project_kernel_qkv())
-      value.push_back(ele);
+    for (unsigned char ele : enc_layer.multihead_project_kernel_qkv())
+      value.push_back(
+          dequantize(ele, _quant_range,
+                     enc_layer.multihead_project_kernel_qkv_clip_max()));
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -144,11 +146,13 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_kernel_output_size() !=
+    if (enc_layer.multihead_project_kernel_output().size() !=
         _hidden_size * _hidden_size)
       return "wrong multihead_project_kernel_output_size !";
-    for (float ele : enc_layer.multihead_project_kernel_output())
-      value.push_back(ele);
+    for (unsigned char ele : enc_layer.multihead_project_kernel_output())
+      value.push_back(
+          dequantize(ele, _quant_range,
+                     enc_layer.multihead_project_kernel_output_clip_max()));
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -171,9 +175,11 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_first_kernel().size() != _hidden_size * _inner_size)
       return "wrong ffn_first_kernel_size !";
-    for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
+    for (unsigned char ele : enc_layer.ffn_first_kernel())
+      value.push_back(
+          dequantize(ele, _quant_range, enc_layer.ffn_first_kernel_clip_max()));
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -183,9 +189,11 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     idx += _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
+    if (enc_layer.ffn_second_kernel().size() != _hidden_size * _inner_size)
       return "wrong ffn_second_kernel_size !";
-    for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
+    for (unsigned char ele : enc_layer.ffn_second_kernel())
+      value.push_back(dequantize(ele, _quant_range,
+                                 enc_layer.ffn_second_kernel_clip_max()));
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -194,14 +202,27 @@ std::string QuantGptWeight<OpType_>::proto_parse_enc_wei(const QuantGpt &gpt) {
     for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
     idx += _hidden_size;
 
+    _enc_clip_max.push_back(enc_layer.multihead_project_kernel_qkv_clip_max());
+    _enc_clip_max.push_back(
+        enc_layer.multihead_project_kernel_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_kernel_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_second_kernel_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_ln_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_project_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_ln_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_act_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_qkv_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.multihead_output_dense_clip_max());
+    _enc_clip_max.push_back(enc_layer.ffn_first_output_clip_max());
+    _enc_clip_max.push_back(enc_layer.self_qkv_bias_out_clip_max());
+
   }  // for
 
   std::vector<_DataType> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  for (int e : offset) _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
   return "";
 }
@@ -285,16 +306,23 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
 
   std::vector<int> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
+  std::vector<unsigned char> value_i8(value_size);
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
   int idx = 0;
+  float clip_max;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
-      hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
+      hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_UCHAR,
+      value_i8.data() + idx,
       [=](int size) { return size != _src_vocab_size * _hidden_size; },
       "Wrong token_embedding_size !");
+  read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/emb_clip_max",
+                           H5T_NATIVE_FLOAT, &clip_max);
+  dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                   _src_vocab_size * _hidden_size);
+  _src_emb_clip_max = clip_max;
   idx += _src_vocab_size * _hidden_size;
 
   offset.push_back(idx);
@@ -323,9 +351,7 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
-  for (int e : offset)
-    _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
-                               e);
+  for (int e : offset) _p_d_src_emb_wei.push_back(_d_src_emb_wei.data() + e);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
 }
@@ -343,9 +369,11 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
+  std::vector<unsigned char> value_i8(value_size);
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
 
+  float clip_max;
   int idx = 0;
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
     std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
@@ -367,13 +395,18 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_UCHAR, value_i8.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
+    read_hdf5_dataset_scalar(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv_clip_max",
+        H5T_NATIVE_FLOAT, &clip_max);
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                     _hidden_size * _hidden_size * 3);
+    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
         H5T_NATIVE_FLOAT, value.data() + idx,
@@ -384,9 +417,15 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_UCHAR, value_i8.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong multihead_project_kernel_output_size !");
+    read_hdf5_dataset_scalar(
+        hdf5_file, dataset_prefix + "/multihead_project_kernel_output_clip_max",
+        H5T_NATIVE_FLOAT, &clip_max);
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                     _hidden_size * _hidden_size);
+    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -413,10 +452,16 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_UCHAR,
+        value_i8.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/ffn_first_kernel_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                     _hidden_size * _inner_size);
+    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -428,10 +473,16 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_UCHAR,
+        value_i8.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/ffn_second_kernel_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                     _hidden_size * _inner_size);
+    _enc_clip_max.push_back(clip_max);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -440,14 +491,45 @@ void QuantGptWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx, [=](int size) { return size != _hidden_size; },
         "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
+
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/multihead_ln_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(
+        hdf5_file, dataset_prefix + "/multihead_project_output_clip_max",
+        H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/ffn_ln_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/ffn_first_act_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/multihead_qkv_dense_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(
+        hdf5_file, dataset_prefix + "/multihead_output_dense_clip_max",
+        H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/ffn_first_output_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
+    read_hdf5_dataset_scalar(hdf5_file,
+                             dataset_prefix + "/self_qkv_bias_out_clip_max",
+                             H5T_NATIVE_FLOAT, &clip_max);
+    _enc_clip_max.push_back(clip_max);
   }  // for
 
   std::vector<_DataType> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
-  for (int e : offset)
-    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  for (int e : offset) _p_d_enc_wei.push_back(_d_enc_wei.data() + e);
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
 }
 
