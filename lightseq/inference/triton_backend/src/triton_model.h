@@ -239,7 +239,14 @@ class ModelInstanceState : public BackendModelInstance {
 
     return nullptr;  // success
   }
-  virtual ~ModelInstanceState() = default;
+  virtual ~ModelInstanceState() {
+      for(auto iter: d_inputs_map) {
+          cudaFree(iter.second);
+      }
+      for(auto iter: d_outputs_map) {
+          cudaFree(iter.second);
+      }
+  }
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
@@ -268,9 +275,7 @@ class ModelInstanceState : public BackendModelInstance {
   std::unordered_map<std::string, int> input_name_map_;
   std::unordered_map<std::string, int> output_name_map_;
 
-  std::map<std::string, void*>
-      d_inputs_map;  // Question:
-                     // 没有手动在析构阶段释放指针，是否存在显存泄漏的风险？
+  std::map<std::string, void*> d_inputs_map;
   std::map<std::string, void*> d_outputs_map;
 };
 

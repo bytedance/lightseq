@@ -11,7 +11,7 @@ input [
 output [
   {
     name: "target_ids"
-    data_type: TYPE_FP32
+    data_type: TYPE_INT32
     dims: [ -1 ]
   },
   {
