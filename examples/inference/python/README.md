@@ -41,6 +41,10 @@ python test/ls_bert.py
 ```shell
 python test/ls_gpt2.py
 ```
+4. ViT
+```shell
+python test/ls_vit.py
+```
 
 ### Fairseq based models
 After exporting the Fairseq based models to protobuf/hdf5 format using above scripts, we can use the following script for fast LightSeq inference on wmt14 en2de dateset, compatible with fp16 and int8 models:

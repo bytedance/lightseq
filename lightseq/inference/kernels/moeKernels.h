@@ -8,10 +8,6 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
-void ker_residual_launcher(int token_num, int hidden_size, cudaStream_t stream,
-                           const T* input, T* output,
-                           const int max_thread_per_block);
-template <typename T>
 void ker_norm_layer_prepost_launcher(int token_num, int hidden_size,
                                      cudaStream_t stream, T* input, T* output,
                                      const T* scale, const T* bias,
