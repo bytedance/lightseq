@@ -62,3 +62,13 @@ else()
   target_link_libraries(moe_model PRIVATE CUDA::cublas_static
                                           CUDA::cublasLt_static)
 endif()
+
+add_library(vit_model STATIC vit_encoder.cc.cu)
+target_link_libraries(vit_model PUBLIC cuda_kernels)
+target_link_libraries(vit_model PUBLIC vit_weight)
+if(DYNAMIC_API)
+  target_link_libraries(vit_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(vit_model PRIVATE CUDA::cublas_static
+                                          CUDA::cublasLt_static)
+endif()

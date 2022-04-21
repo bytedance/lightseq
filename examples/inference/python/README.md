@@ -25,6 +25,12 @@ Export Hugging Face GPT2 models to hdf5 format.
 ```shell
 python export/huggingface/hf_gpt2_export.py
 ```
+4. Hugging Face ViT
+
+Export Hugging Face ViT models to hdf5 format.
+```shell
+python export/huggingface/hf_vit_export.py
+```
 ### Native Fairseq
 1. Native Fairseq Transformer
 
@@ -112,8 +118,12 @@ python test/ls_bert.py
 ```shell
 python test/ls_gpt2.py
 ```
+4. ViT
+```shell
+python test/ls_vit.py
+```
 
-4. Fairseq based models using LightSeq inference
+5. Fairseq based models using LightSeq inference
 ```shell
 bash test/ls_fairseq.sh --model ${model_path}
 ```

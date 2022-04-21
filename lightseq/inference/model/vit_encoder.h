@@ -12,12 +12,12 @@
 #include <iostream>
 #include <string>
 
-#include "../proto/bert_weight.h"
+#include "../proto/vit_weight.h"
 #include "../tools/util.h"
 
 /**
 @file
-Bert encoder, composed by gemm lib and
+ViT encoder, composed by gemm lib and
   custom cuda kernel function
 */
 
@@ -25,7 +25,7 @@ namespace lightseq {
 namespace cuda {
 
 template <OperationType OpType_>
-class BertEncoder {
+class VitEncoder {
  private:
   typedef OperationTypeTraits<OpType_> _optraits;
   typedef typename _optraits::DataType _DataType;
@@ -41,8 +41,7 @@ class BertEncoder {
   const int _max_batch_size;
   int *_p_d_padding_mask;  // true sequence length(remove padding), [batch_size]
 
-  const int *_p_d_lang_id;
-  const BertWeight<OpType_> &_tw;
+  const VitWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
   const _DataType _fone;
@@ -59,7 +58,7 @@ class BertEncoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
 
-  // {token_emb, pos_emb, norm_scale, norm_bias}
+  // {conv_weight, conv_bias, pos_emb, cls_embedding}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
   // multihead_qkv_bias multihead_output_kernel, multihead_output_bias
@@ -75,18 +74,19 @@ class BertEncoder {
   int _weight_offset;
 
  public:
-  const int *_p_d_token_id;  // input token id [batch_size, batch_seq_len]
+  const float *_p_d_pixel_input;  // input pixels [batch_size, channel_input,
+                                  // image_size, image_size]
   _DataType
       *_p_d_output;  // encoder output, [batch_size, batch_seq_len, hidden_size]
 
-  BertEncoder(int max_batch_size, const int *p_d_token_id,
-              int *p_d_padding_mask, _DataType *p_d_output,
-              const BertWeight<OpType_> &tw, cudaStream_t stream,
-              cublasHandle_t hd, const int *p_d_lang_id = nullptr);
+  VitEncoder(int max_batch_size, const float *p_d_pixel_input,
+             int *p_d_padding_mask, _DataType *p_d_output,
+             const VitWeight<OpType_> &tw, cudaStream_t stream,
+             cublasHandle_t hd);
   long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();
-  void run_one_infer(int batch_size, int batch_seq_len);
+  void run_one_infer(int batch_size);
 };
 
 }  // namespace cuda
