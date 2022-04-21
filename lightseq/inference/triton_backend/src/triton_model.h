@@ -268,9 +268,7 @@ class ModelInstanceState : public BackendModelInstance {
   std::unordered_map<std::string, int> input_name_map_;
   std::unordered_map<std::string, int> output_name_map_;
 
-  std::map<std::string, void*>
-      d_inputs_map;  // Question:
-                     // 没有手动在析构阶段释放指针，是否存在显存泄漏的风险？
+  std::map<std::string, void*> d_inputs_map;
   std::map<std::string, void*> d_outputs_map;
 };
 

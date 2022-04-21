@@ -72,13 +72,13 @@ You can experience lightning fast training by running following commands,
 Firstly install these requirements.
 
 ```shell
-pip install lightseq fairseq sacremoses
+$ pip install lightseq fairseq sacremoses
 ```
 
 Then you can train a translation task on wmt14 en2de dataset by running the following script
 
 ```shell
-sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
+$ sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 To compare lightseq with fairseq, delete the arguments with `ls_` prefix to using the original fairseq implementation
@@ -90,8 +90,8 @@ More usage is available [here](./lightseq/training/README.md).
 We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
 
 ```shell
-pip install torch tensorflow transformers lightseq
-cd examples/inference/python
+$ pip install torch tensorflow transformers lightseq
+$ cd examples/inference/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
@@ -104,6 +104,16 @@ python test/ls_bart.py
 LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 More usage is available [here](./lightseq/inference/README.md).
+
+### Fast deploy inference server
+
+We provide a docker image which contains tritonserver and lightseq's dynamic link library, and you can deploy a inference server by simply replace the model file with your own model file.
+
+```shell
+$ sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
+```
+
+More usage is available [here](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend).
 
 ## Cite Us
 
