@@ -2,27 +2,6 @@
 
 ## How To Use Tritonbackend
 
-### How To Compile Tritonbackend
-
-- Execute commands as below
-
-  ```
-  $ cd <lightseq_repository>
-  $ mkdir build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON .. && \
-    make -j${nproc}
-  ```
-
-   Then you can get outcomes include `libliblightseq.so` and `libtriton_lightseq.so`, Which are needed by model repository.
-
-   You can find libliblightseq.so in this path
-
-  ​     `<lightseq_repository>/build/lightseq/inference/pywrapper/libliblightseq.so`
-
-   While libtriton_lightseq.so is in
-
-  ​      `<lightseq_repository>/build/lightseq/inference/triton_backend/libtriton_lightseq.so`
-
 ### How To Organize Model Repository
 
 ```
@@ -31,7 +10,7 @@
 │  ├── <model_name_1>/            # the directory of model, include parameters and configurations.
 │  │  ├── config.pbtxt            # the config of model, more detail is as below.
 │  │  ├── <model_file>            # the file of model parameters, you can simply replace the model file with
-│  │  │                             your own model and change the ${default_model_filename} in config.pbtxt
+│  │  │                             your own model and change the ${default_model_filename} in config.pbtxt.
 │  │  └── 1/                      # this empty directory is necessary, which is needed by tritonserver.
 │  ├── <model_name_2>/            # ...
 │  │  ├── config.pbtxt            # ...
@@ -52,24 +31,21 @@
 
 - You can see example in [Example Of Triton Model Config](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend/model_repo), while you can also find more detailed information in [Model Config Of Tritonserver](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md).
 
-  - The model files which needed by [Example Of Triton Model Config](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend/model_repo) you can find in [The Guide of Model Export](https://github.com/bytedance/lightseq/blob/master/examples/inference/python/README.md).
+- The model files which needed by [Example Of Triton Model Config](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend/model_repo) you can find in [Examples of exporting models for LightSeq inference](https://github.com/bytedance/lightseq/blob/master/examples/inference/python/README.md), and you can also export your own model, steps are available here - [How to export your own model](https://github.com/bytedance/lightseq/blob/master/docs/inference/export_model.md).
 
 ### How To Run Tritonserver
-
-#### Run Tritonserver By Docker
 
 - Get tritonserver Docker: [Tritonserver Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md#install-triton-docker-image)
 
   ```
-  $ sudo docker build -t <docker_image_name> - < Dockerfile
+  $ sudo docker build -t <docker_image_name> - < <repository_root>/docker/tritonserver/Dockerfile
   # Or you can simply pull image which is compiled by ourselves in advance,
   # and you can choose suitable version by replacing `22.01-1` with <tag_name>
   $ sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
   ```
 
-  - We create a [Dockerfile](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend) ,because lightseq need a dynamic link library which is not contained by nvcr.io/nvidia/tritonserver:22.01-py3.
-
-    If necessary, you can add http_proxy/https_proxy to reduce compile time.
+  - We create a [Dockerfile](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend) ,because lightseq need a dynamic link library which is not contained by nvcr.io/nvidia/tritonserver:22.01-py3. If necessary, you can add http_proxy/https_proxy to reduce compile time.
+  - The structure of file tree is shown as blow:
 
   ```
   # file tree of tritonserver in docker image, user could ignore this part.
