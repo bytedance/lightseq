@@ -57,6 +57,8 @@ src_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "ln_f weight",
         "norm_bias": "ln_f bias",
+        "output_ln_clip_max": "lm_head input_quant clip_value_max",
+        "logits_clip_max": "lm_head output_quant clip_value_max",
     }
 )
 

@@ -48,6 +48,8 @@ class QuantGptWeight {
 
   // store the clip_max of weights and activations
   float _src_emb_clip_max;
+  float _output_ln_clip_max;
+  float _logits_clip_max;
   std::vector<float> _enc_clip_max;  // size: 11 * enc_layer_num
 
  public:

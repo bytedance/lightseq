@@ -80,6 +80,8 @@ std::string QuantGptWeight<OpType_>::proto_parse_emb_wei(
     value.push_back(dequantize(ele, _quant_range, layer.emb_clip_max()));
   idx += _src_vocab_size * _hidden_size;
   _src_emb_clip_max = layer.emb_clip_max();
+  _output_ln_clip_max = layer.output_ln_clip_max();
+  _logits_clip_max = layer.logits_clip_max();
 
   offset.push_back(idx);
   if (layer.position_embedding_size() != _max_step * _hidden_size)
@@ -310,7 +312,6 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
   int idx = 0;
-  float clip_max;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
@@ -319,10 +320,13 @@ void QuantGptWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
       [=](int size) { return size != _src_vocab_size * _hidden_size; },
       "Wrong token_embedding_size !");
   read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/emb_clip_max",
-                           H5T_NATIVE_FLOAT, &clip_max);
-  dequantize_array(value_i8, value, clip_max, _quant_range, idx,
+                           H5T_NATIVE_FLOAT, &_src_emb_clip_max);
+  dequantize_array(value_i8, value, _src_emb_clip_max, _quant_range, idx,
                    _src_vocab_size * _hidden_size);
-  _src_emb_clip_max = clip_max;
+  read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/output_ln_clip_max",
+                           H5T_NATIVE_FLOAT, &_output_ln_clip_max);
+  read_hdf5_dataset_scalar(hdf5_file, dataset_prefix + "/logits_clip_max",
+                           H5T_NATIVE_FLOAT, &_logits_clip_max);
   idx += _src_vocab_size * _hidden_size;
 
   offset.push_back(idx);

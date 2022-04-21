@@ -3,6 +3,7 @@ from torch import nn
 from lightseq.training.ops.pytorch.quantization import (
     qat_mode,
     disable_quant,
+    QuantLinear,
     TensorQuantizer,
     weight_quant_config,
 )
@@ -121,3 +122,8 @@ def inject_ls_layer(model, training_args, model_args, config):
             model.transformer.h[i].apply(qat_mode)
         else:
             model.transformer.h[i].apply(disable_quant)
+
+    q_lm_head = QuantLinear(config.n_embd, config.vocab_size, bias=False)
+    q_lm_head.weight = model.transformer.wte.weight
+    q_lm_head.weight_quant = model.transformer.wte.emb_quant
+    model.lm_head = q_lm_head

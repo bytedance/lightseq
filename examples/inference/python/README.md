@@ -18,6 +18,7 @@ We provide the following export examples. All Fairseq based models are trained u
 | Hugging Face + custom Torch layer BERT + QAT | Int8  | python export/huggingface/ls_torch_hf_quant_bert_export.py -m ckpt_ls_torch_hf_quant_bert_ner.bin     | /                                                                                                                                    | Export Hugging Face BERT training with custom Torch layers to hdf5 format.                                                                               |
 | Hugging Face GPT2                            | Float | python export/huggingface/hf_gpt2_export.py                                                           | /                                                                                                                                    | Export Hugging Face GPT2 models to hdf5 format.                                                                                                          |
 | Hugging Face + custom Torch layer GPT2 + QAT | Int8  | python export/huggingface/ls_torch_hf_quant_gpt2_export.py -m ckpt_ls_torch_hf_quant_gpt2_ner.bin     | /                                                                                                                                    | Export Hugging Face GPT2 training with custom Torch layers to hdf5 format.                                                                               |
+| Hugging Face ViT                             | Float | python export/huggingface/hf_vit_export.py                                                            | /                                                                                                                                    | Export Hugging Face ViT models to hdf5 format.                                                                                                           |
 | Native Fairseq Transformer                   | Float | python export/fairseq/native_fs_transformer_export.py -m ckpt_native_fairseq_31.06.pt                 | [link](http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_native_fairseq_31.06.pt)         | Export native Fairseq Transformer models to protobuf/hdf5 format.                                                                                        |
 | Native Fairseq Transformer + PTQ             | Int8  | python export/fairseq/native_fs_transformer_export.py -m ckpt_native_fairseq_31.06.pt                 | [link](http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_native_fairseq_31.06.pt)         | Export native Fairseq Transformer models to int8 protobuf format using post training quantization.                                                       |
 | Fairseq + LightSeq Transformer               | Float | python export/fairseq/ls_fs_transformer_export.py -m ckpt_ls_fairseq_31.17.pt                         | [link](http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/example_model/fairseq/ckpt_ls_fairseq_31.17.pt)             | Export Fairseq Transformer models training with LightSeq modules to protobuf/hdf5 format.                                                                |
@@ -44,6 +45,14 @@ python test/ls_gpt2.py
 4. ViT
 ```shell
 python test/ls_vit.py
+```
+5. Quantized BERT
+```shell
+python test/ls_quant_bert.py
+```
+6. Quantized GPT2
+```shell
+python test/ls_quant_gpt.py
 ```
 
 ### Fairseq based models

@@ -51,6 +51,8 @@ message QuantGptEmbeddingLayer {
 
   // clip max
   float emb_clip_max = 5;
+  float output_ln_clip_max = 6;
+  float logits_clip_max = 7;
 }
 
 message QuantGptModelConf {
