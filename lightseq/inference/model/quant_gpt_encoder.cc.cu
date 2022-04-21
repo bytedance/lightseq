@@ -32,6 +32,12 @@ QuantGptEncoder<OpType_>::QuantGptEncoder(
       _p_d_enc_wei(tw.get_enc_wei()),
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
+      _src_emb_clip_max(tw.get_src_emb_clip_max()),
+      _output_ln_clip_max(tw.get_output_ln_clip_max()),
+      _logits_clip_max(tw.get_logits_clip_max()),
+      _enc_clip_max(tw.get_enc_clip_max()),
+      _ione((int32_t)1),
+      _izero((int32_t)0),
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024),
@@ -39,26 +45,6 @@ QuantGptEncoder<OpType_>::QuantGptEncoder(
       _h_ppl(max_batch_size, 0.f),
       _h_sample_id(max_batch_size * tw._max_step, 0),
       _h_unfinished(1) {}
-
-/**
-Compute GPU memory size needed by gpt encoder,
-  to see how these memory is used, checkout init_buffer() for detail
-*/
-template <OperationType OpType_>
-size_t QuantGptEncoder<OpType_>::compute_buffer_bytesize() {
-  int si = _max_batch_size;
-  size_t sz0 = (size_t)_max_batch_dim;
-  sz0 += 2 * (size_t)_max_batch_dim * (size_t)_tw._n_enc_layer;
-  long long sz1 = (size_t)_max_batch_dim * 6 +
-                  (size_t)_max_batch_size * (size_t)_tw._head_num *
-                      (size_t)_tw._max_step * (size_t)_tw._max_step;
-  long long sz2 = (size_t)_max_batch_dim + (size_t)_max_batch_size *
-                                               (size_t)_tw._max_step *
-                                               (size_t)_tw._inner_size;
-  long long sz3 = (size_t)_max_batch_size * (size_t)_tw._max_step *
-                  (size_t)_tw._src_vocab_size;
-  return (sz0 + max(max(sz1, sz2), sz3)) * sizeof(_DataType) + si * sizeof(int);
-}
 
 /**
 Init the GPU memory pointer which point to

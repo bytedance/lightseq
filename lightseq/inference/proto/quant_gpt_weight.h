@@ -71,6 +71,10 @@ class QuantGptWeight {
 
   float get_src_emb_clip_max() const { return _src_emb_clip_max; }
 
+  float get_output_ln_clip_max() const { return _output_ln_clip_max; }
+
+  float get_logits_clip_max() const { return _logits_clip_max; }
+
   std::vector<float> get_enc_clip_max() const { return _enc_clip_max; }
 
   const float _quant_range = 127;
