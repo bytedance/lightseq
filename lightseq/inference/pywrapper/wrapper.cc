@@ -398,7 +398,7 @@ class PyGpt {
     if (model_->get_output_dtype(0) != lightseq::cuda::DataType::kFloat32) {
       throw std::runtime_error(
           "This model is not for ppl, you should set the sampling_method to "
-          "ppl");
+          "topk or topp");
     }
 
     lightseq::cuda::CHECK_GPU_ERROR(

@@ -1,4 +1,5 @@
 #include "../kernels/gptKernels.h"
+#include "../kernels/gptKernels_int8.h"
 #include "../kernels/transformerKernels.h"
 #include "../kernels/transformerKernels_int8.h"
 #include "quant_gpt_encoder.h"
@@ -53,39 +54,173 @@ These buffer are used during custom cuda kernel function,
   find the corresponding function to see how these buffer are used
 */
 template <OperationType OpType_>
-void QuantGptEncoder<OpType_>::init_buffer(void *pbuf) {
-  // int buffer
-  int *p_d_int = reinterpret_cast<int *>(pbuf);
-  _p_d_real_seq_len = p_d_int;
-  p_d_int += _max_batch_size;
-
-  // datatype buffer
-  _DataType *p_d_datatype = reinterpret_cast<_DataType *>(p_d_int);
-  _p_d_query = p_d_datatype;
-  _p_d_k_cache = _p_d_query + _max_batch_dim;
-  _p_d_v_cache = _p_d_k_cache + _max_batch_dim * _tw._n_enc_layer;
-  p_d_datatype = _p_d_v_cache + _max_batch_dim * _tw._n_enc_layer;
-  // reuse 1 ---------------------
-  _p_d_qkv_projected = p_d_datatype;
-  _p_d_q = _p_d_qkv_projected + _max_batch_dim * 3;
-  _p_d_k = _p_d_q + _max_batch_dim;
-  _p_d_v = _p_d_k + _max_batch_dim;
-  // _max_batch_size * _tw._head_num *
-  //  _tw._max_step * _tw._max_step
-  _p_d_c = _p_d_v + _max_batch_dim;
-  // reuse 2 ---------------------
-  _p_d_ffn_buf1 = p_d_datatype;
-  // _max_batch_size * _tw._max_step * _tw._inner_size
-  _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
-  // reuse 3 ---------------------
-  // _max_batch_size * _tw._max_step * _tw._src_vocab_size
-  _p_d_logit = p_d_datatype;
+void QuantGptEncoder<OpType_>::init_buffer() {
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_p_d_real_seq_len, _max_batch_size * sizeof(int)));
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_query, _max_batch_dim * sizeof(_DataType)));
+  CHECK_GPU_ERROR(cudaMalloc(&_p_d_c, _max_batch_size * _tw._head_num *
+                                          _tw._max_step * _tw._max_step *
+                                          sizeof(_DataType)));
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_sample_id_buf,
                              _max_batch_size * _tw._max_step * sizeof(int)));
   CHECK_GPU_ERROR(cudaMalloc((void **)&_p_d_unfinished, sizeof(int)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
+
+  int max_batch_dim =
+      _max_batch_size * _tw._beam_size *
+      round_up(std::max(_tw._inner_size, _tw._hidden_size * 3), 32);
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_ffn_in_buf, max_batch_dim * sizeof(int8_t)));
+  CHECK_GPU_ERROR(cudaMalloc(
+      &_int32_ffn_out_buf,
+      std::max(std::max(max_batch_dim, _max_batch_size * _tw._beam_size *
+                                           _tw._head_num * _tw._max_step),
+               round_up(_tw._src_vocab_size, 32) * _tw._beam_size *
+                   _max_batch_size) *
+          sizeof(int32_t)));
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_ffn_out_buf,
+                 std::max(max_batch_dim, round_up(_tw._src_vocab_size, 32) *
+                                             _tw._beam_size * _max_batch_size) *
+                     sizeof(int8_t)));
+
+  // malloc embeddings
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_p_d_src_emb_wei,
+                 _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
+  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei, _tw._hidden_size,
+                  _tw._src_vocab_size, _quant_range / _src_emb_clip_max,
+                  _stream, _cublas_lt_handle);
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_int8_p_d_src_emb_bottom_wei,
+                 _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
+  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_bottom_wei,
+                  _tw._hidden_size, _tw._src_vocab_size,
+                  _quant_range / _src_emb_clip_max, _stream, _cublas_lt_handle,
+                  kRowMajor);
+  _p_device_emb.push_back(nullptr);
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[1], _tw._max_step * _tw._hidden_size, _stream));
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[2], _tw._hidden_size, _stream));
+  _p_device_emb.push_back(
+      to_gpu(_p_d_src_emb_wei[3], _tw._hidden_size, _stream));
+
+  // malloc reused kv cache max size: _tw._hidden_size * 2 * _tw._n_enc_layer *
+  // _max_batch_size * _max_step * sizeof(T)
+  int8_t *self_kv_cache_buffer;
+  int8_t *sliding_p;
+  CHECK_GPU_ERROR(
+      cudaMalloc(&self_kv_cache_buffer,
+                 _layer_size_self_k * _tw._n_enc_layer * 4 * sizeof(int8_t)));
+
+  sliding_p = self_kv_cache_buffer;
+  for (int i = 0; i < _tw._n_enc_layer * 2; i++) {
+    _p_d_self_k_cache.push_back(sliding_p);
+    sliding_p += _layer_size_self_k;
+  }
+  for (int i = 0; i < _tw._n_enc_layer * 2; i++) {
+    _p_d_self_v_cache.push_back(sliding_p);
+    sliding_p += _layer_size_self_k;
+  }
+  _p_d_self_k_cache1 = _p_d_self_k_cache.data();
+  _p_d_self_k_cache2 = _p_d_self_k_cache.data() + _tw._n_enc_layer;
+  _p_d_self_v_cache1 = _p_d_self_v_cache.data();
+  _p_d_self_v_cache2 = _p_d_self_v_cache.data() + _tw._n_enc_layer;
+
+  // malloc weights
+  _int8_p_d_enc_wei = std::vector<int8_t *>(_tw._n_enc_layer * 4);
+  _scaled_ffn2_colsum = std::vector<_DataType *>(_tw._n_enc_layer);
+  for (_layer_id = 0; _layer_id < _tw._n_enc_layer; _layer_id++) {
+    _weight_offset = _layer_id * _tw._weight_per_enc_layer;
+    // malloc quantized weights
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4],
+                   _tw._hidden_size * 3 * _tw._hidden_size * sizeof(int8_t)));
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 1],
+                   _tw._hidden_size * _tw._hidden_size * sizeof(int8_t)));
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 2],
+                   _tw._hidden_size * _tw._inner_size * sizeof(int8_t)));
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_int8_p_d_enc_wei[_layer_id * 4 + 3],
+                   _tw._inner_size * _tw._hidden_size * sizeof(int8_t)));
+
+    // malloc unquantized weights
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 1], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(to_gpu(_p_d_enc_wei[_weight_offset + 3],
+                                   _tw._hidden_size * 3, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 5], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 6], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 7], _tw._hidden_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 9], _tw._inner_size, _stream));
+    _p_device_wei.push_back(nullptr);
+    _p_device_wei.push_back(
+        to_gpu(_p_d_enc_wei[_weight_offset + 11], _tw._hidden_size, _stream));
+
+    quantize_weight(_p_d_enc_wei[_weight_offset + 2],
+                    _int8_p_d_enc_wei[_layer_id * 4], _tw._hidden_size,
+                    _tw._hidden_size * 3,
+                    _quant_range / _enc_clip_max[_layer_id * 12], _stream,
+                    _cublas_lt_handle);
+
+    quantize_weight(_p_d_enc_wei[_weight_offset + 4],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 1], _tw._hidden_size,
+                    _tw._hidden_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 1], _stream,
+                    _cublas_lt_handle, kColMajor);
+
+    quantize_weight(_p_d_enc_wei[_weight_offset + 8],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 2], _tw._hidden_size,
+                    _tw._inner_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 2], _stream,
+                    _cublas_lt_handle);
+
+    quantize_weight(_p_d_enc_wei[_weight_offset + 10],
+                    _int8_p_d_enc_wei[_layer_id * 4 + 3], _tw._inner_size,
+                    _tw._hidden_size,
+                    _quant_range / _enc_clip_max[_layer_id * 12 + 3], _stream,
+                    _cublas_lt_handle, kColMajor);
+
+    if (_tw._use_gelu) {
+      _scaled_ffn2_colsum[_layer_id] = nullptr;
+    } else {
+      CHECK_GPU_ERROR(cudaMalloc(&_scaled_ffn2_colsum[_layer_id],
+                                 _tw._hidden_size * sizeof(_DataType)));
+      float relu_scale = _enc_clip_max[_layer_id * 12 + 7] / 2;
+
+      _DataType *temp;
+      int weight_size = _tw._inner_size * _tw._hidden_size;
+
+      CHECK_GPU_ERROR(cudaMalloc(&temp, weight_size * sizeof(_DataType)));
+      CHECK_GPU_ERROR(cudaMemcpyAsync(temp, _p_d_enc_wei[_weight_offset + 10],
+                                      weight_size * sizeof(_DataType),
+                                      cudaMemcpyHostToDevice, _stream));
+      launch_scaled_colsum(temp, _scaled_ffn2_colsum[_layer_id],
+                           _tw._inner_size, _tw._hidden_size, relu_scale,
+                           _stream);
+      CHECK_GPU_ERROR(cudaGetLastError());
+      CHECK_GPU_ERROR(cudaFree(temp));
+    }
+  }
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  CHECK_GPU_ERROR(cudaGetLastError());
+  std::cout << "quantized encoder buffer init succeed" << std::endl;
+
   return;
 }
 
@@ -150,8 +285,8 @@ void QuantGptEncoder<OpType_>::run_one_infer(int batch_size,
 #endif
 
   // token embedding, add position embedding and layer_norm
-  ker_gpt_embedding_launcher<_DataType>(
-      batch_size, batch_seq_len, _tw._hidden_size, _stream, _p_d_src_emb_wei[0],
+  ker_gpt_embedding_int8_launcher<_DataType>(
+      batch_size, batch_seq_len, _tw._hidden_size, _stream, _int8_p_d_src_emb_bottom_wei,
       _p_d_src_emb_wei[1], _p_d_token_id, _p_d_query, _p_d_real_seq_len,
       _tw._padding_id, 0);
 

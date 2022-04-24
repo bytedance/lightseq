@@ -49,9 +49,7 @@ QuantGpt::QuantGpt(const std::string weight_path, const int max_batch_size)
   std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
             << "MB GPU buffer for GPT2" << std::endl;
 
-  // encoder and decoder use the same buffer to save gpu memory useage
-  CHECK_GPU_ERROR(cudaMalloc((void**)&d_buf_, (size_t)buf_bytesize));
-  encoder_->init_buffer(d_buf_);
+  encoder_->init_buffer();
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 }
 
@@ -59,7 +57,6 @@ QuantGpt::~QuantGpt() {
   CHECK_GPU_ERROR(cudaFree(d_input_));
   CHECK_GPU_ERROR(cudaFree(d_sample_id));
   CHECK_GPU_ERROR(cudaFree(d_ppl));
-  CHECK_GPU_ERROR(cudaFree(d_buf_));
   CHECK_GPU_ERROR(cudaStreamDestroy(stream_));
   CHECK_GPU_ERROR(cudaStreamDestroy(cache_stream_));
   CHECK_GPU_ERROR(cublasDestroy(hd_));

@@ -22,7 +22,6 @@ class QuantGpt : public LSModel {
   int* d_input_;
   int* d_sample_id;
   float* d_ppl;
-  void* d_buf_;
 
   int _max_batch_size;
   cudaStream_t stream_;
