@@ -413,7 +413,7 @@ class PyGpt {
     std::vector<int> output_shape = model_->get_output_shape(0);
 
     auto output = py::array_t<float>(output_shape);
-    float *output_data = output.mutable_data(0, 0);
+    float *output_data = output.mutable_data();
     const float *d_output =
         static_cast<const float *>(model_->get_output_ptr(0));
     lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
@@ -518,7 +518,7 @@ class PyQuantGpt {
     std::vector<int> output_shape = model_->get_output_shape(0);
 
     auto output = py::array_t<float>(output_shape);
-    float *output_data = output.mutable_data(0, 0);
+    float *output_data = output.mutable_data();
     const float *d_output =
         static_cast<const float *>(model_->get_output_ptr(0));
     lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,

@@ -45,10 +45,6 @@ QuantGpt::QuantGpt(const std::string weight_path, const int max_batch_size)
     throw std::runtime_error(res);
   }
 
-  size_t buf_bytesize = encoder_->compute_buffer_bytesize();
-  std::cout << "Allocated " << buf_bytesize / (1024 * 1024)
-            << "MB GPU buffer for GPT2" << std::endl;
-
   encoder_->init_buffer();
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 }

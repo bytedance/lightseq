@@ -44,7 +44,7 @@ class QuantGptEncoder {
   cudaStream_t _stream;
   cudaStream_t _cache_stream;
   cublasHandle_t _hd;
-  // cublasLtHandle_t _cublas_lt_handle;
+  cublasLtHandle_t _cublas_lt_handle;
   const _DataType _fone;
   const _DataType _fzero;
   const int32_t _ione;
@@ -117,8 +117,7 @@ class QuantGptEncoder {
                   int *p_d_sample_id, const QuantGptWeight<OpType_> &tw,
                   cudaStream_t stream, cudaStream_t cache_stream,
                   cublasHandle_t hd);
-  size_t compute_buffer_bytesize();
-  void init_buffer(void *pbuf);
+  void init_buffer();
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
   int run_one_sample(int batch_size, int batch_seq_len);
