@@ -7,6 +7,7 @@ import numpy as np
 from collections import OrderedDict
 from transformers import GPT2LMHeadModel
 from lightseq.training.ops.pytorch.export import fill_hdf5_layer
+from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -146,11 +147,11 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    assert args.generation_method in ["topk", "topp", "ppl"]
     output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
     head_number = 12  # 20 for "gpt2-large"
-    # generation_method should be "topk" or "topp"
-    generation_method = "topk"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
@@ -161,7 +162,7 @@ if __name__ == "__main__":
         output_lightseq_model_name,
         input_huggingface_gpt_model,
         head_num=head_number,  # layer number
-        generation_method=generation_method,
+        generation_method=args.generation_method,
         topk=topk,
         topp=topp,
         eos_id=eos_id,

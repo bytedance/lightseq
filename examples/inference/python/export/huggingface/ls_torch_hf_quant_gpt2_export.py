@@ -198,12 +198,11 @@ def extract_gpt_weights(
 
 if __name__ == "__main__":
     args = parse_args()
+    assert args.generation_method in ["topk", "topp", "ppl"]
     model_name = ".".join(args.model.split(".")[:-1])
     hdf5_path = f"{model_name}.hdf5"
 
     head_number = 12  # 20 for "gpt2-large"
-    # generation_method should be "topk" or "topp"
-    generation_method = "topk"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
@@ -214,7 +213,7 @@ if __name__ == "__main__":
         hdf5_path,
         args.model,
         head_num=head_number,  # layer number
-        generation_method=generation_method,
+        generation_method=args.generation_method,
         topk=topk,
         topp=topp,
         eos_id=eos_id,

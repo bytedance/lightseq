@@ -22,6 +22,14 @@ def parse_args():
         action="store_true",
         help="whether to store hdf5",
     )
+    parser.add_argument(
+        "--generation_method",
+        "-g",
+        type=str,
+        default="beam_search",
+        choices=["beam_search", "topk_greedy", "topk", "topp", "ppl"],
+        help="generation method",
+    )
     args = parser.parse_args()
     return args
 

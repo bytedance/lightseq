@@ -80,7 +80,7 @@ class LSHFGptEncoderLayer(TransformerDecoderLayer):
 
 
 class GptEmbedding(nn.Embedding):
-    def __init__(self, training_args, initial_embeddings, *args, **kwargs):
+    def __init__(self, training_args, initial_embeddings=None, *args, **kwargs):
         super(GptEmbedding, self).__init__(*args, **kwargs)
         self.emb_quant = TensorQuantizer(weight_quant_config)
 

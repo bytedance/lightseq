@@ -3,7 +3,7 @@ import time
 import torch
 from transformers import BertTokenizer, BertForTokenClassification, BertConfig
 import lightseq.inference as lsi
-from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
+from lightseq.training.ops.pytorch.quantization import qat_mode
 from lightseq.training.ops.pytorch.torch_transformer_layers import (
     BertEmbeddingLayer,
     TransformerEncoderLayer,
