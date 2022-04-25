@@ -55,7 +55,7 @@ ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:/opt/tritonserver/bin:${PATH}
 # compile lightseq
 RUN cd /opt && git clone --recursive https://github.com/bytedance/lightseq.git && \
     cd lightseq && mkdir build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON -DUSE_TRITONBACKEND=ON .. && \
     make -j${nproc}
 
 # organize lightseq-tritonbackend dynamic link library
