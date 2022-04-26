@@ -638,7 +638,7 @@ void QuantDecoder<OpType_>::self_attention() {
 
   // get q, k, v by split and reshape qkv
 
-  ker_arrange_decself_qkv_i8I_launcher<_DataType>(
+  ker_arrange_decself_qkv_i8I_i8O_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
       _p_device_wei[_weight_offset + 3], _int8_ffn_in_buf,
       _p_d_self_k_cache1[_layer_id], _p_d_self_v_cache1[_layer_id],
@@ -671,7 +671,7 @@ void QuantDecoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  ker_fuse_softmax_new_value_int8_launcher(
+  ker_fuse_softmax_new_value_i32I_i8O_launcher(
       _int32_ffn_out_buf, _p_d_self_v_cache1[_layer_id], _int8_ffn_in_buf,
       _step_token_num * _tw._head_num, _cur_step + 1, _tw._max_step,
       _tw._head_num, _tw._dim_per_head, float(_atten_scaler),

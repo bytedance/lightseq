@@ -140,7 +140,7 @@ def extract_gpt_weights(
         token_embedding.numpy(),
         127,
         state_dict["transformer.wte.emb_quant.clip.clip_value_max"].numpy(),
-    )
+    ).transpose()
     print(f"processed token_embedding, shape: {token_embedding.shape}")
     hdf5_file.create_dataset(
         "src_embedding/token_embedding", data=token_embedding, dtype="uint8"

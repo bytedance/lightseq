@@ -76,9 +76,10 @@ void QuantEncoder<OpType_>::init_buffer() {
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_src_emb_wei,
                  _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
-  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei, _tw._hidden_size,
-                  _tw._src_vocab_size, _quant_range / _src_emb_clip_max,
-                  _stream, _cublas_lt_handle, kRowMajor);
+  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei,
+                  _tw._src_vocab_size, _tw._hidden_size,
+                  _quant_range / _src_emb_clip_max, _stream, _cublas_lt_handle,
+                  kRowMajor);
 
   _p_device_emb.push_back(nullptr);
   _p_device_emb.push_back(

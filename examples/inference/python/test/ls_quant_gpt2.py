@@ -211,7 +211,7 @@ def main():
     hf_model.eval()
 
     print("creating lightseq model...")
-    ls_model = lsi.QuantGpt(args.model, 8)
+    ls_model = lsi.QuantGpt(args.model, max_batch_size=16)
 
     # lightseq gpt perplexity supports batch infer with different lengths,
     # but sampling doesn't support

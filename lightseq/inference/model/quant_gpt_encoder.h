@@ -78,6 +78,12 @@ class QuantGptEncoder {
   int8_t *_int8_ffn_in_buf;
   int32_t *_int32_ffn_out_buf;
   int8_t *_int8_ffn_out_buf;
+  std::vector<int8_t *> _p_d_self_k_cache;
+  std::vector<int8_t *> _p_d_self_v_cache;
+  int8_t **_p_d_self_k_cache1;
+  int8_t **_p_d_self_k_cache2;
+  int8_t **_p_d_self_v_cache1;
+  int8_t **_p_d_self_v_cache2;
 
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;

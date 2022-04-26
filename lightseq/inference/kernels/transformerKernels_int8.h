@@ -73,23 +73,31 @@ void ker_arrange_encself_qkv_i8I_launcher(
     float dequant_scale, bool in_col32 = false);
 
 template <typename T>
+void ker_arrange_encself_qkv_i8I_i8O_launcher(
+    int batch_token_num, int hidden_size, cudaStream_t stream,
+    const int8_t *ori_qkv, const T *qkv_bias, int8_t *new_q, int8_t *new_k,
+    int8_t *new_v, T *d_v, int batch_seq_len, int dim_per_head, int head_num,
+    int max_thread_per_block, float dequant_scale, float quant_scale,
+    bool in_col32 = false);
+
+template <typename T>
 void ker_arrange_atten_output_i8O_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream, const T *ori_q,
     int8_t *new_q, int beam_size, int dim_per_head, int head_num,
     int max_thread_per_block, float quant_scale, bool out_col32 = false);
 
 template <typename T>
-void ker_arrange_decself_qkv_i8I_launcher(
+void ker_arrange_decself_qkv_i8I_i8O_launcher(
     int step_token_num, int hidden_size, cudaStream_t stream,
     const int8_t *ori_qkv, const T *qkv_bias, int8_t *new_q, int8_t *new_k,
     int8_t *new_v, int head_num, int dim_per_head, int max_step, int step_id,
     int max_thread_per_block, float dequant_scale, float quant_scale,
     bool in_col32 = false);
 
-void ker_fuse_softmax_new_value_int8_launcher(
+void ker_fuse_softmax_new_value_i32I_i8O_launcher(
     const int32_t *correlation, const int8_t *v, int8_t *new_v,
     int batch_head_num, int step_num, int max_step, int head_num, int head_dim,
-    float attn_scale, float dequant_scale, float quant_scale, bool col32_out,
+    float attn_scale, float dequant_scale, float quant_scale, bool out_col32,
     cudaStream_t stream);
 
 template <typename T>

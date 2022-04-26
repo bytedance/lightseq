@@ -379,6 +379,7 @@ class MultiheadAttention(nn.Module):
         else:
             attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
         attn = self.out_proj(attn)
+
         attn_weights: Optional[Tensor] = None
         if need_weights:
             attn_weights = attn_weights_float.view(
@@ -861,7 +862,6 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
         """
-
         if need_head_weights:
             need_attn = True
         x = x.transpose(0, 1)

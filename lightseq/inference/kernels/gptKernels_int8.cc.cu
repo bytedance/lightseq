@@ -183,5 +183,65 @@ void ker_ppl_i8I_launcher(int batch_size, int batch_seq_len,
                           dequant_scale, in_col32);
 }
 
+template <typename T>
+__global__ void ker_correlation_softmax_gpt_i32I(
+    int32_t* correlation, T* output, const int* real_seq_len,
+    const int batch_seq_len, float attn_scale, float dequant_scale) {
+  int query_token_pos = blockIdx.y % batch_seq_len;
+  if (query_token_pos >= real_seq_len[blockIdx.x]) {
+    return;
+  }
+
+  int mask = 0;  // can see the token when mask=0
+  if (threadIdx.x > query_token_pos || threadIdx.x >= batch_seq_len) {
+    mask = 1;  // Can only see the token on the left side of it
+  }
+
+  int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
+  float val = threadIdx.x < batch_seq_len
+                  ? ((float)correlation[idx] * attn_scale * dequant_scale *
+                     dequant_scale)
+                  : CUDA_FLOAT_INF_NEG;
+  float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
+  __shared__ float smax;
+  if (threadIdx.x == 0) smax = max_val;
+  __syncthreads();
+
+  val = mask ? 0.f : expf(val - smax);
+  float rsum = blockReduceSum<float>(val);
+  __shared__ float ssum;
+  if (threadIdx.x == 0) ssum = rsum;
+  __syncthreads();
+
+  if (threadIdx.x < batch_seq_len) output[idx] = (T)(val / ssum);
+}
+
+template <typename T>
+void ker_correlation_softmax_gpt_i32I_launcher(
+    int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
+    int32_t* correlation, T* output, const int* real_seq_len, float attn_scale,
+    float dequant_scale) {
+  int block_dim = batch_seq_len;
+  if (batch_seq_len < 1024) {
+    block_dim = (batch_seq_len + 31) >> 5;
+    block_dim *= 32;
+  }
+
+  ker_correlation_softmax_gpt_i32I<T>
+      <<<dim3(batch_size, head_num * batch_seq_len), block_dim, 0, stream>>>(
+          correlation, output, real_seq_len, batch_seq_len, attn_scale,
+          dequant_scale);
+}
+
+template void ker_correlation_softmax_gpt_i32I_launcher<float>(
+    int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
+    int32_t* correlation, float* output, const int* real_seq_len,
+    float attn_scale, float dequant_scale);
+
+template void ker_correlation_softmax_gpt_i32I_launcher<__half>(
+    int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
+    int32_t* correlation, __half* output, const int* real_seq_len,
+    float attn_scale, float dequant_scale);
+
 }  // namespace cuda
 }  // namespace lightseq

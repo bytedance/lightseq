@@ -21,11 +21,11 @@
 
 - The meaning of parameters in config.pbtxt, more information you can find in [Model config of tritonbackend](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 
-  > ${name}: name of model，**which should be same with <model_name_vid>**
+  > ${name}: name of model, **which should be same with <model_name_vid>**
   >
-  > ${backend}: **fixed value - "lightseq"**，which is used to recognize the dynamic link library of tritonbackend,  libtriton_lightseq.so
+  > ${backend}: **fixed value - "lightseq"**, which is used to recognize the dynamic link library of tritonbackend,  libtriton_lightseq.so
   >
-  > ${default_model_filename}: name of model file，**which should be same with <model_file>**
+  > ${default_model_filename}: name of model file, **which should be same with <model_file>**
   >
   > ${parameters - value - string_value}: the type of model, which should be supported by lightseq. You can choose `Transformer`|`QuantTransformer`|`Bert`|`Gpt`|`Moe`
 

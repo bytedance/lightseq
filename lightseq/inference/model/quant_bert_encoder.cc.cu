@@ -71,9 +71,10 @@ void QuantBertEncoder<OpType_>::init_buffer() {
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_src_emb_wei,
                  _tw._src_vocab_size * _tw._hidden_size * sizeof(int8_t)));
-  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei, _tw._hidden_size,
-                  _tw._src_vocab_size, _quant_range / _src_emb_clip_max,
-                  _stream, _cublas_lt_handle, kRowMajor);
+  quantize_weight(_p_d_src_emb_wei[0], _int8_p_d_src_emb_wei,
+                  _tw._src_vocab_size, _tw._hidden_size,
+                  _quant_range / _src_emb_clip_max, _stream, _cublas_lt_handle,
+                  kRowMajor);
 
   _p_device_emb.push_back(nullptr);
   _p_device_emb.push_back(
@@ -356,7 +357,7 @@ void QuantBertEncoder<OpType_>::self_attention() {
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
       std::cout << "attn_ln input: token-" << j << std::endl;
-      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
+      print_vec(_int8_ffn_out_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "attn_ln input", 10);
     }
@@ -380,7 +381,7 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
       std::cout << "ffn1 input: token-" << j << std::endl;
-      print_vec(_int8_ffn_out_buf + i * _batch_seq_len * _tw._hidden_size +
+      print_vec(_int8_ffn_in_buf + i * _batch_seq_len * _tw._hidden_size +
                     j * _tw._hidden_size,
                 "ffn1 input", 10);
     }

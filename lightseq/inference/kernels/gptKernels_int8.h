@@ -21,5 +21,11 @@ void ker_ppl_i8I_launcher(int batch_size, int batch_seq_len,
                           const int* real_seq_len, float* ppl, int vocab_size,
                           float dequant_scale, bool in_col32 = false);
 
+template <typename T>
+void ker_correlation_softmax_gpt_i32I_launcher(
+    int batch_size, int batch_seq_len, int head_num, cudaStream_t stream,
+    int32_t* correlation, T* output, const int* real_seq_len, float attn_scale,
+    float dequant_scale);
+
 }  // namespace cuda
 }  // namespace lightseq
