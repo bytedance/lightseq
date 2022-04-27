@@ -198,7 +198,8 @@ def extract_gpt_weights(
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.generation_method in ["topk", "topp", "ppl"]
+    if args.generation_method not in ["topk", "topp", "ppl"]:
+        args.generation_method = "topk"
     model_name = ".".join(args.model.split(".")[:-1])
     hdf5_path = f"{model_name}.hdf5"
 

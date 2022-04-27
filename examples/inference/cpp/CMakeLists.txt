@@ -15,5 +15,8 @@ target_link_libraries(quant_bert_example PUBLIC liblightseq)
 add_executable(gpt_example gpt_example.cc)
 target_link_libraries(gpt_example PUBLIC liblightseq)
 
+add_executable(quant_gpt_example quant_gpt_example.cc)
+target_link_libraries(quant_gpt_example PUBLIC liblightseq)
+
 add_executable(transformer_decoder_example decoder_example.cc.cu)
 target_link_libraries(transformer_decoder_example PUBLIC transformer_model)

@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
   int max_batch_size = 128;
 
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
-      "Gpt", model_weights_path, max_batch_size);
+      "QuantGpt", model_weights_path, max_batch_size);
 
   int batch_size = 1;
   int batch_seq_len = 5;

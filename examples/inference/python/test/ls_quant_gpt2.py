@@ -118,7 +118,7 @@ def warmup(
 
     if generation_method == "topk" or generation_method == "topp":
         ls_generate(ls_model, ls_tokenizer, ls_inputs)
-        hf_generate(hf_model, hf_tokenizer, hf_inputs)
+        # hf_generate(hf_model, hf_tokenizer, hf_inputs)
     elif generation_method == "ppl":
         ls_ppl(ls_model, ls_tokenizer, ls_inputs)
         hf_ppl(hf_model, hf_tokenizer, hf_inputs)
@@ -185,6 +185,8 @@ def inject_ls_layer(model, config):
 
 def main():
     args = parse_args()
+    if args.generation_method not in ["topk", "topp", "ppl"]:
+        args.generation_method = "topk"
     model_name = ".".join(args.model.split(".")[:-1])
     ckpt_path = f"{model_name}.bin"
 
@@ -216,10 +218,10 @@ def main():
     # lightseq gpt perplexity supports batch infer with different lengths,
     # but sampling doesn't support
     sentences = [
-        "My name is GPT",
-        "My name is GPT",
-        "My name is GPT",
-        "My name is GPT",
+        "I love you, but you",
+        "I love you, but you",
+        "I love you, but you",
+        "I love you, but you",
     ]
 
     print("====================START warmup====================")
@@ -239,7 +241,7 @@ def main():
 
     if args.generation_method == "topk" or args.generation_method == "topp":
         ls_generate(ls_model, ls_tokenizer, ls_inputs)
-        hf_generate(hf_model, hf_tokenizer, hf_inputs)
+        # hf_generate(hf_model, hf_tokenizer, hf_inputs)
     elif args.generation_method == "ppl":
         ls_ppl(ls_model, ls_tokenizer, ls_inputs)
         hf_ppl(hf_model, hf_tokenizer, hf_inputs)

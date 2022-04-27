@@ -514,7 +514,8 @@ def extract_transformer_weights(
 
 if __name__ == "__main__":
     args = parse_args()
-    assert args.generation_method in ["beam_search", "topk", "topp", "topk_greedy"]
+    if args.generation_method not in ["beam_search", "topk", "topp", "topk_greedy"]:
+        args.generation_method = "beam_search"
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
     output_lightseq_model_name = "lightseq_bart_base"  # you can rename it to "lightseq_bart_large" for large model
     input_huggingface_bart_model = (

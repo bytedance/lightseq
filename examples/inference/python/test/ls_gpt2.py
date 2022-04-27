@@ -150,10 +150,10 @@ def main():
     # lightseq gpt perplexity supports batch infer with different lengths,
     # but sampling doesn't support
     sentences = [
-        "My name is GPT",
-        "My name is GPT",
-        "My name is GPT",
-        "My name is GPT",
+        "I love you, but you",
+        "I love you, but you",
+        "I love you, but you",
+        "I love you, but you",
     ]
 
     print("====================START warmup====================")
