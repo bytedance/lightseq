@@ -3,7 +3,7 @@ This repo contains examples of exporting models (LightSeq, Fairseq based, Huggin
 
 Before doing anything, you need to switch to the current directory:
 ```shell
-cd examples/inference/python
+$ cd examples/inference/python
 ```
 
 ## Model export
@@ -32,31 +32,31 @@ We provide the following export examples. All Fairseq based models are trained u
 ### Hugging Face models
 1. BART
 ```shell
-python test/ls_bart.py
+$ python test/ls_bart.py
 ```
 2. BERT
 ```shell
-python test/ls_bert.py
+$ python test/ls_bert.py
 ```
 3. GPT2
 ```shell
-python test/ls_gpt2.py
+$ python test/ls_gpt2.py
 ```
 4. ViT
 ```shell
-python test/ls_vit.py
+$ python test/ls_vit.py
 ```
 5. Quantized BERT
 ```shell
-python test/ls_quant_bert.py
+$ python test/ls_quant_bert.py
 ```
 6. Quantized GPT2
 ```shell
-python test/ls_quant_gpt.py
+$ python test/ls_quant_gpt.py
 ```
 
 ### Fairseq based models
 After exporting the Fairseq based models to protobuf/hdf5 format using above scripts, we can use the following script for fast LightSeq inference on wmt14 en2de dateset, compatible with fp16 and int8 models:
 ```shell
-bash test/ls_fairseq.sh --model ${model_path}
+$ bash test/ls_fairseq.sh --model ${model_path}
 ```

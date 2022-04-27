@@ -3,13 +3,13 @@ This repo contains examples for how to use LightSeq to accerate the training of 
 
 First you should install these requirements.
 ```shell
-pip install lightseq fairseq sacremoses
+$ pip install lightseq fairseq sacremoses
 ```
 
 ## Train
 Then you can train a translation task on wmt14 en2de dataset using LightSeq by running the following script:
 ```shell
-sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
+$ sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 Or you can use LightSeq modules like `--arch ls_transformer_wmt_en_de_big_t2t`,
@@ -34,7 +34,7 @@ to switch to fairseq modules.
 ## Evaluation
 Then you can evaluate on wmt14 en2de dataset by running the following command:
 ```shell
-lightseq-validate /tmp/wmt14_en_de/ \
+$ lightseq-validate /tmp/wmt14_en_de/ \
     --valid-subset valid \
     --path checkpoints/checkpoint_best.pt \
     --task translation \
@@ -47,7 +47,7 @@ lightseq-validate /tmp/wmt14_en_de/ \
 ## Generate
 You can also generate on wmt14 en2de dataset by running the following command:
 ```shell
-lightseq-generate /tmp/wmt14_en_de/ \
+$ lightseq-generate /tmp/wmt14_en_de/ \
     --gen-subset test \
     --path checkpoints/checkpoint_best.pt \
     --task translation \

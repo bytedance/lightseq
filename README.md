@@ -66,6 +66,20 @@ More results is available [here](./docs/inference/performance.md).
 ## Quick Start
 Complete user guide is available [here](docs/guide.md).
 
+### Installation
+You can install LightSeq from PyPI:
+```shell
+$ pip install lightseq
+```
+
+LightSeq installation from PyPi only supports Python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments:
+```shell
+$ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT_DIR
+```
+
+Detailed building introduction is available [here](docs/inference/build.md).
+
+
 ### Fast training from Fairseq
 
 You can experience lightning fast training by running following commands,
@@ -97,11 +111,9 @@ $ cd examples/inference/python
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python export/huggingface/hf_bart_export.py
-python test/ls_bart.py
+$ python export/huggingface/hf_bart_export.py
+$ python test/ls_bart.py
 ```
-
-LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 More usage is available [here](./lightseq/inference/README.md).
 

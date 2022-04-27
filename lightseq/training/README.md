@@ -58,15 +58,15 @@ We compute speedup on different batch size using the WPS (real words per second)
 To install LightSeq training library,
 
 ```shell
-pip install lightseq
+$ pip install lightseq
 ```
 
 or install in develop mode,
 
 ```shell
-git clone https://github.com/bytedance/lightseq.git
-cd lightseq
-pip install -e .
+$ git clone https://github.com/bytedance/lightseq.git
+$ cd lightseq
+$ pip install -e .
 ```
 
 ### TensorFlow
@@ -75,7 +75,7 @@ pip install -e .
 - Cuda version = 11.0
 - To install LightSeq training library:
 ```shell
-pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorflow/lightseq_tf-2.0.1-cp37-cp37m-linux_x86_64.whl
+$ pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorflow/lightseq_tf-2.0.1-cp37-cp37m-linux_x86_64.whl
 ```
 
 ## Usage

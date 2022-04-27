@@ -7,12 +7,12 @@ We modify the examples like token classification [examples](https://github.com/h
 First you should install these requirements.
 
 ```shell
-pip install torch ninja transformers seqeval datasets
+$ pip install torch ninja transformers seqeval datasets
 ```
 
 Before doing next training, you need to switch to the current directory:
 ```shell
-cd examples/training/huggingface/bert
+$ cd examples/training/huggingface/bert
 ```
 
 Then you can easily fine-tunes BERT on different tasks by running the bash scripts `task_ner/run_ner.sh`
