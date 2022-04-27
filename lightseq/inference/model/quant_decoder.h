@@ -101,7 +101,6 @@ class QuantDecoder {
   _DataType* _p_d_query_buf2;
   _DataType* _p_d_c;
   _DataType* _p_d_encoder_out_buf;
-  _DataType* _p_d_logit_buf;
 
   int8_t* _int8_ffn_in_buf;
   int32_t* _int32_ffn_out_buf;

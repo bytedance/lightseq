@@ -904,22 +904,23 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
 template <OperationType OpType_>
 bool QuantDecoder<OpType_>::sample() {
-  throw std::runtime_error("QuantDecoder sample() not implemented");
   CHECK_GPU_ERROR(
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   /* --- Sample new tokens from logits --- */
   if (_tw._sampling_method == "topk") {
-    ker_topk_sample_launcher<_DataType>(
+    ker_topk_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+        _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
+        _logits_clip_max / _quant_range, true);
   } else {
-    ker_topp_sample_launcher<_DataType>(
+    ker_topp_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+        _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
+        _logits_clip_max / _quant_range, true);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -1052,7 +1053,6 @@ void QuantDecoder<OpType_>::update_new_seq_probs() {
 
 template <OperationType OpType_>
 bool QuantDecoder<OpType_>::topk_greedy_search() {
-  throw std::runtime_error("QuantDecoder topk_greedy_search() not implemented");
   _tw._diverse_lambda = 0;
   if (_cur_step == 0) {
     return beam_search();
@@ -1061,11 +1061,11 @@ bool QuantDecoder<OpType_>::topk_greedy_search() {
   CHECK_GPU_ERROR(
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   /* --- Sample new tokens from logits --- */
-  ker_topk_sample_launcher<_DataType>(
+  ker_topk_sample_i8I_launcher<_DataType>(
       _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-      _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+      _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
       _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
-      _p_d_curandstate, _tw._end_id);
+      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, true);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);

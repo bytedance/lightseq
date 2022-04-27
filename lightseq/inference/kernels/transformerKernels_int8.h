@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <curand_kernel.h>
 #include <cstdint>
 
 namespace lightseq {
@@ -117,6 +118,28 @@ void select_beam_rough_topk_i8I_launcher(
     int max_step, float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
     float diverse_lambda, int end_id, bool in_col32 = false);
+
+template <typename T>
+void ker_topk_sample_i8I_launcher(int batch_size, int batch_seq_len,
+                                  const int max_step, int logits_seq_len,
+                                  int max_thread_per_block, cudaStream_t stream,
+                                  const int8_t *logits, const T *logit_bias,
+                                  int *old_input_ids, int *new_input_ids,
+                                  const int vocab_size, const int k,
+                                  int *all_finished, curandState *curandstate,
+                                  int eos_id, float dequant_scale,
+                                  bool in_col32 = false);
+
+template <typename T>
+void ker_topp_sample_i8I_launcher(int batch_size, int batch_seq_len,
+                                  const int max_step, int logits_seq_len,
+                                  int max_thread_per_block, cudaStream_t stream,
+                                  const int8_t *logits, const T *logit_bias,
+                                  int *old_input_ids, int *new_input_ids,
+                                  const int vocab_size, const float p,
+                                  int *unfinished, curandState *curandstate,
+                                  int eos_id, float dequant_scale,
+                                  bool in_col32 = false);
 
 }  // namespace cuda
 }  // namespace lightseq
