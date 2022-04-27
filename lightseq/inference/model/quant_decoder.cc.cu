@@ -840,7 +840,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
         _p_device_wei[_weight_offset + 15], _tw._inner_size,
         _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
-        _quant_range / _dec_clip_max[_layer_id * 19 + 11], true);
+        _quant_range / _dec_clip_max[_layer_id * 19 + 11], true, false);
   } else {
     ker_bias_relu_i8I_i8O_launcher<_DataType>(
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,

@@ -187,7 +187,7 @@ void QuantGptEncoder<OpType_>::init_buffer() {
                     _int8_p_d_enc_wei[_layer_id * 4 + 1], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _enc_clip_max[_layer_id * 12 + 1], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_enc_wei[_weight_offset + 8],
                     _int8_p_d_enc_wei[_layer_id * 4 + 2], _tw._hidden_size,
@@ -199,7 +199,7 @@ void QuantGptEncoder<OpType_>::init_buffer() {
                     _int8_p_d_enc_wei[_layer_id * 4 + 3], _tw._inner_size,
                     _tw._hidden_size,
                     _quant_range / _enc_clip_max[_layer_id * 12 + 3], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, kColMajor);
 
     _scaled_ffn2_colsum[_layer_id] = nullptr;
   }
@@ -538,17 +538,15 @@ void QuantGptEncoder<OpType_>::self_attention(bool cache) {
   ker_arrange_atten_output_i8O_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_q, _int8_ffn_in_buf,
       _batch_seq_len, _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_range / _enc_clip_max[_layer_id * 12 + 5], true);
+      _quant_range / _enc_clip_max[_layer_id * 12 + 5], false);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
-
-  cublasLtMM_withAlgo_i8IO(
-      _int8_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
-      _tw._hidden_size, 0, 0, 0,
+  cublaslt_gemm(
+      _int8_p_d_enc_wei[_layer_id * 4 + 1], _int8_ffn_in_buf, _int8_ffn_out_buf,
+      1, _tw._hidden_size, _batch_token_num, _tw._hidden_size, 0, 0, 0,
       _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
           (_enc_clip_max[_layer_id * 12 + 9] * _quant_range),
-      _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1], _cublas_lt_handle,
-      _stream, false);
+      _cublas_lt_handle, _stream);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "attn out in", 20);
@@ -562,7 +560,7 @@ void QuantGptEncoder<OpType_>::self_attention(bool cache) {
       _int8_ffn_in_buf, _p_d_query, _batch_token_num, _tw._hidden_size,
       _enc_clip_max[_layer_id * 12 + 9] / _quant_range,
       _quant_range / _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block,
-      _stream, false, true);
+      _stream, false, false, true);
 
   return;
 }
@@ -644,16 +642,15 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
   ker_arrange_atten_output_i8O_launcher<_DataType>(
       _batch_size, _tw._hidden_size, _stream, _p_d_q, _int8_ffn_in_buf, 1,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_range / _enc_clip_max[_layer_id * 12 + 5], true);
+      _quant_range / _enc_clip_max[_layer_id * 12 + 5], false);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
-  cublasLtMM_withAlgo_i8IO(
-      _int8_ffn_out_buf, 1, _batch_size, _tw._hidden_size, _tw._hidden_size, 0,
-      0, 0,
+  cublaslt_gemm(
+      _int8_p_d_enc_wei[_layer_id * 4 + 1], _int8_ffn_in_buf, _int8_ffn_out_buf,
+      1, _tw._hidden_size, _batch_size, _tw._hidden_size, 0, 0, 0,
       _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
           (_enc_clip_max[_layer_id * 12 + 9] * _quant_range),
-      _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1], _cublas_lt_handle,
-      _stream, false);
+      _cublas_lt_handle, _stream);
 
   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
       _int8_ffn_out_buf, _p_device_wei[_weight_offset + 6],
@@ -661,7 +658,7 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
       _int8_ffn_in_buf, _p_d_query, _batch_size, _tw._hidden_size,
       _enc_clip_max[_layer_id * 12 + 9] / _quant_range,
       _quant_range / _enc_clip_max[_layer_id * 12 + 6], _max_thread_per_block,
-      _stream, false, true);
+      _stream, false, false, true);
   return;
 }
 
@@ -686,14 +683,12 @@ void QuantGptEncoder<OpType_>::ffn_add_norm() {
       _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
       _p_device_wei[_weight_offset + 9], _tw._inner_size,
       _enc_clip_max[_layer_id * 12 + 10] / _quant_range,
-      _quant_range / _enc_clip_max[_layer_id * 12 + 7], true);
+      _quant_range / _enc_clip_max[_layer_id * 12 + 7], true, false);
 
   /* ---step 2. second ffn layer--- */
-
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
-                      _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_enc_wei[_layer_id * 4 + 3], _cublas_lt_handle,
-                      _stream, false);
+  cublaslt_gemm(_int8_p_d_enc_wei[_layer_id * 4 + 3], _int8_ffn_in_buf,
+                _int32_ffn_out_buf, 1, _tw._hidden_size, _batch_token_num,
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "ffn2 in", 20);
@@ -722,7 +717,7 @@ void QuantGptEncoder<OpType_>::ffn_add_norm() {
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
       _p_d_query, _batch_token_num, _tw._hidden_size, dequant_scale,
-      _quant_range / clip_max, _max_thread_per_block, _stream, false, true,
+      _quant_range / clip_max, _max_thread_per_block, _stream, false, false,
       true, _scaled_ffn2_colsum[_layer_id]);
 
   return;
@@ -743,13 +738,12 @@ void QuantGptEncoder<OpType_>::ffn_add_norm_with_cache() {
       _batch_size, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
       _p_device_wei[_weight_offset + 9], _tw._inner_size,
       _enc_clip_max[_layer_id * 12 + 10] / _quant_range,
-      _quant_range / _enc_clip_max[_layer_id * 12 + 7], true);
+      _quant_range / _enc_clip_max[_layer_id * 12 + 7], true, false);
 
   /* ---step 2. second ffn layer--- */
-  cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_size, _tw._hidden_size,
-                      _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
-                      _int8_p_d_enc_wei[_layer_id * 4 + 3], _cublas_lt_handle,
-                      _stream, false);
+  cublaslt_gemm(_int8_p_d_enc_wei[_layer_id * 4 + 3], _int8_ffn_in_buf,
+                _int32_ffn_out_buf, 1, _tw._hidden_size, _batch_size,
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max, dequant_scale;
@@ -772,7 +766,7 @@ void QuantGptEncoder<OpType_>::ffn_add_norm_with_cache() {
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
       _p_d_query, _batch_size, _tw._hidden_size, dequant_scale,
-      _quant_range / clip_max, _max_thread_per_block, _stream, false, true,
+      _quant_range / clip_max, _max_thread_per_block, _stream, false, false,
       true, _scaled_ffn2_colsum[_layer_id]);
 
   return;

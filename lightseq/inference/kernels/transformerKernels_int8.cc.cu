@@ -864,85 +864,72 @@ template void ker_residual_bias_ln_i32I_launcher<half>(
 
 template <typename T>
 __global__ void ker_bias_gelu_i8I_i8O(int8_t *input, int8_t *output,
-                                      const T *bias, int total_count,
-                                      int feature_dim, float dequant_scale,
-                                      float quant_scale, bool in_out_col32) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+                                      const T *bias, int feature_dim,
+                                      float dequant_scale, float quant_scale,
+                                      bool in_col32, bool out_col32) {
+  int block_start = blockIdx.x * feature_dim;
+  int start = block_start + threadIdx.x;
+  int end = block_start + feature_dim;
+  for (int i = start; i < end; i += blockDim.x) {
+    int input_index;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      input_index =
+          row_major2flat_col32(row_id, col_id, gridDim.x, feature_dim);
+    } else {
+      input_index = i;
+    }
 
-  if (i * 4 >= total_count) return;
+    float fout = gelu<float>(float(input[input_index]) * dequant_scale +
+                             __ldg(&bias[i - block_start]));
 
-  char4 *out4 = reinterpret_cast<char4 *>(output);
-  const char4 *data4 = reinterpret_cast<const char4 *>(input);
-  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-
-  int bias_i;
-  if (in_out_col32) {
-    int row_size = total_count / feature_dim;
-    int flat_i = i << 2;
-    int col_id = (flat_i / (row_size * 32)) * 32 + (flat_i & 31);
-    bias_i = col_id >> 2;
-  } else {
-    bias_i = i % (feature_dim >> 2);
+    int output_index;
+    if (out_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      output_index =
+          row_major2flat_col32(row_id, col_id, gridDim.x, feature_dim);
+    } else {
+      output_index = i;
+    }
+    output[output_index] = float2int8(fout, quant_scale);
   }
-
-  const char4 input4 = data4[i];
-  const float4 b4 = __ldg(&bias4[bias_i]);
-  float4 output4;
-
-  output4.x = gelu<float>(float(input4.x) * dequant_scale + b4.x);
-  output4.y = gelu<float>(float(input4.y) * dequant_scale + b4.y);
-  output4.z = gelu<float>(float(input4.z) * dequant_scale + b4.z);
-  output4.w = gelu<float>(float(input4.w) * dequant_scale + b4.w);
-
-  char4 out_i4;
-  out_i4.x = float2int8(output4.x, quant_scale);
-  out_i4.y = float2int8(output4.y, quant_scale);
-  out_i4.z = float2int8(output4.z, quant_scale);
-  out_i4.w = float2int8(output4.w, quant_scale);
-  out4[i] = out_i4;
 }
 
 /* fp16 version */
 template <>
-__global__ void ker_bias_gelu_i8I_i8O<__half>(int8_t *input, int8_t *output,
-                                              const __half *bias,
-                                              int total_count, int feature_dim,
-                                              float dequant_scale,
-                                              float quant_scale,
-                                              bool in_out_col32) {
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void ker_bias_gelu_i8I_i8O<__half>(
+    int8_t *input, int8_t *output, const __half *bias, int feature_dim,
+    float dequant_scale, float quant_scale, bool in_col32, bool out_col32) {
+  int block_start = blockIdx.x * feature_dim;
+  int start = block_start + threadIdx.x;
+  int end = block_start + feature_dim;
+  for (int i = start; i < end; i += blockDim.x) {
+    int input_index;
+    if (in_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      input_index =
+          row_major2flat_col32(row_id, col_id, gridDim.x, feature_dim);
+    } else {
+      input_index = i;
+    }
 
-  if (i * 8 >= total_count) return;
+    float fout = gelu<float>(float(input[input_index]) * dequant_scale +
+                             __half2float(__ldg(&bias[i - block_start])));
 
-  const int2 *vals_int2 = reinterpret_cast<const int2 *>(input);
-  int64_t *outs_i8 = reinterpret_cast<int64_t *>(output);
-  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
-
-  int bias_i;
-  if (in_out_col32) {
-    int row_size = total_count / feature_dim;
-    int flat_i = i << 3;
-    int col_id = (flat_i / (row_size * 32)) * 32 + (flat_i & 31);
-    bias_i = col_id >> 3;
-  } else {
-    bias_i = i % (feature_dim >> 3);
+    int output_index;
+    if (out_col32) {
+      int row_id = blockIdx.x;
+      int col_id = i - block_start;
+      output_index =
+          row_major2flat_col32(row_id, col_id, gridDim.x, feature_dim);
+    } else {
+      output_index = i;
+    }
+    output[output_index] = float2int8(fout, quant_scale);
   }
-
-  int2 val_int2 = vals_int2[i];
-  int8_t *val1 = reinterpret_cast<int8_t *>(&val_int2);
-  const float4 b4 = __ldg(&bias4[bias_i]);
-  const __half *b_half = reinterpret_cast<const __half *>(&b4);
-  int64_t out_i8;
-  int8_t *out_i1 = reinterpret_cast<int8_t *>(&out_i8);
-
-#pragma unroll
-  for (int j = 0; j < 8; ++j) {
-    float out_f;
-    out_f =
-        gelu<float>(float(val1[j]) * dequant_scale + __half2float(b_half[j]));
-    out_i1[j] = float2int8(out_f, quant_scale);
-  }
-  outs_i8[i] = out_i8;
 }
 
 template <typename T>
@@ -950,35 +937,31 @@ void ker_bias_gelu_i8I_i8O_launcher(int batch_token_num, cudaStream_t stream,
                                     int8_t *input, int8_t *output,
                                     const T *bias, int feature_dim,
                                     float dequant_scale, float quant_scale,
-                                    bool in_out_col32) {
-  int total_count = batch_token_num * feature_dim;
-  int grid_dim = total_count >> 10;
-  ker_bias_gelu_i8I_i8O<T><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
-      in_out_col32);
+                                    bool in_col32, bool out_col32) {
+  ker_bias_gelu_i8I_i8O<T><<<batch_token_num, 1024, 0, stream>>>(
+      input, output, bias, feature_dim, dequant_scale, quant_scale, in_col32,
+      out_col32);
 }
 
 template <>
 void ker_bias_gelu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
     const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
-    bool in_out_col32) {
-  int total_count = batch_token_num * feature_dim;
-  int grid_dim = total_count >> 11;
-  ker_bias_gelu_i8I_i8O<__half><<<grid_dim + 1, 256, 0, stream>>>(
-      input, output, bias, total_count, feature_dim, dequant_scale, quant_scale,
-      in_out_col32);
+    bool in_col32, bool out_col32) {
+  ker_bias_gelu_i8I_i8O<__half><<<batch_token_num, 1024, 0, stream>>>(
+      input, output, bias, feature_dim, dequant_scale, quant_scale, in_col32,
+      out_col32);
 }
 
 template void ker_bias_gelu_i8I_i8O_launcher<float>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
     const float *bias, int feature_dim, float dequant_scale, float quant_scale,
-    bool in_out_col32);
+    bool in_col32, bool out_col32);
 
 template void ker_bias_gelu_i8I_i8O_launcher<__half>(
     int batch_token_num, cudaStream_t stream, int8_t *input, int8_t *output,
     const __half *bias, int feature_dim, float dequant_scale, float quant_scale,
-    bool in_out_col32);
+    bool in_col32, bool out_col32);
 
 template <typename T>
 __global__ void ker_bias_relu_i8I_i8O(int8_t *input, int8_t *output,

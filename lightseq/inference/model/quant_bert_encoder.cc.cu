@@ -370,7 +370,7 @@ void QuantBertEncoder<OpType_>::self_attention() {
       _int8_ffn_in_buf, _p_d_output, _batch_token_num, _tw._hidden_size,
       _enc_clip_max[_layer_id * 11 + 9] / _quant_range,
       _quant_range / _enc_clip_max[_layer_id * 11 + 6], _max_thread_per_block,
-      _stream, _tw._is_post_ln, true);
+      _stream, _tw._is_post_ln, true, true);
 
   return;
 }
@@ -402,7 +402,7 @@ void QuantBertEncoder<OpType_>::ffn_add_norm() {
         _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
         _p_device_wei[_weight_offset + 9], _tw._inner_size,
         _enc_clip_max[_layer_id * 11 + 10] / _quant_range,
-        _quant_range / _enc_clip_max[_layer_id * 11 + 7], true);
+        _quant_range / _enc_clip_max[_layer_id * 11 + 7], true, true);
   } else {
     ker_bias_relu_i8I_i8O_launcher<_DataType>(
         _batch_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
