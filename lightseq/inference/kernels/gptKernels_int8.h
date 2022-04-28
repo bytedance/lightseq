@@ -49,7 +49,7 @@ template <typename T>
 void ker_arrange_qkv_with_cache_i8I_i8O_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t* ori_qkv, const T* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, T* d_v, int batch_seq_len,
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32 = false);
 

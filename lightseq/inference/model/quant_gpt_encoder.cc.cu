@@ -587,7 +587,7 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
       _batch_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
       _p_device_wei[_weight_offset + 3], _int8_ffn_in_buf,
       _p_d_self_k_cache1[_layer_id], _p_d_self_k_cache2[_layer_id],
-      _p_d_self_v_cache1[_layer_id], _p_d_self_v_cache2[_layer_id], _p_d_v,
+      _p_d_self_v_cache1[_layer_id], _p_d_self_v_cache2[_layer_id],
       _batch_seq_len, _tw._dim_per_head, _tw._head_num,
       _enc_clip_max[_layer_id * 12 + 8] / _quant_range,
       _quant_range / _enc_clip_max[_layer_id * 12 + 11], true);
@@ -602,26 +602,12 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
       CUDA_R_32I, _batch_seq_len, _batch_seq_len, _batch_size * _tw._head_num,
       CUDA_R_32I, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-  ker_attention_mask_weights_i32I_launcher<_DataType>(
-      _batch_size, 1, _batch_seq_len, _tw._head_num, _stream,
-      _int32_ffn_out_buf, _p_d_c, _p_d_real_seq_len, _atten_scaler,
-      _enc_clip_max[_layer_id * 12 + 11] / _quant_range);
-
-  /* ---step 3. new_q = correlation * v--- */
-  CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._dim_per_head, 1, _batch_seq_len,
-      &_fone, _p_d_v, _AType, _tw._dim_per_head,
-      _batch_seq_len * _tw._dim_per_head, _p_d_c, _BType, _batch_seq_len,
-      _batch_seq_len, &_fzero, _p_d_q, _CType, _tw._dim_per_head,
-      _tw._dim_per_head, _batch_size * _tw._head_num, _computeType,
-      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
-  // use v to save reshaped q, since they are in same size and v
-  // will not be use again before the next multi-head-attention
-  ker_arrange_atten_output_i8O_launcher<_DataType>(
-      _batch_size, _tw._hidden_size, _stream, _p_d_q, _int8_ffn_in_buf, 1,
-      _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _quant_range / _enc_clip_max[_layer_id * 12 + 5], false);
+  ker_fuse_softmax_new_value_i32I_i8O_launcher(
+      _int32_ffn_out_buf, _p_d_self_v_cache1[_layer_id], _int8_ffn_in_buf,
+      _batch_size * _tw._head_num, _batch_seq_len, _batch_seq_len,
+      _tw._head_num, _tw._dim_per_head, float(_atten_scaler),
+      _enc_clip_max[_layer_id * 12 + 11] / _quant_range,
+      _quant_range / _enc_clip_max[_layer_id * 12 + 5], false, _stream);
 
   /* ---step 4. new_q = ori_q + new_q * output_wei--- */
   cublaslt_gemm(

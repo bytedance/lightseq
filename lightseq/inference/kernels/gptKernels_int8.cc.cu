@@ -658,7 +658,7 @@ void ker_topp_sample_i8I_launcher(int batch_size, int batch_seq_len,
 template <typename T>
 __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
     const int8_t* ori_qkv, const T* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, T* d_v, int batch_seq_len,
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   int hidden_size = head_num * dim_per_head;
@@ -702,16 +702,15 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O(
   if (blockIdx.y == 1) new_k[target_id] = new_val;
   if (blockIdx.y == 2) {
     new_v[target_id] = new_val;
-    d_v[target_id] = float(new_val) / quant_scale;
   }
 }
 
 template <>
 __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
     const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, __half* d_v,
-    int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
-    float quant_scale, bool in_col32) {
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    int dim_per_head, int head_num, float dequant_scale, float quant_scale,
+    bool in_col32) {
   int hidden_size = head_num * dim_per_head;
   int batch_size = gridDim.x / batch_seq_len;
   int batch_id = blockIdx.x / batch_seq_len;
@@ -754,7 +753,6 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
   if (blockIdx.y == 1) new_k[target_id] = new_val;
   if (blockIdx.y == 2) {
     new_v[target_id] = new_val;
-    d_v[target_id] = __float2half(float(new_val) / quant_scale);
   }
 }
 
@@ -762,12 +760,12 @@ template <typename T>
 void ker_arrange_qkv_with_cache_i8I_i8O_launcher(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t* ori_qkv, const T* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, T* d_v, int batch_seq_len,
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   ker_arrange_qkv_with_cache_i8I_i8O<T>
       <<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
-          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache, d_v,
+          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
           batch_seq_len, dim_per_head, head_num, dequant_scale, quant_scale,
           in_col32);
 }
@@ -776,12 +774,12 @@ template <>
 void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, __half* d_v,
-    int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
-    float quant_scale, bool in_col32) {
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    int dim_per_head, int head_num, float dequant_scale, float quant_scale,
+    bool in_col32) {
   ker_arrange_qkv_with_cache_i8I_i8O<__half>
       <<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
-          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache, d_v,
+          ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
           batch_seq_len, dim_per_head, head_num, dequant_scale, quant_scale,
           in_col32);
 }
@@ -789,16 +787,16 @@ void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
 template void ker_arrange_qkv_with_cache_i8I_i8O_launcher<float>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t* ori_qkv, const float* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, float* d_v,
-    int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
-    float quant_scale, bool in_col32);
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    int dim_per_head, int head_num, float dequant_scale, float quant_scale,
+    bool in_col32);
 
 template void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
     int batch_token_num, int hidden_size, cudaStream_t stream,
     const int8_t* ori_qkv, const __half* qkv_bias, int8_t* new_q, int8_t* new_k,
-    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, __half* d_v,
-    int batch_seq_len, int dim_per_head, int head_num, float dequant_scale,
-    float quant_scale, bool in_col32);
+    int8_t* k_cache, int8_t* new_v, int8_t* v_cache, int batch_seq_len,
+    int dim_per_head, int head_num, float dequant_scale, float quant_scale,
+    bool in_col32);
 
 template <typename T>
 __global__ void ker_attention_mask_weights_i32I(

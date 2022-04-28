@@ -8,9 +8,11 @@ Example of how to run gpt inference using our implementation.
 
 int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
+  std::vector<int> example_input = {40, 1842, 345, 11, 475, 345, 910, 326};
+  int eg_seq_len = example_input.size();
   int max_batch_size = 128;
   int batch_size = 1;
-  int batch_seq_len = 10;
+  int batch_seq_len = eg_seq_len;
 
   if (argc == 4) {
     batch_size = atoi(argv[2]);
@@ -20,14 +22,15 @@ int main(int argc, char* argv[]) {
     throw std::runtime_error("batch_size exceeds the maximum (128)!");
   }
 
+  std::vector<int> host_input;
+  for (int i = 0; i < batch_size; ++i) {
+    for (int j = 0; j < batch_seq_len; ++j) {
+      host_input.push_back(example_input[j % eg_seq_len]);
+    }
+  }
+
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Gpt", model_weights_path, max_batch_size);
-
-  std::vector<int> example_input = {40, 1842, 345, 11, 475, 345, 910, 326};
-  std::vector<int> host_input;
-  for (int i = 0; i < batch_size * batch_seq_len; ++i) {
-    host_input.push_back(example_input[i % 8]);
-  }
 
   void* d_input;
   lightseq::cuda::CHECK_GPU_ERROR(
