@@ -719,41 +719,54 @@ __global__ void ker_arrange_qkv_with_cache_i8I_i8O<__half>(
   int dim_id = threadIdx.x % dim_per_head;
   int target_id = targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                                 batch_seq_len, dim_per_head);
-  int8_t new_val;
+  int2 new_val;
+  int8_t* p_new_val = (int8_t*)(&new_val);
+  const int2* p_ori_qkv = (const int2*)ori_qkv;
+  const float4* p_bias = (const float4*)qkv_bias;
+  const int2* p_k_cache = (const int2*)k_cache;
+  const int2* p_v_cache = (const int2*)v_cache;
+  int2* p_new_q = (int2*)new_q;
+  int2* p_new_k = (int2*)new_k;
+  int2* p_new_v = (int2*)new_v;
 
   if (token_id < batch_seq_len - 1) {
     int old_target_id =
         targetid_4dim(batch_id, head_id, token_id, dim_id, head_num,
                       batch_seq_len - 1, dim_per_head);
     if (blockIdx.y == 0) return;
-    if (blockIdx.y == 1) new_val = k_cache[old_target_id];
-    if (blockIdx.y == 2) new_val = v_cache[old_target_id];
+    if (blockIdx.y == 1) new_val = p_k_cache[old_target_id];
+    if (blockIdx.y == 2) new_val = p_v_cache[old_target_id];
   } else {
     int qkv_index;
     if (in_col32) {
       int row_id = batch_id;
-      int col_id = blockIdx.y * hidden_size + threadIdx.x;
+      int col_id = (blockIdx.y * hidden_size + threadIdx.x) << 3;
       qkv_index = row_major2flat_col32(row_id, col_id, batch_size,
-                                       gridDim.y * hidden_size);
+                                       (gridDim.y * hidden_size) << 3) >>
+                  3;
     } else {
       qkv_index =
-          (batch_id * gridDim.y + blockIdx.y) * hidden_size + threadIdx.x;
+          (batch_id * gridDim.y + blockIdx.y) * blockDim.x + threadIdx.x;
     }
-    float tmp_val =
-        float(ori_qkv[qkv_index]) * dequant_scale +
-        __half2float(__ldg(&qkv_bias[blockIdx.y * hidden_size + threadIdx.x]));
-    new_val = float2int8(tmp_val, quant_scale);
+    int2 ori_qkv8 = p_ori_qkv[qkv_index];
+    float4 bias8 = __ldg(&p_bias[blockIdx.y * blockDim.x + threadIdx.x]);
+    int8_t* p_ori_qkv8 = (int8_t*)(&ori_qkv8);
+    __half* p_bias8 = (__half*)(&bias8);
+#pragma unroll
+    for (int i = 0; i < 8; ++i) {
+      p_new_val[i] =
+          float2int8(float(p_ori_qkv8[i]) * dequant_scale + float(p_bias8[i]),
+                     quant_scale);
+    }
     if (blockIdx.y == 0) {
       target_id = targetid_4dim(batch_id, head_id, 0, dim_id, head_num, 1,
                                 dim_per_head);
     }
   }
 
-  if (blockIdx.y == 0) new_q[target_id] = new_val;
-  if (blockIdx.y == 1) new_k[target_id] = new_val;
-  if (blockIdx.y == 2) {
-    new_v[target_id] = new_val;
-  }
+  if (blockIdx.y == 0) p_new_q[target_id] = new_val;
+  if (blockIdx.y == 1) p_new_k[target_id] = new_val;
+  if (blockIdx.y == 2) p_new_v[target_id] = new_val;
 }
 
 template <typename T>
@@ -778,9 +791,9 @@ void ker_arrange_qkv_with_cache_i8I_i8O_launcher<__half>(
     int dim_per_head, int head_num, float dequant_scale, float quant_scale,
     bool in_col32) {
   ker_arrange_qkv_with_cache_i8I_i8O<__half>
-      <<<dim3(batch_token_num, 3), hidden_size, 0, stream>>>(
+      <<<dim3(batch_token_num, 3), hidden_size / 8, 0, stream>>>(
           ori_qkv, qkv_bias, new_q, new_k, k_cache, new_v, v_cache,
-          batch_seq_len, dim_per_head, head_num, dequant_scale, quant_scale,
+          batch_seq_len, dim_per_head / 8, head_num, dequant_scale, quant_scale,
           in_col32);
 }
 
