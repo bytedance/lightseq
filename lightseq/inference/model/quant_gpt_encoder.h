@@ -31,7 +31,7 @@ class QuantGptEncoder {
   const cudaDataType_t _CType = _optraits::CType;
 
   // private member function
-  void self_attention(bool cache = false);
+  void self_attention();
   void self_attention_with_cache();
   void ffn_add_norm();
   void ffn_add_norm_with_cache();
