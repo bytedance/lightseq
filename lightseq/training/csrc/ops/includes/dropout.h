@@ -85,9 +85,62 @@ class Dropout {
     }
   }
 
+  // dropout inside ffn with quantization support.
+  void quant_bias_act_dropout(int8_t *qoutput, uint8_t *clip_mask_out,
+                              uint8_t *clip_mask_in, const int8_t *qinput,
+                              const T *bias, const T *clip_max_out,
+                              const T *clip_max_in, int rows, int cols,
+                              std::string activation_fn, cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_quant_dropout_act_bias<ActivationType::kRelu, T>(
+          qoutput, clip_mask_out, clip_mask_in, _mask, qinput, bias,
+          clip_max_out, clip_max_in, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_quant_dropout_act_bias<ActivationType::kGelu, T>(
+          qoutput, clip_mask_out, clip_mask_in, _mask, qinput, bias,
+          clip_max_out, clip_max_in, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
+  }
+
+  void d_quant_bias_act_dropout(T *d_inp_out, T *d_bias_out, T *d_cmax_in,
+                                T *d_cmax_out, const int8_t *qinput,
+                                const uint8_t *cmask_in, const T *cmax_in,
+                                const uint8_t *cmask_out, const T *bias,
+                                int rows, int cols, std::string activation_fn,
+                                cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, T>(
+          d_inp_out, d_bias_out, d_cmax_in, d_cmax_out, qinput, cmax_in,
+          cmask_in, cmask_out, bias, d_inp_out, _mask, rows, cols,
+          _config.RATIO(), stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, T>(
+          d_inp_out, d_bias_out, d_cmax_in, d_cmax_out, qinput, cmax_in,
+          cmask_in, cmask_out, bias, d_inp_out, _mask, rows, cols,
+          _config.RATIO(), stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
+  }
+
+  void quant_bias_dropout_residual(T *output, const int8_t *qinput,
+                                   const T *cmax_ptr, const T *residual,
+                                   const T *bias, int rows, int cols,
+                                   cudaStream_t stream) {
+    launch_ls_quant_dropout_res_bias<T>(output, _mask, qinput, cmax_ptr, bias,
+                                        residual, rows * cols, cols,
+                                        _config.RATIO(), stream);
+  }
+
   bool HasDropout() const { return _config.RATIO() > 0.0; }
 
   void SetTrainingMode(bool training) { _config.training = training; }
+
+  uint8_t *get_mask() { return _mask; }
 
  private:
   uint8_t *_mask;

@@ -8,6 +8,11 @@ from torch.autograd import Function
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
+from lightseq.training.ops.pytorch.quantization import (
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
+)
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
@@ -40,7 +45,12 @@ class LSTransformerEncoderFunc(Function):
             input_mask = input_mask.to(torch.half)
 
         (output,) = forward_func(
-            config.layer_id, input, input_mask, config.training, config.pre_layer_norm
+            config.layer_id,
+            input,
+            input_mask,
+            config.training,
+            config.pre_layer_norm,
+            config.quant_mode,
         )
 
         if config.is_grad_enabled and config.training:
@@ -98,6 +108,8 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         LSTransformerEncoderLayer.layer_id = LSTransformerEncoderLayer.layer_id + 1
 
         print("Lightseq Transformer config is ", self.config.__dict__)
+
+        self.quant_mode = False
 
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
@@ -177,6 +189,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             hs,  # output_b
             hs,  # ffn_nw
             hs,  # ffn_nb
+            12,  # clip_max
         ]
         offsets = calc_offset(sizes)
         return offsets
@@ -243,6 +256,13 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
 
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        relu_cmax = relu_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+        init_clip_max[-2] = relu_cmax
+        self._get_weights(12).copy_(init_clip_max)
+
     def __assign_layer_weight_grad(self):
         param = (
             self.para_16
@@ -274,6 +294,8 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
+        self.config.quant_mode = self.quant_mode
+
         hidden_states = hidden_states.contiguous()
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
@@ -309,3 +331,9 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         )
 
         return output.to(self.para)
+
+    def disable_quant(self):
+        self.quant_mode = False
+
+    def enable_quant(self):
+        self.quant_mode = True

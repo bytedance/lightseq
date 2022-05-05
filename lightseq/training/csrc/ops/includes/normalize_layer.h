@@ -39,6 +39,13 @@ class Normalize_Layer {
                       config_.hidden_dim, stream);
   }
 
+  void Forward(int8_t *q_out, uint8_t *clip_mask, const T *inp, const T *gamma,
+               const T *betta, const T *clip_max_out, int batch_size,
+               cudaStream_t stream) {
+    launch_layer_norm_i8(q_out, clip_mask, vars_, means_, inp, gamma, betta,
+                         clip_max_out, batch_size, config_.hidden_dim, stream);
+  }
+
   /*
   residual_grad, inp_or_out, betta should be treated carefully.
   inp_or_out = input if use_mean else output
@@ -54,6 +61,15 @@ class Normalize_Layer {
     launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                  inp_or_out, gamma, betta, vars_, means_, batch_size,
                  config_.hidden_dim, stream);
+  }
+
+  void Backward(T *gamma_grad, T *betta_grad, T *inp_grad, T *cmax_grad,
+                const T *out_grad, const T *residual_grad, const T *inp_or_out,
+                const T *gamma, const T *betta, const uint8_t *cmask,
+                int batch_size, cudaStream_t stream[2]) {
+    launch_quant_ln_bw(gamma_grad, betta_grad, inp_grad, cmax_grad, out_grad,
+                       residual_grad, inp_or_out, gamma, betta, vars_, means_,
+                       cmask, batch_size, config_.hidden_dim, stream);
   }
 
   inline bool use_mean() const { return config_.use_mean; }

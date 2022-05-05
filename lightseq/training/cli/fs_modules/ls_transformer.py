@@ -13,12 +13,11 @@ from fairseq.modules import LayerNorm
 
 from lightseq.training.ops.pytorch.quantization import (
     QuantLinear,
-    enable_quant,
     disable_quant,
-    qat_mode,
+    enable_quant,
     ptq_mode,
+    qat_mode,
 )
-
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
 MAX_SEQ_LENGTH = 300
@@ -234,10 +233,11 @@ class LSTransformerEncoder(FairseqEncoder):
         if args.use_torch_layer:
             from lightseq.training.ops.pytorch import TransformerEncoderLayer
         else:
-            # from lightseq.training.ops.pytorch.transformer_encoder_layer import (
-            #     LSTransformerEncoderLayer as TransformerEncoderLayer,
-            # )
-            from lightseq.training.ops.pytorch import TransformerEncoderLayer
+            from lightseq.training.ops.pytorch.transformer_encoder_layer import (
+                LSTransformerEncoderLayer as TransformerEncoderLayer,
+            )
+
+            # from lightseq.training.ops.pytorch import TransformerEncoderLayer
 
         config = TransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
@@ -371,6 +371,9 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 )
             del self.output_projection.weight
 
+        self.quant_mode = args.enable_quant
+        self.use_torch_layer = args.use_torch_layer
+
     def build_decoder_layer(self, args):
         if args.use_torch_layer:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (
@@ -417,14 +420,16 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             prev_output_tokens, incremental_state
         )
 
-        self.output_projection.weight_quant.clip.clip_value_max = (
-            self.embed_tokens.embeddings[-1]
-        )
+        if not self.use_torch_layer:
+            self.output_projection.weight = self.embed_tokens.embeddings[:-1].view(
+                self.embed_tokens.config.vocab_size,
+                self.embed_tokens.config.embedding_dim,
+            )
+            if self.quant_mode:
+                self.output_projection.weight_quant.clip.clip_value_max = (
+                    self.embed_tokens.embeddings[-1]
+                )
 
-        self.output_projection.weight = self.embed_tokens.embeddings[:-1].view(
-            self.embed_tokens.config.vocab_size,
-            self.embed_tokens.config.embedding_dim,
-        )
         # x: [batch_size, seq_len, hidden_size]
         for _, layer in enumerate(self.layers):
             if incremental_state is None:

@@ -10,6 +10,8 @@
 #define MAX_THREADS 1024
 #define WARP_SIZE 32
 
+const float kQuantRangeI8 = 127.0f;
+
 enum class ActivationType { kRelu, kGelu };
 
 void launch_curand_init(int total_count, int dim, cudaStream_t stream);
@@ -20,10 +22,22 @@ void launch_layer_norm(T *ln_res, T *vars, T *means, const T *inp,
                        int hidden_dim, cudaStream_t stream);
 
 template <typename T>
+void launch_layer_norm_i8(int8_t *q_out, uint8_t *clip_mask_out, T *vars,
+                          T *means, const T *inp, const T *gamma,
+                          const T *betta, const T *clip_max_out, int batch_size,
+                          int hidden_dim, cudaStream_t stream);
+template <typename T>
 void launch_ln_bw(T *gamma_grad, T *betta_grad, T *inp_grad, const T *out_grad,
                   const T *residual_grad, const T *inp_or_out, const T *gamma,
                   const T *betta, const T *vars, const T *means, int batch,
                   int hidden_dim, cudaStream_t stream[2]);
+
+template <typename T>
+void launch_quant_ln_bw(T *gamma_grad, T *betta_grad, T *inp_grad, T *cmax_grad,
+                        const T *out_grad, const T *residual_grad,
+                        const T *inp_or_out, const T *gamma, const T *betta,
+                        const T *vars, const T *means, const uint8_t *cmask,
+                        int batch, int hidden_dim, cudaStream_t stream[2]);
 
 template <typename T>
 void launch_attn_softmax(T *vals, const T *attn_mask, int batch_size, int heads,
@@ -78,6 +92,29 @@ void launch_ls_dropout_act_bias_bwd(T *in_grad, T *bias_grad, const T *input,
                                     const uint8_t *mask, int row_size, int dim,
                                     float ratio, cudaStream_t stream);
 
+template <ActivationType act_type, typename T>
+void launch_ls_quant_dropout_act_bias(int8_t *qout, uint8_t *cmask_out,
+                                      uint8_t *cmask_in, uint8_t *dropout_mask,
+                                      const int8_t *qinput, const T *bias,
+                                      const T *cmax_out, const T *cmax_in,
+                                      int total_count, int dim, float ratio,
+                                      cudaStream_t stream);
+
+template <typename T>
+void launch_ls_quant_dropout_res_bias(T *out, uint8_t *mask,
+                                      const int8_t *qvals, const T *cmax,
+                                      const T *bias, const T *residual,
+                                      int total_count, int dim, float ratio,
+                                      cudaStream_t stream);
+
+template <ActivationType act_type, typename T>
+void launch_ls_quant_dropout_act_bias_bwd(
+    T *in_grad, T *bias_grad, T *cmax_in_grad, T *cmax_out_grad,
+    const int8_t *input, const T *cmax_in, const uint8_t *cmask_in,
+    const uint8_t *cmask_out, const T *bias, const T *out_grad,
+    const uint8_t *dropout_mask, int row_size, int dim, float ratio,
+    cudaStream_t stream);
+
 template <typename T>
 void launch_fuse_transpose_bias_kernel(const T *inp, T *out, int rows, int cols,
                                        cudaStream_t stream);
@@ -125,6 +162,24 @@ void launch_d_lookup_scale_pos_dropout(T *grad_embeddings, T *grad_clip_max,
                                        int embedding_dim, int vocab_size,
                                        int padding_idx, float dropout_ratio,
                                        cudaStream_t &stream);
+
+template <typename T>
+void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
+                     const T *f_ptr, const T *clip_max_ptr, int numel,
+                     int mask_start_bit, cudaStream_t stream);
+
+template <typename T>
+void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,
+                       int numel, int mask_start_bit, cudaStream_t stream);
+
+template <typename T>
+void launch_quantize_bwd(T *grad_ptr, T *cmax_grad_ptr,
+                         const uint8_t *clip_mask_ptr, int numel,
+                         int mask_start_bit, cudaStream_t stream);
+
+template <typename T>
+void launch_d_cmax(T *grad_ptr, T *grad_cmax_ptr, const uint8_t *clip_mask_ptr,
+                   int numel, int mask_start_bit, cudaStream_t stream);
 
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
@@ -277,4 +332,77 @@ __forceinline__ __host__ __device__ void decompose_2dim(int src, int dim1,
                                                         int *id0, int *id1) {
   *id1 = src % dim1;
   *id0 = src / dim1;
+}
+
+__forceinline__ __device__ int get_clip_mask(float value, float clip_max,
+                                             int start_bit) {
+  if (value >= clip_max) {
+    return 1 << (start_bit - 1);
+  } else if (value <= -clip_max) {
+    return 1 << (start_bit);
+  } else {
+    return 0;
+  }
+}
+
+__forceinline__ __device__ int is_max_min_mask(uint8_t mask, int start_bit) {
+  if (bool(mask & (1 << (start_bit - 1)))) {
+    return 1;
+  } else if (bool(mask & (1 << (start_bit)))) {
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
+template <typename T>
+__forceinline__ __device__ void clip_bwd(T &in_grad, float &cmax_grad,
+                                         T out_grad, uint8_t mask,
+                                         int start_bit) {
+  if (bool(mask & (1 << (start_bit - 1)))) {
+    in_grad = 0;
+    cmax_grad = out_grad;
+  } else if (bool(mask & (1 << (start_bit)))) {
+    in_grad = 0;
+    cmax_grad = -out_grad;
+  } else {
+    in_grad = out_grad;
+    cmax_grad = 0;
+  }
+}
+
+__forceinline__ __device__ int8_t quantize(float x, float clip_max,
+                                           uint8_t &clip_mask, int start_bit) {
+  clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit));
+  float dequant_scale = clip_max / kQuantRangeI8;
+  float i8_f = x / dequant_scale;
+  float i8 = floorf(i8_f + 0.5);
+  i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
+  return static_cast<int8_t>(i8);
+}
+
+__forceinline__ __device__ float fake_quant_i8(float x, float clip_max) {
+  float dequant_scale = clip_max / kQuantRangeI8;
+  float i8_f = x / dequant_scale;
+  float i8 = floorf(i8_f + 0.5);
+  float res = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
+  return res * dequant_scale;
+}
+
+__forceinline__ __device__ float dequantize(int8_t x, float clip_max) {
+  float res = float(x) * clip_max / kQuantRangeI8;
+  return fminf(fmaxf(res, -clip_max), clip_max);
+}
+
+template <typename T>
+__inline__ float get_float(T val);
+
+template <>
+__inline__ float get_float<float>(float val) {
+  return val;
+}
+
+template <>
+__inline__ float get_float<__half>(__half val) {
+  return __half2float(val);
 }

@@ -315,8 +315,162 @@ def test_launch_layer_norm():
     return custom, baseline
 
 
+@kt.case(atol=4, dtypes=[torch.half])
+def test_launch_layer_norm_i8():
+    batch_size, seq_len = kt.bs_sl()
+    bsz_seq = batch_size * seq_len
+    hidden_dim = kt.hidden_dim
+    with_mean = random.choice([True, False])
+    print(
+        "(batch_token_num, hidden_dim, with_mean): "
+        f"({bsz_seq}, {hidden_dim}, {with_mean})"
+    )
+
+    custom_res = kt.rand((bsz_seq, hidden_dim)).to(dtype=torch.int8)
+    inp = kt.rand((bsz_seq, hidden_dim))
+    gamma = kt.rand((hidden_dim))
+    beta = kt.rand((hidden_dim))
+    vars = kt.rand((bsz_seq))
+    means = kt.rand((bsz_seq))
+    cmask = (
+        torch.empty_like(custom_res, dtype=torch.uint8)
+        .to(device=custom_res.device)
+        .contiguous()
+    )
+    cmax = inp.abs().flatten().topk(100)[0][-1]
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_layer_norm_i8_fp32
+    else:
+        func = cuda_module.torch_launch_layer_norm_i8_fp16
+
+    def custom():
+        func(
+            custom_res,
+            cmask,
+            vars,
+            means,
+            inp,
+            gamma,
+            beta,
+            cmax,
+            bsz_seq,
+            hidden_dim,
+            with_mean,
+        )
+
+        return (
+            [custom_res, vars, means, cmask] if with_mean else [custom_res, vars, cmask]
+        )
+
+    def baseline():
+        base = torch.nn.functional.layer_norm(inp, [hidden_dim], gamma, beta, 1e-8)
+        base_cmask = (base <= -cmax).to(dtype=torch.uint8) * 4 + (base >= cmax).to(
+            dtype=torch.uint8
+        ) * 2
+        base = base / (cmax / 127)
+        base = (base + 0.5).floor()
+        base = base.clamp(-127, 127).to(dtype=torch.int8)
+
+        if with_mean:
+            return [
+                base.contiguous(),
+                inp.var(dim=1).contiguous(),
+                inp.mean(dim=1).contiguous(),
+                base_cmask.contiguous(),
+            ]
+        else:
+            return [
+                base.contiguous(),
+                inp.var(dim=1).contiguous(),
+                base_cmask.contiguous(),
+            ]
+
+    return custom, baseline
+
+
 @kt.case(atol=1e-3, rtol=1e-2)
 def test_launch_ln_bw():
+    batch_size, seq_len = kt.bs_sl()
+    bsz_seq = batch_size * seq_len
+    hidden_dim = kt.hidden_dim
+    with_mean = random.choice([True, False])
+    fuse_add = random.choice([True, False])
+    print(
+        "(batch_token_num, hidden_dim, with_mean, fuse_add): "
+        f"({bsz_seq}, {hidden_dim}, {with_mean}, {fuse_add})"
+    )
+    epsilon = 1e-12
+
+    ln_input = kt.rand((bsz_seq, hidden_dim))
+    out_grad = kt.rand((bsz_seq, hidden_dim))
+    residual_grad = kt.rand((bsz_seq, hidden_dim))
+    gamma = kt.rand((hidden_dim))
+    betta = kt.rand((hidden_dim))
+    gamma_grad = kt.rand((hidden_dim))
+    betta_grad = kt.rand((hidden_dim))
+    inp_grad = kt.rand((bsz_seq, hidden_dim))
+
+    ln_output = functional.layer_norm(ln_input, [hidden_dim], gamma, betta, epsilon)
+    vars = ln_input.var(dim=1).contiguous()
+    means = ln_input.mean(dim=1).contiguous()
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_ln_bw_fp32
+    else:
+        func = cuda_module.torch_launch_ln_bw_fp16
+
+    inp_or_out = ln_input if with_mean else ln_output
+
+    def custom():
+        func(
+            gamma_grad,
+            betta_grad,
+            inp_grad,
+            out_grad,
+            residual_grad,
+            inp_or_out,
+            gamma,
+            betta,
+            vars,
+            means,
+            bsz_seq,
+            hidden_dim,
+            with_mean,
+            fuse_add,
+        )
+        # return [inp_grad]
+        return [gamma_grad, betta_grad, inp_grad]
+
+    def baseline():
+        if with_mean:
+            f_out_grad, f_input, f_vars, f_means, f_betta, f_gamma = cast_fp32_tensor(
+                [out_grad, ln_input, vars, means, betta, gamma]
+            )
+            xhat = (f_input - f_means.unsqueeze(1)) * f_vars.rsqrt().unsqueeze(1)
+        else:
+            f_out_grad, f_out, f_vars, f_betta, f_gamma = cast_fp32_tensor(
+                [out_grad, ln_output, vars, betta, gamma]
+            )
+            xhat = (f_out - f_betta) / f_gamma
+        dxhat = f_out_grad * f_gamma
+        f_betta_grad = f_out_grad.sum(dim=0)
+        f_gamma_grad = (f_out_grad * xhat).sum(dim=0)
+        dinp = dxhat.sum(dim=1).unsqueeze(1) + xhat * (dxhat * xhat).sum(
+            dim=1
+        ).unsqueeze(1)
+        dinp = dxhat - dinp / hidden_dim
+        dinp = dinp * f_vars.rsqrt().unsqueeze(1)
+        if fuse_add:
+            dinp = dinp + residual_grad
+        # return kt.norm_res_list([dinp])
+        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp])
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-3, rtol=1e-2)
+def test_launch_ln_bw_i8():
     batch_size, seq_len = kt.bs_sl()
     bsz_seq = batch_size * seq_len
     hidden_dim = kt.hidden_dim
@@ -721,20 +875,22 @@ def test_launch_dropout_gelu_bias_bwd():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
+        # "test_launch_transform_0213",
+        # "test_launch_bias_add_transform_20314",
+        # "test_launch_transform4d_0213",
+        # "test_launch_fused_add2",
+        # "test_launch_ffn_bias_bwd",
+        # "test_launch_attn_softmax",
+        # "test_launch_attn_softmax_bw",
+        # "test_launch_layer_norm",
+        "test_launch_layer_norm_i8",
+        # "test_launch_ln_bw",
+        # "test_launch_ln_bw_i8",
+        # "test_launch_concat3_dim1",
+        # "test_adam",
+        # "test_launch_dropout_gelu_bias",
+        # "test_launch_dropout_relu_bias",
+        # "test_launch_dropout_relu_bias_bwd",
+        # "test_launch_dropout_gelu_bias_bwd",
     ]
     kt.run(kernel_list)

@@ -393,16 +393,6 @@ __global__ void zero_grads(T *grad_embeddings, int total_nums) {
   grad_embeddings4[idx] = zero4;
 }
 
-__device__ int is_max_min_mask(uint8_t mask) {
-  if (bool(mask & 2)) {
-    return 1;
-  } else if (bool(mask & 4)) {
-    return -1;
-  } else {
-    return 0;
-  }
-}
-
 template <typename T>
 __global__ void d_lookup_scale_pos_dropout(
     T *grad_embeddings, T *grad_clip_max, const T *grad_output,
@@ -444,18 +434,18 @@ __global__ void d_lookup_scale_pos_dropout<float>(
     int offset = i - target_pos * embedding_dim;
     int idx = (tid * (embedding_dim) + offset) << 2;
     atomicAdd(grad_embeddings + idx,
-              res4.x * (is_max_min_mask(m4_ptr[0]) == 0));
+              res4.x * (is_max_min_mask(m4_ptr[0], 2) == 0));
     atomicAdd(grad_embeddings + idx + 1,
-              res4.y * (is_max_min_mask(m4_ptr[1]) == 0));
+              res4.y * (is_max_min_mask(m4_ptr[1], 2) == 0));
     atomicAdd(grad_embeddings + idx + 2,
-              res4.z * (is_max_min_mask(m4_ptr[2]) == 0));
+              res4.z * (is_max_min_mask(m4_ptr[2], 2) == 0));
     atomicAdd(grad_embeddings + idx + 3,
-              res4.w * (is_max_min_mask(m4_ptr[3]) == 0));
+              res4.w * (is_max_min_mask(m4_ptr[3], 2) == 0));
     if (grad_clip_max) {
-      block_g_clip_max += (res4.x * is_max_min_mask(m4_ptr[0]) +
-                           res4.y * is_max_min_mask(m4_ptr[1]) +
-                           res4.z * is_max_min_mask(m4_ptr[2]) +
-                           res4.w * is_max_min_mask(m4_ptr[3]));
+      block_g_clip_max += (res4.x * is_max_min_mask(m4_ptr[0], 2) +
+                           res4.y * is_max_min_mask(m4_ptr[1], 2) +
+                           res4.z * is_max_min_mask(m4_ptr[2], 2) +
+                           res4.w * is_max_min_mask(m4_ptr[3], 2));
     }
   }
 
@@ -530,17 +520,18 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
 #pragma unroll
     for (uint j = 0; j < 4; ++j) {
       __half2 g_clip_emb;
-      g_clip_emb.x =
-          is_max_min_mask(m4_ptr[j << 1]) == 0 ? res_h2[j].x : __int2half_rn(0);
-      g_clip_emb.y = is_max_min_mask(m4_ptr[(j << 1) | 1]) == 0
+      g_clip_emb.x = is_max_min_mask(m4_ptr[j << 1], 2) == 0 ? res_h2[j].x
+                                                             : __int2half_rn(0);
+      g_clip_emb.y = is_max_min_mask(m4_ptr[(j << 1) | 1], 2) == 0
                          ? res_h2[j].y
                          : __int2half_rn(0);
       atomicAdd(grad_embeddings_h2 + idx + j, g_clip_emb);
 
       if (grad_clip_max) {
         block_g_clip_max +=
-            __half2float(res_h2[j].x) * is_max_min_mask(m4_ptr[j << 1]) +
-            __half2float(res_h2[j].y) * is_max_min_mask(m4_ptr[(j << 1) | 1]);
+            __half2float(res_h2[j].x) * is_max_min_mask(m4_ptr[j << 1], 2) +
+            __half2float(res_h2[j].y) *
+                is_max_min_mask(m4_ptr[(j << 1) | 1], 2);
       }
     }
   }

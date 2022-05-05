@@ -20,7 +20,8 @@ class TransformerBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
-            "csrc/kernels/cublas_wrappers.cu",
+            "csrc/kernels/cublas_wrappers.cpp",
+            "csrc/kernels/quantize_kernels.cu",
             "csrc/kernels/transform_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",
@@ -60,4 +61,9 @@ class TransformerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+        ]

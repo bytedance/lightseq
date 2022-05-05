@@ -48,7 +48,7 @@ int create_transformer_encoder_layer(
 template <typename T>
 std::vector<torch::Tensor> transformer_encoder_layer_fw(
     int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
-    bool training_mode, bool prelayernorm) {
+    bool training_mode, bool prelayernorm, bool quant_mode) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
 
@@ -63,6 +63,7 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
           s_transformer_encoder_layers[layer_id]);
   layer->set_cur_batch_shape(input.size(0), input.size(1));
   layer->SetTrainingMode(training_mode);
+  layer->SetQuantMode(quant_mode);
   layer->Forward(input_ptr, input_mask_ptr, out_ptr);
 
   return {output};

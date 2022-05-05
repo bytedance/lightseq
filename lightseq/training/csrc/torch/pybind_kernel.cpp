@@ -124,6 +124,28 @@ void torch_launch_layer_norm(torch::Tensor &ln_res, torch::Tensor &vars,
 }
 
 template <typename T>
+void torch_launch_layer_norm_i8(torch::Tensor &ln_res, torch::Tensor &cmask,
+                                torch::Tensor &vars, torch::Tensor &means,
+                                const torch::Tensor &inp,
+                                const torch::Tensor &scale,
+                                const torch::Tensor &bias,
+                                const torch::Tensor cmax, int batch_size,
+                                int hidden_dim, bool with_mean) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  if (with_mean) {
+    launch_layer_norm_i8(rptr<int8_t>(ln_res), rptr<uint8_t>(cmask),
+                         rptr<T>(vars), rptr<T>(means), rptr<T>(inp),
+                         rptr<T>(scale), rptr<T>(bias), rptr<T>(cmax),
+                         batch_size, hidden_dim, stream);
+  } else {
+    launch_layer_norm_i8(rptr<int8_t>(ln_res), rptr<uint8_t>(cmask),
+                         rptr<T>(vars), (T *)nullptr, rptr<T>(inp),
+                         rptr<T>(scale), rptr<T>(bias), rptr<T>(cmax),
+                         batch_size, hidden_dim, stream);
+  }
+}
+
+template <typename T>
 void torch_launch_ln_bw(torch::Tensor &gamma_grad, torch::Tensor &betta_grad,
                         torch::Tensor &inp_grad, const torch::Tensor &out_grad,
                         const torch::Tensor &residual_grad,
@@ -155,6 +177,41 @@ void torch_launch_ln_bw(torch::Tensor &gamma_grad, torch::Tensor &betta_grad,
                rptr<T>(out_grad), p_residual_grad, rptr<T>(inp_or_out),
                rptr<T>(gamma), p_betta, rptr<T>(vars), p_means, batch_size,
                hidden_dim, streams);
+}
+
+template <typename T>
+void torch_launch_ln_bw_i8(
+    torch::Tensor &gamma_grad, torch::Tensor &betta_grad,
+    torch::Tensor &inp_grad, torch::Tensor &cmax_grad,
+    const torch::Tensor &out_grad, const torch::Tensor &residual_grad,
+    const torch::Tensor &inp_or_out, const torch::Tensor &gamma,
+    const torch::Tensor &betta, const torch::Tensor &vars,
+    const torch::Tensor &means, const torch::Tensor &cmask, int batch_size,
+    int hidden_dim, bool with_mean, bool fuse_add) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  cudaStream_t streams[2] = {stream, stream};
+  const T *p_residual_grad;
+  const T *p_betta;
+  const T *p_means;
+
+  if (fuse_add) {
+    p_residual_grad = rptr<T>(residual_grad);
+  } else {
+    p_residual_grad = nullptr;
+  }
+  if (with_mean) {
+    p_means = rptr<T>(means);
+    p_betta = nullptr;
+  } else {
+    p_means = nullptr;
+    p_betta = rptr<T>(betta);
+  }
+
+  launch_quant_ln_bw(rptr<T>(gamma_grad), rptr<T>(betta_grad),
+                     rptr<T>(inp_grad), rptr<T>(cmax_grad), rptr<T>(out_grad),
+                     p_residual_grad, rptr<T>(inp_or_out), rptr<T>(gamma),
+                     p_betta, rptr<T>(vars), p_means, rptr<uint8_t>(cmask),
+                     batch_size, hidden_dim, streams);
 }
 
 void torch_curand_init(int batch_size, int hidden_dim) {
@@ -230,9 +287,17 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Test kernel wrapper");
   m.def("torch_launch_layer_norm_fp16", &torch_launch_layer_norm<__half>,
         "Test kernel wrapper");
+  m.def("torch_launch_layer_norm_i8_fp32", &torch_launch_layer_norm_i8<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_layer_norm_i8_fp16", &torch_launch_layer_norm_i8<__half>,
+        "Test kernel wrapper");
   m.def("torch_launch_ln_bw_fp32", &torch_launch_ln_bw<float>,
         "Test kernel wrapper");
   m.def("torch_launch_ln_bw_fp16", &torch_launch_ln_bw<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ln_bw_i8_fp32", &torch_launch_ln_bw_i8<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ln_bw_i8_fp16", &torch_launch_ln_bw_i8<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_curand_init", &torch_curand_init, "Test kernel wrapper");
   m.def("torch_launch_concat3_dim1_fp32", &torch_launch_concat3_dim1<float>,

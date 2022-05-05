@@ -135,6 +135,9 @@ class TestDecorator(object):
             t1 = t1.cpu().numpy().flatten()
             t2 = t2.cpu().numpy().flatten()
             try:
+                torch.testing.assert_close(
+                    t1.flatten(), t2.flatten(), rtol=rtol, atol=atol, equal_nan=False
+                )
                 np.testing.assert_allclose(t1, t2, rtol=rtol, atol=atol, verbose=True)
             except Exception as ex:
                 print(f"Unmatches in the {i}-th tensor.")

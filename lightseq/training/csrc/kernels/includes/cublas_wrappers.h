@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <cublas_v2.h>
+#include <cublasLt.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
@@ -38,3 +39,10 @@ int cublas_strided_batched_gemm(
     cublasOperation_t op_A, cublasOperation_t op_B, int stride_A, int stride_B,
     int stride_C, int batch,
     cublasGemmAlgo_t algo = CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+template <typename OutType, typename ScaleType>
+void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
+                    OutType *output_c, int batch_count, int m, int n, int k,
+                    int64_t stridea, int64_t strideb, int64_t stridec,
+                    const ScaleType *alpha, const ScaleType *beta,
+                    cublasLtHandle_t cublasLt_handle, cudaStream_t stream);

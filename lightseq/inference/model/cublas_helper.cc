@@ -321,13 +321,13 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
 
 template void cublaslt_gemm<int32_t, int32_t>(
     const int8_t* input_a, const int8_t* input_b, int32_t* output_c,
-    int batchCount, int m, int n, int k, int64_t stridea, int64_t strideb,
+    int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const int32_t alpha, cublasLtHandle_t cublasLt_handle,
     cudaStream_t stream);
 
 template void cublaslt_gemm<int8_t, float>(
     const int8_t* input_a, const int8_t* input_b, int8_t* output_c,
-    int batchCount, int m, int n, int k, int64_t stridea, int64_t strideb,
+    int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const float alpha, cublasLtHandle_t cublasLt_handle,
     cudaStream_t stream);
 

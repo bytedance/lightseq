@@ -110,11 +110,30 @@ template __half *cuda_malloc<__half>(size_t ele_num);
 
 template uint8_t *cuda_malloc<uint8_t>(size_t ele_num);
 
+template int8_t *cuda_malloc<int8_t>(size_t ele_num);
+
 void cuda_free(void *pdata) {
   if (pdata != nullptr) {
-    cudaFree(pdata);
+    CHECK_GPU_ERROR(cudaFree(pdata));
   }
 }
+
+template <typename T>
+void cuda_set(T *pdata, int value, size_t ele_num) {
+  size_t byte_size = ele_num * sizeof(T);
+
+  if (pdata != nullptr) {
+    CHECK_GPU_ERROR(cudaMemset(pdata, value, byte_size));
+  }
+}
+
+template void cuda_set<float>(float *pdata, int value, size_t ele_num);
+
+template void cuda_set<__half>(__half *pdata, int value, size_t ele_num);
+
+template void cuda_set<uint8_t>(uint8_t *pdata, int value, size_t ele_num);
+
+template void cuda_set<int8_t>(int8_t *pdata, int value, size_t ele_num);
 
 template <typename T>
 struct _isnan {

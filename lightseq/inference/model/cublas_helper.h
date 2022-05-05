@@ -30,7 +30,7 @@ void cublasLtMM_withAlgo_i8IO(int8_t* res, int batchCount, int m, int n, int k,
 
 template <typename OutType, typename ScaleType>
 void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
-                   OutType* output_c, int batchCount, int m, int n, int k,
+                   OutType* output_c, int batch_count, int m, int n, int k,
                    int64_t stridea, int64_t strideb, int64_t stridec,
                    const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
                    cudaStream_t stream);
