@@ -53,7 +53,7 @@ class GptEncoder {
   std::vector<int> _h_sample_id;
   int _h_unfinished;
 
-  // gpu memeory buffer
+  // gpu memory buffer
   _DataType *_p_d_query;
   _DataType *_p_d_k_cache;
   _DataType *_p_d_v_cache;
