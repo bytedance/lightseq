@@ -97,7 +97,7 @@ Nothing's gonna change my love for you.
 Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 ```
 
-LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
+LightSeq installation from PyPI only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 And there is also a quick start for huggingface GPT in examples.
 

@@ -72,7 +72,7 @@ You can install LightSeq from PyPI:
 $ pip install lightseq
 ```
 
-LightSeq installation from PyPi only supports Python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments:
+LightSeq installation from PyPI only supports Python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments:
 ```shell
 $ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT_DIR
 ```
