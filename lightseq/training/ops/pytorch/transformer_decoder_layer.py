@@ -1,17 +1,13 @@
 import math
-from dataclasses import dataclass
 
 import torch
 from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch import transformer_cuda_module
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
-    MODEL_ARCH,
-    check_config,
     calc_offset,
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
@@ -160,7 +156,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.para_offset = self.para_offset[:-2]
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None and initial_biases is None:
+        if initial_weights is None or initial_biases is None:
             # enc-dec kv weights and bias
             self.init_transformer_weights()
             return

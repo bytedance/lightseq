@@ -14,19 +14,22 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-if [ -d "/tmp/test-ner/" ]; then
-  rm -rf /tmp/test-ner/
-fi
-
 python3 -m torch.distributed.launch \
   --nproc_per_node=1 \
-  $THIS_DIR/run_ner.py \
-  --model_name_or_path bert-large-uncased \
-  --per_device_train_batch_size 16 \
-  --dataset_name conll2003 \
-  --output_dir /tmp/test-ner \
+  $THIS_DIR/run_qa.py \
+  --model_name_or_path bert-base-uncased \
+  --dataset_name squad \
   --do_train \
   --do_eval \
-  --num_train_epochs 1 \
-  --with_lightseq true \
+  --max_seq_length 256 \
+  --per_device_train_batch_size 16 \
+  --doc_stride 128 \
+  --learning_rate 3e-5 \
+  --num_train_epochs 10 \
+  --output_dir /tmp/squad \
+  --overwrite_output_dir \
   --fp16 \
+  --seed 1234 \
+  --logging_steps 10 \
+  --module_type 1 \
+  --enable_quant false

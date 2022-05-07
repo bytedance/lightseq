@@ -21,7 +21,7 @@ With only a few lines of code, you can enjoy the excellent performance provided 
 ## Features
 - **High performance**.
 In WMT14 English to German dataset, compared to [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex),
-LightSeq can provide **1.53** times speedup for transformer big model on NVIDIA Ampere A100 with 4096 batch size.
+LightSeq can provide **1.53** times speedup for transformer big model on NVIDIA Tesla A100 with 4096 batch size.
 - **Comprehensive operators**.
 LightSeq provides comprehensive efficient custom operators for PyTorch and TensorFlow, including embedding, encoder layer, decoder layer, criterion and optimizer. To the best of our knowledge, LightSeq is the first open source project that cover the entire training process for Transformer-based models.
 In contrast, [DeepSpeed](https://github.com/microsoft/DeepSpeed) only provides encoder layer.
@@ -38,7 +38,7 @@ The following is a support matrix of LightSeq compared with
 ## Performance
 Detailed experimental results is available [here](../../docs/training/performance.md). Here are the experimental results on WMT14 English to German task.
 
-We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
+We train transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Tesla A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
 ### Speedup for single training step
@@ -58,15 +58,15 @@ We compute speedup on different batch size using the WPS (real words per second)
 To install LightSeq training library,
 
 ```shell
-pip install lightseq
+$ pip install lightseq
 ```
 
 or install in develop mode,
 
 ```shell
-git clone https://github.com/bytedance/lightseq.git
-cd lightseq
-pip install -e .
+$ git clone https://github.com/bytedance/lightseq.git
+$ cd lightseq
+$ pip install -e .
 ```
 
 ### TensorFlow
@@ -75,7 +75,7 @@ pip install -e .
 - Cuda version = 11.0
 - To install LightSeq training library:
 ```shell
-pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorflow/lightseq_tf-2.0.1-cp37-cp37m-linux_x86_64.whl
+$ pip install http://sf3-ttcdn-tos.pstatp.com/obj/nlp-opensource/lightseq/tensorflow/lightseq_tf-2.0.1-cp37-cp37m-linux_x86_64.whl
 ```
 
 ## Usage

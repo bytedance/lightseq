@@ -45,7 +45,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
-from ls_hf_transformer_encoder_layer import inject_ls_enc_layer
+from ls_hf_transformer_layer import inject_ls_layer
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -224,9 +224,15 @@ class ModelArguments:
             "with private models)."
         },
     )
-    with_lightseq: bool = field(
-        default=True,
-        metadata={"help": "Whether to use lightseq TransformerEncoder"},
+    module_type: int = field(
+        default=1,
+        metadata={
+            "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
+        },
+    )
+    enable_quant: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable quantization"},
     )
 
 
@@ -410,8 +416,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    if model_args.with_lightseq:
-        inject_ls_enc_layer(model, training_args, config)
+    if model_args.module_type == 1 or model_args.module_type == 2:
+        inject_ls_layer(model, training_args, model_args, config)
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

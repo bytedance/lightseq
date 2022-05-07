@@ -810,7 +810,7 @@ __global__ void ker_arrange_decself_qkv(const T* ori_qkv, const T* qkv_bias,
     T val = ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i] +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
-        blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
+        blockIdx.x;  // obvious, seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
       // for query
       new_q[seq_id * hidden_size + i] = val;
@@ -841,7 +841,7 @@ __global__ void ker_arrange_decself_qkv<__half>(
     half2 val = __hadd2(
         p_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i],
         __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
-    // obvious，seq_id = batch_id * beam_size + beam_id
+    // obvious, seq_id = batch_id * beam_size + beam_id
     int seq_id = blockIdx.x;
     if (blockIdx.y == 0) {
       // for query

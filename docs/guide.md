@@ -119,7 +119,7 @@ These functions can export the configuration, embedding, encoder and decoder wei
 LightSeq provides export examples of native Hugging Face BERT/BART/GPT2, Fairseq trained with LightSeq and LightSeq Transformer. All codes are available [here](../examples/inference/python/export).
 
 #### Fairseq
-The main code is as follows (some parameters are omitted). Complete code is available [here](../examples/inference/python/export/ls_fs_transformer_export.py).
+The main code is as follows (some parameters are omitted). Complete code is available [here](../examples/inference/python/export/fairseq/ls_fs_transformer_export.py).
 ```python
 model = Transformer()
 encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
@@ -136,7 +136,7 @@ First, you need to divide the state dict into two parts of encoder and decoder, 
 The above functions export the checkpoints to protobuf by default. Specify `save_pb=False` to export to hdf5 files. You can use the [Fairseq training example](../examples/training/fairseq) to obtain the trained checkpoints.
 
 #### Hugging Face
-LightSeq provides three examples of exporting native Hugging Face models ([BERT](../examples/inference/python/export/hf_bert_export.py), [BART](../examples/inference/python/export/hf_bart_export.py) and [GPT2](../examples/inference/python/export/hf_gpt2_export.py)). Because these native models did not use LightSeq modules to pretrain, the users must manually make the export rules.
+LightSeq provides three examples of exporting native Hugging Face models ([BERT](../examples/inference/python/export/huggingface/hf_bert_export.py), [BART](../examples/inference/python/export/huggingface/hf_bart_export.py) and [GPT2](../examples/inference/python/export/huggingface/hf_gpt2_export.py)). Because these native models did not use LightSeq modules to pretrain, the users must manually make the export rules.
 
 #### LightSeq Transformer
 LightSeq provide an example of exporting its own Transformer module, which is similar to Fairseq models export. You can use the [custom training example](../examples/training/custom) to obtain the trained checkpoints. This export example can also compare the results and speeds of forward propagation in training library, inference library loading both protobuf and hdf5 files. The results show that the inference library is faster than the forward propagation of training library by about 2x.

@@ -1,4 +1,3 @@
-# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,22 +14,20 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-export TASK_NAME=stsb
-
 python3 -m torch.distributed.launch \
   --nproc_per_node=1 \
-  $THIS_DIR/run_glue.py \
-  --model_name_or_path bert-large-cased \
-  --task_name $TASK_NAME \
+  $THIS_DIR/run_ner.py \
+  --model_name_or_path bert-base-uncased \
+  --dataset_name conll2003 \
   --do_train \
   --do_eval \
-  --max_seq_length 128 \
-  --per_device_train_batch_size 32 \
-  --learning_rate 2e-5 \
-  --num_train_epochs 3 \
-  --output_dir /tmp/$TASK_NAME/ \
+  --per_device_train_batch_size 16 \
+  --num_train_epochs 20 \
+  --output_dir /tmp/quant/test-ner \
   --overwrite_output_dir \
-  --with_lightseq true \
+  --resume_from_checkpoint /tmp/test-ner/ \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
+  --module_type 2 \
+  --enable_quant true

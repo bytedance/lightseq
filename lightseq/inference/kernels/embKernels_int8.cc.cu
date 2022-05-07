@@ -14,7 +14,8 @@ template <typename T>
 __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
                                 const int *tokens, T *output, int *pad_mask,
                                 int pad_id, int batch_size, int seq_len,
-                                int hidden_dim, float dequant_scale) {
+                                int hidden_dim, float dequant_scale,
+                                bool scaled) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -39,7 +40,8 @@ __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
     }
     char4 value_i4 = ((char4 *)token_emb)[token * hidden_dim + dim_idx];
     float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
-    float scale = dequant_scale * sqrtf(hidden_dim << 2);
+    float scale = dequant_scale;
+    if (scaled) scale *= sqrtf(hidden_dim << 2);
     value.x = float(value_i4.x) * scale + pemb.x;
     value.y = float(value_i4.y) * scale + pemb.y;
     value.z = float(value_i4.z) * scale + pemb.z;
@@ -49,12 +51,10 @@ __global__ void ker_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
 }
 
 template <>
-__global__ void ker_enc_emb_i8I<__half>(const int8_t *token_emb,
-                                        const __half *pos_emb,
-                                        const int *tokens, __half *output,
-                                        int *pad_mask, int pad_id,
-                                        int batch_size, int seq_len,
-                                        int hidden_dim, float dequant_scale) {
+__global__ void ker_enc_emb_i8I<__half>(
+    const int8_t *token_emb, const __half *pos_emb, const int *tokens,
+    __half *output, int *pad_mask, int pad_id, int batch_size, int seq_len,
+    int hidden_dim, float dequant_scale, bool scaled) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -82,7 +82,8 @@ __global__ void ker_enc_emb_i8I<__half>(const int8_t *token_emb,
     __half2 *value_h2 = (__half2 *)(&value);
     char2 *value_i2 = (char2 *)(&value_i8);
     __half2 *pemb_h2 = (__half2 *)(&pemb);
-    float scale = dequant_scale * sqrtf(hidden_dim << 3);
+    float scale = dequant_scale;
+    if (scaled) scale *= sqrtf(hidden_dim << 3);
 #pragma unroll
     for (int i = 0; i < 4; i++) {
       float2 value_f2;
@@ -101,7 +102,7 @@ void launch_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
                         int batch_size, int seq_len, int hidden_dim,
                         cudaStream_t stream, const T *lang_emb,
                         const int *lang_id, int multilg_type,
-                        float dequant_scale) {
+                        float dequant_scale, bool scaled) {
   if (hidden_dim % 4 != 0) {
     throw std::runtime_error("violate hidden_dim % 4 = 0");
   }
@@ -111,7 +112,7 @@ void launch_enc_emb_i8I(const int8_t *token_emb, const T *pos_emb,
   if (multilg_type == 0) {
     ker_enc_emb_i8I<T><<<nblock, MAX_THREADS, 0, stream>>>(
         token_emb, pos_emb, tokens, output, pad_mask, pad_id, batch_size,
-        seq_len, hidden_dim, dequant_scale);
+        seq_len, hidden_dim, dequant_scale, scaled);
   } else {
     throw std::runtime_error("multilingle not supported");
   }
@@ -124,7 +125,7 @@ void launch_enc_emb_i8I<__half>(const int8_t *token_emb, const __half *pos_emb,
                                 int seq_len, int hidden_dim,
                                 cudaStream_t stream, const __half *lang_emb,
                                 const int *lang_id, int multilg_type,
-                                float dequant_scale) {
+                                float dequant_scale, bool scaled) {
   if (hidden_dim % 8 != 0) {
     throw std::runtime_error("violate hidden_dim % 8 = 0");
   }
@@ -135,7 +136,7 @@ void launch_enc_emb_i8I<__half>(const int8_t *token_emb, const __half *pos_emb,
   if (multilg_type == 0) {
     ker_enc_emb_i8I<__half><<<nblock, MAX_THREADS, 0, stream>>>(
         token_emb, pos_emb, tokens, output, pad_mask, pad_id, batch_size,
-        seq_len, hidden_dim, dequant_scale);
+        seq_len, hidden_dim, dequant_scale, scaled);
   } else {
     throw std::runtime_error("multilingle not supported");
   }
@@ -145,13 +146,13 @@ template void launch_enc_emb_i8I<float>(
     const int8_t *token_emb, const float *pos_emb, const int *tokens,
     float *output, int *pad_mask, int pad_id, int batch_size, int seq_len,
     int hidden_dim, cudaStream_t stream, const float *lang_emb,
-    const int *lang_id, int multilg_type, float dequant_scale);
+    const int *lang_id, int multilg_type, float dequant_scale, bool scaled);
 
 template void launch_enc_emb_i8I<__half>(
     const int8_t *token_emb, const __half *pos_emb, const int *tokens,
     __half *output, int *pad_mask, int pad_id, int batch_size, int seq_len,
     int hidden_dim, cudaStream_t stream, const __half *lang_emb,
-    const int *lang_id, int multilg_type, float dequant_scale);
+    const int *lang_id, int multilg_type, float dequant_scale, bool scaled);
 
 template <typename T>
 __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
@@ -159,7 +160,7 @@ __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
                                 const int *lang_id, T *output, int batch_size,
                                 int beam_size, int hidden_dim, int vocab_size,
                                 int step, int max_step, int multilg_type,
-                                float dequant_scale) {
+                                float dequant_scale, bool scaled) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * beam_size * hidden_dim) {
     return;
@@ -170,8 +171,10 @@ __global__ void ker_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb,
   int8_t emb;
   int token = tokens[flat_3dim(batch_idx, beam_idx, step, beam_size, max_step)];
   emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
-  float value = float(emb) * dequant_scale * sqrtf(hidden_dim) +
-                float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
+  float scale = dequant_scale;
+  if (scaled) scale *= sqrtf(hidden_dim);
+  float value =
+      float(emb) * scale + float(pos_emb[flat_2dim(step, dim_idx, hidden_dim)]);
   output[idx] = T(value);
 }
 
@@ -181,7 +184,7 @@ void launch_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb, int *tokens,
                         int batch_size, int beam_size, int hidden_dim,
                         int vocab_size, int step, int max_step,
                         int multilg_type, cudaStream_t stream,
-                        float dequant_scale) {
+                        float dequant_scale, bool scaled) {
   if (step >= max_step) {
     throw std::runtime_error("violate step < max_step");
   }
@@ -193,19 +196,19 @@ void launch_dec_emb_i8I(const int8_t *token_emb, const T *pos_emb, int *tokens,
   ker_dec_emb_i8I<T><<<nblock, MAX_THREADS, 0, stream>>>(
       token_emb, pos_emb, tokens, lang_emb, lang_id, output, batch_size,
       beam_size, hidden_dim, vocab_size, step, max_step, multilg_type,
-      dequant_scale);
+      dequant_scale, scaled);
 }
 
 template void launch_dec_emb_i8I<float>(
     const int8_t *token_emb, const float *pos_emb, int *tokens,
     const float *lang_emb, const int *lang_id, float *output, int batch_size,
     int beam_size, int hidden_dim, int vocab_size, int step, int max_step,
-    int multilg_type, cudaStream_t stream, float dequant_scale);
+    int multilg_type, cudaStream_t stream, float dequant_scale, bool scaled);
 
 template void launch_dec_emb_i8I<__half>(
     const int8_t *token_emb, const __half *pos_emb, int *tokens,
     const __half *lang_emb, const int *lang_id, __half *output, int batch_size,
     int beam_size, int hidden_dim, int vocab_size, int step, int max_step,
-    int multilg_type, cudaStream_t stream, float dequant_scale);
+    int multilg_type, cudaStream_t stream, float dequant_scale, bool scaled);
 }  // namespace cuda
 }  // namespace lightseq

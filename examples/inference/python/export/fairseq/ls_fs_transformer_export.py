@@ -1,10 +1,8 @@
 """
-Export Fairseq Transformer models training with LightSeq to protobuf/hdf5 format.
+Export Fairseq Transformer models training with LightSeq modules to protobuf/hdf5 format.
 Refer to the `examples/training/fairseq` directory for more training details.
 """
-import argparse
 import torch
-import h5py
 from export.proto.transformer_pb2 import Transformer
 from lightseq.training import (
     export_ls_config,
@@ -13,6 +11,7 @@ from lightseq.training import (
     export_ls_decoder,
 )
 import lightseq.inference as lsi
+from export.util import parse_args, save_model
 
 
 def _extract_weight(state_dict):
@@ -26,7 +25,7 @@ def _extract_weight(state_dict):
     return encoder_state_dict, decoder_state_dict
 
 
-def export_fs_weights(file, state_dict, save_pb=True):
+def export_fs_weights(transformer, state_dict):
     enc_norm_w = state_dict["encoder.layer_norm.weight"].flatten().tolist()
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
@@ -36,78 +35,52 @@ def export_fs_weights(file, state_dict, save_pb=True):
         .flatten()
         .tolist()
     )
-    if save_pb:
-        file.src_embedding.norm_scale[:] = enc_norm_w
-        file.src_embedding.norm_bias[:] = enc_norm_b
-        file.trg_embedding.norm_scale[:] = dec_norm_w
-        file.trg_embedding.norm_bias[:] = dec_norm_b
-        file.trg_embedding.shared_bias[:] = dec_shared_b
-    else:
-        file.create_dataset("src_embedding/norm_scale", data=enc_norm_w, dtype="f4")
-        file.create_dataset("src_embedding/norm_bias", data=enc_norm_b, dtype="f4")
-        file.create_dataset("trg_embedding/norm_scale", data=dec_norm_w, dtype="f4")
-        file.create_dataset("trg_embedding/norm_bias", data=dec_norm_b, dtype="f4")
-        file.create_dataset("trg_embedding/shared_bias", data=dec_shared_b, dtype="f4")
+    transformer.src_embedding.norm_scale[:] = enc_norm_w
+    transformer.src_embedding.norm_bias[:] = enc_norm_b
+    transformer.trg_embedding.norm_scale[:] = dec_norm_w
+    transformer.trg_embedding.norm_bias[:] = dec_norm_b
+    transformer.trg_embedding.shared_bias[:] = dec_shared_b
 
 
-def export_ls_fs_transformer(ckpt_path, out_path, save_pb=True):
-    with open(ckpt_path, "rb") as fin:
+def export_ls_fs_transformer(model_path, pb_path, hdf5_path, hdf5):
+    with open(model_path, "rb") as fin:
         ckpt_file = torch.load(fin)
     args = ckpt_file["args"]
     state_dict = ckpt_file["model"]
 
-    if save_pb:
-        file = Transformer()
-    else:
-        file = h5py.File(out_path, "w")
+    transformer = Transformer()
     encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
-    export_ls_embedding(file, encoder_state_dict, 300, True, save_pb)
-    export_ls_embedding(file, decoder_state_dict, 300, False, save_pb)
+    export_ls_embedding(transformer, encoder_state_dict, 300, True, save_pb=True)
+    export_ls_embedding(transformer, decoder_state_dict, 300, False, save_pb=True)
     export_ls_encoder(
-        file,
+        transformer,
         encoder_state_dict,
         args.encoder_embed_dim,
         args.encoder_ffn_embed_dim,
-        save_pb,
+        save_pb=True,
     )
     export_ls_decoder(
-        file,
+        transformer,
         decoder_state_dict,
         args.decoder_embed_dim,
         args.decoder_ffn_embed_dim,
         args.decoder_layers,
-        save_pb,
+        save_pb=True,
     )
-    export_fs_weights(file, state_dict, save_pb)
+    export_fs_weights(transformer, state_dict)
     export_ls_config(
-        file,
+        transformer,
         args.encoder_attention_heads,
         1,
         2,
         2,
         args.encoder_layers,
         args.decoder_layers,
-        save_pb=save_pb,
+        save_pb=True,
     )
 
-    if save_pb:
-        with open(out_path, "wb") as fout:
-            fout.write(file.SerializeToString())
-    else:
-        file.close()
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="export fairseq checkpoint", usage="")
-    parser.add_argument(
-        "--model",
-        "-m",
-        type=str,
-        default="checkpoint_best.pt",
-        help="path of fairseq checkpoint",
-    )
-    args = parser.parse_args()
-    return args
+    save_path = save_model(transformer, pb_path, hdf5_path, hdf5)
+    return save_path
 
 
 if __name__ == "__main__":
@@ -115,15 +88,9 @@ if __name__ == "__main__":
     model_name = ".".join(args.model.split(".")[:-1])
     pb_path = f"{model_name}.pb"
     hdf5_path = f"{model_name}.hdf5"
-    print("export to pb model >>>>>>")
-    export_ls_fs_transformer(args.model, pb_path)
-    print("export to hdf5 model >>>>>>")
-    export_ls_fs_transformer(args.model, hdf5_path, save_pb=False)
+    path = export_ls_fs_transformer(args.model, pb_path, hdf5_path, args.hdf5)
     src = [[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1, 1, 1]]
-    pb_model = lsi.Transformer(pb_path, 8)
-    pb_output = pb_model.infer(src)
-    hdf5_model = lsi.Transformer(hdf5_path, 8)
-    hdf5_output = hdf5_model.infer(src)
+    model = lsi.Transformer(path, 8)
+    output = model.infer(src)
     # Expected result: [23, 550, 34, 118, 148, 2939, 4, 42, 32, 37, 6, 224, 10, 179, 5, 2]
-    print("pb results:", pb_output)
-    print("hdf5 results:", hdf5_output)
+    print("results:", output)

@@ -33,6 +33,7 @@ from typing import Optional
 import datasets
 from datasets import load_dataset
 
+import torch
 import transformers
 from transformers import (
     CONFIG_MAPPING,
@@ -50,8 +51,7 @@ from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
-
-from lightseq.training import ls_hf_gpt_convert
+from ls_hf_gpt_layer import inject_ls_layer
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -133,9 +133,15 @@ class ModelArguments:
             "with private models)."
         },
     )
-    with_lightseq: bool = field(
-        default=True,
-        metadata={"help": "Whether to use lightseq"},
+    module_type: int = field(
+        default=1,
+        metadata={
+            "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
+        },
+    )
+    enable_quant: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable quantization"},
     )
 
     def __post_init__(self):
@@ -436,8 +442,8 @@ def main():
         )
 
     # Replace with LightSeq encoder layers.
-    if model_args.with_lightseq:
-        ls_hf_gpt_convert(model, training_args, config)
+    if model_args.module_type == 1 or model_args.module_type == 2:
+        inject_ls_layer(model, training_args, model_args, config)
 
     model.resize_token_embeddings(len(tokenizer))
 
@@ -547,6 +553,12 @@ def main():
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator,
     )
+
+    if not training_args.do_train:
+        state_dict = torch.load(
+            training_args.resume_from_checkpoint, map_location="cpu"
+        )
+        trainer._load_state_dict_in_model(state_dict)
 
     # Training
     if training_args.do_train:

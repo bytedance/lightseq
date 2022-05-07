@@ -20,7 +20,7 @@
 
 /**
 @file
-Transformer decoder, composed by gemm lib and
+QuantTransformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 namespace lightseq {
@@ -101,7 +101,6 @@ class QuantDecoder {
   _DataType* _p_d_query_buf2;
   _DataType* _p_d_c;
   _DataType* _p_d_encoder_out_buf;
-  _DataType* _p_d_logit_buf;
 
   int8_t* _int8_ffn_in_buf;
   int32_t* _int32_ffn_out_buf;
@@ -159,7 +158,6 @@ class QuantDecoder {
                QuantTransformerWeight<OpType_>& tw, cudaStream_t stream,
                cublasHandle_t hd, bool output_topk = false,
                const int* p_d_lang_id = nullptr);
-  long compute_buffer_bytesize();
   void init_buffer();
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
