@@ -115,7 +115,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
 
     def reset_parameters(self):
-        nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim ** -0.5)
+        nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim**-0.5)
         nn.init.constant_(
             self.embeddings[
                 self.config.padding_idx

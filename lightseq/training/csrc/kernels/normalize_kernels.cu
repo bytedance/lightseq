@@ -427,7 +427,7 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
   float dgamma = 0;
   float dout, val;
 
-  float thread_cmax_g, cmax_g;
+  float thread_cmax_g = 0, cmax_g;
   if (idx < width) {
     if (means == nullptr) {
       float vbetta = (float)betta[idx];
@@ -461,6 +461,9 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
     }
   }
   __shared__ float block_cmax_g;
+  if (threadIdx.x == 0 && threadIdx.y == 0) block_cmax_g = 0;
+  __syncthreads();
+
   if (thread_cmax_g != 0) {
     atomicAdd(&block_cmax_g, thread_cmax_g);
   }

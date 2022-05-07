@@ -321,6 +321,7 @@ def test_launch_layer_norm_i8():
     bsz_seq = batch_size * seq_len
     hidden_dim = kt.hidden_dim
     with_mean = random.choice([True, False])
+    with_mean = False
     print(
         "(batch_token_num, hidden_dim, with_mean): "
         f"({bsz_seq}, {hidden_dim}, {with_mean})"
@@ -463,7 +464,6 @@ def test_launch_ln_bw():
         dinp = dinp * f_vars.rsqrt().unsqueeze(1)
         if fuse_add:
             dinp = dinp + residual_grad
-        # return kt.norm_res_list([dinp])
         return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp])
 
     return custom, baseline
@@ -495,18 +495,27 @@ def test_launch_ln_bw_i8():
     vars = ln_input.var(dim=1).contiguous()
     means = ln_input.mean(dim=1).contiguous()
 
+    cmax = ln_input.abs().flatten().topk(100)[0][-1]
+    cmask = (ln_output <= -cmax).to(dtype=torch.uint8) * 4 + (ln_output >= cmax).to(
+        dtype=torch.uint8
+    ) * 2
+
     if kt.dtype == torch.float:
-        func = cuda_module.torch_launch_ln_bw_fp32
+        func = cuda_module.torch_launch_ln_bw_i8_fp32
     else:
-        func = cuda_module.torch_launch_ln_bw_fp16
+        func = cuda_module.torch_launch_ln_bw_i8_fp16
 
     inp_or_out = ln_input if with_mean else ln_output
 
+    f_zero = torch.zeros(1).to(ln_input.device).float()
+
     def custom():
+        cmax_grad = kt.zeros((1))
         func(
             gamma_grad,
             betta_grad,
             inp_grad,
+            cmax_grad,
             out_grad,
             residual_grad,
             inp_or_out,
@@ -514,13 +523,13 @@ def test_launch_ln_bw_i8():
             betta,
             vars,
             means,
+            cmask,
             bsz_seq,
             hidden_dim,
             with_mean,
             fuse_add,
         )
-        # return [inp_grad]
-        return [gamma_grad, betta_grad, inp_grad]
+        return [gamma_grad, betta_grad, inp_grad, cmax_grad]
 
     def baseline():
         if with_mean:
@@ -533,9 +542,15 @@ def test_launch_ln_bw_i8():
                 [out_grad, ln_output, vars, betta, gamma]
             )
             xhat = (f_out - f_betta) / f_gamma
-        dxhat = f_out_grad * f_gamma
-        f_betta_grad = f_out_grad.sum(dim=0)
-        f_gamma_grad = (f_out_grad * xhat).sum(dim=0)
+        f_out_grad_inside = torch.where(ln_output.abs() < cmax, f_out_grad, f_zero)
+        f_out_grad_outside = torch.where(ln_output.abs() >= cmax, f_out_grad, f_zero)
+        f_out_grad_outside = torch.where(
+            ln_output <= -cmax, -f_out_grad_outside, f_out_grad_outside
+        )
+        f_cmax_grad = f_out_grad_outside.sum()
+        dxhat = f_out_grad_inside * f_gamma
+        f_betta_grad = f_out_grad_inside.sum(dim=0)
+        f_gamma_grad = (f_out_grad_inside * xhat).sum(dim=0)
         dinp = dxhat.sum(dim=1).unsqueeze(1) + xhat * (dxhat * xhat).sum(
             dim=1
         ).unsqueeze(1)
@@ -543,8 +558,7 @@ def test_launch_ln_bw_i8():
         dinp = dinp * f_vars.rsqrt().unsqueeze(1)
         if fuse_add:
             dinp = dinp + residual_grad
-        # return kt.norm_res_list([dinp])
-        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp])
+        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp, f_cmax_grad])
 
     return custom, baseline
 
@@ -883,9 +897,9 @@ if __name__ == "__main__":
         # "test_launch_attn_softmax",
         # "test_launch_attn_softmax_bw",
         # "test_launch_layer_norm",
-        "test_launch_layer_norm_i8",
+        # "test_launch_layer_norm_i8",
         # "test_launch_ln_bw",
-        # "test_launch_ln_bw_i8",
+        "test_launch_ln_bw_i8",
         # "test_launch_concat3_dim1",
         # "test_adam",
         # "test_launch_dropout_gelu_bias",
