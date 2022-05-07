@@ -321,7 +321,6 @@ def test_launch_layer_norm_i8():
     bsz_seq = batch_size * seq_len
     hidden_dim = kt.hidden_dim
     with_mean = random.choice([True, False])
-    with_mean = False
     print(
         "(batch_token_num, hidden_dim, with_mean): "
         f"({bsz_seq}, {hidden_dim}, {with_mean})"
@@ -897,7 +896,7 @@ if __name__ == "__main__":
         # "test_launch_attn_softmax",
         # "test_launch_attn_softmax_bw",
         # "test_launch_layer_norm",
-        # "test_launch_layer_norm_i8",
+        "test_launch_layer_norm_i8",
         # "test_launch_ln_bw",
         "test_launch_ln_bw_i8",
         # "test_launch_concat3_dim1",
