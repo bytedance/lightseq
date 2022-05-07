@@ -343,5 +343,16 @@ int read_hdf5_dataset_scalar(hid_t hdf5_file, std::string dataset_name,
       [](int size) { return size != 1; }, "Expect scalar with shape of 1.");
 }
 
+float dequantize(unsigned char i, float scale, float clip_max) {
+  return (float(i) - scale) * clip_max / scale;
+}
+
+void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
+                      float clip_max, float quant_range, int start, int num) {
+  for (int i = start; i < start + num; ++i) {
+    f[i] = dequantize(i8[i], quant_range, clip_max);
+  }
+}
+
 }  // namespace cuda
 }  // namespace lightseq

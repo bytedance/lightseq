@@ -41,7 +41,7 @@ The following is a support matrix of LightSeq **inference** library compared wit
 ## Performance
 
 ### [>>> Training](./lightseq/training)
-Here we present the experimental results on WMT14 English to German translation task based on Transformer-big models. We train Transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Ampere A100 GPUs with data parallel and fp16 mixed precision.
+Here we present the experimental results on WMT14 English to German translation task based on Transformer-big models. We train Transformer models of different sizes on eight NVIDIA Tesla V100/NVIDIA Tesla A100 GPUs with data parallel and fp16 mixed precision.
 [Fairseq](https://github.com/pytorch/fairseq) with [Apex](https://github.com/NVIDIA/apex) is choosed as our baseline.
 
 <img src="./docs/training/images/single_step.png"  width="80%" aligned="middle">
@@ -66,19 +66,33 @@ More results is available [here](./docs/inference/performance.md).
 ## Quick Start
 Complete user guide is available [here](docs/guide.md).
 
+### Installation
+You can install LightSeq from PyPI:
+```shell
+$ pip install lightseq
+```
+
+LightSeq installation from PyPI only supports Python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments:
+```shell
+$ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT_DIR
+```
+
+Detailed building introduction is available [here](docs/inference/build.md).
+
+
 ### Fast training from Fairseq
 
 You can experience lightning fast training by running following commands,
 Firstly install these requirements.
 
 ```shell
-pip install lightseq fairseq sacremoses
+$ pip install lightseq fairseq sacremoses
 ```
 
 Then you can train a translation task on wmt14 en2de dataset by running the following script
 
 ```shell
-sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
+$ sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 ```
 
 To compare lightseq with fairseq, delete the arguments with `ls_` prefix to using the original fairseq implementation
@@ -90,20 +104,28 @@ More usage is available [here](./lightseq/training/README.md).
 We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
 
 ```shell
-pip install torch tensorflow transformers lightseq
-cd examples/inference/python
+$ pip install torch tensorflow transformers lightseq
+$ cd examples/inference/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python export/hf_bart_export.py
-python test/ls_bart.py
+$ python export/huggingface/hf_bart_export.py
+$ python test/ls_bart.py
 ```
 
-LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
-
 More usage is available [here](./lightseq/inference/README.md).
+
+### Fast deploy inference server
+
+We provide a docker image which contains tritonserver and lightseq's dynamic link library, and you can deploy a inference server by simply replace the model file with your own model file.
+
+```shell
+$ sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
+```
+
+More usage is available [here](https://github.com/bytedance/lightseq/tree/master/examples/triton_backend).
 
 ## Cite Us
 

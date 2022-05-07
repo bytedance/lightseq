@@ -7,8 +7,8 @@ We modify the language modeling [examples](https://github.com/huggingface/transf
 First you should install these requirements.
 
 ```shell
-pip install -r requirements.txt
-bash run_clm.sh
+$ pip install -r requirements.txt
+$ bash run_clm.sh
 ```
 
 Before running the script.make sure your pytorch worksfine with cuda, lightseq doesn't support pytorch cpu mode. You can verify your pytorch on CUDA by the following code.

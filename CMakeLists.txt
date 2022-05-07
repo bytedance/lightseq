@@ -14,6 +14,7 @@ find_package(CUDA 11.6 REQUIRED)
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
+option(USE_TRITONBACKEND "build tritonbackend for lightseq" OFF)
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
@@ -48,6 +49,8 @@ include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/3rdparty/cub)
 
 link_directories(${COMMON_LIB_DIRS})
 
+add_compile_options(-Wno-unknown-pragmas)
+
 if(FP16_MODE)
   add_definitions(-DFP16_MODE)
   message(STATUS "Build using fp16 precision")
@@ -67,5 +70,8 @@ add_subdirectory(lightseq/inference/proto)
 add_subdirectory(lightseq/inference/model)
 add_subdirectory(lightseq/inference/pywrapper)
 add_subdirectory(lightseq/inference/server)
+if(USE_TRITONBACKEND)
+  add_subdirectory(lightseq/inference/triton_backend)
+endif()
 
 # add_subdirectory(examples/inference/cpp)

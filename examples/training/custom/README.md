@@ -6,7 +6,7 @@ The source inputs of the encoder are batch of sentences and the target outputs o
 
 You can run the example simplely by:
 ```shell
-python examples/training/custom/run.py
+$ python examples/training/custom/run.py
 ```
 
 If it runs successfully, you will see the following output:

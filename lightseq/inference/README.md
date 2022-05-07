@@ -65,15 +65,15 @@ More results is available [here](../../docs/inference/performance.md).
 We provide an end2end bart-base example to see how fast Lightseq is compared to HuggingFace. First you should install these requirements.
 
 ```shell
-pip install torch tensorflow transformers lightseq
-cd examples/inference/python
+$ pip install torch tensorflow transformers lightseq
+$ cd examples/inference/python
 ```
 
 then you can check the performance by simply running following commands. `hf_bart_export.py` is used to transform pytorch weights to LightSeq protobuffer.
 
 ```shell
-python export/hf_bart_export.py
-python test/ls_bart.py
+$ python export/huggingface/hf_bart_export.py
+$ python test/ls_bart.py
 ```
 
 on our Tesla V100 we can get following output, 10x speedup have been obtained from running LightSeq rather than HuggingFace.
@@ -97,7 +97,7 @@ Nothing's gonna change my love for you.
 Drop everything now. Meet me in the pouring rain. Kiss me on the sidewalk.
 ```
 
-LightSeq installation from pypi only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
+LightSeq installation from PyPI only supports python 3.6 to 3.8 on Linux for now. Consider compiling from source if you have other environments.
 
 And there is also a quick start for huggingface GPT in examples.
 
@@ -108,8 +108,8 @@ We provide python api to call lightseq, all you need is to install `lightseq` wi
 And check these files `lightseq/inference/proto/*.proto` to prepare your model weights. We provide an example weight file for you to test.
 
 ```shell
-curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
-tar -zxvf transformer_weight.tar.gz
+$ curl -OL https://github.com/bytedance/lightseq/releases/download/v0.0.1/transformer_weight.tar.gz
+$ tar -zxvf transformer_weight.tar.gz
 ```
 
 Finally you can run lightseq in only a few lines!
@@ -138,12 +138,12 @@ To avoid problems caused by inconsistent environments, you can use the pre-built
 [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) and make your GPU driver version >= 410.48
 
 ```shell
-docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
+$ docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
 #
-docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
+$ docker run --gpus '"device=0"' -it --rm -p8000:8000 -p8001:8001 -p8002:8002 -v
 /${current}/${path}:/quick_start nvcr.io/nvidia/tensorrtserver:19.05-py3 /bin/bash
 # inside container
-cd /quick_start
+$ cd /quick_start
 ```
 
 ### Use our pre-build lib
@@ -154,8 +154,8 @@ version, we will upload binary executable example and dynamic link library of mo
 custom backend of TRTIS.
 
 ```shell
-wget https://github.com/bytedance/lightseq/releases/download/${VERSION}/${VERSION}_libs.tar.gz
-tar -zxvf ${VERSION}_libs.tar.gz
+$ wget https://github.com/bytedance/lightseq/releases/download/${VERSION}/${VERSION}_libs.tar.gz
+$ tar -zxvf ${VERSION}_libs.tar.gz
 ```
 
 ### Run local inference demo
@@ -164,12 +164,12 @@ To run local inference demo, you need to prepare model weights saved in custom p
 LightSeq and input token ids. We provide a GPT-LM model and its corresponding input token ids:
 
 ```shell
-wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.pkg.tar.gz
-tar -zxvf v0.0.1_gptlm.pkg.tar.gz
+$ wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.pkg.tar.gz
+$ tar -zxvf v0.0.1_gptlm.pkg.tar.gz
 # fp32 example
-./{VERSION}_libs/gptlm_example.fp32 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
+$ ./{VERSION}_libs/gptlm_example.fp32 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
 # fp16 example
-./{VERSION}_libs/gptlm_example.fp16 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
+$ ./{VERSION}_libs/gptlm_example.fp16 ./v0.0.1_gptlm.pkg/gpt.pb ./v0.0.1_gptlm.pkg/test_case
 ```
 
 To run the end-to-end model server based on TRTIS, you need to prepare a custom backend [model
@@ -187,15 +187,15 @@ models/
 With the pre-built libraries and example weights mentioned above, you can easily run a server:
 
 ```shell
-mkdir -p ./model_zoo/gptlm/1
-wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.config.pbtxt
-mv v0.0.1_gptlm.config.pbtxt model_zoo/gptlm/config.pbtxt
-cp ./v0.0.1_gptlm.pkg/gpt.pb model_zoo/gptlm/gpt.pb
-cp ./{VERSION}_libs/libgptlm.so.fp32 model_zoo/gptlm/1/libgptlm.so
+$ mkdir -p ./model_zoo/gptlm/1
+$ wget https://github.com/bytedance/lightseq/releases/download/v0.0.1/v0.0.1_gptlm.config.pbtxt
+$ mv v0.0.1_gptlm.config.pbtxt model_zoo/gptlm/config.pbtxt
+$ cp ./v0.0.1_gptlm.pkg/gpt.pb model_zoo/gptlm/gpt.pb
+$ cp ./{VERSION}_libs/libgptlm.so.fp32 model_zoo/gptlm/1/libgptlm.so
 # or fp16 server
 # cp ./{VERSION}_libs/libgptlm.so.fp16 model_zoo/gptlm/1/libgptlm.so
-export MODEL_ZOO="/quick_start/model_zoo"
-trtserver --model-store=${MODEL_ZOO}
+$ export MODEL_ZOO="/quick_start/model_zoo"
+$ trtserver --model-store=${MODEL_ZOO}
 ```
 
 After starting server, Invoking the [TRTIS

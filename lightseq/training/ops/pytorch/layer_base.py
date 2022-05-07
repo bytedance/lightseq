@@ -52,6 +52,7 @@ class TransformerDecoderLayerBase(nn.Module):
             local_rank: int  # rank in local node
             nlayer: int  # number of layers
             activation_fn: str = "relu"  # relu or gelu
+            has_cross_attn: bool = True
 
         if "model" in kwargs:
             if kwargs["model"] not in MODEL_ARCH:

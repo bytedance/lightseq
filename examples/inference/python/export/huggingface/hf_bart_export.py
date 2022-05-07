@@ -11,6 +11,7 @@ from operator import attrgetter
 from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
 from export.proto.transformer_pb2 import Transformer
 from transformers import BartForConditionalGeneration
+from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -512,14 +513,15 @@ def extract_transformer_weights(
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    if args.generation_method not in ["beam_search", "topk", "topp", "topk_greedy"]:
+        args.generation_method = "beam_search"
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
     output_lightseq_model_name = "lightseq_bart_base"  # you can rename it to "lightseq_bart_large" for large model
     input_huggingface_bart_model = (
         "facebook/bart-base"  # Example: you can try "facebook/bart-large" as well
     )
     head_number = 12  # change this to 16 for "bart-large" model
-    # in order to get score, we should use `beam_search` inference method
-    generation_method = "beam_search"
     beam_size = 4
     max_step = 50  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
@@ -529,7 +531,7 @@ if __name__ == "__main__":
         output_lightseq_model_name,
         input_huggingface_bart_model,
         head_num=head_number,  # layer number
-        generation_method=generation_method,
+        generation_method=args.generation_method,
         beam_size=beam_size,
         max_step=max_step,
         extra_decode_length=extra_decode_length,

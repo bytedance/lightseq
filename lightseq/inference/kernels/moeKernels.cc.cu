@@ -149,62 +149,6 @@ template void ker_norm_layer_prepost_launcher<__half>(
     __half* output, const __half* scale, const __half* bias,
     const int max_thread_per_block, bool is_post_ln);
 
-template <typename T>
-__global__ void ker_residual(const T* input, T* output, const int hidden_size) {
-  uint block_start = blockIdx.x * hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = block_start + hidden_size;
-  for (uint i = start; i < end; i += blockDim.x) {
-    output[i] += __ldg(&input[i]);
-  }
-}
-
-template <>
-__global__ void ker_residual<__half>(const __half* input, __half* output,
-                                     const int half_hidden_size) {
-  uint block_start = blockIdx.x * half_hidden_size;
-  uint start = block_start + threadIdx.x;
-  uint end = blockIdx.x * half_hidden_size + half_hidden_size;
-  half2* pinput = (half2*)input;
-  half2* poutput = (half2*)output;
-
-  for (uint i = start; i < end; i += blockDim.x) {
-    float2 local_f2 = safe_half2_to_float2(poutput[i]);
-    float2 residual_val = __half22float2(__ldg(&pinput[i]));
-    float2 new_output_f2;
-    new_output_f2.x = local_f2.x + residual_val.x;
-    new_output_f2.y = local_f2.y + residual_val.y;
-    poutput[i] = __float22half2_rn(new_output_f2);
-  }
-}
-
-template <typename T>
-void ker_residual_launcher(int token_num, int hidden_size, cudaStream_t stream,
-                           const T* input, T* output,
-                           const int max_thread_per_block) {
-  ker_residual<T><<<token_num, max_thread_per_block, 0, stream>>>(input, output,
-                                                                  hidden_size);
-}
-
-template <>
-void ker_residual_launcher<__half>(int token_num, int hidden_size,
-                                   cudaStream_t stream, const __half* input,
-                                   __half* output,
-                                   const int max_thread_per_block) {
-  ker_residual<__half><<<token_num, max_thread_per_block, 0, stream>>>(
-      input, output, hidden_size / 2);
-}
-
-template void ker_residual_launcher<float>(int token_num, int hidden_size,
-                                           cudaStream_t stream,
-                                           const float* input, float* output,
-                                           const int max_thread_per_block);
-
-template void ker_residual_launcher<__half>(int token_num, int hidden_size,
-                                            cudaStream_t stream,
-                                            const __half* input, __half* output,
-                                            const int max_thread_per_block);
-
 /**
 @brief: ker_softmax_topk_router
 softmax of gate output and route each token to topk experts

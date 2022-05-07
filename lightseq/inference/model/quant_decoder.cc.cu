@@ -7,7 +7,7 @@
 
 /**
 @file
-Transformer decoder, composed by gemm lib and
+QuantTransformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
@@ -68,15 +68,6 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
   }
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
   return;
-}
-
-/**
-Compute GPU memory size needed by transformer decoder,
-  to see how these memory is used, checkout init_buffer() for detail
-*/
-template <OperationType OpType_>
-long QuantDecoder<OpType_>::compute_buffer_bytesize() {
-  return 0;
 }
 
 /**
@@ -573,7 +564,7 @@ void QuantDecoder<OpType_>::embedding() {
       _p_device_emb[7], _p_d_lang_id, _p_d_cur_step_query, _batch_size,
       _tw._beam_size, _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
       _tw._max_step, _tw._multilg_type, _stream,
-      _trg_emb_clip_max / _quant_range);
+      _trg_emb_clip_max / _quant_range, true);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
@@ -647,7 +638,7 @@ void QuantDecoder<OpType_>::self_attention() {
 
   // get q, k, v by split and reshape qkv
 
-  ker_arrange_decself_qkv_i8I_launcher<_DataType>(
+  ker_arrange_decself_qkv_i8I_i8O_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
       _p_device_wei[_weight_offset + 3], _int8_ffn_in_buf,
       _p_d_self_k_cache1[_layer_id], _p_d_self_v_cache1[_layer_id],
@@ -680,7 +671,7 @@ void QuantDecoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  ker_fuse_softmax_new_value_int8_launcher(
+  ker_fuse_softmax_new_value_i32I_i8O_launcher(
       _int32_ffn_out_buf, _p_d_self_v_cache1[_layer_id], _int8_ffn_in_buf,
       _step_token_num * _tw._head_num, _cur_step + 1, _tw._max_step,
       _tw._head_num, _tw._dim_per_head, float(_atten_scaler),
@@ -849,7 +840,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
         _p_device_wei[_weight_offset + 15], _tw._inner_size,
         _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
-        _quant_range / _dec_clip_max[_layer_id * 19 + 11], true);
+        _quant_range / _dec_clip_max[_layer_id * 19 + 11], true, false);
   } else {
     ker_bias_relu_i8I_i8O_launcher<_DataType>(
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
@@ -871,7 +862,16 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
                 _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
-  float clip_max;
+  float clip_max, dequant_scale;
+  if (_tw._use_gelu) {
+    dequant_scale = _dec_clip_max[_layer_id * 19 + 5] *
+                    _dec_clip_max[_layer_id * 19 + 11] /
+                    (_quant_range * _quant_range);
+  } else {
+    dequant_scale = _dec_clip_max[_layer_id * 19 + 5] *
+                    _dec_clip_max[_layer_id * 19 + 11] /
+                    (2 * _quant_range * _quant_range);
+  }
   if (_layer_id == _tw._n_dec_layer - 1) {
     scale_ptr = _p_device_emb[2];
     bias_ptr = _p_device_emb[3];
@@ -887,9 +887,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
   ker_residual_bias_ln_i32I_i8O_launcher<_DataType>(
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
-      _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
-      _dec_clip_max[_layer_id * 19 + 5] * _dec_clip_max[_layer_id * 19 + 11] /
-          (2 * _quant_range * _quant_range),
+      _p_d_cur_step_query, _step_token_num, _tw._hidden_size, dequant_scale,
       _quant_range / clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
       false, true, _scaled_ffn2_colsum[_layer_id]);
 
@@ -906,22 +904,23 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
 template <OperationType OpType_>
 bool QuantDecoder<OpType_>::sample() {
-  throw std::runtime_error("QuantDecoder sample() not implemented");
   CHECK_GPU_ERROR(
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   /* --- Sample new tokens from logits --- */
   if (_tw._sampling_method == "topk") {
-    ker_topk_sample_launcher<_DataType>(
+    ker_topk_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+        _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
+        _logits_clip_max / _quant_range, true);
   } else {
-    ker_topp_sample_launcher<_DataType>(
+    ker_topp_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-        _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+        _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
-        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id);
+        _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
+        _logits_clip_max / _quant_range, true);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -1054,7 +1053,6 @@ void QuantDecoder<OpType_>::update_new_seq_probs() {
 
 template <OperationType OpType_>
 bool QuantDecoder<OpType_>::topk_greedy_search() {
-  throw std::runtime_error("QuantDecoder topk_greedy_search() not implemented");
   _tw._diverse_lambda = 0;
   if (_cur_step == 0) {
     return beam_search();
@@ -1063,11 +1061,11 @@ bool QuantDecoder<OpType_>::topk_greedy_search() {
   CHECK_GPU_ERROR(
       cudaMemsetAsync(_p_d_sample_unfinished, 0, sizeof(int), _stream));
   /* --- Sample new tokens from logits --- */
-  ker_topk_sample_launcher<_DataType>(
+  ker_topk_sample_i8I_launcher<_DataType>(
       _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
-      _stream, _p_d_logit_buf, _p_device_emb[6], _p_d_alive_seq,
+      _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
       _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
-      _p_d_curandstate, _tw._end_id);
+      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, true);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);

@@ -6,12 +6,11 @@
 import math
 import uuid
 
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, List
 
 import torch
-import torch.nn.functional as F
 from torch import Tensor, nn
-from torch.nn import Parameter, LayerNorm, Dropout, Linear
+from torch.nn import Parameter, LayerNorm, Dropout
 
 from lightseq.training.ops.pytorch import util
 from lightseq.training.ops.pytorch.layer_base import (
@@ -25,6 +24,11 @@ from .quantization import (
     act_quant_config,
     weight_quant_config,
 )
+
+
+def copy_para(x, fp16):
+    y = util.copy_para(x)
+    return y.half() if fp16 else y.float()
 
 
 class MultiheadAttention(nn.Module):
@@ -46,12 +50,14 @@ class MultiheadAttention(nn.Module):
         self_attention=False,
         encoder_decoder_attention=False,
         is_decoder=False,
+        has_causal_mask=False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
         self.qkv_same_dim = self.kdim == embed_dim and self.vdim == embed_dim
+        self.has_causal_mask = has_causal_mask
 
         self.num_heads = num_heads
         self.dropout_module = Dropout(dropout)
@@ -65,6 +71,15 @@ class MultiheadAttention(nn.Module):
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
         self.is_decoder = is_decoder
+
+        max_positions = 1024
+        self.register_buffer(
+            "bias",
+            torch.tril(
+                torch.ones((max_positions, max_positions), dtype=torch.uint8)
+            ).view(1, max_positions, max_positions),
+        )
+        self.register_buffer("masked_bias", torch.tensor(-1e4))
 
         assert (
             not self.self_attention or self.qkv_same_dim
@@ -316,6 +331,15 @@ class MultiheadAttention(nn.Module):
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
 
+        if self.has_causal_mask:
+            query_length, key_length = query.size(0), key.size(0)
+            causal_mask = self.bias[
+                :, key_length - query_length : key_length, :key_length
+            ].bool()
+            attn_weights = torch.where(
+                causal_mask, attn_weights, self.masked_bias.to(attn_weights.dtype)
+            )
+
         if attn_mask is not None:
             attn_mask = attn_mask.unsqueeze(0)
             if self.onnx_trace:
@@ -355,6 +379,7 @@ class MultiheadAttention(nn.Module):
         else:
             attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
         attn = self.out_proj(attn)
+
         attn_weights: Optional[Tensor] = None
         if need_weights:
             attn_weights = attn_weights_float.view(
@@ -535,10 +560,43 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
             config.intermediate_size,
         )
         self.fc2 = QuantLinear(
-            config.intermediate_size, self.embed_dim, pre_activation="relu"
+            config.intermediate_size,
+            self.embed_dim,
+            pre_activation=config.activation_fn,
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
+
+        if initial_weights is None or initial_biases is None:
+            return
+
+        # load initial weights
+        self.self_attn.qkv_proj.weight.data.copy_(
+            copy_para(torch.cat(initial_weights[:3], 0), config.fp16)
+        )
+        self.self_attn.qkv_proj.bias.data.copy_(
+            copy_para(torch.cat(initial_biases[:3], 0), config.fp16)
+        )
+        self.self_attn.out_proj.weight.data.copy_(
+            copy_para(initial_weights[3], config.fp16)
+        )
+        self.self_attn.out_proj.bias.data.copy_(
+            copy_para(initial_biases[3], config.fp16)
+        )
+        self.self_attn_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[4], config.fp16)
+        )
+        self.self_attn_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[4], config.fp16)
+        )
+        self.fc1.weight.data.copy_(copy_para(initial_weights[5], config.fp16))
+        self.fc1.bias.data.copy_(copy_para(initial_biases[5], config.fp16))
+        self.fc2.weight.data.copy_(copy_para(initial_weights[6], config.fp16))
+        self.fc2.bias.data.copy_(copy_para(initial_biases[6], config.fp16))
+        self.final_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[7], config.fp16)
+        )
+        self.final_layer_norm.bias.data.copy_(copy_para(initial_biases[7], config.fp16))
 
     def build_self_attention(self, embed_dim, nhead, attn_dropout):
         return MultiheadAttention(
@@ -625,27 +683,29 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         super().__init__()
         self.embed_dim = config.hidden_size
         self.dropout_module = Dropout(config.hidden_dropout_ratio)
-        self.cross_self_attention = False
 
         self.self_attn = self.build_self_attention(
             self.embed_dim,
             config.nhead,
             config.attn_prob_dropout_ratio,
+            has_causal_mask=not config.has_cross_attn,
         )
 
         self.activation_fn = util.get_activation_fn(activation=config.activation_fn)
         self.activation_dropout_module = Dropout(float(config.activation_dropout_ratio))
         self.normalize_before = config.pre_layer_norm
+        self.has_cross_attn = config.has_cross_attn
 
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
 
-        self.encoder_attn = self.build_encoder_attention(
-            self.embed_dim,
-            config.hidden_size,
-            config.attn_prob_dropout_ratio,
-            config.nhead,
-        )
-        self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
+        if config.has_cross_attn:
+            self.encoder_attn = self.build_encoder_attention(
+                self.embed_dim,
+                config.hidden_size,
+                config.attn_prob_dropout_ratio,
+                config.nhead,
+            )
+            self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
 
         self.fc1 = QuantLinear(
             self.embed_dim,
@@ -654,7 +714,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         self.fc2 = QuantLinear(
             config.intermediate_size,
             self.embed_dim,
-            pre_activation="relu",
+            pre_activation=config.activation_fn,
         )
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
@@ -662,8 +722,89 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
         self.onnx_trace = False
 
+        if initial_weights is None or initial_biases is None:
+            return
+
+        # load initial weights
+        self.self_attn.qkv_proj.weight.data.copy_(
+            copy_para(torch.cat(initial_weights[:3], 0), config.fp16)
+        )
+        self.self_attn.qkv_proj.bias.data.copy_(
+            copy_para(torch.cat(initial_biases[:3], 0), config.fp16)
+        )
+        self.self_attn.out_proj.weight.data.copy_(
+            copy_para(initial_weights[3], config.fp16)
+        )
+        self.self_attn.out_proj.bias.data.copy_(
+            copy_para(initial_biases[3], config.fp16)
+        )
+        self.self_attn_layer_norm.weight.data.copy_(
+            copy_para(initial_weights[4], config.fp16)
+        )
+        self.self_attn_layer_norm.bias.data.copy_(
+            copy_para(initial_biases[4], config.fp16)
+        )
+        if config.has_cross_attn:
+            self.encoder_attn.q_proj.weight.data.copy_(
+                copy_para(initial_weights[5], config.fp16)
+            )
+            self.encoder_attn.q_proj.bias.data.copy_(
+                copy_para(initial_weights[5], config.fp16)
+            )
+            self.encoder_attn.k_proj.weight.data.copy_(
+                copy_para(initial_weights[6], config.fp16)
+            )
+            self.encoder_attn.k_proj.bias.data.copy_(
+                copy_para(initial_weights[6], config.fp16)
+            )
+            self.encoder_attn.v_proj.weight.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.encoder_attn.v_proj.bias.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.encoder_attn.out_proj.weight.data.copy_(
+                copy_para(initial_weights[8], config.fp16)
+            )
+            self.encoder_attn.out_proj.bias.data.copy_(
+                copy_para(initial_biases[8], config.fp16)
+            )
+            self.encoder_attn_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[9], config.fp16)
+            )
+            self.encoder_attn_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[9], config.fp16)
+            )
+            self.fc1.weight.data.copy_(copy_para(initial_weights[10], config.fp16))
+            self.fc1.bias.data.copy_(copy_para(initial_biases[10], config.fp16))
+            self.fc2.weight.data.copy_(copy_para(initial_weights[11], config.fp16))
+            self.fc2.bias.data.copy_(copy_para(initial_biases[11], config.fp16))
+            self.final_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[12], config.fp16)
+            )
+            self.final_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[12], config.fp16)
+            )
+        else:
+            self.fc1.weight.data.copy_(copy_para(initial_weights[5], config.fp16))
+            self.fc1.bias.data.copy_(copy_para(initial_biases[5], config.fp16))
+            self.fc2.weight.data.copy_(copy_para(initial_weights[6], config.fp16))
+            self.fc2.bias.data.copy_(copy_para(initial_biases[6], config.fp16))
+            self.final_layer_norm.weight.data.copy_(
+                copy_para(initial_weights[7], config.fp16)
+            )
+            self.final_layer_norm.bias.data.copy_(
+                copy_para(initial_biases[7], config.fp16)
+            )
+
     def build_self_attention(
-        self, embed_dim, nhead, attn_dropout, add_bias_kv=False, add_zero_attn=False
+        self,
+        embed_dim,
+        nhead,
+        attn_dropout,
+        add_bias_kv=False,
+        add_zero_attn=False,
+        has_causal_mask=False,
     ):
         return MultiheadAttention(
             embed_dim,
@@ -671,8 +812,9 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             dropout=attn_dropout,
             add_bias_kv=add_bias_kv,
             add_zero_attn=add_zero_attn,
-            self_attention=not self.cross_self_attention,
+            self_attention=True,
             is_decoder=True,
+            has_causal_mask=has_causal_mask,
         )
 
     def build_encoder_attention(
@@ -720,7 +862,6 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
         """
-
         if need_head_weights:
             need_attn = True
         x = x.transpose(0, 1)
@@ -737,35 +878,11 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
                 saved_state["prev_key_padding_mask"] = prev_self_attn_state[2]
             assert incremental_state is not None
             self.self_attn._set_input_buffer(incremental_state, saved_state)
-        _self_attn_input_buffer = self.self_attn._get_input_buffer(incremental_state)
-        if self.cross_self_attention and not (
-            incremental_state is not None
-            and _self_attn_input_buffer is not None
-            and "prev_key" in _self_attn_input_buffer
-        ):
-            if self_attn_mask is not None:
-                assert encoder_out is not None
-                self_attn_mask = torch.cat(
-                    (x.new_zeros(x.size(0), encoder_out.size(0)), self_attn_mask), dim=1
-                )
-            if self_attn_padding_mask is not None:
-                if encoder_padding_mask is None:
-                    assert encoder_out is not None
-                    encoder_padding_mask = self_attn_padding_mask.new_zeros(
-                        encoder_out.size(1), encoder_out.size(0)
-                    )
-                self_attn_padding_mask = torch.cat(
-                    (encoder_padding_mask, self_attn_padding_mask), dim=1
-                )
-            assert encoder_out is not None
-            y = torch.cat((encoder_out, x), dim=0)
-        else:
-            y = x
 
         x, attn = self.self_attn(
             query=x,
-            key=y,
-            value=y,
+            key=x,
+            value=x,
             key_padding_mask=self_attn_padding_mask,
             incremental_state=incremental_state,
             need_weights=False,
@@ -776,7 +893,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
-        if self.encoder_attn is not None and encoder_out is not None:
+        if self.has_cross_attn and encoder_out is not None:
             if (
                 encoder_out.shape[1] != x.shape[1]
                 and x.shape[1] % encoder_out.shape[1] == 0
@@ -847,7 +964,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
 
 class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
-    def __init__(self, config):
+    def __init__(self, config, initial_embeddings=None):
         super().__init__()
 
         self.emb_lookup = nn.Embedding(
@@ -855,9 +972,15 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.emb_lookup.to(dtype=(torch.half if config.fp16 else torch.float))
         self.embeddings = self.emb_lookup.weight
-
         nn.init.normal_(self.embeddings, mean=0, std=config.embedding_dim**-0.5)
         nn.init.constant_(self.embeddings[config.padding_idx], 0)
+
+        # load initial weights
+        if initial_embeddings is not None:
+            self.emb_lookup.weight.data.copy_(
+                copy_para(initial_embeddings, config.fp16)
+            )
+
         self.embed_positions = SinusoidalPositionalEmbedding(
             config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16
         )
@@ -941,3 +1064,79 @@ class SinusoidalPositionalEmbedding(nn.Module):
             .view(bsz, seq_len, -1)
             * mask
         ).detach()
+
+
+class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
+    def __init__(self, config, initial_weights=None):
+        super().__init__()
+        self.word_embeddings = nn.Embedding(
+            config.vocab_size, config.embedding_dim, padding_idx=config.padding_idx
+        )
+        self.position_embeddings = nn.Embedding(
+            config.max_seq_len, config.embedding_dim
+        )
+        self.token_type_embeddings = nn.Embedding(
+            config.type_vocab_size, config.embedding_dim
+        )
+
+        self.LayerNorm = nn.LayerNorm(config.embedding_dim, eps=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.dropout)
+
+        self.register_buffer(
+            "position_ids", torch.arange(config.max_seq_len).expand((1, -1))
+        )
+        self.register_buffer(
+            "token_type_ids",
+            torch.zeros(self.position_ids.size(), dtype=torch.long),
+            persistent=False,
+        )
+
+        self.emb_quant = TensorQuantizer(weight_quant_config)
+
+        if initial_weights is None:
+            return
+
+        # load initial weights
+        self.word_embeddings.weight.data.copy_(
+            copy_para(initial_weights[0], config.fp16)
+        )
+        self.position_embeddings.weight.data.copy_(
+            copy_para(initial_weights[1], config.fp16)
+        )
+        self.token_type_embeddings.weight.data.copy_(
+            copy_para(initial_weights[2], config.fp16)
+        )
+        self.LayerNorm.weight.data.copy_(copy_para(initial_weights[3], config.fp16))
+        self.LayerNorm.bias.data.copy_(copy_para(initial_weights[4], config.fp16))
+
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+        past_key_values_length=0,
+    ):
+        assert input_ids is not None
+        assert position_ids is None
+        assert inputs_embeds is None
+        assert torch.all(token_type_ids == 0)
+
+        input_shape = input_ids.size()
+        seq_length = input_shape[1]
+        position_ids = self.position_ids[:, :seq_length]
+
+        token_type_ids = self.token_type_ids[:, :seq_length].expand(
+            input_shape[0], seq_length
+        )
+
+        inputs_embeds = self.word_embeddings(input_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = inputs_embeds + token_type_embeddings
+        embeddings = self.emb_quant(embeddings)
+        position_embeddings = self.position_embeddings(position_ids)
+        embeddings += position_embeddings
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
