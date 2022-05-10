@@ -899,15 +899,15 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   out[1] = quantize(activation_kernel<act_type, float>(
                         dequantize(qinput[1], output_clip_max) + b4.y) *
                         scale * m[1],
-                    input_clip_max, in_cmask[0], 2);
+                    input_clip_max, in_cmask[1], 2);
   out[2] = quantize(activation_kernel<act_type, float>(
                         dequantize(qinput[2], output_clip_max) + b4.z) *
                         scale * m[2],
-                    input_clip_max, in_cmask[0], 2);
+                    input_clip_max, in_cmask[2], 2);
   out[3] = quantize(activation_kernel<act_type, float>(
                         dequantize(qinput[3], output_clip_max) + b4.w) *
                         scale * m[3],
-                    input_clip_max, in_cmask[0], 2);
+                    input_clip_max, in_cmask[3], 2);
 
   in_cmask4[i] = reinterpret_cast<uint32_t *>(in_cmask)[0];
   out4[i] = reinterpret_cast<int32_t *>(out)[0];
@@ -935,7 +935,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   uint64_t *out_cmask8 = reinterpret_cast<uint64_t *>(cmask_out);
   uint64_t *in_cmask8 = reinterpret_cast<uint64_t *>(cmask_in);
 
-  float output_clip_max = __half2float(cmax_out[2]);
+  float output_clip_max = __half2float(cmax_out[0]);
   float input_clip_max = __half2float(cmax_in[0]);
 
   uint8_t m[8];
@@ -962,10 +962,10 @@ __global__ void ls_quant_dropout_act_bias_kernel(
 
   __half2 scale_mask[4];
 
-  scale_mask[1] = __floats2half2_rn(scale * m[0], scale * m[1]);
-  scale_mask[2] = __floats2half2_rn(scale * m[2], scale * m[3]);
-  scale_mask[3] = __floats2half2_rn(scale * m[4], scale * m[5]);
-  scale_mask[4] = __floats2half2_rn(scale * m[6], scale * m[7]);
+  scale_mask[0] = __floats2half2_rn(scale * m[0], scale * m[1]);
+  scale_mask[1] = __floats2half2_rn(scale * m[2], scale * m[3]);
+  scale_mask[2] = __floats2half2_rn(scale * m[4], scale * m[5]);
+  scale_mask[3] = __floats2half2_rn(scale * m[6], scale * m[7]);
 
   uint8_t out_cmask[8];
   uint8_t in_cmask[8];

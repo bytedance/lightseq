@@ -18,6 +18,22 @@ def is_inf(x):
     return x.isinf().any().item()
 
 
+def quantize(x, cmax):
+    x_cmask = (x <= -cmax).to(dtype=torch.uint8) * 4 + (x >= cmax).to(
+        dtype=torch.uint8
+    ) * 2
+    x = x / (cmax / 127)
+    x = (x + 0.5).floor()
+    x = x.clamp(-127, 127).to(dtype=torch.int8)
+    return x, x_cmask
+
+
+def dequantize(x, cmax, dtype):
+    x = x.to(dtype) * cmax / 127
+    x = x.clamp(-cmax, cmax)
+    return x
+
+
 max_batch_tokens = 9216
 max_seq_len = 256
 
