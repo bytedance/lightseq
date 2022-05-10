@@ -60,11 +60,30 @@ void launch_bias_add_transform_20314(T *output, const T *input, const T *bias,
                                      int dim_0, int dim_1, int dim_2, int dim_3,
                                      int dim_4, cudaStream_t stream);
 
+template <typename T>
+void launch_quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
+                                           const int8_t *input, const T *bias,
+                                           const T *clip_max, int dim_0,
+                                           int dim_1, int dim_2, int dim_3,
+                                           int dim_4, cudaStream_t stream);
+
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <typename T>
 void launch_transform4d_0213(T *output, const T *vals, int batch_size,
                              int seq_len, int hidden_dim, int nhead,
                              int trans_count, cudaStream_t stream);
+
+template <typename T>
+void launch_quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
+                                   const T *vals, const T *clip_max,
+                                   int batch_size, int seq_len, int hidden_dim,
+                                   int nhead, int trans_count,
+                                   cudaStream_t stream);
+template <typename T>
+void launch_transform4d_0213_dcmax(T *output, T *grad_cmax, const T *vals,
+                                   const uint8_t *clip_mask, int batch_size,
+                                   int seq_len, int hidden_dim, int nhead,
+                                   int trans_count, cudaStream_t stream);
 
 template <typename T>
 void launch_ls_dropout(T *out, const T *vals, uint8_t *mask, int total_count,
