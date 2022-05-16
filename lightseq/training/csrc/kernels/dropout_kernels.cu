@@ -1293,19 +1293,24 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     }
   }
   __shared__ float block_cmax_in_grad, block_cmax_out_grad;
+  if (threadIdx.x == 0 && threadIdx.y == 0) {
+    block_cmax_in_grad = 0;
+    block_cmax_out_grad = 0;
+  }
+  __syncthreads();
 
   if (thread_cmax_out_grad != 0) {
-    atomicAdd(&block_cmax_in_grad, thread_cmax_out_grad);
+    atomicAdd(&block_cmax_out_grad, thread_cmax_out_grad);
   }
   if (thread_cmax_in_grad != 0) {
-    atomicAdd(&block_cmax_out_grad, thread_cmax_in_grad);
+    atomicAdd(&block_cmax_in_grad, thread_cmax_in_grad);
   }
 
   tile[threadIdx.x][threadIdx.y] = thread_grad_bias;
   __syncthreads();
   float sum = tile[threadIdx.y][threadIdx.x];
 
-  if (threadIdx.x == 0) {
+  if (threadIdx.x == 0 && threadIdx.y == 0) {
     if (block_cmax_in_grad != 0) {
       atomicAdd(&cmax_in_grad[0], block_cmax_in_grad);
     }
