@@ -1078,40 +1078,63 @@ def test_launch_dropout_relu_bias_bwd_i8():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float, torch.half], ntest=5, atol=1e-2, rtol=1e-2)
+@kt.case(atol=1e-2, rtol=1e-2)
 def test_launch_dropout_gelu_bias_bwd_i8():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim * 4
     print("test shape:", (batch_size, seq_len, hidden_dim))
 
-    test_input = kt.rand((batch_size, seq_len, hidden_dim))
-    test_input.requires_grad_()
-    test_bias = kt.rand((hidden_dim))
-    test_bias.requires_grad_()
+    test_input = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(torch.int8)
+    test_bias = kt.rand((hidden_dim,))
+    test_out = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(
+        torch.int8
+    )
+    test_mask = torch.rand((batch_size, seq_len, hidden_dim)).to(
+        dtype=torch.uint8, device="cuda:0"
+    )
+    cmask_out = (
+        torch.empty_like(test_input, dtype=torch.uint8)
+        .to(device=test_input.device)
+        .contiguous()
+    )
+    cmax_out = ((test_input.abs().flatten().topk(100)[0][-1]) / 127).to(kt.dtype)
+    cmax_in = ((test_input.abs().flatten().topk(100)[0][-1]) / 127).to(kt.dtype)
+
     test_out_grad = kt.rand((batch_size, seq_len, hidden_dim))
     test_in_grad_cus = kt.rand((batch_size, seq_len, hidden_dim))
     test_bias_grad_cus = kt.rand((hidden_dim))
-    test_mask = torch.ones((batch_size, seq_len, hidden_dim)).to(
-        dtype=torch.uint8,
-        device="cuda:0",
-    )
+
+    test_input_dq = dequantize(test_input, cmax_out, kt.dtype)
+    test_gelu_in = test_input_dq + test_bias
+    test_gelu_in.requires_grad_()
+    test_gelu_out = torch.nn.functional.gelu(test_gelu_in)
+    test_gelu_out_sum = test_gelu_out.sum()
+    test_out = torch.nn.functional.dropout(test_gelu_out, p=0)
+
+    cmask_in = (test_out <= -cmax_in).to(dtype=torch.uint8) * 4 + (test_out >= cmax_in).to(
+        dtype=torch.uint8
+    ) * 2
+
+    f_zero = torch.zeros(1).to(test_input.device).to(kt.dtype)
 
     if kt.dtype == torch.float:
-        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp32
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp32
     else:
-        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp16
-
-    temp = torch.nn.functional.gelu(test_input + test_bias)
-    base_out = torch.nn.functional.dropout(temp, p=0)
-    base_out = base_out * test_out_grad
-    base_out = base_out.sum()
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp16
 
     def custom():
+        cmax_in_grad_cus = kt.zeros((1))
+        cmax_out_grad_cus = kt.zeros((1))
         cus_func(
             test_in_grad_cus,
             test_bias_grad_cus,
+            cmax_out_grad_cus,
+            cmax_in_grad_cus,
             test_mask,
             test_input,
+            cmax_out,
+            cmask_out,
+            cmask_in,
             test_bias,
             test_out_grad,
             batch_size * seq_len,
@@ -1119,18 +1142,25 @@ def test_launch_dropout_gelu_bias_bwd_i8():
             0,
         )
 
-        return test_in_grad_cus, test_bias_grad_cus
+        return test_in_grad_cus, test_bias_grad_cus, cmax_in_grad_cus
 
     def baseline():
-        if test_input.grad is not None:
-            test_input.grad.zero_()
-            test_bias.grad.zero_()
-        base_out.backward(retain_graph=True)
+        out_grad_inside = torch.where(test_out.abs() < cmax_in, test_out_grad, f_zero)
+        out_grad_outside = torch.where(test_out.abs() >= cmax_in, test_out_grad, f_zero)
+        out_grad_outside = torch.where(
+            test_out <= -cmax_in, -out_grad_outside, out_grad_outside
+        )
+        cmax_in_grad_base = out_grad_outside.sum()
 
-        return [
-            test_input.grad.contiguous().detach(),
-            test_bias.grad.contiguous().detach(),
-        ]
+        temp = out_grad_inside * test_mask
+
+        if test_gelu_in.grad is not None:
+            test_gelu_in.grad.zero_()
+        test_gelu_out_sum.backward(retain_graph=True)
+        test_in_grad_base = temp * test_gelu_in.grad
+        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1))
+
+        return test_in_grad_base, test_bias_grad_base, cmax_in_grad_base
 
     return custom, baseline
 
@@ -1156,8 +1186,8 @@ if __name__ == "__main__":
         # "test_launch_dropout_gelu_bias",
         # "test_launch_dropout_gelu_bias_bwd",
         # "test_launch_dropout_relu_bias_i8",
-        "test_launch_dropout_relu_bias_bwd_i8",
+        # "test_launch_dropout_relu_bias_bwd_i8",
         # "test_launch_dropout_gelu_bias_i8",
-        # "test_launch_dropout_gelu_bias_bwd_i8",
+        "test_launch_dropout_gelu_bias_bwd_i8",
     ]
     kt.run(kernel_list)
