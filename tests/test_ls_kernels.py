@@ -1006,9 +1006,7 @@ def test_launch_dropout_relu_bias_bwd_i8():
 
     test_input = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(torch.int8)
     test_bias = kt.rand((hidden_dim,))
-    test_out = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(
-        torch.int8
-    )
+    test_out = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(torch.int8)
     test_mask = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -1028,9 +1026,9 @@ def test_launch_dropout_relu_bias_bwd_i8():
     test_out = torch.nn.functional.relu(test_input_dq + test_bias)
     test_out = torch.nn.functional.dropout(test_out, p=0)
 
-    cmask_in = (test_out <= -cmax_in).to(dtype=torch.uint8) * 4 + (test_out >= cmax_in).to(
-        dtype=torch.uint8
-    ) * 2
+    cmask_in = (test_out <= -cmax_in).to(dtype=torch.uint8) * 4 + (
+        test_out >= cmax_in
+    ).to(dtype=torch.uint8) * 2
 
     f_zero = torch.zeros(1).to(test_input.device).to(kt.dtype)
 
@@ -1086,9 +1084,7 @@ def test_launch_dropout_gelu_bias_bwd_i8():
 
     test_input = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(torch.int8)
     test_bias = kt.rand((hidden_dim,))
-    test_out = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(
-        torch.int8
-    )
+    test_out = kt.randint(-127, 128, (batch_size, seq_len, hidden_dim)).to(torch.int8)
     test_mask = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -1111,9 +1107,9 @@ def test_launch_dropout_gelu_bias_bwd_i8():
     test_gelu_out_sum = test_gelu_out.sum()
     test_out = torch.nn.functional.dropout(test_gelu_out, p=0)
 
-    cmask_in = (test_out <= -cmax_in).to(dtype=torch.uint8) * 4 + (test_out >= cmax_in).to(
-        dtype=torch.uint8
-    ) * 2
+    cmask_in = (test_out <= -cmax_in).to(dtype=torch.uint8) * 4 + (
+        test_out >= cmax_in
+    ).to(dtype=torch.uint8) * 2
 
     f_zero = torch.zeros(1).to(test_input.device).to(kt.dtype)
 
