@@ -5,35 +5,6 @@ from collections import OrderedDict
 import numpy as np
 import torch
 
-
-def cast_fp32_tensor(tlist):
-    return [ele.to(torch.float32) for ele in tlist]
-
-
-def is_nan(x):
-    return x.isnan().any().item()
-
-
-def is_inf(x):
-    return x.isinf().any().item()
-
-
-def quantize(x, cmax):
-    x_cmask = (x <= -cmax).to(dtype=torch.uint8) * 4 + (x >= cmax).to(
-        dtype=torch.uint8
-    ) * 2
-    x = x / (cmax / 127)
-    x = (x + 0.5).floor()
-    x = x.clamp(-127, 127).to(dtype=torch.int8)
-    return x, x_cmask
-
-
-def dequantize(x, cmax, dtype):
-    x = x.to(dtype) * cmax / 127
-    x = x.clamp(-cmax, cmax)
-    return x
-
-
 max_batch_tokens = 9216
 max_seq_len = 256
 
@@ -45,6 +16,7 @@ class TestDecorator(object):
         self.dtype = None
         self.max_batch_tokens = max_batch_tokens
         self.max_seq_len = max_seq_len
+        self.epsilon = 1e-8
 
     def init(self, device, nhead):
         # device: str. e.g. "cuda:0"
@@ -76,14 +48,52 @@ class TestDecorator(object):
         else:
             return 8
 
+    def cast_fp32_tensor(self, tlist):
+        return [ele.to(torch.float32) for ele in tlist]
+
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)
 
     def norm_res_list(self, rlist):
         return [ele.to(dtype=self.dtype).contiguous() for ele in rlist]
 
+    def get_cmask(self, x, cmax):
+        x_cmask = (x <= -cmax).to(dtype=torch.uint8) * 4 + (x >= cmax).to(
+            dtype=torch.uint8
+        ) * 2
+        return x_cmask
+
+    def quantize(self, x, cmax):
+        x = x / (cmax / 127)
+        x = (x + 0.5).floor()
+        x = x.clamp(-127, 127).to(dtype=torch.int8)
+        return x, self.get_cmask(x, cmax)
+
+    def dequantize(self, x, cmax):
+        x = x.to(self.dtype) * cmax / 127
+        x = x.clamp(-cmax, cmax)
+        return x
+
+    def topk(self, x, k=100):
+        return x.abs().flatten().topk(k)[0][-1]
+
+    def tensor_inrange(self, x, y, cmax):
+        out = torch.where(y.abs() < cmax, x, self.zeros(1).to(x.dtype))
+        return out
+
+    def tensor_outrange(self, x, y, cmax):
+        out = torch.where(y.abs() >= cmax, x, self.zeros(1).to(x.dtype))
+        out = torch.where(y <= -cmax, -out, out)
+        return out
+
     def rand(self, shape):
         return self.move(torch.rand(shape))
+
+    def randint8(self, shape):
+        return torch.rand(shape).to(self.device, dtype=torch.int8)
+
+    def randuint8(self, shape):
+        return torch.rand(shape).to(self.device, dtype=torch.uint8)
 
     def randint(self, low, high, shape):
         return torch.randint(low, high, shape).to(self.device, dtype=torch.long)
