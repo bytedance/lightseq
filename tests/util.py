@@ -265,6 +265,28 @@ def get_fairseq_enc_params(fairseq_layer):
     initial_biases.append(fairseq_layer.fc2.bias.detach().clone())
     initial_weights.append(fairseq_layer.final_layer_norm.weight.detach().clone())
     initial_biases.append(fairseq_layer.final_layer_norm.bias.detach().clone())
+
+    clip_max = torch.stack(
+        [
+            fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.weight_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.out_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.out_proj.weight_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.out_proj.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc1.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc1.weight_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc1.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc2.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc2.weight_quant.clip.clip_value_max.detach().clone(),
+            # fairseq_layer.fc2.output_quant.clip.clip_value_max.detach().clone(),
+            torch.tensor(16).to(
+                fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max
+            ),
+        ]
+    )
+
+    initial_weights.append(clip_max)
     return initial_weights, initial_biases
 
 

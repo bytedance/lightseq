@@ -38,7 +38,7 @@ from lightseq.training.ops.pytorch.quantization import (
 
 kt = TestDecorator()
 
-num_layers = 1
+NUM_LAYERS = 1
 
 ###################### encoding layer ######################
 
@@ -76,7 +76,7 @@ def gen_enc_layer_pair():
     return fairseq_enc_layer, custom_enc_layer
 
 
-for _ in range(num_layers):
+for _ in range(NUM_LAYERS):
     fairseq_enc_layer, custom_enc_layer = gen_enc_layer_pair()
     custom_enc_layer_list.append(custom_enc_layer)
     fairseq_enc_layer_list.append(fairseq_enc_layer)
@@ -130,7 +130,7 @@ def get_test_bert_encoder(num_layers):
 
 
 custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
-    num_layers
+    NUM_LAYERS
 )
 
 
@@ -150,7 +150,7 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         pre_layer_norm=True,
         fp16=True,
         local_rank=0,
-        nlayer=num_layers,
+        nlayer=NUM_LAYERS,
         activation_fn="relu",
     )
     layer = LSFSTransformerDecoderLayer(
@@ -169,7 +169,7 @@ _initial_dec_biases_list = []
 _initial_encdec_attn_kvw_list = []
 _initial_encdec_attn_kvb_list = []
 
-for _ in range(num_layers):
+for _ in range(NUM_LAYERS):
     fairseq_dec_layer = fairseq_layers.generate_dec_layer()
     fairseq_dec_layer.train()
     initial_dec_weights, initial_dec_biases = get_fairseq_dec_params(fairseq_dec_layer)
@@ -183,7 +183,7 @@ for _ in range(num_layers):
 
 _initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
 _initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
-for i in range(num_layers):
+for i in range(NUM_LAYERS):
     _initial_dec_weights_list[i].pop(7)
     _initial_dec_weights_list[i].pop(6)
     if i == 0:
@@ -271,7 +271,7 @@ def test_encoder_layer_forward():
 
     def custom():
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res = custom_enc_layer_list[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
@@ -279,7 +279,38 @@ def test_encoder_layer_forward():
 
     def baseline():
         res = hidden_states.contiguous().clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
+            res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1)
+def test_quant_encoder_layer_forward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    hidden_states = kt.rand((batch_size, seq_len, 1024))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+
+    for i in range(NUM_LAYERS):
+        custom_enc_layer_list[i].apply(enable_quant)
+        fairseq_enc_layer_list[i].apply(qat_mode)
+
+    def custom():
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = custom_enc_layer_list[i](res, self_attn_padding_mask)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        res = hidden_states.contiguous().clone()
+        for i in range(NUM_LAYERS):
             res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
@@ -300,16 +331,16 @@ def test_encoder_layer_backward():
     loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
 
     def custom():
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             custom_enc_layer_list[i].zero_grad()
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res = custom_enc_layer_list[i](res, self_attn_padding_mask)
         custom_loss = (res / 1000).sum()
         custom_loss.data.copy_(loss_data)
         custom_loss.backward()
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             """
             attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
             inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
@@ -338,16 +369,16 @@ def test_encoder_layer_backward():
         return grad_list
 
     def baseline():
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             fairseq_enc_layer_list[i].zero_grad()
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
         fairseq_loss = (res / 1000).sum()
         fairseq_loss.data.copy_(loss_data)
         fairseq_loss.backward()
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             curl = fairseq_enc_layer_list[i]
             cur_grads = copy_grad_from_paras(
                 [
@@ -385,7 +416,7 @@ def test_bert_encoder_layer_forward():
 
     def custom():
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res = custom_bert_enc_layer_list[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
@@ -393,7 +424,7 @@ def test_bert_encoder_layer_forward():
 
     def baseline():
         res = hidden_states.contiguous().clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res = fairseq_bert_enc_layer_list[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
@@ -413,12 +444,12 @@ def test_bert_encoder_layer_backward():
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
     cus_x = hidden_states.clone()
-    for i in range(num_layers):
+    for i in range(NUM_LAYERS):
         cus_x = custom_bert_enc_layer_list[i](cus_x, self_attn_padding_mask)
     custom_loss = (cus_x / 1000).sum()
 
     base_x = hidden_states.clone()
-    for i in range(num_layers):
+    for i in range(NUM_LAYERS):
         base_x = fairseq_bert_enc_layer_list[i](base_x, self_attn_padding_mask)
     fairseq_loss = (base_x / 1000).sum()
 
@@ -426,7 +457,7 @@ def test_bert_encoder_layer_backward():
         custom_bert_enc_layer_list.zero_grad()
         custom_loss.backward(retain_graph=True)
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             """
             attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
             inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
@@ -458,7 +489,7 @@ def test_bert_encoder_layer_backward():
         fairseq_bert_enc_layer_list.zero_grad()
         fairseq_loss.backward(retain_graph=True)
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             curl = fairseq_bert_enc_layer_list[i]
             cur_grads = copy_grad_from_paras(
                 [
@@ -503,7 +534,7 @@ def test_decoder_layer_forward():
 
     def custom():
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res, _, _ = custom_dec_layer_list[i](
                 res,
                 encoder_out=encoder_out,
@@ -516,7 +547,7 @@ def test_decoder_layer_forward():
 
     def baseline():
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res, _, _ = fairseq_dec_layer_list[i](
                 res,
                 encoder_out=encoder_out,
@@ -549,10 +580,10 @@ def test_decoder_layer_backward():
     loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
 
     def custom():
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             custom_dec_layer_list[i].zero_grad()
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res, _, _ = custom_dec_layer_list[i](
                 res,
                 encoder_out=encoder_out,
@@ -563,7 +594,7 @@ def test_decoder_layer_backward():
         custom_loss.data.copy_(loss_data)
         custom_loss.backward()
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             """
             0 attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
             6 encdec_attn_qw, encdec_attn_qb, encdec_attn_ow, encdec_attn_ob, encdec_attn_nw, encdec_attn_nb,
@@ -611,10 +642,10 @@ def test_decoder_layer_backward():
         return grad_list
 
     def baseline():
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             fairseq_dec_layer_list[i].zero_grad()
         res = hidden_states.clone()
-        for i in range(num_layers):
+        for i in range(NUM_LAYERS):
             res, _, _ = fairseq_dec_layer_list[i](
                 res,
                 encoder_out=encoder_out,
@@ -626,7 +657,7 @@ def test_decoder_layer_backward():
         fairseq_loss.data.copy_(loss_data)
         fairseq_loss.backward()
         grad_list = []
-        for i in range(num_layers - 1, -1, -1):
+        for i in range(NUM_LAYERS - 1, -1, -1):
             grad_list.extend(
                 [
                     fairseq_dec_layer_list[i].fc2.weight.grad.contiguous().detach(),
@@ -744,7 +775,7 @@ def test_decoder_layer_forward_inference():
         res_list = []
         for i in range(max_step):
             res = hidden_states_list[i].clone()
-            for i in range(num_layers):
+            for i in range(NUM_LAYERS):
                 res, _, _ = custom_dec_layer_list[i](
                     res,
                     encoder_out=ls_encoder_out,
@@ -759,7 +790,7 @@ def test_decoder_layer_forward_inference():
         res_list = []
         for i in range(max_step):
             res = hidden_states_list[i].clone()
-            for i in range(num_layers):
+            for i in range(NUM_LAYERS):
                 res, _, _ = fairseq_dec_layer_list[i](
                     res,
                     encoder_out=fs_encoder_out,
@@ -1071,18 +1102,19 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_encoder_layer_forward",
-            "test_encoder_layer_backward",
-            "test_bert_encoder_layer_forward",
-            "test_bert_encoder_layer_backward",
-            "test_decoder_layer_forward",
-            "test_decoder_layer_backward",
-            "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_quant_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_quant_embedding_layer_backward",
-            "test_cross_entropy_layer_forward",
-            "test_cross_entropy_layer_backward",
+            # "test_encoder_layer_forward",
+            "test_quant_encoder_layer_forward",
+            # "test_encoder_layer_backward",
+            # "test_bert_encoder_layer_forward",
+            # "test_bert_encoder_layer_backward",
+            # "test_decoder_layer_forward",
+            # "test_decoder_layer_backward",
+            # "test_decoder_layer_forward_inference",
+            # "test_embedding_layer_forward",
+            # "test_quant_embedding_layer_forward",
+            # "test_embedding_layer_backward",
+            # "test_quant_embedding_layer_backward",
+            # "test_cross_entropy_layer_forward",
+            # "test_cross_entropy_layer_backward",
         ]
     )

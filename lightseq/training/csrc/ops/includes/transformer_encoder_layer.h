@@ -144,20 +144,15 @@ class TransformerEncoderLayer {
     _ctx_bufB_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
     if (_enable_quant) {
       _gemmQKV_inp_i8_ptr =
-          _pre_or_postLayerNorm
-              ? cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size)
-              : nullptr;
-      _attn_qkvw_i8_ptr = cuda_malloc<int8_t>(_hidden_size * 3 * _hidden_size);
+          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
+
       _attn_o_inp_i8_ptr =
           cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _attn_ow_i8_ptr = cuda_malloc<int8_t>(_hidden_size * _hidden_size);
       _ff1_inp_i8_ptr = cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
       _relu_inp_i8_ptr =
           cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
       _ff2_inp_i8_ptr =
           cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _ff1_w_i8_ptr = cuda_malloc<int8_t>(_hidden_size * _intermediate_size);
-      _ff2_w_i8_ptr = cuda_malloc<int8_t>(_hidden_size * _intermediate_size);
       _igemm_alpha_ptr = cuda_malloc<float>(1);
       _igemm_beta_ptr = cuda_malloc<float>(1);
       cuda_set<float>(_igemm_beta_ptr, 0, 1);
@@ -195,18 +190,17 @@ class TransformerEncoderLayer {
     cuda_free(_qkv_ptr);
     cuda_free(_soft_out_ptr);
     cuda_free(_ctx_bufB_ptr);
-    cuda_free(_attn_o_inp_ptr);
     if (_enable_quant) {
       cuda_free(_gemmQKV_inp_i8_ptr);
+      cuda_free(_attn_o_inp_i8_ptr);
       cuda_free(_ff1_inp_i8_ptr);
       cuda_free(_relu_inp_i8_ptr);
       cuda_free(_ff2_inp_i8_ptr);
       cuda_free(_igemm_alpha_ptr);
       cuda_free(_igemm_beta_ptr);
-      cuda_free(_ff1_w_i8_ptr);
-      cuda_free(_ff2_w_i8_ptr);
     } else {
       cuda_free(_gemmQKV_inp_ptr);
+      cuda_free(_attn_o_inp_ptr);
       cuda_free(_ff1_inp_ptr);
       cuda_free(_relu_inp_ptr);
       cuda_free(_ff2_inp_ptr);

@@ -80,10 +80,10 @@ void launch_quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
                                    int nhead, int trans_count,
                                    cudaStream_t stream);
 template <typename T>
-void launch_transform4d_0213_dcmax(T *output, T *grad_cmax, const T *vals,
-                                   const uint8_t *clip_mask, int batch_size,
-                                   int seq_len, int hidden_dim, int nhead,
-                                   int trans_count, cudaStream_t stream);
+void launch_transform_0213_dcmax(T *output, T *grad_cmax, const T *vals,
+                                 const uint8_t *clip_mask, int batch_size,
+                                 int seq_len, int hidden_dim, int nhead,
+                                 cudaStream_t stream);
 
 template <typename T>
 void launch_ls_dropout(T *out, const T *vals, uint8_t *mask, int total_count,

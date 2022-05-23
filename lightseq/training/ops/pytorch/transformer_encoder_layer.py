@@ -1,3 +1,4 @@
+from itertools import zip_longest
 import math
 
 import torch
@@ -132,16 +133,18 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
 
         idx = 0
-        for w, b in zip(weights, biases):
-            cur_para = self._get_weights(idx)
-            assert cur_para.numel() == w.numel()
-            cur_para.copy_(w.view(-1))
-            idx += 1
+        for w, b in zip_longest(weights, biases):
+            if w is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == w.numel()
+                cur_para.copy_(w.view(-1))
+                idx += 1
 
-            cur_para = self._get_weights(idx)
-            assert cur_para.numel() == b.numel()
-            cur_para.copy_(b.view(-1))
-            idx += 1
+            if b is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == b.numel()
+                cur_para.copy_(b.view(-1))
+                idx += 1
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
