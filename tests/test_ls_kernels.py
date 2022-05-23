@@ -928,7 +928,7 @@ def test_launch_dropout_relu_bias_i8I_i8O():
 
 
 @kt.case(atol=4, rtol=1e-2)
-def test_launch_dropout_gelu_bias_i8I():
+def test_launch_dropout_gelu_bias_i8I_i8O():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
     print("test shape:", (batch_size, seq_len, hidden_dim))
@@ -1113,29 +1113,140 @@ def test_launch_dropout_gelu_bias_i8I_i8O_bwd():
     return custom, baseline
 
 
+@kt.case()
+def test_launch_quant_bias_add_transform_20314():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    count = random.randint(1, 20)
+    print(
+        "(batch_size, seq_len, count, nhead, head_dim): "
+        f"({batch_size}, {seq_len}, {count}, {nhead}, {head_dim})"
+    )
+
+    # shared weights
+    qkv = kt.randint8((batch_size, seq_len, count, hidden_dim))
+    bias = kt.zeros((1, 1, count, hidden_dim))
+    cmax = (kt.topk(qkv) / 127).to(kt.dtype)
+    cmask = kt.randuint8((batch_size, seq_len, count, hidden_dim))
+
+    # custom weights
+    custom_res = kt.rand((count, batch_size, nhead, seq_len, head_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_quant_bias_add_transform_20314_fp32
+    else:
+        func = cuda_module.torch_launch_quant_bias_add_transform_20314_fp16
+
+    def custom():
+        func(
+            custom_res,
+            cmask,
+            qkv,
+            bias,
+            cmax,
+            batch_size,
+            seq_len,
+            count,
+            nhead,
+            head_dim,
+        )
+        return [
+            custom_res,
+        ]
+
+    def baseline():
+        # [batch_size, seq_len, count, hidden_dim]
+        qkv_dq = kt.dequantize(qkv, cmax)
+        base = qkv_dq + bias
+        # [count, batch_size, seq_len, hidden_dim]
+        base = base.transpose(1, 2).transpose(0, 1)
+        base = base.reshape((count, batch_size, seq_len, nhead, head_dim)).transpose(
+            2, 3
+        )
+        return [
+            base.contiguous(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(atol=4)
+def test_launch_quant_transform4d_0213():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    trans_count = random.choice([1, 3])
+    print(
+        "(batch_size, seq_len, hidden_dim, nhead, trans_count): "
+        f"({batch_size}, {seq_len}, {hidden_dim}, {nhead}, {trans_count})"
+    )
+
+    # shared weights
+    vals = kt.rand((trans_count, batch_size, nhead, seq_len, head_dim))
+    cmax = (kt.topk(vals) / 127).to(kt.dtype)
+
+    # custom weights
+    custom_cmask = kt.randuint8((batch_size, seq_len, trans_count, nhead, head_dim))
+    custom_res = kt.randint8((batch_size, seq_len, trans_count, nhead, head_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_quant_transform4d_0213_fp32
+    else:
+        func = cuda_module.torch_launch_quant_transform4d_0213_fp16
+
+    # [trans_count, batch_size, nhead, seq_len, head_dim] ->
+    # [batch_size, seq_len, trans_count, nhead, head_dim]
+
+    def custom():
+        func(
+            custom_res,
+            custom_cmask,
+            vals,
+            cmax,
+            batch_size,
+            seq_len,
+            hidden_dim,
+            nhead,
+            trans_count,
+        )
+        return [custom_res, custom_cmask]
+
+    def baseline():
+        base = vals.permute(1, 3, 0, 2, 4)
+        base_q, base_cmask = kt.quantize(base, cmax)
+        return [base_q.contiguous(), base_cmask.contiguous()]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_gelu_bias_bwd",
-        "test_launch_layer_norm_i8O",
-        "test_launch_ln_i8O_bw",
-        "test_launch_dropout_relu_bias_i8I_i8O",
-        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        "test_launch_dropout_gelu_bias_i8I",
-        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        # "test_launch_transform_0213",
+        # "test_launch_bias_add_transform_20314",
+        # "test_launch_transform4d_0213",
+        # "test_launch_fused_add2",
+        # "test_launch_ffn_bias_bwd",
+        # "test_launch_attn_softmax",
+        # "test_launch_attn_softmax_bw",
+        # "test_launch_layer_norm",
+        # "test_launch_ln_bw",
+        # "test_launch_concat3_dim1",
+        # "test_adam",
+        # "test_launch_dropout_relu_bias",
+        # "test_launch_dropout_relu_bias_bwd",
+        # "test_launch_dropout_gelu_bias",
+        # "test_launch_dropout_gelu_bias_bwd",
+        # "test_launch_layer_norm_i8O",
+        # "test_launch_ln_i8O_bw",
+        # "test_launch_dropout_relu_bias_i8I_i8O",
+        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        # "test_launch_dropout_gelu_bias_i8I_i8O_i8O",
+        # "test_launch_dropout_gelu_bias_i8I_i8O_i8O_bwd",
+        # "test_launch_quant_bias_add_transform_20314",
+        "test_launch_quant_transform4d_0213",
     ]
     kt.run(kernel_list)

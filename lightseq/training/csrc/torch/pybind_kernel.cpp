@@ -46,6 +46,19 @@ void torch_launch_bias_add_transform_20314(torch::Tensor &output,
 }
 
 template <typename T>
+void torch_launch_quant_bias_add_transform_20314(
+    torch::Tensor &output, torch::Tensor &cmask, const torch::Tensor &input,
+    const torch::Tensor &bias, const torch::Tensor &cmax, int dim_0, int dim_1,
+    int dim_2, int dim_3, int dim_4) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_quant_bias_add_transform_20314(
+      rptr<T>(output), rptr<uint8_t>(cmask), rptr<int8_t>(input), rptr<T>(bias),
+      rptr<T>(cmax), dim_0, dim_1, dim_2, dim_3, dim_4, stream);
+  //   cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
 void torch_launch_transform4d_0213(torch::Tensor &output,
                                    const torch::Tensor &vals, int batch_size,
                                    int seq_len, int hidden_dim, int nhead,
@@ -53,6 +66,19 @@ void torch_launch_transform4d_0213(torch::Tensor &output,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_transform4d_0213(rptr<T>(output), rptr<T>(vals), batch_size, seq_len,
                           hidden_dim, nhead, trans_count, stream);
+  //   cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_launch_quant_transform4d_0213(
+    torch::Tensor &output, torch::Tensor &cmask, const torch::Tensor &vals,
+    const torch::Tensor &cmax, int batch_size, int seq_len, int hidden_dim,
+    int nhead, int trans_count) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_quant_transform4d_0213(
+      rptr<int8_t>(output), rptr<uint8_t>(cmask), rptr<T>(vals), rptr<T>(cmax),
+      batch_size, seq_len, hidden_dim, nhead, trans_count, stream);
   //   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
@@ -387,4 +413,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu,
                                                     __half>,
         "Test kernel wrapper");
+  m.def("torch_launch_quant_bias_add_transform_20314_fp32",
+        &torch_launch_quant_bias_add_transform_20314<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_quant_bias_add_transform_20314_fp16",
+        &torch_launch_quant_bias_add_transform_20314<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_quant_transform4d_0213_fp32",
+        &torch_launch_quant_transform4d_0213<float>, "Test kernel wrapper");
+  m.def("torch_launch_quant_transform4d_0213_fp16",
+        &torch_launch_quant_transform4d_0213<__half>, "Test kernel wrapper");
 }
