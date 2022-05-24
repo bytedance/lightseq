@@ -1,13 +1,17 @@
 import math
+from dataclasses import dataclass
 
 import torch
 from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch import transformer_cuda_module
+from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
+    MODEL_ARCH,
+    check_config,
     calc_offset,
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
@@ -111,6 +115,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
     """
 
     layer_id = 0
+    encdec_kv_sta = None
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSTransformerDecoderLayer, self).__init__()
@@ -156,7 +161,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.para_offset = self.para_offset[:-2]
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None or initial_biases is None:
+        if initial_weights is None and initial_biases is None:
             # enc-dec kv weights and bias
             self.init_transformer_weights()
             return
@@ -184,28 +189,31 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size, nlayer):
+        """Returns the offset of each module's parameters among all 
+        parameters of a layer
+        """
         hs, ims = hidden_size, intermediate_size
         sizes = [
-            hs * hs * 3,  # attn_qkvw
-            hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            hs,  # attn_ob
-            hs,  # attn_nw
-            hs,  # attn_nb
-            hs * hs,  # encdec_attn_qw
-            hs,  # encdec_attn_qb
-            hs * hs,  # encdec_attn_ow
-            hs,  # encdec_attn_ob
-            hs,  # encdec_attn_nw
-            hs,  # encdec_attn_nb
-            hs * ims,  # inter_w
-            ims,  # inter_b
-            hs * ims,  # output_w
-            hs,  # output_b
-            hs,  # ffn_nw
-            hs,  # ffn_nb
-            hs * hs * 2 * nlayer,  # encdec_attn_kvw
-            hs * 2 * nlayer,  # encdec_attn_kvb
+            hs * hs * 3,  # attn_qkv weight
+            hs * 3,  # attn_qkv bias
+            hs * hs,  # attn_out weight
+            hs,  # attn_out bias
+            hs,  # attn_layernorm weight
+            hs,  # attn_layernorm bias
+            hs * hs,  # encdec_attn_q weight
+            hs,  # encdec_attn_q bias
+            hs * hs,  # encdec_attn_out weight
+            hs,  # encdec_attn_out bias
+            hs,  # encdec_attn_layernorm weight
+            hs,  # encdec_attn_layernorm bias
+            hs * ims,  # inter weight
+            ims,  # inter bias
+            hs * ims,  # output weight
+            hs,  # output bias
+            hs,  # ffn norm weight
+            hs,  # ffn norm bias
+            hs * hs * 2 * nlayer,  # encdec_attn_kv w
+            hs * 2 * nlayer,  # encdec_attn_kv b
         ]
         offsets = calc_offset(sizes)
         return offsets
@@ -216,6 +224,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         )
 
     def calc_bound(self, w):
+        """Used to initialize parameters"""
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(w)
         bound = 1.0 / math.sqrt(fan_in)
         return bound
@@ -268,6 +277,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             nn.init.uniform_(self._get_weights(19), -bound, bound)
 
     def __assign_layer_weight_grad(self):
+        """fp16 or fp32"""
         param = (
             self.para_16
             if self.config.fp16 and self.para.dtype != torch.half
@@ -316,7 +326,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         return destination
 
     def forward(
-        self, decoder_states, encoder_out, encoder_padding_mask, cache, **kwargs
+        self, decoder_states, encoder_out, encoder_padding_mask, cache=None, **kwargs
     ):
         """
         decoder_states, [batch_size, trg_len, hidden_size] or [batch_size * beam_size, 1, hidden_size]
@@ -375,7 +385,9 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
                         shape, dtype=decoder_states.dtype, device=decoder_states.device
                     ).contiguous()
                     cache["encdec_kv"] = encdec_kv
-                cache_list.append(cache["encdec_kv"])
+                    self.encdec_kv = encdec_kv
+                # cache_list.append(cache["encdec_kv"])
+                cache_list.append(self.encdec_kv)
             head_dim = int(self.config.hidden_size / self.config.nhead)
             shape = (batch_beams, self.config.nhead, step + 1, head_dim)
             new_k = torch.zeros(
@@ -418,4 +430,5 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.config,
             cache_list,
         )
-        return output.to(self.para)
+        past_key_value = (cache_list[0], cache_list[1])
+        return output.to(self.para), past_key_value
