@@ -69,9 +69,13 @@ class TestDecorator(object):
         x = x.clamp(-127, 127).to(dtype=torch.int8)
         return x, self.get_cmask(x, cmax)
 
-    def dequantize(self, x, cmax):
-        x = x.to(self.dtype) * cmax / 127
+    def dequantize(self, x, cmax, float_out=False):
+        x = x.float()
+        cmax = cmax.float()
+        x = x * cmax / 127
         x = x.clamp(-cmax, cmax)
+        if not float_out:
+            x = x.to(self.dtype)
         return x
 
     def topk(self, x, k=100):
@@ -90,10 +94,10 @@ class TestDecorator(object):
         return self.move(torch.rand(shape))
 
     def randint8(self, shape):
-        return torch.rand(shape).to(self.device, dtype=torch.int8)
+        return torch.randint(-127, 128, shape).to(self.device, dtype=torch.int8)
 
     def randuint8(self, shape):
-        return torch.rand(shape).to(self.device, dtype=torch.uint8)
+        return torch.randint(0, 257, shape).to(self.device, dtype=torch.uint8)
 
     def randint(self, low, high, shape):
         return torch.randint(low, high, shape).to(self.device, dtype=torch.long)

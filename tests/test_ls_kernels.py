@@ -885,7 +885,7 @@ def test_launch_dropout_relu_bias_i8I_i8O():
     # shared weights
     inp = kt.randint8((batch_size, seq_len, hidden_dim))
     bias = kt.rand((hidden_dim,))
-    mask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
     cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
     cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
 
@@ -936,7 +936,7 @@ def test_launch_dropout_gelu_bias_i8I_i8O():
     # shared weights
     inp = kt.randint8((batch_size, seq_len, hidden_dim))
     bias = kt.rand((hidden_dim,))
-    mask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
     cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
     cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
 
@@ -989,10 +989,11 @@ def test_launch_dropout_relu_bias_i8I_i8O_bwd():
     inp = kt.randint8((batch_size, seq_len, hidden_dim))
     bias = kt.rand((hidden_dim,))
     out_grad = kt.rand((batch_size, seq_len, hidden_dim))
-    mask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
     cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
     cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
-    inp_dq = kt.dequantize(inp, cmax_out)
+
+    inp_dq = kt.dequantize(inp, cmax_out, float_out=True)
     res = torch.nn.functional.relu(inp_dq + bias)
     res = torch.nn.functional.dropout(res, p=0)
 
@@ -1026,7 +1027,6 @@ def test_launch_dropout_relu_bias_i8I_i8O_bwd():
             hidden_dim,
             0,
         )
-
         return custom_inp_grad, custom_bias_grad, custom_cmax_in_grad
 
     def baseline():
@@ -1037,7 +1037,6 @@ def test_launch_dropout_relu_bias_i8I_i8O_bwd():
         temp = out_grad_inrange * mask
         base_inp_grad = temp * ((inp_dq + bias) > 0)
         base_bias_grad = torch.sum(base_inp_grad, (0, 1))
-
         return base_inp_grad, base_bias_grad, base_cmax_in_grad
 
     return custom, baseline
@@ -1053,7 +1052,7 @@ def test_launch_dropout_gelu_bias_i8I_i8O_bwd():
     inp = kt.randint8((batch_size, seq_len, hidden_dim))
     bias = kt.rand((hidden_dim,))
     out_grad = kt.rand((batch_size, seq_len, hidden_dim))
-    mask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
     cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
     cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
     inp_dq = kt.dequantize(inp, cmax_out)
@@ -1240,13 +1239,13 @@ if __name__ == "__main__":
         # "test_launch_dropout_relu_bias_bwd",
         # "test_launch_dropout_gelu_bias",
         # "test_launch_dropout_gelu_bias_bwd",
-        # "test_launch_layer_norm_i8O",
-        # "test_launch_ln_i8O_bw",
-        # "test_launch_dropout_relu_bias_i8I_i8O",
-        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        # "test_launch_dropout_gelu_bias_i8I_i8O_i8O",
-        # "test_launch_dropout_gelu_bias_i8I_i8O_i8O_bwd",
-        # "test_launch_quant_bias_add_transform_20314",
+        "test_launch_layer_norm_i8O",
+        "test_launch_ln_i8O_bw",
+        "test_launch_dropout_relu_bias_i8I_i8O",
+        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        "test_launch_dropout_gelu_bias_i8I_i8O",
+        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        "test_launch_quant_bias_add_transform_20314",
         "test_launch_quant_transform4d_0213",
     ]
     kt.run(kernel_list)
