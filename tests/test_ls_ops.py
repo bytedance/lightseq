@@ -269,9 +269,9 @@ def test_encoder_layer_forward():
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
-    for i in range(NUM_LAYERS):
-        custom_enc_layer_list[i].apply(disable_quant)
-        fairseq_enc_layer_list[i].apply(disable_quant)
+    # for i in range(NUM_LAYERS):
+    #     custom_enc_layer_list[i].apply(disable_quant)
+    #     fairseq_enc_layer_list[i].apply(disable_quant)
 
     def custom():
         res = hidden_states.clone()
@@ -360,12 +360,8 @@ def test_encoder_layer_backward():
                     grads[11],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                 ]
@@ -394,12 +390,8 @@ def test_encoder_layer_backward():
                     curl.final_layer_norm.bias,
                     curl.self_attn.out_proj.weight,
                     curl.self_attn.out_proj.bias,
-                    curl.self_attn.q_proj.weight,
-                    curl.self_attn.q_proj.bias,
-                    curl.self_attn.k_proj.weight,
-                    curl.self_attn.k_proj.bias,
-                    curl.self_attn.v_proj.weight,
-                    curl.self_attn.v_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
                     curl.self_attn_layer_norm.weight,
                     curl.self_attn_layer_norm.bias,
                 ]
@@ -477,12 +469,8 @@ def test_bert_encoder_layer_backward():
                     grads[11],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                 ]
@@ -505,12 +493,8 @@ def test_bert_encoder_layer_backward():
                     curl.final_layer_norm.bias,
                     curl.self_attn.out_proj.weight,
                     curl.self_attn.out_proj.bias,
-                    curl.self_attn.q_proj.weight,
-                    curl.self_attn.q_proj.bias,
-                    curl.self_attn.k_proj.weight,
-                    curl.self_attn.k_proj.bias,
-                    curl.self_attn.v_proj.weight,
-                    curl.self_attn.v_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
                     curl.self_attn_layer_norm.weight,
                     curl.self_attn_layer_norm.bias,
                 ]
@@ -616,12 +600,8 @@ def test_decoder_layer_backward():
                     grads[17],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                     # encdec grad
@@ -681,22 +661,10 @@ def test_decoder_layer_backward():
                     .self_attn.out_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .self_attn.q_proj.weight.grad.contiguous()
+                    .self_attn.qkv_proj.weight.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .self_attn.q_proj.bias.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.k_proj.weight.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.k_proj.bias.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.v_proj.weight.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.v_proj.bias.grad.contiguous()
+                    .self_attn.qkv_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
                     .self_attn_layer_norm.weight.grad.contiguous()
@@ -828,8 +796,8 @@ def test_embedding_layer_forward():
     else:
         custom_layer = custom_emb_layer_fp16
         fs_layer = fs_emb_layer_fp16
-    fs_layer.apply(disable_quant)
-    custom_layer.apply(disable_quant)
+    # fs_layer.apply(disable_quant)
+    # custom_layer.apply(disable_quant)
 
     def custom():
         res = custom_layer(input, step=1)
@@ -910,8 +878,8 @@ def test_embedding_layer_backward():
         fs_layer = fs_emb_layer_fp16
 
     loss_data = torch.randn(1, dtype=kt.dtype).sum()
-    fs_layer.apply(disable_quant)
-    custom_layer.apply(disable_quant)
+    # fs_layer.apply(disable_quant)
+    # custom_layer.apply(disable_quant)
 
     def custom():
         custom_layer.zero_grad()
@@ -1107,18 +1075,18 @@ if __name__ == "__main__":
     kt.run(
         [
             # "test_encoder_layer_forward",
-            # "test_quant_encoder_layer_forward",
             # "test_encoder_layer_backward",
             # "test_bert_encoder_layer_forward",
             # "test_bert_encoder_layer_backward",
             # "test_decoder_layer_forward",
             # "test_decoder_layer_backward",
             # "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_quant_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_quant_embedding_layer_backward",
+            # "test_embedding_layer_forward",
+            # "test_quant_embedding_layer_forward",
+            # "test_embedding_layer_backward",
+            # "test_quant_embedding_layer_backward",
             # "test_cross_entropy_layer_forward",
             # "test_cross_entropy_layer_backward",
+            "test_quant_encoder_layer_forward",
         ]
     )

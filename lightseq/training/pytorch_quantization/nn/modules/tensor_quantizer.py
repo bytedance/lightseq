@@ -77,8 +77,8 @@ class TensorQuantizer(nn.Module):
     def __init__(
         self,
         quant_desc=QuantDescriptor(),
-        disabled=False,
-        if_quant=True,
+        disabled=True,
+        if_quant=False,
         if_clip=False,
         if_calib=False,
     ):
