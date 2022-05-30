@@ -219,6 +219,9 @@ class MultiheadAttention(nn.Module):
             q = self.q_proj(query)
             k = self.k_proj(key)
             v = self.v_proj(value)
+
+        print("self attn q", q)
+        print("self attn k", k)
         q = q * self.scaling
 
         if self.bias_k is not None:
@@ -632,7 +635,7 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
 
 
         Returns:
-            encoded output of shape `(seq_len, batch, embed_dim)`
+            encoded output of shape `(batch, seq_len, embed_dim)`
         """
 
         # anything in original attn_mask = 1, becomes -1e8
@@ -657,6 +660,8 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
 
+        # print("torch attn out", x.transpose(0, 1))
+
         residual = x
         if self.normalize_before:
             x = self.final_layer_norm(x)
@@ -669,8 +674,9 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
         x = self.residual_connection(x, residual)
         if not self.normalize_before:
             x = self.final_layer_norm(x)
-
+        # print("torch ffn out before transpose", x)
         x = x.transpose(0, 1)
+        # print("torch ffn out", x)
         return x
 
 

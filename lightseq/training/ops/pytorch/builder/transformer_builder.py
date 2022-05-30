@@ -50,7 +50,7 @@ class TransformerBuilder(CUDAOpBuilder):
     def nvcc_args(self):
         args = [
             "-O3",
-            "--use_fast_math",
+            # "--use_fast_math",
             "-std=c++14",
             "-U__CUDA_NO_HALF_OPERATORS__",
             "-U__CUDA_NO_HALF_CONVERSIONS__",

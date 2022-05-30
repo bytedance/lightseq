@@ -1221,6 +1221,44 @@ def test_launch_quant_transform4d_0213():
     return custom, baseline
 
 
+@kt.case()
+def test_torch_launch_ls_quantize():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+
+    print(
+        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
+    )
+
+    # shared weights
+    inputs = kt.rand((batch_size, seq_len, hidden_dim))
+    base_cmax = torch.tensor(1.0, dtype=kt.dtype, device=kt.device)
+    custom_cmax = torch.tensor([1.0, 1.0], dtype=kt.dtype, device=kt.device)
+    cmask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    igemm_alpha = torch.tensor(1.0, dtype=torch.float, device=kt.device)
+
+    # custom weights
+    custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_ls_quantize_fp32
+    else:
+        func = cuda_module.torch_launch_ls_quantize_fp16
+
+    def custom():
+        func(custom_res, cmask, igemm_alpha, inputs, custom_cmax, inputs.numel())
+        return [custom_res]
+
+    def baseline():
+        base, base_mask = kt.quantize(inputs, base_cmax)
+
+        return [
+            base.contiguous(),
+        ]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
@@ -1239,13 +1277,14 @@ if __name__ == "__main__":
         # "test_launch_dropout_relu_bias_bwd",
         # "test_launch_dropout_gelu_bias",
         # "test_launch_dropout_gelu_bias_bwd",
-        "test_launch_layer_norm_i8O",
-        "test_launch_ln_i8O_bw",
-        "test_launch_dropout_relu_bias_i8I_i8O",
-        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        "test_launch_dropout_gelu_bias_i8I_i8O",
-        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
-        "test_launch_quant_bias_add_transform_20314",
-        "test_launch_quant_transform4d_0213",
+        # "test_launch_layer_norm_i8O",
+        # "test_launch_ln_i8O_bw",
+        # "test_launch_dropout_relu_bias_i8I_i8O",
+        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        # "test_launch_dropout_gelu_bias_i8I_i8O",
+        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        # "test_launch_quant_bias_add_transform_20314",
+        # "test_launch_quant_transform4d_0213",
+        "test_torch_launch_ls_quantize"
     ]
     kt.run(kernel_list)

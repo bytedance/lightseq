@@ -100,6 +100,19 @@ void print_vec<int8_t>(const int8_t *outv, std::string outn,
   std::cout << std::endl;
 }
 
+template <>
+void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
+                        int num_output_ele) {
+  std::cout << outn << ": ";
+  std::vector<uint8_t> hout(num_output_ele, 0);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(uint8_t),
+             cudaMemcpyDeviceToHost);
+  for (int i = 0; i < num_output_ele; i++) {
+    std::cout << static_cast<int>(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
 template void print_vec<float>(const float *outv, std::string outn,
                                int num_output_ele);
 
@@ -111,6 +124,9 @@ template void print_vec<__half>(const __half *outv, std::string outn,
 
 template void print_vec<int8_t>(const int8_t *outv, std::string outn,
                                 int num_output_ele);
+
+template void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
+                                 int num_output_ele);
 
 template <typename T>
 T *cuda_malloc(size_t ele_num) {

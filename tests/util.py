@@ -64,7 +64,9 @@ class TestDecorator(object):
         return x_cmask
 
     def quantize(self, x, cmax):
-        x = x / (cmax / 127)
+        x, cmax = x.float(), cmax.float()
+        dequant_scale = cmax / 127
+        x = x / dequant_scale
         x = (x + 0.5).floor()
         x = x.clamp(-127, 127).to(dtype=torch.int8)
         return x, self.get_cmask(x, cmax)
@@ -72,7 +74,8 @@ class TestDecorator(object):
     def dequantize(self, x, cmax, float_out=False):
         x = x.float()
         cmax = cmax.float()
-        x = x * cmax / 127
+        dequant_scale = cmax / 127
+        x = x * dequant_scale
         x = x.clamp(-cmax, cmax)
         if not float_out:
             x = x.to(self.dtype)
@@ -165,9 +168,9 @@ class TestDecorator(object):
             t1 = t1.cpu().numpy().flatten()
             t2 = t2.cpu().numpy().flatten()
             try:
-                torch.testing.assert_close(
-                    t1.flatten(), t2.flatten(), rtol=rtol, atol=atol, equal_nan=False
-                )
+                diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
+                print("diff x:", t1[~diff_mask])
+                print("diff y:", t2[~diff_mask])
                 np.testing.assert_allclose(t1, t2, rtol=rtol, atol=atol, verbose=True)
             except Exception as ex:
                 print(f"Unmatches in the {i}-th tensor.")

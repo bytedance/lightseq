@@ -269,6 +269,10 @@ def test_encoder_layer_forward():
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
+    for i in range(NUM_LAYERS):
+        custom_enc_layer_list[i].apply(disable_quant)
+        fairseq_enc_layer_list[i].apply(disable_quant)
+
     def custom():
         res = hidden_states.clone()
         for i in range(NUM_LAYERS):
@@ -288,7 +292,7 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_quant_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
