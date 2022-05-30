@@ -415,8 +415,6 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   T *grad_ff1_out_ptr = buffer;
   // buffer += _batch_size * _seq_len * _intermediate_size;
 
-  std::cout << "test 4" << std::endl;
-
   if (_pre_or_postLayerNorm) {
     _ffn_dropout.d_bias_dropout_residual(grad_inp_ptr, _grad_output_b_ptr,
                                          grad_output_ptr, _batch_tokens,
@@ -483,7 +481,6 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
       launch_fused_add2<T>(grad_inp_ptr, grad_ff1_inp_ptr, grad_residual_ptr,
                            _batch_size, _seq_len, _hidden_size, _stream);
     }
-    std::cout << "test 5" << std::endl;
 
     return;
   }

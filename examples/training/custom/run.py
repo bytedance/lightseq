@@ -2,6 +2,12 @@ import torch
 
 from transformers import BertTokenizer
 from lightseq.training import LSTransformer, LSCrossEntropyLayer, LSAdam
+from lightseq.training.ops.pytorch.quantization import (
+    disable_quant,
+    enable_quant,
+    ptq_mode,
+    qat_mode,
+)
 
 
 def create_data():
@@ -70,6 +76,7 @@ def create_model(vocab_size):
         local_rank=0,
     )
     model = LSTransformer(transformer_config)
+    # model.apply(enable_quant)
     model.to(dtype=torch.half, device=torch.device("cuda:0"))
     return model
 

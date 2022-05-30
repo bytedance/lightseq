@@ -166,11 +166,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 else:
                     raise NotImplementedError
         else:
-            if args.use_torch_layer:
-                encoder.apply(disable_quant)
-                decoder.apply(disable_quant)
-            else:
-                pass
+            encoder.apply(disable_quant)
+            decoder.apply(disable_quant)
 
         return cls(args, encoder, decoder)
 

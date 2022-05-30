@@ -153,11 +153,11 @@ class LSTransformerDecoder(nn.Module):
         self.layer_norm = nn.LayerNorm(embed_dim)
 
         self.output_projection = nn.Linear(
-            self.embed_tokens.embeddings.shape[1],
-            self.embed_tokens.embeddings.shape[0],
+            self.embed_tokens.config.embedding_dim,
+            self.embed_tokens.config.vocab_size,
             bias=False,
         )
-        self.output_projection.weight = self.embed_tokens.embeddings
+        del self.output_projection.weight
 
     def build_decoder_layer(self, config):
         dec_config = LSTransformerDecoderLayer.get_config(
@@ -203,5 +203,9 @@ class LSTransformerDecoder(nn.Module):
 
         x = self.layer_norm(x)
 
+        self.output_projection.weight = self.embed_tokens.embeddings[:-1].view(
+            self.embed_tokens.config.vocab_size,
+            self.embed_tokens.config.embedding_dim,
+        )
         x = self.output_projection(x)
         return x

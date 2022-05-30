@@ -1277,14 +1277,14 @@ if __name__ == "__main__":
         # "test_launch_dropout_relu_bias_bwd",
         # "test_launch_dropout_gelu_bias",
         # "test_launch_dropout_gelu_bias_bwd",
-        # "test_launch_layer_norm_i8O",
-        # "test_launch_ln_i8O_bw",
-        # "test_launch_dropout_relu_bias_i8I_i8O",
-        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        # "test_launch_dropout_gelu_bias_i8I_i8O",
-        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
-        # "test_launch_quant_bias_add_transform_20314",
-        # "test_launch_quant_transform4d_0213",
-        "test_torch_launch_ls_quantize"
+        "test_launch_layer_norm_i8O",
+        "test_launch_ln_i8O_bw",
+        "test_launch_dropout_relu_bias_i8I_i8O",
+        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        "test_launch_dropout_gelu_bias_i8I_i8O",
+        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        "test_launch_quant_bias_add_transform_20314",
+        "test_launch_quant_transform4d_0213",
+        # "test_torch_launch_ls_quantize"
     ]
     kt.run(kernel_list)
