@@ -104,7 +104,7 @@ class LSBertForSequenceClassification(BertForSequenceClassification):
             layer.output.LayerNorm.weight.data.copy_(weight["final_layer_norm"])
             layer.output.LayerNorm.bias.data.copy_(bias["final_layer_norm"])
 
-    def save_pretrained(self, *args, **kwargs):
+    def hf_state_dict(self):
         def unwrap_model(model):
             # since there could be multiple levels of wrapping, unwrap recursively
             if hasattr(model, "module"):
@@ -113,15 +113,17 @@ class LSBertForSequenceClassification(BertForSequenceClassification):
                 return model    
 
         model_to_save = unwrap_model(self)
-
         ls_encoder_layer = model_to_save.bert.encoder.layer
         model_to_save.bert.encoder.layer = nn.ModuleList([BertLayer(self.config) for _ in range(self.config.num_hidden_layers)])
         self.inject_origin_layer(model_to_save.bert.encoder.layer, ls_encoder_layer)
         state_dict = model_to_save.state_dict()
-        kwargs["state_dict"] = state_dict
-
-        super().save_pretrained(*args, **kwargs)
         model_to_save.bert.encoder.layer = ls_encoder_layer
+        return state_dict
+
+
+    def save_pretrained(self, *args, **kwargs):
+        kwargs["state_dict"] = self.hf_state_dict()
+        super().save_pretrained(*args, **kwargs)
 
 
 @dataclass
@@ -467,17 +469,17 @@ def main():
     #     revision=model_args.model_revision,
     #     use_auth_token=True if model_args.use_auth_token else None,
     # )
-    model = LSBertForSequenceClassification.from_pretrained(
+    model = BertForSequenceClassification.from_pretrained(
         '/tmp/sst2/checkpoint-500',
-        training_args=training_args,
-        model_args=model_args,
+        # training_args=training_args,
+        # model_args=model_args,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    print(type(model))
+    # print(type(model))
     # Replace with LightSeq encoder layers.
     # if model_args.module_type == 1 or model_args.module_type == 2:
     #     inject_ls_layer(model, training_args, model_args, config)

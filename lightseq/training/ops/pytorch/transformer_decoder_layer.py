@@ -153,6 +153,8 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
 
         self.para_offset = LSTransformerDecoderLayer.gen_offset(
             hs, ims, self.config.nlayer
@@ -217,6 +219,69 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         ]
         offsets = calc_offset(sizes)
         return offsets
+
+    def params_dict(self):
+        '''
+        Returns:
+            weight: dict
+            bias: dict
+        '''
+        def copy_and_view(m, shape=None):
+            if shape is None:
+                shape = (-1,)
+            return m.data.clone().view(*shape)
+        def _copy(m):
+            return copy_and_view(m, (self.hs, self.hs))
+
+        self_attn_qkvw = self._get_weights(0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(self.hs * self.hs, 0)
+        self_attn_qkvb = self._get_weights(1)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+
+        all_enc_attn_kw, all_enc_attn_vw = None, None
+        all_enc_attn_kb, all_enc_attn_vb = None, None
+        if self.config.layer_id == 0:
+            all_enc_attn_kvw = self._get_weights(18)
+            all_enc_attn_kvw = all_enc_attn_kvw.split(self.hs * self.hs, 0)
+            all_enc_attn_kw = list(map(_copy, all_enc_attn_kvw[::2]))
+            all_enc_attn_vw = list(map(_copy, all_enc_attn_kvw[1::2]))
+
+            all_enc_attn_kvb = self._get_weights(19)
+            all_enc_attn_kvb = all_enc_attn_kvb.split(self.hs, 0)
+            all_enc_attn_kb = list(map(copy_and_view, all_enc_attn_kvb[::2]))
+            all_enc_attn_vb = list(map(copy_and_view, all_enc_attn_kvb[1::2]))
+
+        weight = {
+            "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn_out_proj": copy_and_view(self._get_weights(2), (self.hs, self.hs)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
+            "encoder_attn_q_proj":copy_and_view(self._get_weights(6), (self.hs, self.hs)),
+            "encoder_attn_out_proj":copy_and_view(self._get_weights(8), (self.hs, self.hs)),
+            "encoder_attn_layer_norm":copy_and_view(self._get_weights(10), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(12), (self.ims, self.hs)),
+            "fc2": copy_and_view(self._get_weights(14), (self.hs, self.ims)),
+            "final_layer_norm": copy_and_view(self._get_weights(16), (self.hs,)),
+            "encoder_attn_k_proj": all_enc_attn_kw,
+            "encoder_attn_v_proj": all_enc_attn_vw,
+        }
+        bias = {
+            "self_attn_q_proj": copy_and_view(self_attn_qb),
+            "self_attn_k_proj": copy_and_view(self_attn_kb),
+            "self_attn_v_proj": copy_and_view(self_attn_vb),
+            "self_attn_out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
+            "encoder_attn_q_proj":copy_and_view(self._get_weights(7), (self.hs,)),
+            "encoder_attn_out_proj":copy_and_view(self._get_weights(9), (self.hs,)),
+            "encoder_attn_layer_norm":copy_and_view(self._get_weights(11), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(13)),
+            "fc2": copy_and_view(self._get_weights(15)),
+            "final_layer_norm": copy_and_view(self._get_weights(17)),
+            "encoder_attn_k_proj": all_enc_attn_kb,
+            "encoder_attn_v_proj": all_enc_attn_vb
+        }
+        return weight, bias
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -430,5 +495,8 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.config,
             cache_list,
         )
-        past_key_value = (cache_list[0], cache_list[1])
+        if cache_list == []:
+            past_key_value = None
+        else:
+            past_key_value = (cache_list[0], cache_list[1])
         return output.to(self.para), past_key_value
