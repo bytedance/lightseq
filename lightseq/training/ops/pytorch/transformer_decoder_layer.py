@@ -115,7 +115,6 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
     """
 
     layer_id = 0
-    encdec_kv_sta = None
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSTransformerDecoderLayer, self).__init__()
