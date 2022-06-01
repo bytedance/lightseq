@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # generation_method should be "topk" or "topp"
     generation_method = "topk"
     topk = 1
-    topp = 1
+    topp = 0.75
 
     eos_id = 2
     pad_id = 1
