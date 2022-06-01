@@ -162,7 +162,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.para_offset = self.para_offset[:-2]
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None and initial_biases is None:
+        if initial_weights is None or initial_biases is None:
             # enc-dec kv weights and bias
             self.init_transformer_weights()
             return
