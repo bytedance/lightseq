@@ -68,8 +68,6 @@ def main():
     ls_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
 
     hf_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
-    # use EOS as PAD for huggingface to avoid warning according to https://huggingface.co/blog/how-to-generate while avoid reshaping the model embedding
-    # hf_tokenizer.pad_token = hf_tokenizer.eos_token
 
     print("creating lightseq model...")
     # XGLM shares the same model architecture as GPT
