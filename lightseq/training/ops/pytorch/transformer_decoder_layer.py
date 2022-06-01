@@ -459,11 +459,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
                         shape, dtype=decoder_states.dtype, device=decoder_states.device
                     ).contiguous()
                     cache["encdec_kv"] = encdec_kv
-                    self.encdec_kv = encdec_kv
-                if "encdec_kv" in cache:
-                    cache_list.append(cache["encdec_kv"])
-                else:
-                    cache_list.append(self.encdec_kv)
+                cache_list.append(cache["encdec_kv"])
             head_dim = int(self.config.hidden_size / self.config.nhead)
             shape = (batch_beams, self.config.nhead, step + 1, head_dim)
             new_k = torch.zeros(

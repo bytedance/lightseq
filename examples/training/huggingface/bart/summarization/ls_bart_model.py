@@ -319,13 +319,21 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
             cache = (
                 {}
                 if past_key_value is None
-                else {"dec_self_k": past_key_value[0], "dec_self_v": past_key_value[1]}
+                else {
+                    "dec_self_k": past_key_value[0],
+                    "dec_self_v": past_key_value[1],
+                    "encdec_kv": past_key_value[2],
+                }
             )
         output = super().forward(
             hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache
         )
         if use_cache:
-            self_attn_kv_cache = (cache["dec_self_k"], cache["dec_self_v"])
+            self_attn_kv_cache = (
+                cache["dec_self_k"],
+                cache["dec_self_v"],
+                cache["encdec_kv"] if "encdec_kv" in cache else None,
+            )
         return output, self_attn_kv_cache
 
     @staticmethod
