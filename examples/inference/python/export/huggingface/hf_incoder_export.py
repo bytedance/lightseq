@@ -8,6 +8,7 @@ from collections import OrderedDict
 from transformers import AutoTokenizer, XGLMForCausalLM
 from lightseq.training.ops.pytorch.export import fill_hdf5_layer
 import math
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
@@ -19,21 +20,21 @@ You can operate separately on each tensor and support multiple expressions. Mult
 and the expression will finally be concatenated on axis = -1.
 """
 
-enc_layer_mapping_dict = OrderedDict(	
-    {	
-        "multihead_norm_scale": "self_attn_layer_norm weight",	
-        "multihead_norm_bias": "self_attn_layer_norm bias",	
-        "multihead_project_kernel_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",	
-        "multihead_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",	
-        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",	
-        "multihead_project_bias_output": "self_attn out_proj bias",	
-        "ffn_norm_scale": "final_layer_norm weight",	
-        "ffn_norm_bias": "final_layer_norm bias",	
-        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",	
-        "ffn_first_bias": "fc1 bias",	
-        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",	
-        "ffn_second_bias": "fc2 bias",	
-    }	
+enc_layer_mapping_dict = OrderedDict(
+    {
+        "multihead_norm_scale": "self_attn_layer_norm weight",
+        "multihead_norm_bias": "self_attn_layer_norm bias",
+        "multihead_project_kernel_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",
+        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_output": "self_attn out_proj bias",
+        "ffn_norm_scale": "final_layer_norm weight",
+        "ffn_norm_bias": "final_layer_norm bias",
+        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
+        "ffn_first_bias": "fc1 bias",
+        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
+        "ffn_second_bias": "fc2 bias",
+    }
 )
 
 
@@ -97,19 +98,16 @@ def extract_gpt_weights(
         src_emb_mapping_dict,
     )
 
-
     token_emb = encoder_state_dict["model.embed_tokens.weight"]
 
     # scale embedding
     d_model = 2048
     scale = math.sqrt(d_model)
-    token_embedding = (token_emb.flatten()*scale).tolist()
+    token_embedding = (token_emb.flatten() * scale).tolist()
 
     hdf5_file.create_dataset(
         "src_embedding/token_embedding", data=token_embedding, dtype="f4"
     )
-    
-
 
     # special handling for position embedding
     position_emb = encoder_state_dict["model.embed_positions.weights"]

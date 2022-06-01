@@ -4,7 +4,8 @@ import argparse
 import torch
 import numpy as np
 import lightseq.inference as lsi
-#from transformers import GPT2Tokenizer, GPT2LMHeadModel
+
+# from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
@@ -25,9 +26,7 @@ def hf_gpt2(model, inputs, tokenizer):
     #     inputs, max_length=50, pad_token_id=tokenizer.eos_token_id,top_k = 1
     # )
 
-    generated_ids = model.generate(
-        inputs, max_length=100,top_k = 1
-    )
+    generated_ids = model.generate(inputs, max_length=100, top_k=1)
     torch.cuda.synchronize()
     end_time = time.perf_counter()
     return generated_ids, end_time - start_time
@@ -77,8 +76,8 @@ def main():
 
     hf_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
     # use EOS as PAD for huggingface to avoid warning according to https://huggingface.co/blog/how-to-generate while avoid reshaping the model embedding
-    #hf_tokenizer.pad_token = hf_tokenizer.eos_token
-    #print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
+    # hf_tokenizer.pad_token = hf_tokenizer.eos_token
+    # print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
     ls_model = lsi.Gpt("lightseq_incoder_base.hdf5", max_batch_size=16)
@@ -89,9 +88,7 @@ def main():
 
     # lightseq gpt perplexity supports batch infer with different lengths,
     # but sampling doesn't support
-    sentences = [
-        "def quick_sort(nums):"
-    ]
+    sentences = ["def quick_sort(nums):"]
 
     print("====================START warmup====================")
     warmup(ls_tokenizer, hf_tokenizer, ls_model, hf_model, sentences)
@@ -103,12 +100,8 @@ def main():
 
         print("tokenizing the sentences...")
 
-        ls_inputs = ls_tokenizer(sentences, return_tensors="pt")[
-            "input_ids"
-        ]
-        hf_inputs = hf_tokenizer(sentences, return_tensors="pt")[
-            "input_ids"
-        ]
+        ls_inputs = ls_tokenizer(sentences, return_tensors="pt")["input_ids"]
+        hf_inputs = hf_tokenizer(sentences, return_tensors="pt")["input_ids"]
 
         ls_generate(ls_model, ls_tokenizer, ls_inputs)
         hf_generate(hf_model, hf_tokenizer, hf_inputs)
