@@ -145,5 +145,3 @@ build/
 *.bin
 *.idx
 *.hdf5
-
-.lock
