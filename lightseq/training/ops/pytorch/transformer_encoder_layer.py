@@ -214,7 +214,6 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
 
-
     def params_dict(self):
         '''
         Returns:
@@ -227,9 +226,11 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             return m.data.clone().view(*shape)
 
         self_attn_qkvw = self._get_weights(0)
-        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(self.hs * self.hs, 0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
+            self.hs * self.hs, 0)
         self_attn_qkvb = self._get_weights(1)
-        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(
+            self.hs, 0)
 
         weight = {
             "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
@@ -239,7 +240,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
             "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
             "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
-            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)) 
+            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,))
         }
         bias = {
             "self_attn_q_proj": copy_and_view(self_attn_qb),
@@ -249,10 +250,9 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
             "fc1": copy_and_view(self._get_weights(7)),
             "fc2": copy_and_view(self._get_weights(9)),
-            "final_layer_norm": copy_and_view(self._get_weights(11)) 
+            "final_layer_norm": copy_and_view(self._get_weights(11))
         }
         return weight, bias
-
 
     def __assign_layer_weight_grad(self):
         param = (

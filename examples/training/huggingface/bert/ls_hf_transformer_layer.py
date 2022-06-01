@@ -13,6 +13,7 @@ from transformers import (
     BertForQuestionAnswering,
 )
 
+
 def get_hf_bert_enc_layer_params(layer):
     init_ws = []
     init_bs = []
@@ -116,7 +117,8 @@ def inject_ls_layer(model, training_args, model_args, config):
 
     for i in range(config.num_hidden_layers):
         bert_enc_config = gen_bert_enc_config(training_args, config)
-        init_ws, init_bs = get_hf_bert_enc_layer_params(model.bert.encoder.layer[i])
+        init_ws, init_bs = get_hf_bert_enc_layer_params(
+            model.bert.encoder.layer[i])
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_enc_config, init_ws, init_bs
         ).cuda()
@@ -139,27 +141,37 @@ def hf_state_dict(model):
         if hasattr(model, "module"):
             return unwrap_model(model.module)
         else:
-            return model    
+            return model
 
     def inject_hf_layer(config, hf_layer, ls_layer):
         for layer_id in range(config.num_hidden_layers):
             weight, bias = ls_layer[layer_id].params_dict()
             layer = hf_layer[layer_id]
-            layer.attention.self.query.weight.data.copy_(weight["self_attn_q_proj"])
-            layer.attention.self.query.bias.data.copy_(bias["self_attn_q_proj"])
-            layer.attention.self.key.weight.data.copy_(weight["self_attn_k_proj"])
+            layer.attention.self.query.weight.data.copy_(
+                weight["self_attn_q_proj"])
+            layer.attention.self.query.bias.data.copy_(
+                bias["self_attn_q_proj"])
+            layer.attention.self.key.weight.data.copy_(
+                weight["self_attn_k_proj"])
             layer.attention.self.key.bias.data.copy_(bias["self_attn_k_proj"])
-            layer.attention.self.value.weight.data.copy_(weight["self_attn_v_proj"])
-            layer.attention.self.value.bias.data.copy_(bias["self_attn_v_proj"])
-            layer.attention.output.dense.weight.data.copy_(weight["self_attn_out_proj"])
-            layer.attention.output.dense.bias.data.copy_(bias["self_attn_out_proj"])
-            layer.attention.output.LayerNorm.weight.data.copy_(weight["self_attn_layer_norm"])
-            layer.attention.output.LayerNorm.bias.data.copy_(bias["self_attn_layer_norm"])
+            layer.attention.self.value.weight.data.copy_(
+                weight["self_attn_v_proj"])
+            layer.attention.self.value.bias.data.copy_(
+                bias["self_attn_v_proj"])
+            layer.attention.output.dense.weight.data.copy_(
+                weight["self_attn_out_proj"])
+            layer.attention.output.dense.bias.data.copy_(
+                bias["self_attn_out_proj"])
+            layer.attention.output.LayerNorm.weight.data.copy_(
+                weight["self_attn_layer_norm"])
+            layer.attention.output.LayerNorm.bias.data.copy_(
+                bias["self_attn_layer_norm"])
             layer.intermediate.dense.weight.data.copy_(weight["fc1"])
             layer.intermediate.dense.bias.data.copy_(bias["fc1"])
             layer.output.dense.weight.data.copy_(weight["fc2"])
             layer.output.dense.bias.data.copy_(bias["fc2"])
-            layer.output.LayerNorm.weight.data.copy_(weight["final_layer_norm"])
+            layer.output.LayerNorm.weight.data.copy_(
+                weight["final_layer_norm"])
             layer.output.LayerNorm.bias.data.copy_(bias["final_layer_norm"])
 
     model_to_save = unwrap_model(model)
@@ -169,8 +181,10 @@ def hf_state_dict(model):
         )
     # reload original modules
     ls_encoder_layer = model_to_save.bert.encoder.layer
-    model_to_save.bert.encoder.layer = nn.ModuleList([BertLayer(model.config) for _ in range(model.config.num_hidden_layers)])
-    inject_hf_layer(model_to_save.config, model_to_save.bert.encoder.layer, ls_encoder_layer)
+    model_to_save.bert.encoder.layer = nn.ModuleList(
+        [BertLayer(model.config) for _ in range(model.config.num_hidden_layers)])
+    inject_hf_layer(model_to_save.config,
+                    model_to_save.bert.encoder.layer, ls_encoder_layer)
     state_dict = model_to_save.state_dict()
     # replace with lightseq modules
     model_to_save.bert.encoder.layer = ls_encoder_layer
