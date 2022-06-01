@@ -100,8 +100,7 @@ def extract_xglm_weights(
     token_emb = encoder_state_dict["model.embed_tokens.weight"]
 
     # scale embedding
-    d_model = 2048
-    scale = math.sqrt(d_model)
+    scale = math.sqrt(token_emb.shape[1])
     token_embedding = (token_emb.flatten() * scale).tolist()
 
     hdf5_file.create_dataset(
