@@ -67,6 +67,7 @@ class GptWeight {
   int _hidden_size;
   int _inner_size;
   int _max_step;
+  int _extra_decode_length;
   int _src_vocab_size;
   int _n_enc_layer;  // number of encoder layer
   int _dim_per_head;
