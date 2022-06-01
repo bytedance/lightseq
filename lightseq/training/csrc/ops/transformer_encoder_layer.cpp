@@ -64,7 +64,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
 
   int8_t *i8_buffer_ptr = reinterpret_cast<int8_t *>(buffer);
   int8_t *qout_ptr = i8_buffer_ptr;
-  int8_t *qweight_ptr = qout_ptr + _batch_dim;
+  int8_t *qweight_ptr = qout_ptr + _batch_dim * 3;
 
   if (_enable_quant) {
     if (_pre_or_postLayerNorm) {
