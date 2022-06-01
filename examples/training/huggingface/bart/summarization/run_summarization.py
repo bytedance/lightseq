@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
+# Copyright 2022 The LightSeq Team
 # Copyright 2021 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -409,6 +410,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+    # Replace with lightseq encoder layers and save the huggingface model
     model = LSBartForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -418,6 +420,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+    # # Replace with lightseq encoder layers and save the lightseq model
     # model = BartForConditionalGeneration.from_pretrained(
     #     model_args.model_name_or_path,
     #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -426,7 +429,6 @@ def main():
     #     revision=model_args.model_revision,
     #     use_auth_token=True if model_args.use_auth_token else None,
     # )
-    # inject_lightseq_layer(model=model, training_args=training_args, config=config)
     # inject_lightseq_layer(model, training_args, config)
 
     model.resize_token_embeddings(len(tokenizer))

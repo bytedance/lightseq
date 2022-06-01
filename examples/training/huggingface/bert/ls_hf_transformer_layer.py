@@ -1,6 +1,17 @@
+import torch.nn as nn
 from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
 from lightseq.training.ops.pytorch.torch_transformer_layers import BertEmbeddingLayer
-
+from transformers import (
+    BertForSequenceClassification,
+    BertPreTrainedModel,
+    BertLayer,
+    BertLMHeadModel,
+    BertForMaskedLM,
+    BertForNextSentencePrediction,
+    BertForMultipleChoice,
+    BertForTokenClassification,
+    BertForQuestionAnswering,
+)
 
 def get_hf_bert_enc_layer_params(layer):
     init_ws = []
@@ -114,3 +125,95 @@ def inject_ls_layer(model, training_args, model_args, config):
                 model.bert.encoder.layer[i].apply(qat_mode)
             else:
                 model.bert.encoder.layer[i].apply(disable_quant)
+
+
+def hf_state_dict(model):
+    """
+    Args:
+        model: huggingface model replaced with lightseq layer
+    Returns:
+        Dict: The huggingface state dict
+    """
+    def unwrap_model(model):
+        # since there could be multiple levels of wrapping, unwrap recursively
+        if hasattr(model, "module"):
+            return unwrap_model(model.module)
+        else:
+            return model    
+
+    def inject_hf_layer(config, hf_layer, ls_layer):
+        for layer_id in range(config.num_hidden_layers):
+            weight, bias = ls_layer[layer_id].params_dict()
+            layer = hf_layer[layer_id]
+            layer.attention.self.query.weight.data.copy_(weight["self_attn_q_proj"])
+            layer.attention.self.query.bias.data.copy_(bias["self_attn_q_proj"])
+            layer.attention.self.key.weight.data.copy_(weight["self_attn_k_proj"])
+            layer.attention.self.key.bias.data.copy_(bias["self_attn_k_proj"])
+            layer.attention.self.value.weight.data.copy_(weight["self_attn_v_proj"])
+            layer.attention.self.value.bias.data.copy_(bias["self_attn_v_proj"])
+            layer.attention.output.dense.weight.data.copy_(weight["self_attn_out_proj"])
+            layer.attention.output.dense.bias.data.copy_(bias["self_attn_out_proj"])
+            layer.attention.output.LayerNorm.weight.data.copy_(weight["self_attn_layer_norm"])
+            layer.attention.output.LayerNorm.bias.data.copy_(bias["self_attn_layer_norm"])
+            layer.intermediate.dense.weight.data.copy_(weight["fc1"])
+            layer.intermediate.dense.bias.data.copy_(bias["fc1"])
+            layer.output.dense.weight.data.copy_(weight["fc2"])
+            layer.output.dense.bias.data.copy_(bias["fc2"])
+            layer.output.LayerNorm.weight.data.copy_(weight["final_layer_norm"])
+            layer.output.LayerNorm.bias.data.copy_(bias["final_layer_norm"])
+
+    model_to_save = unwrap_model(model)
+    if not isinstance(model_to_save, LSBertPreTrainedModel):
+        raise ValueError(
+            "Must be ligtseq replaced model"
+        )
+    # reload original modules
+    ls_encoder_layer = model_to_save.bert.encoder.layer
+    model_to_save.bert.encoder.layer = nn.ModuleList([BertLayer(model.config) for _ in range(model.config.num_hidden_layers)])
+    inject_hf_layer(model_to_save.config, model_to_save.bert.encoder.layer, ls_encoder_layer)
+    state_dict = model_to_save.state_dict()
+    # replace with lightseq modules
+    model_to_save.bert.encoder.layer = ls_encoder_layer
+    return state_dict
+
+
+class LSBertPreTrainedModel(BertPreTrainedModel):
+    @classmethod
+    def from_pretrained(self, *args, training_args, model_args, **kwargs):
+        self.config = kwargs["config"]
+        model = super().from_pretrained(*args, **kwargs)
+        if model_args.module_type == 1 or model_args.module_type == 2:
+            inject_ls_layer(model, training_args, model_args, self.config)
+        return model
+
+    def save_pretrained(self, *args, **kwargs):
+        kwargs["state_dict"] = hf_state_dict(self)
+        super().save_pretrained(*args, **kwargs)
+
+
+class LSBertForSequenceClassification(LSBertPreTrainedModel, BertForSequenceClassification):
+    """from BertForSequenceClassification"""
+
+
+class LSBertLMHeadModel(LSBertPreTrainedModel, BertLMHeadModel):
+    """from BertLMHeadModel"""
+
+
+class LSBertForMaskedLM(LSBertPreTrainedModel, BertForMaskedLM):
+    """from BertForMaskedLM"""
+
+
+class LSBertForNextSentencePrediction(LSBertPreTrainedModel, BertForNextSentencePrediction):
+    """from BertForNextSentencePrediction"""
+
+
+class LSBertForMultipleChoice(LSBertPreTrainedModel, BertForMultipleChoice):
+    """from BertForMultipleChoice"""
+
+
+class LSBertForTokenClassification(LSBertPreTrainedModel, BertForTokenClassification):
+    """from BertForTokenClassification"""
+
+
+class LSBertForQuestionAnswering(LSBertPreTrainedModel, BertForQuestionAnswering):
+    """from BertForQuestionAnswering"""

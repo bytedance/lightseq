@@ -47,7 +47,7 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
-from ls_hf_transformer_layer import inject_ls_layer
+from ls_hf_transformer_layer import inject_ls_layer, LSBertForSequenceClassification
 import torch.nn as nn
 
 
@@ -72,58 +72,6 @@ task_to_keys = {
 }
 
 logger = logging.getLogger(__name__)
-
-class LSBertForSequenceClassification(BertForSequenceClassification):
-    @classmethod
-    def from_pretrained(self, *args, training_args, model_args, **kwargs):
-        self.config = kwargs["config"]
-        model = super().from_pretrained(*args, **kwargs)
-        if model_args.module_type == 1 or model_args.module_type == 2:
-            inject_ls_layer(model, training_args, model_args, self.config)
-        return model
-
-    def inject_origin_layer(self, hf_layer, ls_layer):
-        for layer_id in range(self.config.num_hidden_layers):
-            weight, bias = ls_layer[layer_id].params_dict()
-            layer = hf_layer[layer_id]
-
-            layer.attention.self.query.weight.data.copy_(weight["self_attn_q_proj"])
-            layer.attention.self.query.bias.data.copy_(bias["self_attn_q_proj"])
-            layer.attention.self.key.weight.data.copy_(weight["self_attn_k_proj"])
-            layer.attention.self.key.bias.data.copy_(bias["self_attn_k_proj"])
-            layer.attention.self.value.weight.data.copy_(weight["self_attn_v_proj"])
-            layer.attention.self.value.bias.data.copy_(bias["self_attn_v_proj"])
-            layer.attention.output.dense.weight.data.copy_(weight["self_attn_out_proj"])
-            layer.attention.output.dense.bias.data.copy_(bias["self_attn_out_proj"])
-            layer.attention.output.LayerNorm.weight.data.copy_(weight["self_attn_layer_norm"])
-            layer.attention.output.LayerNorm.bias.data.copy_(bias["self_attn_layer_norm"])
-            layer.intermediate.dense.weight.data.copy_(weight["fc1"])
-            layer.intermediate.dense.bias.data.copy_(bias["fc1"])
-            layer.output.dense.weight.data.copy_(weight["fc2"])
-            layer.output.dense.bias.data.copy_(bias["fc2"])
-            layer.output.LayerNorm.weight.data.copy_(weight["final_layer_norm"])
-            layer.output.LayerNorm.bias.data.copy_(bias["final_layer_norm"])
-
-    def hf_state_dict(self):
-        def unwrap_model(model):
-            # since there could be multiple levels of wrapping, unwrap recursively
-            if hasattr(model, "module"):
-                return unwrap_model(model.module)
-            else:
-                return model    
-
-        model_to_save = unwrap_model(self)
-        ls_encoder_layer = model_to_save.bert.encoder.layer
-        model_to_save.bert.encoder.layer = nn.ModuleList([BertLayer(self.config) for _ in range(self.config.num_hidden_layers)])
-        self.inject_origin_layer(model_to_save.bert.encoder.layer, ls_encoder_layer)
-        state_dict = model_to_save.state_dict()
-        model_to_save.bert.encoder.layer = ls_encoder_layer
-        return state_dict
-
-
-    def save_pretrained(self, *args, **kwargs):
-        kwargs["state_dict"] = self.hf_state_dict()
-        super().save_pretrained(*args, **kwargs)
 
 
 @dataclass
@@ -461,6 +409,8 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+
+    # # Replace with lightseq encoder layers and save the lightseq model
     # model = AutoModelForSequenceClassification.from_pretrained(
     #     model_args.model_name_or_path,
     #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -469,20 +419,21 @@ def main():
     #     revision=model_args.model_revision,
     #     use_auth_token=True if model_args.use_auth_token else None,
     # )
-    model = BertForSequenceClassification.from_pretrained(
-        '/tmp/sst2/checkpoint-500',
-        # training_args=training_args,
-        # model_args=model_args,
+    # # Replace with LightSeq encoder layers.
+    # if model_args.module_type == 1 or model_args.module_type == 2:
+    #     inject_ls_layer(model, training_args, model_args, config)
+
+    # Replace with lightseq encoder layers and save the huggingface model
+    model = LSBertForSequenceClassification.from_pretrained(
+        model_args.model_name_or_path,
+        training_args=training_args,
+        model_args=model_args,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    # print(type(model))
-    # Replace with LightSeq encoder layers.
-    # if model_args.module_type == 1 or model_args.module_type == 2:
-    #     inject_ls_layer(model, training_args, model_args, config)
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

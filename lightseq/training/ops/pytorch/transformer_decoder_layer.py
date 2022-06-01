@@ -126,7 +126,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
-        if self.config.local_rank >= 0:
+        if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
         # create the layer in cuda kernels.
@@ -498,5 +498,6 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         if cache_list == []:
             past_key_value = None
         else:
+            # cache decoder self attention k v
             past_key_value = (cache_list[0], cache_list[1])
         return output.to(self.para), past_key_value

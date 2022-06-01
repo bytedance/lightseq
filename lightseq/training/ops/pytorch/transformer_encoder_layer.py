@@ -95,7 +95,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
-        if self.config.local_rank >= 0:
+        if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
         self.create_cpp_layer()

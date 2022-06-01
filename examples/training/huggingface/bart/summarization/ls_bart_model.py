@@ -7,8 +7,12 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import (
 from lightseq.training.ops.pytorch.transformer_decoder_layer import (
             LSTransformerDecoderLayer as TransformerDecoderLayer,
 )
-from transformers import BartForConditionalGeneration
+from transformers import (
+    BartForConditionalGeneration,
+    BartPretrainedModel,
+)
 from transformers.models.bart.modeling_bart import BartEncoderLayer, BartDecoderLayer
+
 
 def get_weight_and_bias(m):
     weight = m.weight.detach().clone()
@@ -30,117 +34,6 @@ def get_hf_bart_dec_enc_atten_kv(layers, params_list, nlayer):
     enc_attn_kvw = torch.cat([ele for ele in init_ws], dim=0)
     enc_attn_kvb = torch.cat([ele for ele in init_bs], dim=0)
     return enc_attn_kvw, enc_attn_kvb
-
-
-class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
-    def __init__(self, *args, **kwargs):
-        self.params_list = None
-        super(LSHFTransformerEncoderLayer, self).__init__(*args, **kwargs)
-
-    def forward(self, hidden_states, encoder_padding_mask, *args, **kwargs):
-        ls_encoder_padding_mask = encoder_padding_mask.narrow(2, 0, 1).squeeze().ne(0).type_as(encoder_padding_mask) 
-        output = super().forward(hidden_states, ls_encoder_padding_mask)
-        return (output, None, None, None)
-
-    @staticmethod
-    def get_params_list(**kwargs):
-        """Configuration of model hyperparameters for encoder and decoder"""
-        @dataclass
-        class ParamsList:
-            self_attn_q_proj: None  
-            self_attn_k_proj: None  
-            self_attn_v_proj: None  
-            self_attn_out_proj: None 
-            self_attn_layer_norm: None  
-            fc1: None
-            fc2: None
-            final_layer_norm: None  
-
-        params_list = ParamsList(**kwargs)
-        # check_config(config)
-        return params_list
-
-    @classmethod
-    def build_model(cls, config, params_list, layer_list, layer_id):
-        layer = layer_list[layer_id]
-        modules_list = []
-        ## only python >= 3.6 (orderedDict)
-        for module_name in params_list.__dict__.values():
-            print(module_name)
-            exec(f"modules_list.append(layer.{module_name})")
-        init_ws = []
-        init_bs = []
-        for module in modules_list:
-            w, b = get_weight_and_bias(module)
-            init_ws.append(w)
-            init_bs.append(b)
-        return cls(config, init_ws, init_bs)
-
-
-class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
-    def __init__(self, *args, **kwargs):
-        super(LSHFTransformerDecoderLayer, self).__init__(*args, **kwargs)
-
-    def forward(self, hidden_states,
-                attention_mask = None,
-                encoder_hidden_states = None,
-                encoder_attention_mask = None,
-                past_key_value=None,
-                use_cache=False,
-                *args, **kwargs):
-        encoder_hidden_states = encoder_hidden_states.transpose(0, 1).contiguous()
-        ls_encoder_padding_mask = encoder_attention_mask.narrow(2, 0, 1).squeeze().ne(0).type_as(encoder_attention_mask) 
-        cache = None
-        if use_cache:
-            import pdb; pdb.set_trace()
-            cache = {} if past_key_value is None else {
-                "dec_self_k": past_key_value[0],
-                "dec_self_v": past_key_value[1]
-            }
-        output = super().forward(hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache)
-        return output
-
-    @staticmethod
-    def get_params_list(**kwargs):
-        """Configuration of model hyperparameters for encoder and decoder"""
-        @dataclass
-        class ParamsList:
-            self_attn_q_proj: None  
-            self_attn_k_proj: None  
-            self_attn_v_proj: None  
-            self_attn_out_proj: None 
-            self_attn_layer_norm: None  
-            encoder_attn_q_proj: None
-            encoder_attn_out_proj: None
-            encoder_attn_layer_norm: None
-            fc1: None
-            fc2: None
-            final_layer_norm: None
-            encoder_attn_k_proj: None
-            encoder_attn_v_proj: None
-
-        params_list = ParamsList(**kwargs)
-        # check_config(config)
-        return params_list
-
-    @classmethod
-    def build_model(cls, config, params_list, layer_list, layer_id):
-        layer = layer_list[layer_id]
-        modules_list = []
-        for param_name in list(params_list.__dict__.values())[:-2]:
-            exec(f"modules_list.append(layer.{param_name})")
-
-        init_ws = []
-        init_bs = []
-        for module in modules_list:
-            w, b = get_weight_and_bias(module)
-            init_ws.append(w)
-            init_bs.append(b)
-        if layer_id == 0:
-            enc_kvw, enc_kvb = get_hf_bart_dec_enc_atten_kv(layer_list, params_list, config.nlayer)
-            init_ws.append(enc_kvw)
-            init_bs.append(enc_kvb)
-        return cls(config, init_ws, init_bs)
 
 
 def get_enc_layer_config(training_args, config):
@@ -221,24 +114,25 @@ def inject_lightseq_layer(model, training_args, config):
         ).cuda()
 
 
-    # model.apply(disable_quant)
+def hf_state_dict(model):
+    """
+    Args:
+        model: huggingface model replaced with lightseq layer
+    Returns:
+        Dict: The huggingface state dict
+    """
+    def unwrap_model(model):
+        # since there could be multiple levels of wrapping, unwrap recursively
+        if hasattr(model, "module"):
+            return unwrap_model(model.module)
+        else:
+            return model
 
-
-
-class LSBartForConditionalGeneration(BartForConditionalGeneration):
-    @classmethod
-    def from_pretrained(self, *args, training_args, **kwargs):
-        self.config = kwargs["config"]
-        model = super().from_pretrained(*args, **kwargs)
-        inject_lightseq_layer(model, training_args, self.config)
-        return model
-
-    def inject_origin_layer(self, hf_layer, ls_layer, is_decoder=False):
+    def inject_hf_layer(config, hf_layer, ls_layer, is_decoder=False):
         if not is_decoder:
-            for layer_id in range(self.config.encoder_layers):
+            for layer_id in range(config.encoder_layers):
                 weight, bias = ls_layer[layer_id].params_dict()
                 layer = hf_layer[layer_id]
-
                 layer.self_attn.q_proj.weight.data.copy_(weight["self_attn_q_proj"])
                 layer.self_attn.q_proj.bias.data.copy_(bias["self_attn_q_proj"])
                 layer.self_attn.k_proj.weight.data.copy_(weight["self_attn_k_proj"])
@@ -260,10 +154,9 @@ class LSBartForConditionalGeneration(BartForConditionalGeneration):
             encoder_attn_k_proj_b = None
             encoder_attn_v_proj_w = None
             encoder_attn_v_proj_b = None
-            for layer_id in range(self.config.decoder_layers):
+            for layer_id in range(config.decoder_layers):
                 weight, bias = ls_layer[layer_id].params_dict()
                 layer = hf_layer[layer_id]
-
                 layer.self_attn.q_proj.weight.data.copy_(weight["self_attn_q_proj"])
                 layer.self_attn.q_proj.bias.data.copy_(bias["self_attn_q_proj"])
                 layer.self_attn.k_proj.weight.data.copy_(weight["self_attn_k_proj"])
@@ -297,30 +190,156 @@ class LSBartForConditionalGeneration(BartForConditionalGeneration):
                 layer.encoder_attn.v_proj.weight.data.copy_(encoder_attn_v_proj_w[layer_id])
                 layer.encoder_attn.v_proj.bias.data.copy_(encoder_attn_v_proj_b[layer_id])
 
+    model_to_save = unwrap_model(model)
+    if not isinstance(model_to_save, LSBartPretrainedModel):
+        raise ValueError(
+            "Must be ligtseq replaced model"
+        )
+    # reload original modules
+    ls_encoder_layer = model_to_save.model.encoder.layers
+    ls_decoder_layer = model_to_save.model.decoder.layers
+    model_to_save.model.encoder.layers = nn.ModuleList([BartEncoderLayer(model.config) for _ in range(model.config.encoder_layers)])
+    model_to_save.model.decoder.layers = nn.ModuleList([BartDecoderLayer(model.config) for _ in range(model.config.decoder_layers)])
+    
+    inject_hf_layer(model.config, model_to_save.model.encoder.layers, ls_encoder_layer)
+    inject_hf_layer(model.config, model_to_save.model.decoder.layers, ls_decoder_layer, is_decoder=True)
+    state_dict = model_to_save.state_dict()
+    # replace with lightseq modules
+    model_to_save.model.encoder.layers = ls_encoder_layer
+    model_to_save.model.decoder.layers = ls_decoder_layer
+    return state_dict
 
 
-    def hf_state_dict(self):
-        def unwrap_model(model):
-            # since there could be multiple levels of wrapping, unwrap recursively
-            if hasattr(model, "module"):
-                return unwrap_model(model.module)
-            else:
-                return model
+class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
+    def __init__(self, *args, **kwargs):
+        self.params_list = None
+        super(LSHFTransformerEncoderLayer, self).__init__(*args, **kwargs)
 
-        model_to_save = unwrap_model(self)
-        ls_encoder_layer = model_to_save.model.encoder.layers
-        ls_decoder_layer = model_to_save.model.decoder.layers
-        model_to_save.model.encoder.layers = nn.ModuleList([BartEncoderLayer(self.config) for _ in range(self.config.encoder_layers)])
-        model_to_save.model.decoder.layers = nn.ModuleList([BartDecoderLayer(self.config) for _ in range(self.config.decoder_layers)])
-        
-        self.inject_origin_layer(model_to_save.model.encoder.layers, ls_encoder_layer)
-        self.inject_origin_layer(model_to_save.model.decoder.layers, ls_decoder_layer, is_decoder=True)
-        state_dict = model_to_save.state_dict()
-        model_to_save.model.encoder.layers = ls_encoder_layer
-        model_to_save.model.decoder.layers = ls_decoder_layer
-        return state_dict
+    def forward(self, hidden_states, encoder_padding_mask, *args, **kwargs):
+        ls_encoder_padding_mask = encoder_padding_mask.narrow(2, 0, 1).squeeze().ne(0).type_as(encoder_padding_mask) 
+        output = super().forward(hidden_states, ls_encoder_padding_mask)
+        return (output, None, None, None)
 
+    @staticmethod
+    def get_params_list(**kwargs):
+        """Configuration of model hyperparameters for encoder and decoder"""
+        @dataclass
+        class ParamsList:
+            self_attn_q_proj: None  
+            self_attn_k_proj: None  
+            self_attn_v_proj: None  
+            self_attn_out_proj: None 
+            self_attn_layer_norm: None  
+            fc1: None
+            fc2: None
+            final_layer_norm: None  
+
+        params_list = ParamsList(**kwargs)
+        # check_config(config)
+        return params_list
+
+    @classmethod
+    def build_model(cls, config, params_list, layer_list, layer_id):
+        layer = layer_list[layer_id]
+        modules_list = []
+        ## only python >= 3.6 (orderedDict)
+        for module_name in params_list.__dict__.values():
+            exec(f"modules_list.append(layer.{module_name})")
+        init_ws = []
+        init_bs = []
+        for module in modules_list:
+            w, b = get_weight_and_bias(module)
+            init_ws.append(w)
+            init_bs.append(b)
+        return cls(config, init_ws, init_bs)
+
+
+class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
+    def __init__(self, *args, **kwargs):
+        super(LSHFTransformerDecoderLayer, self).__init__(*args, **kwargs)
+
+    def forward(self, hidden_states,
+                attention_mask = None,
+                encoder_hidden_states = None,
+                encoder_attention_mask = None,
+                past_key_value=None,
+                use_cache=False,
+                *args, **kwargs):
+        encoder_hidden_states = encoder_hidden_states.transpose(0, 1).contiguous()
+        ls_encoder_padding_mask = encoder_attention_mask.narrow(2, 0, 1).squeeze().ne(0).type_as(encoder_attention_mask) 
+        cache = None
+        if use_cache:
+            import pdb; pdb.set_trace()
+            cache = {} if past_key_value is None else {
+                "dec_self_k": past_key_value[0],
+                "dec_self_v": past_key_value[1]
+            }
+        output = super().forward(hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache)
+        return output
+
+    @staticmethod
+    def get_params_list(**kwargs):
+        """Configuration of model hyperparameters for encoder and decoder"""
+        @dataclass
+        class ParamsList:
+            self_attn_q_proj: None  
+            self_attn_k_proj: None  
+            self_attn_v_proj: None  
+            self_attn_out_proj: None 
+            self_attn_layer_norm: None  
+            encoder_attn_q_proj: None
+            encoder_attn_out_proj: None
+            encoder_attn_layer_norm: None
+            fc1: None
+            fc2: None
+            final_layer_norm: None
+            encoder_attn_k_proj: None
+            encoder_attn_v_proj: None
+
+        params_list = ParamsList(**kwargs)
+        # check_config(config)
+        return params_list
+
+    @classmethod
+    def build_model(cls, config, params_list, layer_list, layer_id):
+        layer = layer_list[layer_id]
+        modules_list = []
+        for param_name in list(params_list.__dict__.values())[:-2]:
+            exec(f"modules_list.append(layer.{param_name})")
+
+        init_ws = []
+        init_bs = []
+        for module in modules_list:
+            w, b = get_weight_and_bias(module)
+            init_ws.append(w)
+            init_bs.append(b)
+        if layer_id == 0:
+            enc_kvw, enc_kvb = get_hf_bart_dec_enc_atten_kv(layer_list, params_list, config.nlayer)
+            init_ws.append(enc_kvw)
+            init_bs.append(enc_kvb)
+        return cls(config, init_ws, init_bs)
+
+
+class LSBartPretrainedModel(BartPretrainedModel):
+    @classmethod
+    def from_pretrained(self, *args, training_args, **kwargs):
+        self.config = kwargs["config"]
+        model = super().from_pretrained(*args, **kwargs)
+        inject_lightseq_layer(model, training_args, self.config)
+        return model
 
     def save_pretrained(self, *args, **kwargs):
-        kwargs["state_dict"] = self.hf_state_dict()
+        kwargs["state_dict"] = hf_state_dict(self)
         super().save_pretrained(*args, **kwargs)
+
+
+class LSBartForConditionalGeneration(LSBartPretrainedModel, BartForConditionalGeneration):
+    """from BartForConditionalGeneration"""
+
+
+class LSBartForSequenceClassification(LSBartPretrainedModel, BartForSequenceClassification):
+    """from BartForSequenceClassification"""
+
+    
+class LSBartForQuestionAnswering(LSBartPretrainedModel, BartForQuestionAnswering):
+    """from BartForQuestionAnswering"""
