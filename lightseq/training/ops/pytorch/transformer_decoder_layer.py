@@ -190,7 +190,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size, nlayer):
-        """Returns the offset of each module's parameters among all 
+        """Returns the offset of each module's parameters among all
         parameters of a layer
         """
         hs, ims = hidden_size, intermediate_size
@@ -220,11 +220,12 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         return offsets
 
     def params_dict(self):
-        '''
+        """
         Returns:
             weight: dict
             bias: dict
-        '''
+        """
+
         def copy_and_view(m, shape=None):
             if shape is None:
                 shape = (-1,)
@@ -235,10 +236,10 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         self_attn_qkvw = self._get_weights(0)
         self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
-            self.hs * self.hs, 0)
+            self.hs * self.hs, 0
+        )
         self_attn_qkvb = self._get_weights(1)
-        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(
-            self.hs, 0)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
 
         all_enc_attn_kw, all_enc_attn_vw = None, None
         all_enc_attn_kb, all_enc_attn_vb = None, None
@@ -257,10 +258,16 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
             "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
             "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
-            "self_attn_out_proj": copy_and_view(self._get_weights(2), (self.hs, self.hs)),
+            "self_attn_out_proj": copy_and_view(
+                self._get_weights(2), (self.hs, self.hs)
+            ),
             "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
-            "encoder_attn_q_proj": copy_and_view(self._get_weights(6), (self.hs, self.hs)),
-            "encoder_attn_out_proj": copy_and_view(self._get_weights(8), (self.hs, self.hs)),
+            "encoder_attn_q_proj": copy_and_view(
+                self._get_weights(6), (self.hs, self.hs)
+            ),
+            "encoder_attn_out_proj": copy_and_view(
+                self._get_weights(8), (self.hs, self.hs)
+            ),
             "encoder_attn_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
             "fc1": copy_and_view(self._get_weights(12), (self.ims, self.hs)),
             "fc2": copy_and_view(self._get_weights(14), (self.hs, self.ims)),
@@ -281,7 +288,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             "fc2": copy_and_view(self._get_weights(15)),
             "final_layer_norm": copy_and_view(self._get_weights(17)),
             "encoder_attn_k_proj": all_enc_attn_kb,
-            "encoder_attn_v_proj": all_enc_attn_vb
+            "encoder_attn_v_proj": all_enc_attn_vb,
         }
         return weight, bias
 
@@ -417,8 +424,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             if hasattr(self, "para_16"):
                 self.para_16.copy_(self.para.to(torch.half))
             else:
-                self.register_buffer(
-                    "para_16", self.para.clone().detach().half())
+                self.register_buffer("para_16", self.para.clone().detach().half())
 
         if self.config.fp16:
             decoder_states = decoder_states.to(torch.half)

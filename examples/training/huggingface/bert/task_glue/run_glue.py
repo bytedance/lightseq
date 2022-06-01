@@ -42,7 +42,7 @@ from transformers import (
     default_data_collator,
     set_seed,
     BertForSequenceClassification,
-    BertLayer
+    BertLayer,
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
@@ -92,8 +92,7 @@ class DataTrainingArguments:
     )
     dataset_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "The name of the dataset to use (via the datasets library)."},
+        metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
     dataset_config_name: Optional[str] = field(
         default=None,
@@ -464,14 +463,12 @@ def main():
     # Some models have set the order of the labels to use, so let's make sure we do use it.
     label_to_id = None
     if (
-        model.config.label2id != PretrainedConfig(
-            num_labels=num_labels).label2id
+        model.config.label2id != PretrainedConfig(num_labels=num_labels).label2id
         and data_args.task_name is not None
         and not is_regression
     ):
         # Some have all caps in their config, some don't.
-        label_name_to_id = {
-            k.lower(): v for k, v in model.config.label2id.items()}
+        label_name_to_id = {k.lower(): v for k, v in model.config.label2id.items()}
         if list(sorted(label_name_to_id.keys())) == list(sorted(label_list)):
             label_to_id = {
                 i: int(label_name_to_id[label_list[i]]) for i in range(num_labels)
@@ -487,8 +484,7 @@ def main():
 
     if label_to_id is not None:
         model.config.label2id = label_to_id
-        model.config.id2label = {
-            id: label for label, id in config.label2id.items()}
+        model.config.id2label = {id: label for label, id in config.label2id.items()}
 
     if data_args.max_seq_length > tokenizer.model_max_length:
         logger.warning(
@@ -526,8 +522,7 @@ def main():
             raise ValueError("--do_train requires a train dataset")
         train_dataset = datasets["train"]
         if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(
-                range(data_args.max_train_samples))
+            train_dataset = train_dataset.select(range(data_args.max_train_samples))
 
     if training_args.do_eval:
         if "validation" not in datasets and "validation_matched" not in datasets:
@@ -536,8 +531,7 @@ def main():
             "validation_matched" if data_args.task_name == "mnli" else "validation"
         ]
         if data_args.max_eval_samples is not None:
-            eval_dataset = eval_dataset.select(
-                range(data_args.max_eval_samples))
+            eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
 
     if (
         training_args.do_predict
@@ -557,8 +551,7 @@ def main():
     # Log a few random samples from the training set:
     if training_args.do_train:
         for index in random.sample(range(len(train_dataset)), 3):
-            logger.info(
-                f"Sample {index} of the training set: {train_dataset[index]}.")
+            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # Get the metric function
     if data_args.task_name is not None:
@@ -569,15 +562,12 @@ def main():
     # You can define your custom compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with a
     # predictions and label_ids field) and has to return a dictionary string to float.
     def compute_metrics(p: EvalPrediction):
-        preds = p.predictions[0] if isinstance(
-            p.predictions, tuple) else p.predictions
-        preds = np.squeeze(
-            preds) if is_regression else np.argmax(preds, axis=1)
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+        preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
         if data_args.task_name is not None:
             result = metric.compute(predictions=preds, references=p.label_ids)
             if len(result) > 1:
-                result["combined_score"] = np.mean(
-                    list(result.values())).item()
+                result["combined_score"] = np.mean(list(result.values())).item()
             return result
         elif is_regression:
             return {"mse": ((preds - p.label_ids) ** 2).mean().item()}
@@ -588,8 +578,7 @@ def main():
     if data_args.pad_to_max_length:
         data_collator = default_data_collator
     elif training_args.fp16:
-        data_collator = DataCollatorWithPadding(
-            tokenizer, pad_to_multiple_of=8)
+        data_collator = DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8)
     else:
         data_collator = None
 
