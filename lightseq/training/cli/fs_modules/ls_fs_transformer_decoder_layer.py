@@ -49,7 +49,7 @@ class LSFSTransformerDecoderLayer(LSTransformerDecoderLayer):
         else:
             cache = self.get_self_attn_cache(incremental_state)
         self.beam_size = int(x.shape[0] / encoder_padding_mask.shape[0])
-        res, _ = super().forward(x, encoder_out, encoder_padding_mask, cache)
+        res = super().forward(x, encoder_out, encoder_padding_mask, cache)
         if cache:
             self.set_self_attn_cache(incremental_state, cache)
         return res, None, None

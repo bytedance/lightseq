@@ -194,7 +194,7 @@ class LSTransformerDecoder(nn.Module):
 
         for i, layer in enumerate(self.layers):
             layer_cache = cache[i] if cache else None
-            x, _ = layer(
+            x = layer(
                 x,
                 encoder_out,
                 encoder_padding_mask,

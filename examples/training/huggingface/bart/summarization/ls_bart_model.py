@@ -314,9 +314,6 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
         )
         cache = None
         if use_cache:
-            import pdb
-
-            pdb.set_trace()
             cache = (
                 {}
                 if past_key_value is None
@@ -325,7 +322,7 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
         output = super().forward(
             hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache
         )
-        return output
+        return output, (cache["dec_self_k"], cache["dec_self_v"])
 
     @staticmethod
     def get_params_list(**kwargs):
