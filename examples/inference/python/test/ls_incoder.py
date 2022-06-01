@@ -1,11 +1,9 @@
 import time
 import argparse
-
 import torch
 import numpy as np
 import lightseq.inference as lsi
 
-# from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
@@ -22,10 +20,6 @@ def hf_gpt2(model, inputs, tokenizer):
     inputs = inputs.to("cuda:0")
     torch.cuda.synchronize()
     start_time = time.perf_counter()
-    # generated_ids = model.generate(
-    #     inputs, max_length=50, pad_token_id=tokenizer.eos_token_id,top_k = 1
-    # )
-
     generated_ids = model.generate(inputs, max_length=100, top_k=1)
     torch.cuda.synchronize()
     end_time = time.perf_counter()
