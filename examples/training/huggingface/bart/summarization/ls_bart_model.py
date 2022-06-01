@@ -8,8 +8,10 @@ from lightseq.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer as TransformerDecoderLayer,
 )
 from transformers import (
-    BartForConditionalGeneration,
     BartPretrainedModel,
+    BartForConditionalGeneration,
+    BartForSequenceClassification,
+    BartForQuestionAnswering,
 )
 from transformers.models.bart.modeling_bart import BartEncoderLayer, BartDecoderLayer
 
@@ -313,6 +315,7 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
             .type_as(encoder_attention_mask)
         )
         cache = None
+        self_attn_kv_cache = None
         if use_cache:
             cache = (
                 {}
@@ -322,7 +325,9 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
         output = super().forward(
             hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache
         )
-        return output, (cache["dec_self_k"], cache["dec_self_v"])
+        if use_cache:
+            self_attn_kv_cache = (cache["dec_self_k"], cache["dec_self_v"])
+        return output, self_attn_kv_cache
 
     @staticmethod
     def get_params_list(**kwargs):
