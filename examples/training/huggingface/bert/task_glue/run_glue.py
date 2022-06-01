@@ -48,7 +48,6 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from ls_hf_transformer_layer import inject_ls_layer, LSBertForSequenceClassification
-import torch.nn as nn
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.

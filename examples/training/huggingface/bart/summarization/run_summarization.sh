@@ -33,4 +33,4 @@ python3 -m torch.distributed.launch \
     --seed 1234 \
     --logging_steps 10 \
     --fp16 \
-    --predict_with_generate --save_step 100
+    --predict_with_generate
