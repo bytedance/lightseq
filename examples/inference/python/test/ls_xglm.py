@@ -66,12 +66,10 @@ def main():
     ls_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
     # lightseq use len(tokenizer) as pad_token in default
     ls_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
-    # print(f"lightseq tokenizer pad token id: {ls_tokenizer.pad_token_id}")
 
     hf_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
     # use EOS as PAD for huggingface to avoid warning according to https://huggingface.co/blog/how-to-generate while avoid reshaping the model embedding
     # hf_tokenizer.pad_token = hf_tokenizer.eos_token
-    # print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
     # XGLM shares the same model architecture as GPT

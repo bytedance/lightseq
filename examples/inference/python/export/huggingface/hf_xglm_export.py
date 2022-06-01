@@ -165,7 +165,7 @@ if __name__ == "__main__":
     generation_method = "topk"
     topk = 1
     topp = 1
-    
+
     eos_id = 2
     pad_id = 1
     max_step = 100
