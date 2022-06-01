@@ -273,7 +273,6 @@ class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
             final_layer_norm: None
 
         params_list = ParamsList(**kwargs)
-        # check_config(config)
         return params_list
 
     @classmethod
@@ -350,7 +349,6 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
             encoder_attn_v_proj: None
 
         params_list = ParamsList(**kwargs)
-        # check_config(config)
         return params_list
 
     @classmethod
