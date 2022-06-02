@@ -82,6 +82,7 @@ class GptEncoder {
 
   int _batch_size;
   int _batch_token_num;
+  int _batch_max_seq_len;
   int _layer_id;
   int _weight_offset;
 

@@ -49,6 +49,11 @@ void GptWeight<OpType_>::proto_get_model_config(const Gpt &gpt) {
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
   _padding_id = gpt.model_conf().src_padding_id();
+  if (gpt.model_conf().extra_decode_length() > 0) {
+    _extra_decode_length = gpt.model_conf().extra_decode_length();
+  } else {
+    _extra_decode_length = _max_step;
+  }
   if (gpt.model_conf().sampling_method() != "") {
     _sampling_method = gpt.model_conf().sampling_method();
   }
@@ -250,6 +255,15 @@ void GptWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
       std::string(_sampling_method_buf, _sampling_method_strlen);
   if (_sampling_method_read != "") {
     _sampling_method = _sampling_method_read;
+  }
+
+  int _extra_decode_length_read;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
+                           H5T_NATIVE_INT, &_extra_decode_length_read);
+  if (_extra_decode_length_read > 0) {
+    _extra_decode_length = _extra_decode_length_read;
+  } else {
+    _extra_decode_length = _max_step;
   }
 
   int _topk_read;

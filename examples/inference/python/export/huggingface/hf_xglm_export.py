@@ -1,13 +1,13 @@
 """
-Export Hugging Face GPT2 models to hdf5 format.
+Export Hugging Face XGLM models to hdf5 format.
 """
 import os
 import h5py
 import numpy as np
 from collections import OrderedDict
-from transformers import GPT2LMHeadModel
+from transformers import AutoTokenizer, XGLMForCausalLM
 from lightseq.training.ops.pytorch.export import fill_hdf5_layer
-from export.util import parse_args
+import math
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -15,56 +15,52 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 """
 For the mapping dictionary: key is the value of the proto parameter,
 value is a powerful expression, each && split tensor name of the matching path or expression.
-
 The sub-pattern of the path is separated by spaces, and the expression starts with a expression_.
 You can operate separately on each tensor and support multiple expressions. Multiple matching paths
 and the expression will finally be concatenated on axis = -1.
 """
+
 enc_layer_mapping_dict = OrderedDict(
     {
-        "multihead_norm_scale": "ln_1 weight",
-        "multihead_norm_bias": "ln_1 bias",
-        # GPT2's Conv1D don't need transpose
-        # https://github.com/huggingface/transformers/blob/9ec0f01b6c3aff4636869aee735859fb6f89aa98/src/transformers/modeling_utils.py#L1400
-        "multihead_project_kernel_qkv": "attn c_attn weight",
-        "multihead_project_bias_qkv": "attn c_attn bias",
-        "multihead_project_kernel_output": "attn c_proj weight",
-        "multihead_project_bias_output": "attn c_proj bias",
-        "ffn_norm_scale": "ln_2 weight",
-        "ffn_norm_bias": "ln_2 bias",
-        "ffn_first_kernel": "mlp c_fc weight",
-        "ffn_first_bias": "mlp c_fc bias",
-        "ffn_second_kernel": "mlp c_proj weight",
-        "ffn_second_bias": "mlp c_proj bias",
+        "multihead_norm_scale": "self_attn_layer_norm weight",
+        "multihead_norm_bias": "self_attn_layer_norm bias",
+        "multihead_project_kernel_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",
+        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
+        "multihead_project_bias_output": "self_attn out_proj bias",
+        "ffn_norm_scale": "final_layer_norm weight",
+        "ffn_norm_bias": "final_layer_norm bias",
+        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
+        "ffn_first_bias": "fc1 bias",
+        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
+        "ffn_second_bias": "fc2 bias",
     }
 )
+
 
 src_emb_mapping_dict = OrderedDict(
     {
-        "norm_scale": "ln_f weight",
-        "norm_bias": "ln_f bias",
-        "token_embedding": "wte",
-        # manually process position_embedding to customize for max_step
-        # "position_embedding": "wpe",
+        "norm_scale": "layer_norm weight",
+        "norm_bias": "layer_norm bias",
+        # "token_embedding": "embed_tokens",
     }
 )
 
 
-def extract_gpt_weights(
+def extract_xglm_weights(
     output_file,
     model_dir,
     head_num,
     generation_method,
-    topk=1,
+    topk=10,
     topp=0.75,
-    # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id=50256,
     pad_id=50257,
-    max_step=50,
+    max_step=100,
     extra_decode_length=0,
 ):
     # load var names
-    encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
+    encoder_state_dict = XGLMForCausalLM.from_pretrained(model_dir).state_dict()
     enc_var_name_list = list(encoder_state_dict.keys())
 
     # initialize output file
@@ -101,8 +97,18 @@ def extract_gpt_weights(
         src_emb_mapping_dict,
     )
 
+    token_emb = encoder_state_dict["model.embed_tokens.weight"]
+
+    # scale embedding
+    scale = math.sqrt(token_emb.shape[1])
+    token_embedding = (token_emb.flatten() * scale).tolist()
+
+    hdf5_file.create_dataset(
+        "src_embedding/token_embedding", data=token_embedding, dtype="f4"
+    )
+
     # special handling for position embedding
-    position_emb = encoder_state_dict["transformer.wpe.weight"]
+    position_emb = encoder_state_dict["model.embed_positions.weights"]
     _max_allowed_step, _hidden_size = position_emb.shape
     if max_step > _max_allowed_step:
         print(f"max_step {max_step} exceed max allowed step, abort.")
@@ -151,24 +157,23 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    if args.generation_method not in ["topk", "topp", "ppl"]:
-        args.generation_method = "topk"
-    output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
-    input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
-    head_number = 12  # 20 for "gpt2-large"
+    output_lightseq_model_name = "lightseq_incoder_base"
+    input_huggingface_xglm_model = "facebook/incoder-1B"
+    head_number = 32
+    # generation_method should be "topk" or "topp"
+    generation_method = "topk"
     topk = 1
     topp = 0.75
-    # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
-    eos_id = 50256
-    pad_id = 50257
-    max_step = 50
+
+    eos_id = 2
+    pad_id = 1
+    max_step = 100
     extra_decode_length = 0  # use positive length to avtivate it
-    extract_gpt_weights(
+    extract_xglm_weights(
         output_lightseq_model_name,
-        input_huggingface_gpt_model,
+        input_huggingface_xglm_model,
         head_num=head_number,  # layer number
-        generation_method=args.generation_method,
+        generation_method=generation_method,
         topk=topk,
         topp=topp,
         eos_id=eos_id,
