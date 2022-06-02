@@ -95,13 +95,15 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
-        if self.config.local_rank >= 0:
+        if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
         self.create_cpp_layer()
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
         self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
@@ -211,6 +213,49 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
+
+    def params_dict(self):
+        """
+        Returns:
+            weight: dict
+            bias: dict
+        """
+
+        def copy_and_view(m, shape=None):
+            if shape is None:
+                shape = (-1,)
+            return m.data.clone().view(*shape)
+
+        self_attn_qkvw = self._get_weights(0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
+            self.hs * self.hs, 0
+        )
+        self_attn_qkvb = self._get_weights(1)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+
+        weight = {
+            "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn_out_proj": copy_and_view(
+                self._get_weights(2), (self.hs, self.hs)
+            ),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
+            "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
+            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
+        }
+        bias = {
+            "self_attn_q_proj": copy_and_view(self_attn_qb),
+            "self_attn_k_proj": copy_and_view(self_attn_kb),
+            "self_attn_v_proj": copy_and_view(self_attn_vb),
+            "self_attn_out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
+            "fc1": copy_and_view(self._get_weights(7)),
+            "fc2": copy_and_view(self._get_weights(9)),
+            "final_layer_norm": copy_and_view(self._get_weights(11)),
+        }
+        return weight, bias
 
     def __assign_layer_weight_grad(self):
         param = (

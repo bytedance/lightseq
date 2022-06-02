@@ -46,7 +46,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from utils_qa import postprocess_qa_predictions
-from ls_hf_transformer_layer import inject_ls_layer
+from ls_hf_transformer_layer import inject_ls_layer, LSBertForQuestionAnswering
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -373,18 +373,30 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForQuestionAnswering.from_pretrained(
+    # # Replace with lightseq encoder layers and save the lightseq model
+    # model = AutoModelForQuestionAnswering.from_pretrained(
+    #     model_args.model_name_or_path,
+    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
+    #     config=config,
+    #     cache_dir=model_args.cache_dir,
+    #     revision=model_args.model_revision,
+    #     use_auth_token=True if model_args.use_auth_token else None,
+    # )
+    # # Replace with LightSeq encoder layers.
+    # if model_args.module_type == 1 or model_args.module_type == 2:
+    #     inject_ls_layer(model, training_args, model_args, config)
+
+    # Replace with lightseq encoder layers and save the huggingface model
+    model = LSBertForQuestionAnswering.from_pretrained(
         model_args.model_name_or_path,
+        training_args=training_args,
+        model_args=model_args,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-
-    # Replace with LightSeq encoder layers.
-    if model_args.module_type == 1 or model_args.module_type == 2:
-        inject_ls_layer(model, training_args, model_args, config)
 
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
