@@ -49,7 +49,7 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(
       cudaMalloc(&d_trg_lang_id_, _max_batch_size * sizeof(int32_t)));
 
-  if (tw_._multilg_type < 3) { 
+  if (tw_._multilg_type < 3) {
     encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
         _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
         stream_, hd_, d_src_lang_id_);
