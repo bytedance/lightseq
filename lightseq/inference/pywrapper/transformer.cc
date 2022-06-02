@@ -49,9 +49,15 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(
       cudaMalloc(&d_trg_lang_id_, _max_batch_size * sizeof(int32_t)));
 
-  encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
-      _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-      stream_, hd_, d_src_lang_id_);
+  if (tw_._multilg_type < 3) {
+    encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
+        _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
+        stream_, hd_, d_src_lang_id_);
+  } else {
+    encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
+        _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
+        stream_, hd_, d_trg_lang_id_);
+  }
   res = encoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -108,7 +114,7 @@ void Transformer::Infer() {
     if (tw_._multilg_type == 1) {
       seq_len -= 2;
     }
-    if (tw_._multilg_type == 2) {
+    if (tw_._multilg_type == 2 || tw_._multilg_type == 3) {
       seq_len -= 1;
     }
   }

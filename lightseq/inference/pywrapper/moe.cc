@@ -105,7 +105,7 @@ void Moe::Infer() {
     if (tw_._multilg_type == 1) {
       seq_len -= 2;
     }
-    if (tw_._multilg_type == 2) {
+    if (tw_._multilg_type == 2 || tw_._multilg_type == 3) {
       seq_len -= 1;
     }
   }
