@@ -292,7 +292,7 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-1, ntest=10)
 def test_quant_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -302,7 +302,7 @@ def test_quant_encoder_layer_forward():
 
     for i in range(NUM_LAYERS):
         custom_enc_layer_list[i].apply(enable_quant)
-        fairseq_enc_layer_list[i].apply(qat_mode)
+        fairseq_enc_layer_list[i].apply(enable_quant)
 
     def custom():
         res = hidden_states.clone()

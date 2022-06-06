@@ -1185,7 +1185,7 @@ def test_launch_quant_transform4d_0213():
 
     # shared weights
     vals = kt.rand((trans_count, batch_size, nhead, seq_len, head_dim))
-    cmax = (kt.topk(vals) / 127).to(kt.dtype)
+    cmax = kt.topk(vals).to(kt.dtype)
 
     # custom weights
     custom_cmask = kt.randuint8((batch_size, seq_len, trans_count, nhead, head_dim))
@@ -1284,7 +1284,7 @@ if __name__ == "__main__":
         # "test_launch_dropout_gelu_bias_i8I_i8O",
         # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
         # "test_launch_quant_bias_add_transform_20314",
-        # "test_launch_quant_transform4d_0213",
-        "test_torch_launch_ls_quantize"
+        "test_launch_quant_transform4d_0213",
+        # "test_torch_launch_ls_quantize"
     ]
     kt.run(kernel_list)

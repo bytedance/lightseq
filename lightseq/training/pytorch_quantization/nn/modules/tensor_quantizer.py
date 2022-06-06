@@ -469,6 +469,8 @@ class TensorQuantizer(nn.Module):
 def enable_quant(m):
     if isinstance(m, TensorQuantizer):
         m.enable()
+        m.enable_quant()
+
     elif isinstance(m, torch.nn.Module):
         if hasattr(m, "enable_quant"):
             m.enable_quant()

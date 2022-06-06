@@ -24,7 +24,7 @@ class TestDecorator(object):
         assert nhead % 4 == 0
         self.nhead = nhead
 
-    def bs_sl(self, batch_size=None):
+    def bs_sl(self, batch_size=None, enable_quant=False):
         if batch_size is None:
             seq_len = random.randint(1, self.max_seq_len)
             max_batch_size = self.max_batch_tokens // seq_len
@@ -32,6 +32,10 @@ class TestDecorator(object):
         else:
             max_seq_len = min(self.max_batch_tokens // batch_size, self.max_seq_len)
             seq_len = random.randint(1, max_seq_len)
+
+        if enable_quant and seq_len < 8:
+            return self.bs_sl(batch_size, enable_quant=False)
+
         return batch_size, seq_len
 
     @property
@@ -286,20 +290,20 @@ def get_fairseq_enc_params(fairseq_layer):
     clip_max = torch.stack(
         [
             fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.self_attn.qkv_proj.weight_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.self_attn.qkv_proj.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.output_quant._amax.detach().clone(),
             fairseq_layer.self_attn.out_proj.input_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.self_attn.out_proj.weight_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.self_attn.out_proj.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.out_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.self_attn.out_proj.output_quant._amax.detach().clone(),
             fairseq_layer.fc1.input_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.fc1.weight_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.fc1.output_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc1.weight_quant._amax.detach().clone(),
+            fairseq_layer.fc1.output_quant._amax.detach().clone(),
             fairseq_layer.fc2.input_quant.clip.clip_value_max.detach().clone(),
-            fairseq_layer.fc2.weight_quant.clip.clip_value_max.detach().clone(),
-            # fairseq_layer.fc2.output_quant.clip.clip_value_max.detach().clone(),
-            torch.tensor(16).to(
-                fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max
-            ),
+            fairseq_layer.fc2.weight_quant._amax.detach().clone(),
+            fairseq_layer.fc2.output_quant._amax.detach().clone(),
+            # torch.tensor(16).to(
+            #     fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max
+            # ),
         ]
     )
 

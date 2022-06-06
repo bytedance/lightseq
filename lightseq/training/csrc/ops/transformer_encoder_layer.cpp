@@ -105,11 +105,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                                        _batch_size, _seq_len, 3, _heads,
                                        _hidden_size / _heads, _stream);
   }
-  // print_vec(q_tf_ptr, "self attn q head", 3);
-  // print_vec(q_tf_ptr + _batch_dim - 3, "self attn q tail", 3);
-
-  // print_vec(k_tf_ptr, "self attn k head", 3);
-  // print_vec(k_tf_ptr + _batch_dim - 3, "self attn k tail", 3);
 
   // attention scores, q*k
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
@@ -163,8 +158,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
   }
-
-  // print_vec(output_ptr, "self attn out", 10);
 }
 
 template <typename T>
@@ -190,7 +183,6 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ff1.Forward(_batch_tokens, _ff1_inp_i8_ptr, qweight_ptr, _igemm_alpha_ptr,
                  _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream);
 
-    // print_vec(_relu_inp_i8_ptr, "ff1 out", 10);
     _ffn_activation_dropout.quant_bias_act_dropout(
         _ff2_inp_i8_ptr, _ffn_activation_dropout.get_mask(),
         _ffn_activation_dropout.get_mask(), _relu_inp_i8_ptr, _inter_b_ptr,
@@ -213,7 +205,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _ffn_ln.Forward(out_ptr, out_ptr, _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
                       _stream);
     }
-    // print_vec(out_ptr, "ffn out", 10);
+
     return;
   }
 
