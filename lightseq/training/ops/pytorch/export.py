@@ -73,8 +73,8 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
     except:
         target_tensor = tt["save"]
     print(
-        "%s -> %s, shape: %s, convert finished!"
-        % (target_tn if target_tn else "created", proto_name, target_tensor.shape)
+        "%s -> %s, convert finished!"
+        % (target_tn if target_tn else "created", proto_name)
     )
     return target_tensor
 
@@ -361,7 +361,7 @@ def export_ls_config(
 
 
 def export_pb2hdf5(transformer, f):
-    """Convert bart protobuf to hdf5 format to support larger weight."""
+    """Convert Transformer protobuf to hdf5 format to support larger weight."""
     MODEL_CONF_KEYS = [
         # model_conf
         "head_num",

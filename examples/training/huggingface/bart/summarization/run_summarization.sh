@@ -1,3 +1,4 @@
+# Copyright 2021 The LightSeq Team
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +15,22 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-if [ -d "/tmp/test-ner/" ]; then
-  rm -rf /tmp/test-ner/
-fi
+export TASK_NAME=summarization
 
-accelerate launch $THIS_DIR/run_ner_no_trainer.py \
-  --model_name_or_path bert-large-uncased \
-  --dataset_name conll2003 \
-  --output_dir /tmp/test-ner \
-  --task_name ner \
-  --num_train_epochs 1
+python3 -m torch.distributed.launch \
+    --nproc_per_node=1 \
+    $THIS_DIR/run_summarization.py \
+    --model_name_or_path facebook/bart-base \
+    --do_train \
+    --do_eval \
+    --dataset_name cnn_dailymail \
+    --dataset_config "3.0.0" \
+    --output_dir /tmp/$TASK_NAME \
+    --max_source_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --overwrite_output_dir \
+    --seed 1234 \
+    --logging_steps 10 \
+    --fp16 \
+    --predict_with_generate

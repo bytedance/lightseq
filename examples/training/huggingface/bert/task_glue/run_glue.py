@@ -41,11 +41,13 @@ from transformers import (
     TrainingArguments,
     default_data_collator,
     set_seed,
+    BertForSequenceClassification,
+    BertLayer,
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
-from ls_hf_transformer_encoder_layer import inject_ls_enc_layer
+from ls_hf_transformer_layer import inject_ls_layer, LSBertForSequenceClassification
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -224,9 +226,15 @@ class ModelArguments:
             "with private models)."
         },
     )
-    with_lightseq: bool = field(
-        default=True,
-        metadata={"help": "Whether to use lightseq TransformerEncoder"},
+    module_type: int = field(
+        default=1,
+        metadata={
+            "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
+        },
+    )
+    enable_quant: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable quantization"},
     )
 
 
@@ -400,18 +408,31 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForSequenceClassification.from_pretrained(
+
+    # # Replace with lightseq encoder layers and save the lightseq model
+    # model = AutoModelForSequenceClassification.from_pretrained(
+    #     model_args.model_name_or_path,
+    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
+    #     config=config,
+    #     cache_dir=model_args.cache_dir,
+    #     revision=model_args.model_revision,
+    #     use_auth_token=True if model_args.use_auth_token else None,
+    # )
+    # # Replace with LightSeq encoder layers.
+    # if model_args.module_type == 1 or model_args.module_type == 2:
+    #     inject_ls_layer(model, training_args, model_args, config)
+
+    # Replace with lightseq encoder layers and save the huggingface model
+    model = LSBertForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
+        training_args=training_args,
+        model_args=model_args,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-
-    # Replace with LightSeq encoder layers.
-    if model_args.with_lightseq:
-        inject_ls_enc_layer(model, training_args, config)
 
     # Preprocessing the datasets
     if data_args.task_name is not None:

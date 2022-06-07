@@ -3,7 +3,7 @@
 until [[ -z "$1" ]]
 do
     case $1 in
-        --model)
+        -m)
             shift; MODEL=$1;
             shift;;
         *)

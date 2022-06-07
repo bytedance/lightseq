@@ -7,6 +7,8 @@ typedef std::pair<std::string, vi> psvi;
 typedef std::vector<psvi> vpsvi;
 typedef std::vector<float> vf;
 
+inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
+
 inline void checkCudaStatus(cudaError_t status) {
   if (status != cudaSuccess) {
     printf("cuda API failed with status %d: %s\n", status,
@@ -76,38 +78,29 @@ void init_data(float *fX, __half *hX, int8_t *iX, float *fW, __half *hW,
   }
 }
 
-void print_res(float *Y, float *fY, __half *hY, int32_t *iY, int C, int B,
-               int O, int H, float ft, float ht, float it, bool debug) {
-  float fe = 0, he = 0, ie = 0;
+template <typename T>
+void print_res(float *oracle, T *res, float time, int C, int B, int O, int H,
+               std::string name, bool debug) {
+  float dequant_scale = 1.0;
+  if (std::is_same<T, int32_t>::value) {
+    dequant_scale /= (127 * 127);
+  } else if (std::is_same<T, int8_t>::value) {
+    dequant_scale /= (127 * 2.951 / H);
+  }
+  float e = 0;
   if (debug) {
     printf("oracle:\n");
-    for (int i = 0; i < 10; ++i) printf("%.5f%c", Y[i], " \n"[i == 9]);
+    for (int i = 0; i < 10; ++i) printf("%.5f%c", oracle[i], " \n"[i == 9]);
   }
 
-  printf("fp32:\n");
-  if (debug)
-    for (int i = 0; i < 10; ++i) printf("%.5f%c", fY[i], " \n"[i == 9]);
-  for (int i = 0; i < C * B * O; ++i)
-    fe += fabs((debug ? Y[i] : fY[i]) - fY[i]);
-  printf("  diff: %.5f\n", fe / C / B / O);
-  printf("  time: %.3f ms\n", ft);
-
-  printf("fp16:\n");
-  if (debug)
-    for (int i = 0; i < 10; ++i) printf("%.5f%c", float(hY[i]), " \n"[i == 9]);
-  for (int i = 0; i < C * B * O; ++i)
-    he += fabs((debug ? Y[i] : fY[i]) - float(hY[i]));
-  printf("  diff: %.5f\n", he / C / B / O);
-  printf("  time: %.3f ms\n", ht);
-
-  printf("int8:\n");
+  printf("%s:\n", name.c_str());
   if (debug)
     for (int i = 0; i < 10; ++i)
-      printf("%.5f%c", float(iY[i]) / 127 / 127, " \n"[i == 9]);
+      printf("%.5f%c", float(res[i]) * dequant_scale, " \n"[i == 9]);
   for (int i = 0; i < C * B * O; ++i)
-    ie += fabs((debug ? Y[i] : fY[i]) - float(iY[i]) / 127 / 127);
-  printf("  diff: %.5f\n", ie / C / B / O);
-  printf("  time: %.3f ms\n", it);
+    e += fabs(oracle[i] - float(res[i]) * dequant_scale);
+  printf("  diff: %.3f\n", e / (C * B * O));
+  printf("  time: %.3f ms\n", time);
 }
 
 void vec_pb(vpsvi &shapes, std::string name, vi shape) {

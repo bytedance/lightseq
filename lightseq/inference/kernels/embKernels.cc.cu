@@ -492,7 +492,7 @@ __global__ void ker_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
   decompose_3dim(idx, beam_size, hidden_dim, &batch_idx, &beam_idx, &dim_idx);
 
   T emb;
-  if (multilg_type == 2 && step == 0) {
+  if ((multilg_type == 2 || multilg_type == 3) && step == 0) {
     // the bos of sentense level multilg is target lang id
     int lid = lang_id[batch_idx];
     emb = lang_emb[flat_2dim(lid, dim_idx, hidden_dim)];

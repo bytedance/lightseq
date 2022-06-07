@@ -1,5 +1,4 @@
 import math
-from dataclasses import dataclass
 
 import torch
 from torch import nn
@@ -7,12 +6,9 @@ from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
 from lightseq.training.ops.pytorch import transformer_cuda_module
-from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
-    MODEL_ARCH,
-    check_config,
     calc_offset,
 )
 
@@ -99,17 +95,19 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
-        if self.config.local_rank >= 0:
+        if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
         self.create_cpp_layer()
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
         self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None and initial_biases is None:
+        if initial_weights is None or initial_biases is None:
             self.init_transformer_weights()
             return
 
@@ -133,33 +131,6 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             assert cur_para.numel() == b.numel()
             cur_para.copy_(b.view(-1))
             idx += 1
-
-    @staticmethod
-    def get_config(**kwargs):
-        @dataclass
-        class Config:
-            max_batch_tokens: int  # max batch token numbers
-            max_seq_len: int  # max sequence length
-            hidden_size: int  # size of transformer hidden layers
-            intermediate_size: int  # size of ffn inner size
-            nhead: int  # number of heads in attention
-            attn_prob_dropout_ratio: float  # attention score dropout ratio
-            activation_dropout_ratio: float  # ffn activation dropout ratio
-            hidden_dropout_ratio: float  # dropout ration before residual
-            pre_layer_norm: bool  # pre layer norm or post
-            fp16: bool  # fp16 presion
-            local_rank: int  # rank in local node
-            activation_fn: str = "relu"  # relu or gelu
-
-        if "model" in kwargs:
-            if kwargs["model"] not in MODEL_ARCH:
-                raise ValueError("{} architecture is not supported.")
-            MODEL_ARCH[kwargs["model"]](kwargs)
-            del kwargs["model"]
-
-        config = Config(**kwargs)
-        check_config(config)
-        return config
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
@@ -242,6 +213,49 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
+
+    def params_dict(self):
+        """
+        Returns:
+            weight: dict
+            bias: dict
+        """
+
+        def copy_and_view(m, shape=None):
+            if shape is None:
+                shape = (-1,)
+            return m.data.clone().view(*shape)
+
+        self_attn_qkvw = self._get_weights(0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
+            self.hs * self.hs, 0
+        )
+        self_attn_qkvb = self._get_weights(1)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+
+        weight = {
+            "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn_out_proj": copy_and_view(
+                self._get_weights(2), (self.hs, self.hs)
+            ),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
+            "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
+            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
+        }
+        bias = {
+            "self_attn_q_proj": copy_and_view(self_attn_qb),
+            "self_attn_k_proj": copy_and_view(self_attn_kb),
+            "self_attn_v_proj": copy_and_view(self_attn_vb),
+            "self_attn_out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
+            "fc1": copy_and_view(self._get_weights(7)),
+            "fc2": copy_and_view(self._get_weights(9)),
+            "final_layer_norm": copy_and_view(self._get_weights(11)),
+        }
+        return weight, bias
 
     def __assign_layer_weight_grad(self):
         param = (

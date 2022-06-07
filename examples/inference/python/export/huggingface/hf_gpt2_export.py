@@ -7,6 +7,7 @@ import numpy as np
 from collections import OrderedDict
 from transformers import GPT2LMHeadModel
 from lightseq.training.ops.pytorch.export import fill_hdf5_layer
+from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -60,6 +61,7 @@ def extract_gpt_weights(
     eos_id=50256,
     pad_id=50257,
     max_step=50,
+    extra_decode_length=0,
 ):
     # load var names
     encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
@@ -130,6 +132,9 @@ def extract_gpt_weights(
     hdf5_file.create_dataset("model_conf/topp", data=topp, dtype="f4")
     hdf5_file.create_dataset("model_conf/topk", data=topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=eos_id, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/extra_decode_length", data=extra_decode_length, dtype="i4"
+    )
 
     hdf5_file.close()
     # read-in again to double check
@@ -146,25 +151,28 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    if args.generation_method not in ["topk", "topp", "ppl"]:
+        args.generation_method = "topk"
     output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
     head_number = 12  # 20 for "gpt2-large"
-    # generation_method should be "topk" or "topp"
-    generation_method = "topk"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id = 50256
     pad_id = 50257
     max_step = 50
+    extra_decode_length = 0  # use positive length to avtivate it
     extract_gpt_weights(
         output_lightseq_model_name,
         input_huggingface_gpt_model,
         head_num=head_number,  # layer number
-        generation_method=generation_method,
+        generation_method=args.generation_method,
         topk=topk,
         topp=topp,
         eos_id=eos_id,
         pad_id=pad_id,
         max_step=max_step,
+        extra_decode_length=extra_decode_length,
     )

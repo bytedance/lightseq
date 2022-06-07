@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 
 set(cuda_kernel_files
     gptKernels.cc.cu
+    gptKernels_int8.cc.cu
     transformerKernels.cc.cu
     multilgKernels.cc.cu
     embKernels.cc.cu

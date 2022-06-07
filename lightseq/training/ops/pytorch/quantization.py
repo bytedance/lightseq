@@ -1,7 +1,5 @@
-from audioop import bias
-import torch
 import torch.nn.functional as F
-from torch.nn import Parameter, Linear
+from torch.nn import Linear
 from lightseq.training.pytorch_quantization.tensor_quant import (
     QuantDescriptor,
     QUANT_DESC_8BIT_PER_TENSOR,
@@ -29,20 +27,16 @@ weight_quant_config = QuantDescriptor(
 class QuantLinear(Linear):
     def __init__(self, in_features, out_features, pre_activation=None, *args, **kwargs):
         super(QuantLinear, self).__init__(in_features, out_features, *args, **kwargs)
-        if pre_activation is None or pre_activation == "encoder_out":
-            input_quant_config = act_quant_config
-        elif pre_activation == "relu":
+        if pre_activation == "relu":
             input_quant_config = relu_quant_config
         else:
-            raise NotImplementedError(
-                f"pre_activation {pre_activation} is not supported"
-            )
+            input_quant_config = act_quant_config
 
         self.input_quant = None
         if pre_activation != "encoder_out":
             self.input_quant = TensorQuantizer(input_quant_config)
         self.output_quant = None
-        if pre_activation != "relu" and pre_activation != "encoder_out":
+        if pre_activation is None:
             self.output_quant = TensorQuantizer(act_quant_config)
         self.weight_quant = TensorQuantizer(weight_quant_config)
 
