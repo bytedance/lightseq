@@ -20,10 +20,10 @@ class FeedForward {
     int outputSize;
     int inputSize;
     std::array<int, 3> gemm_algos;
-    Config(int outputs, int inputs): 
-        outputSize(outputs),
-        inputSize(inputs),
-        gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+    Config(int outputs, int inputs)
+        : outputSize(outputs),
+          inputSize(inputs),
+          gemm_algos(std::array<int, 3>({99, 99, 99})) {}
   };
   FeedForward(Config config) : config_(config) {}
 

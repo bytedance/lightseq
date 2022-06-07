@@ -47,8 +47,8 @@ class StridedBatchGemm {
                cublasHandle_t handle);
 
   void Backward(int bsz, const T *d_output, const T *_buffer_a,
-                const T *_buffer_b, cublasHandle_t handle, T *inpGradA = nullptr,
-                T *inpGradB = nullptr);
+                const T *_buffer_b, cublasHandle_t handle,
+                T *inpGradA = nullptr, T *inpGradB = nullptr);
 
   void SetConfig(int m, int n, int k);
 

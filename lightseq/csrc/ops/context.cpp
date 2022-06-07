@@ -1,6 +1,5 @@
 #include "context.h"
 
-
 Context::Context() : _stream(nullptr) {
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
 }
@@ -18,4 +17,3 @@ void Context::set_stream(cudaStream_t stream) {
 cudaStream_t Context::get_stream() { return _stream; }
 
 cublasHandle_t Context::get_cublashandle() { return _cublasHandle; }
-
