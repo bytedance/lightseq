@@ -356,6 +356,39 @@ def get_fairseq_dec_params(fairseq_layer):
     initial_biases.append(fairseq_layer.fc2.bias.detach().clone())
     initial_weights.append(fairseq_layer.final_layer_norm.weight.detach().clone())
     initial_biases.append(fairseq_layer.final_layer_norm.bias.detach().clone())
+
+    clip_max = torch.stack(
+        [
+            fairseq_layer.self_attn.qkv_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.self_attn.qkv_proj.output_quant._amax.detach().clone(),
+            fairseq_layer.self_attn.out_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.self_attn.out_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.self_attn.out_proj.output_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.output_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.out_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.encoder_attn.out_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.out_proj.output_quant._amax.detach().clone(),
+            fairseq_layer.fc1.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc1.weight_quant._amax.detach().clone(),
+            fairseq_layer.fc1.output_quant._amax.detach().clone(),
+            fairseq_layer.fc2.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.fc2.weight_quant._amax.detach().clone(),
+            fairseq_layer.fc2.output_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.output_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.input_quant.clip.clip_value_max.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.weight_quant._amax.detach().clone(),
+            fairseq_layer.encoder_attn.q_proj.output_quant._amax.detach().clone(),
+        ]
+    )
+
+    initial_weights.append(clip_max)
+    initial_biases.append(None)
+
     return initial_weights, initial_biases
 
 

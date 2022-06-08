@@ -1,3 +1,4 @@
+from itertools import zip_longest
 import math
 
 import torch
@@ -9,6 +10,11 @@ from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,
+)
+from lightseq.training.ops.pytorch.quantization import (
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
 
@@ -42,6 +48,7 @@ class LSTransformerDecoderFunc(Function):
             encoder_padding_mask,
             config.training,
             config.pre_layer_norm,
+            config.quant_mode,
             cache,
         )
 
@@ -121,6 +128,8 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
+        self.quant_mode = False
+
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
@@ -164,23 +173,29 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         # For testing only.
         attn_qkvw = [ele.detach().clone() for ele in initial_weights[:3]]
         attn_qkvw = torch.cat(attn_qkvw, dim=0)
-        weights = [attn_qkvw] + [copy_para(ele) for ele in initial_weights[3:]]
+        weights = [attn_qkvw] + [
+            copy_para(ele) if ele is not None else None for ele in initial_weights[3:]
+        ]
 
         attn_qkvb = [ele.detach().clone() for ele in initial_biases[:3]]
         attn_qkvb = torch.cat(attn_qkvb, dim=0)
-        biases = [attn_qkvb] + [copy_para(ele) for ele in initial_biases[3:]]
+        biases = [attn_qkvb] + [
+            copy_para(ele) if ele is not None else None for ele in initial_biases[3:]
+        ]
 
         idx = 0
-        for w, b in zip(weights, biases):
-            cur_para = self._get_weights(idx)
-            assert cur_para.numel() == w.numel()
-            cur_para.copy_(w.view(-1))
-            idx += 1
+        for w, b in zip_longest(weights, biases):
+            if w is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == w.numel()
+                cur_para.copy_(w.view(-1))
+                idx += 1
 
-            cur_para = self._get_weights(idx)
-            assert cur_para.numel() == b.numel()
-            cur_para.copy_(b.view(-1))
-            idx += 1
+            if b is not None:
+                cur_para = self._get_weights(idx)
+                assert cur_para.numel() == b.numel()
+                cur_para.copy_(b.view(-1))
+                idx += 1
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size, nlayer):
@@ -204,6 +219,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             hs,  # output_b
             hs,  # ffn_nw
             hs,  # ffn_nb
+            24,
             hs * hs * 2 * nlayer,  # encdec_attn_kvw
             hs * 2 * nlayer,  # encdec_attn_kvb
         ]
@@ -261,11 +277,16 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         nn.init.ones_(self._get_weights(16))
         nn.init.zeros_(self._get_weights(17))
 
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 8)
+        self._get_weights(18).copy_(init_clip_max)
+
         if self.config.layer_id == 0:
-            encdec_attn_kvw = self._get_weights(18).view(-1, hs)
+            encdec_attn_kvw = self._get_weights(19).view(-1, hs)
             nn.init.xavier_uniform_(encdec_attn_kvw, 1.0 / math.sqrt(2.0))
             bound = self.calc_bound(encdec_attn_kvw)
-            nn.init.uniform_(self._get_weights(19), -bound, bound)
+            nn.init.uniform_(self._get_weights(20), -bound, bound)
 
     def __assign_layer_weight_grad(self):
         param = (
@@ -286,11 +307,11 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         _all_layer_grads[self.config.layer_id] = grad
 
     def split_weights(self):
-        weights = [self._get_weights(i) for i in range(18)]
+        weights = [self._get_weights(i) for i in range(22)]
 
         if self.config.layer_id == 0:
-            _shared_encdec_attn_kv_params["w"] = self._get_weights(18)
-            _shared_encdec_attn_kv_params["b"] = self._get_weights(19)
+            _shared_encdec_attn_kv_params["w"] = self._get_weights(19)
+            _shared_encdec_attn_kv_params["b"] = self._get_weights(20)
         encdec_kvw = _shared_encdec_attn_kv_params["w"]
         encdec_kvb = _shared_encdec_attn_kv_params["b"]
 
@@ -306,7 +327,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         weights[8] = weights[8].view(-1, hs)
         weights[12] = weights[12].view(-1, hs)
         weights[14] = weights[14].view(hs, -1)
-        weights[18] = weights[18].view(-1, hs)
+        weights[19] = weights[19].view(-1, hs)
         return weights
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
@@ -329,6 +350,8 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         """
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
+        self.config.quant_mode = self.quant_mode
+
         decoder_states = decoder_states.contiguous()
         # [s, b, h] -> [b, s, h]
         encoder_out = encoder_out.transpose(0, 1).contiguous()
@@ -419,3 +442,9 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             cache_list,
         )
         return output.to(self.para)
+
+    def disable_quant(self):
+        self.quant_mode = False
+
+    def enable_quant(self):
+        self.quant_mode = True

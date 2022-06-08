@@ -1259,6 +1259,51 @@ def test_torch_launch_ls_quantize():
     return custom, baseline
 
 
+@kt.case()
+def test_torch_launch_fake_quantize():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+
+    print(
+        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
+    )
+
+    # shared weights
+    inputs = kt.rand((batch_size, seq_len, hidden_dim))
+    base_cmax = torch.tensor(1.0, dtype=kt.dtype, device=kt.device)
+    custom_cmax = torch.tensor([1.0, 1.0], dtype=kt.dtype, device=kt.device)
+    cmask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    igemm_alpha = torch.tensor(1.0, dtype=torch.float, device=kt.device)
+
+    custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_fake_quantize_fp32
+    else:
+        func = cuda_module.torch_launch_fake_quantize_fp16
+
+    def custom():
+        custom_inputs = inputs.clone().detach()
+        func(
+            cmask,
+            igemm_alpha,
+            custom_inputs,
+            custom_cmax,
+            inputs.numel(),
+        )
+        return [custom_inputs]
+
+    def baseline():
+        base, base_mask = kt.quantize(inputs, base_cmax)
+        base = kt.dequantize(base, base_cmax)
+
+        return [
+            base.contiguous(),
+        ]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
@@ -1284,7 +1329,8 @@ if __name__ == "__main__":
         # "test_launch_dropout_gelu_bias_i8I_i8O",
         # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
         # "test_launch_quant_bias_add_transform_20314",
-        "test_launch_quant_transform4d_0213",
+        # "test_launch_quant_transform4d_0213",
         # "test_torch_launch_ls_quantize"
+        "test_torch_launch_fake_quantize"
     ]
     kt.run(kernel_list)

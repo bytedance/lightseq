@@ -323,6 +323,17 @@ void torch_launch_ls_quantize(torch::Tensor &output,
                      rptr<T>(clip_max), numel, 4, stream);
 }
 
+template <typename T>
+void torch_launch_fake_quantize(torch::Tensor &clip_max_mask,
+                                torch::Tensor &igemm_alpha,
+                                torch::Tensor &input,
+                                const torch::Tensor &clip_max, int numel) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_fake_quantize<T>(rptr<uint8_t>(clip_max_mask),
+                          rptr<float>(igemm_alpha), rptr<T>(input),
+                          rptr<T>(clip_max), numel, 4, stream);
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -438,5 +449,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_ls_quantize_fp32", &torch_launch_ls_quantize<float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quantize_fp16", &torch_launch_ls_quantize<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_fake_quantize_fp32", &torch_launch_fake_quantize<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_fake_quantize_fp16", &torch_launch_fake_quantize<__half>,
         "Test kernel wrapper");
 }
