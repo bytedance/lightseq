@@ -23,7 +23,7 @@ class AdamBuilder(CUDAOpBuilder):
         ]
 
     def include_paths(self):
-        return ["csrc/kernels/includes", "csrc/ops/includes"]
+        return ["csrc/kernels/includes", "csrc/ops/includes", "csrc/layers/includes"]
 
     def nvcc_args(self):
         args = [
