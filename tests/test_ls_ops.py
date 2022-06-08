@@ -318,12 +318,8 @@ def test_encoder_layer_backward():
                     grads[11],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                 ]
@@ -352,12 +348,8 @@ def test_encoder_layer_backward():
                     curl.final_layer_norm.bias,
                     curl.self_attn.out_proj.weight,
                     curl.self_attn.out_proj.bias,
-                    curl.self_attn.q_proj.weight,
-                    curl.self_attn.q_proj.bias,
-                    curl.self_attn.k_proj.weight,
-                    curl.self_attn.k_proj.bias,
-                    curl.self_attn.v_proj.weight,
-                    curl.self_attn.v_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
                     curl.self_attn_layer_norm.weight,
                     curl.self_attn_layer_norm.bias,
                 ]
@@ -435,12 +427,8 @@ def test_bert_encoder_layer_backward():
                     grads[11],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                 ]
@@ -463,12 +451,8 @@ def test_bert_encoder_layer_backward():
                     curl.final_layer_norm.bias,
                     curl.self_attn.out_proj.weight,
                     curl.self_attn.out_proj.bias,
-                    curl.self_attn.q_proj.weight,
-                    curl.self_attn.q_proj.bias,
-                    curl.self_attn.k_proj.weight,
-                    curl.self_attn.k_proj.bias,
-                    curl.self_attn.v_proj.weight,
-                    curl.self_attn.v_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
                     curl.self_attn_layer_norm.weight,
                     curl.self_attn_layer_norm.bias,
                 ]
@@ -528,7 +512,8 @@ def test_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
     print(
-        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len}, {dec_seq_len})"
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
     )
     hidden_size = 1024
     shs = hidden_size * hidden_size
@@ -572,12 +557,8 @@ def test_decoder_layer_backward():
                     grads[17],
                     grads[2],
                     grads[3],
-                    grads[0][:shs],
-                    grads[1][:hidden_size],
-                    grads[0][shs : shs * 2],
-                    grads[1][hidden_size : hidden_size * 2],
-                    grads[0][shs * 2 : shs * 3],
-                    grads[1][hidden_size * 2 : hidden_size * 3],
+                    grads[0],
+                    grads[1],
                     grads[4],
                     grads[5],
                     # encdec grad
@@ -637,22 +618,10 @@ def test_decoder_layer_backward():
                     .self_attn.out_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .self_attn.q_proj.weight.grad.contiguous()
+                    .self_attn.qkv_proj.weight.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
-                    .self_attn.q_proj.bias.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.k_proj.weight.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.k_proj.bias.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.v_proj.weight.grad.contiguous()
-                    .detach(),
-                    fairseq_dec_layer_list[i]
-                    .self_attn.v_proj.bias.grad.contiguous()
+                    .self_attn.qkv_proj.bias.grad.contiguous()
                     .detach(),
                     fairseq_dec_layer_list[i]
                     .self_attn_layer_norm.weight.grad.contiguous()
