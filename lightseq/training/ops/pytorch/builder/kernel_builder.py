@@ -33,6 +33,7 @@ class KernelBuilder(CUDAOpBuilder):
         return [
             "csrc/kernels/includes",
             "csrc/ops/includes",
+            "csrc/layers/includes",
             str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),
         ]
 
