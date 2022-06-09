@@ -15,6 +15,7 @@ from tests.util import (
     max_seq_len,
     split_custom_layer_grad,
     copy_grad_from_paras,
+    copy_cmax_grad_from_paras,
 )
 
 from tests import fairseq_layers
@@ -397,6 +398,99 @@ def test_encoder_layer_backward():
                 ]
             )
             grad_list.extend(cur_grads)
+        return grad_list
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-12, atol=1e-12, ntest=10)
+def test_quant_encoder_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    hidden_size = 1024
+
+    hidden_states = kt.rand((batch_size, seq_len, hidden_size))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+    loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
+
+    for i in range(NUM_LAYERS):
+        custom_enc_layer_list[i].apply(enable_quant)
+        fairseq_enc_layer_list[i].apply(enable_quant)
+
+    def custom():
+        for i in range(NUM_LAYERS):
+            custom_enc_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = custom_enc_layer_list[i](res, self_attn_padding_mask)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            """
+            attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            """
+            grads = split_custom_layer_grad(custom_enc_layer_list[i])
+            grad_list.extend(
+                [
+                    # grads[8],
+                    # grads[9],
+                    # grads[6],
+                    # grads[7],
+                    # grads[10],
+                    # grads[11],
+                    # grads[2],
+                    # grads[3],
+                    # grads[0],
+                    # grads[1],
+                    # grads[4],
+                    # grads[5],
+                ]
+            )
+            grad_list.append(
+                torch.Tensor([grads[12][0], grads[12][3], grads[12][6], grads[12][9]])
+            )
+        return grad_list
+
+    def baseline():
+        for i in range(NUM_LAYERS):
+            fairseq_enc_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = fairseq_enc_layer_list[i](res, self_attn_padding_mask)
+        fairseq_loss = (res / 1000).sum()
+        fairseq_loss.data.copy_(loss_data)
+        fairseq_loss.backward()
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            curl = fairseq_enc_layer_list[i]
+            cur_grads = copy_grad_from_paras(
+                [
+                    # curl.fc2.weight,
+                    # curl.fc2.bias,
+                    # curl.fc1.weight,
+                    # curl.fc1.bias,
+                    # curl.final_layer_norm.weight,
+                    # curl.final_layer_norm.bias,
+                    # curl.self_attn.out_proj.weight,
+                    # curl.self_attn.out_proj.bias,
+                    # curl.self_attn.qkv_proj.weight,
+                    # curl.self_attn.qkv_proj.bias,
+                    # curl.self_attn_layer_norm.weight,
+                    # curl.self_attn_layer_norm.bias,
+                ]
+            )
+            cur_cmax_grads = copy_cmax_grad_from_paras(
+                [
+                    curl.self_attn.qkv_proj,
+                    curl.self_attn.out_proj,
+                    curl.fc1,
+                    curl.fc2,
+                ]
+            )
+            grad_list.extend(cur_grads + cur_cmax_grads)
         return grad_list
 
     return custom, baseline
@@ -1087,6 +1181,7 @@ if __name__ == "__main__":
             # "test_quant_embedding_layer_backward",
             # "test_cross_entropy_layer_forward",
             # "test_cross_entropy_layer_backward",
-            "test_quant_encoder_layer_forward",
+            # "test_quant_encoder_layer_forward",
+            "test_quant_encoder_layer_backward",
         ]
     )

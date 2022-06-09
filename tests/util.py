@@ -155,8 +155,6 @@ class TestDecorator(object):
         tlist1 and tlist2 are list of torch.tensor.
         """
         passed = True
-        # tlist1 = [ele.cpu().numpy().flatten() for ele in tlist1]
-        # tlist2 = [ele.cpu().numpy().flatten() for ele in tlist2]
         assert len(tlist1) == len(tlist2)
         for i in range(len(tlist1)):
             t1 = tlist1[i]
@@ -172,9 +170,9 @@ class TestDecorator(object):
             t1 = t1.cpu().numpy().flatten()
             t2 = t2.cpu().numpy().flatten()
             try:
-                diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
-                print("diff x:", t1[~diff_mask])
-                print("diff y:", t2[~diff_mask])
+                # diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
+                # print("diff x:", t1[~diff_mask])
+                # print("diff y:", t2[~diff_mask])
                 np.testing.assert_allclose(t1, t2, rtol=rtol, atol=atol, verbose=True)
             except Exception as ex:
                 print(f"Unmatches in the {i}-th tensor.")
@@ -377,3 +375,19 @@ def copy_grad_from_paras(para_list):
             grad = torch.zeros_like(para)
         res.append(grad)
     return res
+
+
+def copy_cmax_grad_from_paras(para_list):
+    res = []
+    for para in para_list:
+        if para.input_quant.clip.clip_value_max.grad is not None:
+            grad = (
+                para.input_quant.clip.clip_value_max.grad.data.clone()
+                .detach()
+                .contiguous()
+            )
+        else:
+            grad = torch.zeros_like(para)
+        res.append(grad)
+
+    return [torch.Tensor(res)]

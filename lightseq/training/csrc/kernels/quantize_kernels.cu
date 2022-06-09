@@ -126,7 +126,7 @@ __global__ void dequantize_kernel(float *f_ptr, const int8_t *q_ptr,
 
   float4 weight4;
   int32_t q_weight_i32 = q_weight4_ptr[i];
-  int8_t *q_weight = reinterpret_cast<int8_t *>(q_weight_i32);
+  int8_t *q_weight = reinterpret_cast<int8_t *>(&q_weight_i32);
   weight4.x = dequantize(q_weight[0], clip_max_val);
   weight4.y = dequantize(q_weight[1], clip_max_val);
   weight4.z = dequantize(q_weight[2], clip_max_val);
@@ -149,12 +149,13 @@ __global__ void dequantize_kernel(__half *f_ptr, const int8_t *q_ptr,
 
   float4 weight8;
   int64_t q_weight_i64 = q_weight8_ptr[i];
-  int8_t *q_weight = reinterpret_cast<int8_t *>(q_weight_i64);
+  int8_t *q_weight = reinterpret_cast<int8_t *>(&q_weight_i64);
   __half2 *weight2_ptr = reinterpret_cast<__half2 *>(&weight8);
 #pragma unroll
-  for (int i = 0; i < 4; i++) {
-    weight2_ptr[i].x = dequantize(q_weight[i * 2], clip_max_val);
-    weight2_ptr[i].y = dequantize(q_weight[i * 2 + 1], clip_max_val);
+  for (int j = 0; j < 4; j++) {
+    weight2_ptr[j].x = __float2half(dequantize(q_weight[j * 2], clip_max_val));
+    weight2_ptr[j].y =
+        __float2half(dequantize(q_weight[j * 2 + 1], clip_max_val));
   }
 
   weight8_ptr[i] = weight8;
