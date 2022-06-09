@@ -644,6 +644,55 @@ def test_decoder_layer_forward():
     return custom, baseline
 
 
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1, ntest=10)
+def test_quant_decoder_layer_forward():
+    batch_size, enc_seq_len = kt.bs_sl()
+    _, dec_seq_len = kt.bs_sl(batch_size)
+    print(
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
+    )
+
+    for i in range(NUM_LAYERS):
+        custom_dec_layer_list[i].apply(enable_quant)
+        fairseq_dec_layer_list[i].apply(enable_quant)
+
+    hidden_states = kt.rand((batch_size, dec_seq_len, 1024))
+    encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
+    incremental_state = None
+    encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
+    self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
+
+    def custom():
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = custom_dec_layer_list[i](
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = fairseq_dec_layer_list[i](
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
+            )
+        return [
+            res.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
 @kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
 def test_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
@@ -1183,5 +1232,6 @@ if __name__ == "__main__":
             # "test_cross_entropy_layer_backward",
             # "test_quant_encoder_layer_forward",
             "test_quant_encoder_layer_backward",
+            # "test_quant_decoder_layer_forward",
         ]
     )

@@ -131,7 +131,8 @@ template <typename T>
 std::vector<torch::Tensor> transformer_decoder_layer_fw(
     int layer_id, const torch::Tensor &dec_input,
     const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
-    bool training_mode, bool prelayernorm, std::vector<torch::Tensor> &cache) {
+    bool training_mode, bool prelayernorm, bool quant_mode,
+    std::vector<torch::Tensor> &cache) {
   CHECK_INPUT(dec_input);
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
@@ -169,6 +170,7 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   }
   layer->set_cur_batch_shape(batch_size, trg_seq_len, src_seq_len, step);
   layer->SetTrainingMode(training_mode);
+  layer->SetQuantMode(quant_mode);
   layer->Forward(dec_input_ptr, enc_output_ptr, enc_mask_ptr, dec_output_ptr,
                  cache_ptr);
 

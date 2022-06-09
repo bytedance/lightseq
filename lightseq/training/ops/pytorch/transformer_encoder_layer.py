@@ -231,9 +231,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         act_cmax = act_quant_config.amax.tolist()
         wei_cmax = weight_quant_config.amax.tolist()
-        relu_cmax = relu_quant_config.amax.tolist()
         init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
-        init_clip_max[-2] = relu_cmax
         self._get_weights(12).copy_(init_clip_max)
 
     def __assign_layer_weight_grad(self):

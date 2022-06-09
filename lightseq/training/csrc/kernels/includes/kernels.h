@@ -188,6 +188,11 @@ void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
                      int mask_start_bit, cudaStream_t stream);
 
 template <typename T>
+void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *f_ptr,
+                          const T *clip_max_ptr, int numel, int mask_start_bit,
+                          cudaStream_t stream);
+
+template <typename T>
 void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,
                        int numel, int mask_start_bit, cudaStream_t stream);
 
@@ -398,6 +403,17 @@ __forceinline__ __device__ int8_t quantize(float x, float clip_max,
   float i8 = floorf(i8_f + 0.5);
   i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
   return static_cast<int8_t>(i8);
+}
+
+__forceinline__ __device__ float fake_quantize(float x, float clip_max,
+                                               uint8_t &clip_mask,
+                                               int start_bit) {
+  clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit));
+  float dequant_scale = clip_max / kQuantRangeI8;
+  float i8_f = x / dequant_scale;
+  float i8 = floorf(i8_f + 0.5);
+  i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
+  return i8 * dequant_scale;
 }
 
 __forceinline__ __device__ float fake_quant_i8(float x, float clip_max) {
