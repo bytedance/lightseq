@@ -1,3 +1,6 @@
+from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
+    enable_quant,
+)
 from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
 from lightseq.training.ops.pytorch.torch_transformer_layers import BertEmbeddingLayer
 
@@ -109,8 +112,7 @@ def inject_ls_layer(model, training_args, model_args, config):
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_enc_config, init_ws, init_bs
         ).cuda()
-        if model_args.module_type == 2:
-            if model_args.enable_quant:
-                model.bert.encoder.layer[i].apply(qat_mode)
-            else:
-                model.bert.encoder.layer[i].apply(disable_quant)
+        if model_args.enable_quant:
+            model.bert.encoder.layer[i].apply(enable_quant)
+        else:
+            model.bert.encoder.layer[i].apply(disable_quant)
