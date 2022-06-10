@@ -981,9 +981,17 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
                 copy_para(initial_embeddings, config.fp16)
             )
 
-        self.embed_positions = SinusoidalPositionalEmbedding(
-            config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16
-        )
+        if config.trainable_pos:
+            self.embed_positions = TrainablePositionalEmbedding(
+                config.max_seq_len, config.embedding_dim, config.padding_idx
+            )
+        else:
+            self.embed_positions = SinusoidalPositionalEmbedding(
+                config.embedding_dim,
+                config.padding_idx,
+                config.max_seq_len,
+                config.fp16,
+            )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
         self.emb_quant = TensorQuantizer(weight_quant_config)
@@ -997,6 +1005,32 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         x = self.dropout(x)
 
         return x
+
+
+class TrainablePositionalEmbedding(nn.Embedding):
+    """
+    This module learns positional embeddings up to a fixed maximum size.
+    """
+
+    def __init__(self, num_embeddings, embedding_dim, padding_idx):
+        super().__init__(num_embeddings, embedding_dim)
+        self.embedding_dim = embedding_dim
+        self.padding_id = padding_idx
+
+    def make_positions(self, tensor, step):
+        mask = tensor.ne(self.padding_id).int()
+        return ((torch.cumsum(mask, dim=1).type_as(mask) - 1 + step) * mask).long()
+
+    def forward(self, input, step: int = 0):
+        """`input.shape` is expected to be [bsz x seqlen]."""
+        bsz, seq_len = input.size(0), input.size(1)
+        positions = self.make_positions(input, step)
+        mask = (
+            torch.ne(input, self.padding_id)
+            .unsqueeze(2)
+            .expand(bsz, seq_len, self.embedding_dim)
+        )
+        return super().forward(positions) * mask
 
 
 class SinusoidalPositionalEmbedding(nn.Module):

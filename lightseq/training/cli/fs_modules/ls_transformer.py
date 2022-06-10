@@ -95,6 +95,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                                  'memory usage at the cost of some additional compute')
         parser.add_argument('--offload-activations', action='store_true',
                             help='checkpoint activations at each layer, then save to gpu. Sets --checkpoint-activations.')
+        parser.add_argument('--trainable-position', action='store_true',
+                            help='trainable positional embedding.')
         # args for "Cross+Self-Attention for Transformer Models" (Peitz et al., 2019)
         parser.add_argument('--no-cross-attention', default=False, action='store_true',
                             help='do not perform cross-attention')
@@ -179,7 +181,6 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             from lightseq.training.ops.pytorch.transformer_embedding_layer import (
                 LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
             )
-
         config = TransformerEmbeddingLayer.get_config(
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
@@ -189,6 +190,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             dropout=args.dropout,
             fp16=args.fp16,
             local_rank=args.device_id,
+            trainable_pos=args.trainable_position,
         )
         emb = TransformerEmbeddingLayer(config)
 

@@ -115,5 +115,6 @@ class TransformerEmbeddingLayerBase(nn.Module):
             dropout: float  # embedding dropout ration
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
+            trainable_pos: bool = False  # trainable positional embedding
 
         return Config(**kwargs)

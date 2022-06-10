@@ -228,6 +228,54 @@ custom_emb_layer_fp16 = generate_emb_layer(
 custom_emb_layer_fp32.train()
 custom_emb_layer_fp16.train()
 
+# ######################trainable positional embedding layer ######################
+
+ls_tra_pos_emb_config_fp16 = LSTransformerEmbeddingLayer.get_config(
+    vocab_size=40000,
+    embedding_dim=1024,
+    max_batch_tokens=9216,
+    max_seq_len=256,
+    padding_idx=1,
+    dropout=0.0,
+    fp16=True,
+    local_rank=0,
+    trainable_pos=True,
+)
+ls_tra_pos_emb_config_fp32 = deepcopy(ls_tra_pos_emb_config_fp16)
+ls_tra_pos_emb_config_fp32.fp16 = False
+
+fs_tra_pos_emb_layer_fp32 = fairseq_layers.generate_emb_layer(
+    ls_tra_pos_emb_config_fp32
+)
+fs_tra_pos_emb_layer_fp16 = fairseq_layers.generate_emb_layer(
+    ls_tra_pos_emb_config_fp16
+)
+fs_tra_pos_emb_layer_fp32.train()
+fs_tra_pos_emb_layer_fp16.train()
+
+
+def generate_emb_layer(config, initial_weights=None, initial_positions=None):
+    custom_layer = LSTransformerEmbeddingLayer(
+        config, initial_weights, initial_positions
+    )
+    dtype = torch.float16 if config.fp16 else torch.float32
+    custom_layer.to(torch.device("cuda:0"), dtype=dtype)
+    return custom_layer
+
+
+custom_tra_pos_emb_layer_fp32 = generate_emb_layer(
+    ls_tra_pos_emb_config_fp32,
+    fs_tra_pos_emb_layer_fp32.embeddings.detach().clone(),
+    fs_tra_pos_emb_layer_fp32.embed_positions.weight.detach().clone(),
+)
+custom_tra_pos_emb_layer_fp16 = generate_emb_layer(
+    ls_tra_pos_emb_config_fp16,
+    fs_tra_pos_emb_layer_fp16.embeddings.detach().clone(),
+    fs_tra_pos_emb_layer_fp16.embed_positions.weight.detach().clone(),
+)
+custom_tra_pos_emb_layer_fp32.train()
+custom_tra_pos_emb_layer_fp16.train()
+
 ###################### cross entropy layer ######################
 
 ce_config_fp16 = LSCrossEntropyLayer.get_config(
@@ -799,7 +847,7 @@ def test_embedding_layer_backward():
         custom_loss.data.copy_(loss_data)
         custom_loss.backward()
         return [
-            custom_layer.embeddings.grad.contiguous().detach(),
+            custom_layer.para.grad.contiguous().detach(),
         ]
 
     def baseline():
@@ -811,6 +859,94 @@ def test_embedding_layer_backward():
         fs_loss.backward()
         return [
             fs_layer.embeddings.grad.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], ntest=10, nrepeat=10)
+def test_tra_pos_embedding_layer_forward():
+    batch_size, seq_len = kt.bs_sl(1)
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
+    # TODO: can not generate PAD in the middle of the sentences.
+    config = ls_tra_pos_emb_config_fp16
+    input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
+    pad_left = random.choice([True, False])
+    pad_left = False
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_tra_pos_emb_layer_fp32
+        fs_layer = fs_tra_pos_emb_layer_fp32
+    else:
+        custom_layer = custom_tra_pos_emb_layer_fp16
+        fs_layer = fs_tra_pos_emb_layer_fp16
+
+    def custom():
+        res = custom_layer(input, step=1)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        x = fs_layer(input, step=1)
+        return [
+            x.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.float, torch.half], ntest=10, nrepeat=10, rtol=1e-2, atol=1e-2)
+def test_tra_pos_embedding_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
+    config = ls_tra_pos_emb_config_fp16
+    input = kt.randint(config.padding_idx + 1, config.vocab_size, (batch_size, seq_len))
+    pad_left = random.choice([True, False])
+    if pad_left:
+        input = input * padding_mask + config.padding_idx * (1 - padding_mask)
+    else:
+        input = input * (1 - padding_mask) + config.padding_idx * padding_mask
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_tra_pos_emb_layer_fp32
+        fs_layer = fs_tra_pos_emb_layer_fp32
+    else:
+        custom_layer = custom_tra_pos_emb_layer_fp16
+        fs_layer = fs_tra_pos_emb_layer_fp16
+
+    loss_data = torch.randn(1, dtype=kt.dtype).sum()
+
+    def custom():
+        custom_layer.zero_grad()
+        custom_input = input.clone()
+        res = custom_layer(custom_input)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        return [
+            custom_layer.para.grad.contiguous().detach(),
+        ]
+
+    def baseline():
+        fs_layer.zero_grad()
+        fs_input = input.clone()
+        res = fs_layer(fs_input)
+        fs_loss = (res / 1000).sum()
+        fs_loss.data.copy_(loss_data)
+        fs_loss.backward()
+        a = fs_layer.embeddings.grad.contiguous().detach()
+        b = fs_layer.embed_positions.weight.grad.contiguous().detach()
+        return [
+            torch.cat((a.view(-1), b.view(-1)), 0),
         ]
 
     return custom, baseline
@@ -934,6 +1070,8 @@ if __name__ == "__main__":
             "test_decoder_layer_forward_inference",
             "test_embedding_layer_forward",
             "test_embedding_layer_backward",
+            "test_tra_pos_embedding_layer_forward",
+            "test_tra_pos_embedding_layer_backward",
             "test_cross_entropy_layer_forward",
             "test_cross_entropy_layer_backward",
         ]
