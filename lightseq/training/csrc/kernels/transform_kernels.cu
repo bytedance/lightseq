@@ -723,6 +723,7 @@ void launch_transform_0213_dcmax<float>(float *output, float *grad_cmax,
   hidden_dim >>= 2;
   int head_dim = hidden_dim / nhead;
 
+  zero_grad<<<1, 1>>>(grad_cmax);
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 
@@ -740,6 +741,7 @@ void launch_transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
 
+  zero_grad<<<1, 1>>>(grad_cmax);
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 

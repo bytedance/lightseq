@@ -180,7 +180,8 @@ class TensorQuantizer(nn.Module):
         """Enable clip stage"""
         # logger.warning("Enable `clip` stage for amax learning.")
         if not self._learn_amax:
-            raise ValueError("learn_amax is False. Cannot enable clip.")
+            # raise ValueError("learn_amax is False. Cannot enable clip.")
+            return
         # self.clip.clip_value_min.required_grad = True
         if hasattr(self.clip, "clip_value_max"):
             self.clip.clip_value_max.required_grad = True

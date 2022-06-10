@@ -806,6 +806,7 @@ void launch_quant_ln_bw<float>(
     const float *gamma, const float *betta, const float *vars,
     const float *means, const uint8_t *cmask, int batch, int hidden_dim,
     cudaStream_t stream[2]) {
+  zero_grad<<<1, 1>>>(cmax_grad);
   // compute grad of gamma and betta
   dim3 grid_dim(((hidden_dim + TILE_DIM - 1) / TILE_DIM) * TILE_DIM);
   dim3 block_dim(TILE_DIM, TILE_DIM);
@@ -831,6 +832,7 @@ void launch_quant_ln_bw<__half>(
     const __half *inp_or_out, const __half *gamma, const __half *betta,
     const __half *vars, const __half *means, const uint8_t *cmask, int batch,
     int hidden_dim, cudaStream_t stream[2]) {
+  zero_grad<<<1, 1>>>(cmax_grad);
   // compute grad of gamma and betta
   dim3 grid_dim(((hidden_dim + TILE_DIM - 1) / TILE_DIM) * TILE_DIM);
   dim3 block_dim(TILE_DIM, TILE_DIM);

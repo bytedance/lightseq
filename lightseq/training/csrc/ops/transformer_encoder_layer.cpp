@@ -296,9 +296,9 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
                               _grad_attn_ob_ptr, _cublasHandle, _stream,
                               grad_input_buf_ptr, nullptr, false);
 
-    launch_d_cmax(_grad_attn_ow_ptr, _grad_attn_out_cmax_ptr + 1,
-                  _attn_dropout.get_mask(), _hidden_size * _hidden_size, 4,
-                  _stream);
+    // launch_d_cmax(_grad_attn_ow_ptr, _grad_attn_out_cmax_ptr + 1,
+    //               _attn_dropout.get_mask(), _hidden_size * _hidden_size, 4,
+    //               _stream);
 
     launch_transform_0213_dcmax<T>(grad_input_ptr, _grad_attn_out_cmax_ptr,
                                    grad_input_buf_ptr, _attn_dropout.get_mask(),
@@ -345,9 +345,9 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
                          _grad_attn_qkvb_ptr, _cublasHandle, _stream,
                          grad_input_buf_ptr);
 
-    launch_d_cmax(_grad_attn_qkvw_ptr, _grad_attn_qkv_cmax_ptr + 1,
-                  _attn_prob_dropout.get_mask(),
-                  _hidden_size * _hidden_size * 3, 4, _stream);
+    // launch_d_cmax(_grad_attn_qkvw_ptr, _grad_attn_qkv_cmax_ptr + 1,
+    //               _attn_prob_dropout.get_mask(),
+    //               _hidden_size * _hidden_size * 3, 4, _stream);
 
     // use_mean should be True when enable_quant, because we can't get
     // layer norm output before clip
@@ -422,10 +422,9 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                   _grad_output_w_ptr, _grad_output_b_ptr, _cublasHandle,
                   _stream, grad_ff1_out_ptr, nullptr, false);
 
-    launch_d_cmax(_grad_output_w_ptr, _grad_output_cmax_ptr + 1,
-                  _ffn_activation_dropout.get_mask(),
-                  _intermediate_size * _hidden_size, 4, _stream);
-
+    // launch_d_cmax(_grad_output_w_ptr, _grad_output_cmax_ptr + 1,
+    //               _ffn_activation_dropout.get_mask(),
+    //               _intermediate_size * _hidden_size, 4, _stream);
     _ffn_activation_dropout.d_quant_bias_act_dropout(
         grad_ff1_out_ptr, _grad_inter_b_ptr, _grad_inter_cmax_ptr + 2,
         _grad_output_cmax_ptr, _act_inp_i8_ptr,
@@ -442,9 +441,9 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                   _grad_inter_w_ptr, _grad_inter_b_ptr, _cublasHandle, _stream,
                   grad_ff1_inp_ptr, nullptr, false);
 
-    launch_d_cmax(_grad_inter_w_ptr, _grad_inter_cmax_ptr + 1,
-                  _ffn_dropout.get_mask(), _intermediate_size * _hidden_size, 4,
-                  _stream);
+    // launch_d_cmax(_grad_inter_w_ptr, _grad_inter_cmax_ptr + 1,
+    //               _ffn_dropout.get_mask(), _intermediate_size * _hidden_size,
+    //               4, _stream);
 
     if (_pre_or_postLayerNorm) {
       _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,

@@ -303,7 +303,7 @@ def test_quant_encoder_layer_forward():
 
     for i in range(NUM_LAYERS):
         custom_enc_layer_list[i].apply(enable_quant)
-        fairseq_enc_layer_list[i].apply(enable_quant)
+        fairseq_enc_layer_list[i].apply(qat_mode)
 
     def custom():
         res = hidden_states.clone()
@@ -403,7 +403,7 @@ def test_encoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-12, atol=1e-12, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=3, ntest=10)
 def test_quant_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -415,7 +415,7 @@ def test_quant_encoder_layer_backward():
 
     for i in range(NUM_LAYERS):
         custom_enc_layer_list[i].apply(enable_quant)
-        fairseq_enc_layer_list[i].apply(enable_quant)
+        fairseq_enc_layer_list[i].apply(qat_mode)
 
     def custom():
         for i in range(NUM_LAYERS):
@@ -435,18 +435,18 @@ def test_quant_encoder_layer_backward():
             grads = split_custom_layer_grad(custom_enc_layer_list[i])
             grad_list.extend(
                 [
-                    # grads[8],
-                    # grads[9],
-                    # grads[6],
-                    # grads[7],
-                    # grads[10],
-                    # grads[11],
-                    # grads[2],
-                    # grads[3],
-                    # grads[0],
-                    # grads[1],
-                    # grads[4],
-                    # grads[5],
+                    grads[8],
+                    grads[9],
+                    grads[6],
+                    grads[7],
+                    grads[10],
+                    grads[11],
+                    grads[2],
+                    grads[3],
+                    grads[0],
+                    grads[1],
+                    grads[4],
+                    grads[5],
                 ]
             )
             grad_list.append(
@@ -468,18 +468,18 @@ def test_quant_encoder_layer_backward():
             curl = fairseq_enc_layer_list[i]
             cur_grads = copy_grad_from_paras(
                 [
-                    # curl.fc2.weight,
-                    # curl.fc2.bias,
-                    # curl.fc1.weight,
-                    # curl.fc1.bias,
-                    # curl.final_layer_norm.weight,
-                    # curl.final_layer_norm.bias,
-                    # curl.self_attn.out_proj.weight,
-                    # curl.self_attn.out_proj.bias,
-                    # curl.self_attn.qkv_proj.weight,
-                    # curl.self_attn.qkv_proj.bias,
-                    # curl.self_attn_layer_norm.weight,
-                    # curl.self_attn_layer_norm.bias,
+                    curl.fc2.weight,
+                    curl.fc2.bias,
+                    curl.fc1.weight,
+                    curl.fc1.bias,
+                    curl.final_layer_norm.weight,
+                    curl.final_layer_norm.bias,
+                    curl.self_attn.out_proj.weight,
+                    curl.self_attn.out_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
+                    curl.self_attn_layer_norm.weight,
+                    curl.self_attn_layer_norm.bias,
                 ]
             )
             cur_cmax_grads = copy_cmax_grad_from_paras(

@@ -1339,6 +1339,8 @@ void launch_ls_quant_dropout_act_bias_bwd(
     const uint8_t *cmask_out, const T *bias, const T *out_grad,
     const uint8_t *dropout_mask, int row_size, int dim, float ratio,
     cudaStream_t stream) {
+  zero_grad<<<1, 1>>>(cmax_in_grad);
+  zero_grad<<<1, 1>>>(cmax_out_grad);
   dim3 grid_dim((dim - 1) / WARP_SIZE + 1);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
   ls_quant_dropout_act_bias_bwd_kernel<act_type>

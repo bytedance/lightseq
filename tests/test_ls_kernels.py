@@ -502,6 +502,7 @@ def test_launch_ln_i8O_bw():
     gamma_grad = kt.rand((hidden_dim))
     betta_grad = kt.rand((hidden_dim))
     inp_grad = kt.rand((bsz_seq, hidden_dim))
+    cmax_grad = kt.zeros(1)
 
     if kt.dtype == torch.float:
         func = cuda_module.torch_launch_ln_bw_i8_fp32
@@ -509,7 +510,6 @@ def test_launch_ln_i8O_bw():
         func = cuda_module.torch_launch_ln_bw_i8_fp16
 
     def custom():
-        cmax_grad = kt.zeros(1)
         func(
             gamma_grad,
             betta_grad,
@@ -1002,6 +1002,8 @@ def test_launch_dropout_relu_bias_i8I_i8O_bwd():
     custom_bias_grad = kt.rand((hidden_dim))
     custom_cmask_out = kt.get_cmask(inp, cmax_out)
     custom_cmask_in = kt.get_cmask(res, cmax_in)
+    custom_cmax_in_grad = kt.zeros(1)
+    custom_cmax_out_grad = kt.zeros(1)
 
     if kt.dtype == torch.float:
         cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp32
@@ -1009,8 +1011,6 @@ def test_launch_dropout_relu_bias_i8I_i8O_bwd():
         cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp16
 
     def custom():
-        custom_cmax_in_grad = kt.zeros(1)
-        custom_cmax_out_grad = kt.zeros(1)
         cus_func(
             custom_inp_grad,
             custom_bias_grad,
@@ -1067,6 +1067,8 @@ def test_launch_dropout_gelu_bias_i8I_i8O_bwd():
     custom_bias_grad = kt.rand((hidden_dim))
     custom_cmask_out = kt.get_cmask(inp, cmax_out)
     custom_cmask_in = kt.get_cmask(res, cmax_in)
+    custom_cmax_in_grad = kt.zeros(1)
+    custom_cmax_out_grad = kt.zeros(1)
 
     if kt.dtype == torch.float:
         cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp32
@@ -1074,8 +1076,6 @@ def test_launch_dropout_gelu_bias_i8I_i8O_bwd():
         cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp16
 
     def custom():
-        custom_cmax_in_grad = kt.zeros(1)
-        custom_cmax_out_grad = kt.zeros(1)
         cus_func(
             custom_inp_grad,
             custom_bias_grad,
@@ -1221,7 +1221,7 @@ def test_launch_quant_transform4d_0213():
     return custom, baseline
 
 
-@kt.case()
+@kt.case(atol=1)
 def test_torch_launch_ls_quantize():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
@@ -1259,7 +1259,7 @@ def test_torch_launch_ls_quantize():
     return custom, baseline
 
 
-@kt.case()
+@kt.case(atol=1e-2, rtol=1e-3)
 def test_torch_launch_fake_quantize():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
@@ -1324,13 +1324,13 @@ if __name__ == "__main__":
         # "test_launch_dropout_gelu_bias_bwd",
         # "test_launch_layer_norm_i8O",
         # "test_launch_ln_i8O_bw",
-        # "test_launch_dropout_relu_bias_i8I_i8O",
-        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        # "test_launch_dropout_gelu_bias_i8I_i8O",
-        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        "test_launch_dropout_relu_bias_i8I_i8O",
+        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        "test_launch_dropout_gelu_bias_i8I_i8O",
+        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
         # "test_launch_quant_bias_add_transform_20314",
         # "test_launch_quant_transform4d_0213",
-        # "test_torch_launch_ls_quantize"
-        "test_torch_launch_fake_quantize"
+        # "test_torch_launch_ls_quantize",
+        # "test_torch_launch_fake_quantize",
     ]
     kt.run(kernel_list)

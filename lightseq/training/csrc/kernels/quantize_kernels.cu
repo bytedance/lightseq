@@ -514,6 +514,7 @@ void launch_d_cmax<float>(float *grad_ptr, float *grad_cmax_ptr,
   if (numel % 4 != 0) {
     throw std::runtime_error("violate numel % 4 = 0");
   }
+  zero_grad<<<1, 1>>>(grad_cmax_ptr);
   int ele_per_block = MAX_THREADS * 4;
   int grid_dim = numel / ele_per_block;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
@@ -527,6 +528,7 @@ void launch_d_cmax<__half>(__half *grad_ptr, __half *grad_cmax_ptr,
   if (numel % 8 != 0) {
     throw std::runtime_error("violate numel % 8 = 0");
   }
+  zero_grad<<<1, 1>>>(grad_cmax_ptr);
   int ele_per_block = MAX_THREADS * 8;
   int grid_dim = numel / ele_per_block;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
