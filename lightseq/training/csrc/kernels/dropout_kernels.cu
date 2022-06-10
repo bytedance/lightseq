@@ -909,7 +909,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
                         scale * m[3],
                     input_clip_max, in_cmask[3], 2);
 
-  in_cmask4[i] += reinterpret_cast<uint32_t *>(in_cmask)[0];
+  in_cmask4[i] |= reinterpret_cast<uint32_t *>(in_cmask)[0];
   out4[i] = reinterpret_cast<int32_t *>(out)[0];
 }
 
@@ -986,7 +986,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
         quantize(__half2float(temp.y), input_clip_max, in_cmask[j * 2 + 1], 2);
   }
 
-  in_cmask8[i] += reinterpret_cast<uint64_t *>(in_cmask)[0];
+  in_cmask8[i] |= reinterpret_cast<uint64_t *>(in_cmask)[0];
   qout8[i] = reinterpret_cast<int64_t *>(out)[0];
 }
 

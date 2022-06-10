@@ -1231,7 +1231,7 @@ if __name__ == "__main__":
             # "test_cross_entropy_layer_forward",
             # "test_cross_entropy_layer_backward",
             # "test_quant_encoder_layer_forward",
-            "test_quant_encoder_layer_backward",
+            # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
         ]
     )

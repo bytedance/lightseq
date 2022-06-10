@@ -892,7 +892,6 @@ def test_launch_dropout_relu_bias_i8I_i8O():
     # custom weights
     custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
     custom_cmask_out = kt.randuint8((batch_size, seq_len, hidden_dim))
-    custom_cmask_in = kt.randuint8((batch_size, seq_len, hidden_dim))
 
     if kt.dtype == torch.float:
         cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_fp32
@@ -900,11 +899,12 @@ def test_launch_dropout_relu_bias_i8I_i8O():
         cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_fp16
 
     def custom():
+        custom_cmask_in = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
         cus_func(
             custom_res,
             custom_cmask_out,
             custom_cmask_in,
-            mask,
+            custom_cmask_in,
             inp,
             bias,
             cmax_out,
@@ -913,7 +913,7 @@ def test_launch_dropout_relu_bias_i8I_i8O():
             hidden_dim,
             0,
         )
-
+        
         return [custom_res, custom_cmask_in]
 
     def baseline():
@@ -921,6 +921,7 @@ def test_launch_dropout_relu_bias_i8I_i8O():
         out_base = torch.nn.functional.relu(inp_dq + bias)
         out_base = torch.nn.functional.dropout(out_base, p=0)
         out_base, cmask_in_base = kt.quantize(out_base, cmax_in)
+        cmask_in_base |= mask
 
         return [out_base, cmask_in_base]
 
@@ -942,9 +943,7 @@ def test_launch_dropout_gelu_bias_i8I_i8O():
 
     # custom weights
     custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
-
     custom_cmask_out = kt.randuint8((batch_size, seq_len, hidden_dim))
-    custom_cmask_in = kt.randuint8((batch_size, seq_len, hidden_dim))
 
     if kt.dtype == torch.float:
         cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_fp32
@@ -952,11 +951,12 @@ def test_launch_dropout_gelu_bias_i8I_i8O():
         cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_fp16
 
     def custom():
+        custom_cmask_in = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
         cus_func(
             custom_res,
             custom_cmask_out,
             custom_cmask_in,
-            mask,
+            custom_cmask_in,
             inp,
             bias,
             cmax_out,
@@ -973,6 +973,7 @@ def test_launch_dropout_gelu_bias_i8I_i8O():
         out_base = torch.nn.functional.gelu(inp_dq + bias)
         out_base = torch.nn.functional.dropout(out_base, p=0)
         out_base, cmask_in_base = kt.quantize(out_base, cmax_in)
+        cmask_in_base |= mask
 
         return [out_base, cmask_in_base]
 
@@ -1324,10 +1325,10 @@ if __name__ == "__main__":
         # "test_launch_dropout_gelu_bias_bwd",
         # "test_launch_layer_norm_i8O",
         # "test_launch_ln_i8O_bw",
-        "test_launch_dropout_relu_bias_i8I_i8O",
-        "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        "test_launch_dropout_gelu_bias_i8I_i8O",
-        "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        # "test_launch_dropout_relu_bias_i8I_i8O",
+        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        # "test_launch_dropout_gelu_bias_i8I_i8O",
+        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
         # "test_launch_quant_bias_add_transform_20314",
         # "test_launch_quant_transform4d_0213",
         # "test_torch_launch_ls_quantize",
