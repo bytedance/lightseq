@@ -23,6 +23,7 @@ from .quantization import (
     TensorQuantizer,
     act_quant_config,
     weight_quant_config,
+    emb_quant_config,
 )
 
 
@@ -989,7 +990,7 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
         self.config = config
 
     def forward(self, input, step=0):

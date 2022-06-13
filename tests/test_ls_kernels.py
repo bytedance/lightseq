@@ -913,7 +913,7 @@ def test_launch_dropout_relu_bias_i8I_i8O():
             hidden_dim,
             0,
         )
-        
+
         return [custom_res, custom_cmask_in]
 
     def baseline():
