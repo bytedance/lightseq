@@ -5,7 +5,7 @@ from collections import OrderedDict
 import numpy as np
 import torch
 
-max_batch_tokens = 9216
+max_batch_tokens = 20000
 max_seq_len = 256
 
 
