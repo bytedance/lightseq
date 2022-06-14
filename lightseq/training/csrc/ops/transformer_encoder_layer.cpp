@@ -287,8 +287,9 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   if (_enable_quant) {
     _attn_o_inp_ptr = buffer;
     // T *_clipped_w_ptr = buffer + _batch_dim;
-    launch_dequantize<T>(_attn_o_inp_ptr, _attn_o_inp_i8_ptr, _output_cmax_ptr,
-                         _batch_tokens * _hidden_size, 2, _stream);
+    launch_dequantize<T>(_attn_o_inp_ptr, _attn_o_inp_i8_ptr,
+                         _attn_out_cmax_ptr, _batch_tokens * _hidden_size, 2,
+                         _stream);
 
     // bw of output project
     _attn_out_linear.Backward(_batch_tokens, grad_input_ptr, _attn_o_inp_ptr,
@@ -337,8 +338,9 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   if (_enable_quant) {
     T *gemmQKV_inp_ptr = _qkv_ptr;
 
-    launch_dequantize<T>(gemmQKV_inp_ptr, _gemmQKV_inp_i8_ptr, _output_cmax_ptr,
-                         _batch_tokens * _hidden_size, 2, _stream);
+    launch_dequantize<T>(gemmQKV_inp_ptr, _gemmQKV_inp_i8_ptr,
+                         _attn_qkv_cmax_ptr, _batch_tokens * _hidden_size, 2,
+                         _stream);
 
     _qkv_linear.Backward(_batch_tokens, grad_qkv_4d_ptr, gemmQKV_inp_ptr,
                          _attn_qkvw_ptr, _grad_attn_qkvw_ptr,

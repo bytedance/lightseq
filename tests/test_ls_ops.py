@@ -760,10 +760,180 @@ def test_decoder_layer_backward():
                 grad_list.extend(
                     [
                         # encdec kv grad
-                        grads[18][:shs],
-                        grads[19][:hidden_size],
-                        grads[18][shs : shs * 2],
-                        grads[19][hidden_size : hidden_size * 2],
+                        grads[19][:shs],
+                        grads[20][:hidden_size],
+                        grads[19][shs : shs * 2],
+                        grads[20][hidden_size : hidden_size * 2],
+                    ]
+                )
+        return grad_list
+
+    def baseline():
+        for i in range(NUM_LAYERS):
+            fairseq_dec_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = fairseq_dec_layer_list[i](
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
+            )
+        fairseq_loss = (res / 1000).sum()
+        fairseq_loss.data.copy_(loss_data)
+        fairseq_loss.backward()
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            grad_list.extend(
+                [
+                    fairseq_dec_layer_list[i].fc2.weight.grad.contiguous().detach(),
+                    fairseq_dec_layer_list[i].fc2.bias.grad.contiguous().detach(),
+                    fairseq_dec_layer_list[i].fc1.weight.grad.contiguous().detach(),
+                    fairseq_dec_layer_list[i].fc1.bias.grad.contiguous().detach(),
+                    fairseq_dec_layer_list[i]
+                    .final_layer_norm.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .final_layer_norm.bias.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn.out_proj.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn.out_proj.bias.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn.qkv_proj.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn.qkv_proj.bias.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn_layer_norm.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .self_attn_layer_norm.bias.grad.contiguous()
+                    .detach(),
+                    # encdec weights grad
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn.q_proj.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn.q_proj.bias.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn.out_proj.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn.out_proj.bias.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn_layer_norm.weight.grad.contiguous()
+                    .detach(),
+                    fairseq_dec_layer_list[i]
+                    .encoder_attn_layer_norm.bias.grad.contiguous()
+                    .detach(),
+                ]
+            )
+            if i == 0:
+                grad_list.extend(
+                    [
+                        # encdec kv grad
+                        fairseq_dec_layer_list[i]
+                        .encoder_attn.k_proj.weight.grad.contiguous()
+                        .detach(),
+                        fairseq_dec_layer_list[i]
+                        .encoder_attn.k_proj.bias.grad.contiguous()
+                        .detach(),
+                        fairseq_dec_layer_list[i]
+                        .encoder_attn.v_proj.weight.grad.contiguous()
+                        .detach(),
+                        fairseq_dec_layer_list[i]
+                        .encoder_attn.v_proj.bias.grad.contiguous()
+                        .detach(),
+                    ]
+                )
+        return grad_list
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+def test_quant_decoder_layer_backward():
+    batch_size, enc_seq_len = kt.bs_sl()
+    _, dec_seq_len = kt.bs_sl(batch_size)
+    print(
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
+    )
+    hidden_size = 1024
+    shs = hidden_size * hidden_size
+    hidden_states = kt.rand((batch_size, dec_seq_len, hidden_size))
+    encoder_out = kt.rand((enc_seq_len, batch_size, hidden_size))
+    incremental_state = None
+    encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
+    self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
+    loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
+
+    for i in range(NUM_LAYERS):
+        custom_dec_layer_list[i].apply(enable_quant)
+        fairseq_dec_layer_list[i].apply(qat_mode)
+
+    def custom():
+        for i in range(NUM_LAYERS):
+            custom_dec_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = custom_dec_layer_list[i](
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            """
+            0 attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            6 encdec_attn_qw, encdec_attn_qb, encdec_attn_ow, encdec_attn_ob, encdec_attn_nw, encdec_attn_nb,
+            12 inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            18 encdec_attn_kvw, encdec_attn_kvb,
+            """
+            grads = split_custom_layer_grad(custom_dec_layer_list[i])
+            grad_list.extend(
+                [
+                    grads[14],
+                    grads[15],
+                    grads[12],
+                    grads[13],
+                    grads[16],
+                    grads[17],
+                    grads[2],
+                    grads[3],
+                    grads[0],
+                    grads[1],
+                    grads[4],
+                    grads[5],
+                    # encdec grad
+                    grads[6],
+                    grads[7],
+                    grads[8],
+                    grads[9],
+                    grads[10],
+                    grads[11],
+                ]
+            )
+            if i == 0:
+                grad_list.extend(
+                    [
+                        # encdec kv grad
+                        grads[19][:shs],
+                        grads[20][:hidden_size],
+                        grads[19][shs : shs * 2],
+                        grads[20][hidden_size : hidden_size * 2],
                     ]
                 )
         return grad_list
@@ -1233,5 +1403,6 @@ if __name__ == "__main__":
             # "test_quant_encoder_layer_forward",
             # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
+            "test_quant_decoder_layer_backward",
         ]
     )

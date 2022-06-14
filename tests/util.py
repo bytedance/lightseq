@@ -34,7 +34,7 @@ class TestDecorator(object):
             seq_len = random.randint(1, max_seq_len)
 
         if enable_quant and seq_len < 8:
-            return self.bs_sl(batch_size, enable_quant=False)
+            return self.bs_sl(batch_size, enable_quant)
 
         return batch_size, seq_len
 
@@ -173,7 +173,9 @@ class TestDecorator(object):
                 # diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
                 # print("diff x:", t1[~diff_mask])
                 # print("diff y:", t2[~diff_mask])
-                np.testing.assert_allclose(t1, t2, rtol=rtol, atol=atol, verbose=True)
+                np.testing.assert_allclose(
+                    t1, t2, rtol=rtol, atol=atol, verbose=True, equal_nan=False
+                )
             except Exception as ex:
                 print(f"Unmatches in the {i}-th tensor.")
                 print(ex)
