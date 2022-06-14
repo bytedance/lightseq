@@ -25,6 +25,9 @@ relu_quant_config = QuantDescriptor(
 weight_quant_config = QuantDescriptor(
     num_bits=8, narrow_range=True, learn_amax=False, amax=1.0
 )
+emb_quant_config = QuantDescriptor(
+    num_bits=8, narrow_range=True, learn_amax=True, amax=1.0
+)
 
 
 class QuantLinear(Linear):
