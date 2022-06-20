@@ -23,9 +23,7 @@ class Normalize_Layer {
   Normalize_Layer(Config config, size_t max_rows)
       : config_(config), vars_(nullptr), means_(nullptr) {
     vars_ = cuda_malloc<T>(max_rows);
-    if (config_.use_mean) {
-      means_ = cuda_malloc<T>(max_rows);
-    }
+    means_ = cuda_malloc<T>(max_rows);
   }
 
   ~Normalize_Layer() {
@@ -56,20 +54,21 @@ class Normalize_Layer {
     (use_mean == false) ^ (betta == nullptr) should be true
   */
   void Backward(T *gamma_grad, T *betta_grad, T *inp_grad, const T *out_grad,
-                const T *residual_grad, const T *inp_or_out, const T *gamma,
+                const T *residual_grad, const T *out, const T *gamma,
                 const T *betta, int batch_size, cudaStream_t stream[2]) {
-    launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
-                 inp_or_out, gamma, betta, vars_, means_, batch_size,
-                 config_.hidden_dim, stream);
+    const T *means = nullptr;
+    launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad, out,
+                 gamma, betta, vars_, means, batch_size, config_.hidden_dim,
+                 stream);
   }
 
   void Backward(T *gamma_grad, T *betta_grad, T *inp_grad, T *cmax_grad,
-                const T *out_grad, const T *residual_grad, const T *inp_or_out,
+                const T *out_grad, const T *residual_grad, const T *inp,
                 const T *gamma, const T *betta, const uint8_t *cmask,
                 int batch_size, cudaStream_t stream[2]) {
     launch_quant_ln_bw(gamma_grad, betta_grad, inp_grad, cmax_grad, out_grad,
-                       residual_grad, inp_or_out, gamma, betta, vars_, means_,
-                       cmask, batch_size, config_.hidden_dim, stream);
+                       residual_grad, inp, gamma, betta, vars_, means_, cmask,
+                       batch_size, config_.hidden_dim, stream);
   }
 
   inline bool use_mean() const { return config_.use_mean; }

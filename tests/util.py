@@ -68,12 +68,13 @@ class TestDecorator(object):
         return x_cmask
 
     def quantize(self, x, cmax):
+        qmask = self.get_cmask(x, cmax)
         x, cmax = x.float(), cmax.float()
         dequant_scale = cmax / 127
         x = x / dequant_scale
         x = (x + 0.5).floor()
         x = x.clamp(-127, 127).to(dtype=torch.int8)
-        return x, self.get_cmask(x, cmax)
+        return x, qmask
 
     def dequantize(self, x, cmax, float_out=False):
         x = x.float()
@@ -98,7 +99,7 @@ class TestDecorator(object):
         return out
 
     def rand(self, shape):
-        return self.move(torch.rand(shape))
+        return self.move((torch.rand(shape) - 0.5) * 2)
 
     def randint8(self, shape):
         return torch.randint(-127, 128, shape).to(self.device, dtype=torch.int8)
@@ -170,9 +171,9 @@ class TestDecorator(object):
             t1 = t1.cpu().numpy().flatten()
             t2 = t2.cpu().numpy().flatten()
             try:
-                # diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
-                # print("diff x:", t1[~diff_mask])
-                # print("diff y:", t2[~diff_mask])
+                diff_mask = np.isclose(t1, t2, rtol=rtol, atol=atol)
+                print("Unmatched x:", t1[~diff_mask])
+                print("Unmatched y:", t2[~diff_mask])
                 np.testing.assert_allclose(
                     t1, t2, rtol=rtol, atol=atol, verbose=True, equal_nan=False
                 )

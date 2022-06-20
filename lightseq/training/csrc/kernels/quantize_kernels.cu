@@ -114,11 +114,13 @@ void launch_quantize<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
 
 template <typename T>
 __global__ void fake_quantize_kernel(uint8_t *clip_mask_ptr, float *alpha_ptr,
-                                     T *f_ptr, const T *clip_max_ptr, int numel,
+                                     T *output, const T *input,
+                                     const T *clip_max_ptr, int numel,
                                      int mask_start_bit);
 template <>
 __global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
-                                            float *alpha_ptr, float *f_ptr,
+                                            float *alpha_ptr, float *output,
+                                            const float *input,
                                             const float *clip_max_ptr,
                                             int numel, int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -127,25 +129,26 @@ __global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
 
   float clip_max_val = clip_max_ptr[1];
 
-  float4 *weight4_ptr = reinterpret_cast<float4 *>(f_ptr);
+  const float4 *input4_ptr = reinterpret_cast<const float4 *>(input);
+  float4 *output4_ptr = reinterpret_cast<float4 *>(output);
   uint32_t *clip_mask4_ptr;
   if (clip_mask_ptr) {
     clip_mask4_ptr = reinterpret_cast<uint32_t *>(clip_mask_ptr);
   }
 
-  float4 weight4 = weight4_ptr[i];
+  float4 input4 = input4_ptr[i];
 
   uint8_t clip_mask[4];
 
-  weight4.x =
-      fake_quantize(weight4.x, clip_max_val, clip_mask[0], mask_start_bit);
-  weight4.y =
-      fake_quantize(weight4.y, clip_max_val, clip_mask[1], mask_start_bit);
-  weight4.z =
-      fake_quantize(weight4.z, clip_max_val, clip_mask[2], mask_start_bit);
-  weight4.w =
-      fake_quantize(weight4.w, clip_max_val, clip_mask[3], mask_start_bit);
-  weight4_ptr[i] = weight4;
+  input4.x =
+      fake_quantize(input4.x, clip_max_val, clip_mask[0], mask_start_bit);
+  input4.y =
+      fake_quantize(input4.y, clip_max_val, clip_mask[1], mask_start_bit);
+  input4.z =
+      fake_quantize(input4.z, clip_max_val, clip_mask[2], mask_start_bit);
+  input4.w =
+      fake_quantize(input4.w, clip_max_val, clip_mask[3], mask_start_bit);
+  output4_ptr[i] = input4;
 
   if (clip_mask_ptr) {
     clip_mask4_ptr[i] = reinterpret_cast<uint32_t *>(clip_mask)[0];
@@ -161,7 +164,8 @@ __global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
 
 template <>
 __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
-                                             float *alpha_ptr, __half *f_ptr,
+                                             float *alpha_ptr, __half *output,
+                                             const __half *input,
                                              const __half *clip_max_ptr,
                                              int numel, int mask_start_bit) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -170,24 +174,25 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
 
   float clip_max_val = __half2float(clip_max_ptr[1]);
 
-  float4 *weight8_ptr = reinterpret_cast<float4 *>(f_ptr);
+  const float4 *input8_ptr = reinterpret_cast<const float4 *>(input);
+  float4 *output8_ptr = reinterpret_cast<float4 *>(output);
   uint64_t *clip_mask8_ptr;
   if (clip_mask_ptr) {
     clip_mask8_ptr = reinterpret_cast<uint64_t *>(clip_mask_ptr);
   }
-  float4 weight8 = weight8_ptr[i];
+  float4 input8 = input8_ptr[i];
 
   uint8_t clip_mask[8];
-  __half2 *weight2_ptr = reinterpret_cast<__half2 *>(&weight8);
+  __half2 *input2_ptr = reinterpret_cast<__half2 *>(&input8);
 #pragma unroll
   for (int i = 0; i < 4; i++) {
-    weight2_ptr[i].x = fake_quantize(weight2_ptr[i].x, clip_max_val,
-                                     clip_mask[i * 2], mask_start_bit);
-    weight2_ptr[i].y = fake_quantize(weight2_ptr[i].y, clip_max_val,
-                                     clip_mask[i * 2 + 1], mask_start_bit);
+    input2_ptr[i].x = fake_quantize(input2_ptr[i].x, clip_max_val,
+                                    clip_mask[i * 2], mask_start_bit);
+    input2_ptr[i].y = fake_quantize(input2_ptr[i].y, clip_max_val,
+                                    clip_mask[i * 2 + 1], mask_start_bit);
   }
 
-  weight8_ptr[i] = weight8;
+  output8_ptr[i] = input8;
   if (clip_mask_ptr) {
     clip_mask8_ptr[i] = reinterpret_cast<uint64_t *>(clip_mask)[0];
   }
@@ -201,30 +206,32 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
 
 template <>
 void launch_fake_quantize<float>(uint8_t *clip_mask_ptr, float *alpha_ptr,
-                                 float *f_ptr, const float *clip_max_ptr,
-                                 int numel, int mask_start_bit,
-                                 cudaStream_t stream) {
+                                 float *output, const float *input,
+                                 const float *clip_max_ptr, int numel,
+                                 int mask_start_bit, cudaStream_t stream) {
   if (numel % 4 != 0) {
     throw std::runtime_error("violate numel % 4 = 0");
   }
   int ele_per_block = MAX_THREADS * 4;
   int grid_dim = numel / ele_per_block;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
-      clip_mask_ptr, alpha_ptr, f_ptr, clip_max_ptr, numel, mask_start_bit);
+      clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
+      mask_start_bit);
 }
 
 template <>
 void launch_fake_quantize<__half>(uint8_t *clip_mask_ptr, float *alpha_ptr,
-                                  __half *f_ptr, const __half *clip_max_ptr,
-                                  int numel, int mask_start_bit,
-                                  cudaStream_t stream) {
+                                  __half *output, const __half *input,
+                                  const __half *clip_max_ptr, int numel,
+                                  int mask_start_bit, cudaStream_t stream) {
   if (numel % 8 != 0) {
     throw std::runtime_error("violate numel % 8 = 0");
   }
   int ele_per_block = MAX_THREADS * 8;
   int grid_dim = numel / ele_per_block;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
-      clip_mask_ptr, alpha_ptr, f_ptr, clip_max_ptr, numel, mask_start_bit);
+      clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
+      mask_start_bit);
 }
 
 __global__ void dequantize_kernel(float *f_ptr, const int8_t *q_ptr,

@@ -859,7 +859,7 @@ def test_decoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=0.5, ntest=10)
 def test_quant_decoder_layer_backward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
@@ -1391,8 +1391,8 @@ if __name__ == "__main__":
             # "test_encoder_layer_backward",
             # "test_bert_encoder_layer_forward",
             # "test_bert_encoder_layer_backward",
-            # "test_decoder_layer_forward",
-            # "test_decoder_layer_backward",
+            "test_decoder_layer_forward",
+            "test_decoder_layer_backward",
             # "test_decoder_layer_forward_inference",
             # "test_embedding_layer_forward",
             # "test_embedding_layer_backward",
@@ -1403,6 +1403,6 @@ if __name__ == "__main__":
             # "test_quant_encoder_layer_forward",
             # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
-            "test_quant_decoder_layer_backward",
+            # "test_quant_decoder_layer_backward",
         ]
     )

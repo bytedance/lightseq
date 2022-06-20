@@ -188,9 +188,9 @@ void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
                      int mask_start_bit, cudaStream_t stream);
 
 template <typename T>
-void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *f_ptr,
-                          const T *clip_max_ptr, int numel, int mask_start_bit,
-                          cudaStream_t stream);
+void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *output,
+                          const T *input, const T *clip_max_ptr, int numel,
+                          int mask_start_bit, cudaStream_t stream);
 
 template <typename T>
 void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,

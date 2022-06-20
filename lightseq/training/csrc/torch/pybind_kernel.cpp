@@ -326,12 +326,13 @@ void torch_launch_ls_quantize(torch::Tensor &output,
 template <typename T>
 void torch_launch_fake_quantize(torch::Tensor &clip_max_mask,
                                 torch::Tensor &igemm_alpha,
-                                torch::Tensor &input,
+                                torch::Tensor &output,
+                                const torch::Tensor &input,
                                 const torch::Tensor &clip_max, int numel) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_fake_quantize<T>(rptr<uint8_t>(clip_max_mask),
-                          rptr<float>(igemm_alpha), rptr<T>(input),
-                          rptr<T>(clip_max), numel, 4, stream);
+                          rptr<float>(igemm_alpha), rptr<T>(output),
+                          rptr<T>(input), rptr<T>(clip_max), numel, 4, stream);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
