@@ -170,7 +170,7 @@ class TransformerEncoderLayer {
 
     // buffer size needed by ffn bw
     size_t sz_ffn_bw = 3 * _max_batch_tokens * _hidden_size +
-                       _max_batch_tokens * _intermediate_size;
+                       2 * _max_batch_tokens * _intermediate_size;
     // buffer size needed by attn bw
     size_t sz_attn_bw = 5 * _max_batch_tokens * _hidden_size +
                         std::max(3 * _max_batch_tokens * _hidden_size,
