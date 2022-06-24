@@ -182,18 +182,18 @@ namespace cuda {
     int idx = (blockIdx.x * gridDim.y + blockIdx.y) * batch_seq_len + threadIdx.x;
     if (threadIdx.x < batch_seq_len &&
         src_padding_mask[blockIdx.x * batch_seq_len +
-                        blockIdx.y % batch_seq_len]) {
+                          blockIdx.y % batch_seq_len]) {
       correlation[idx] = (T)0.f;
       return;
     }
     int mask = threadIdx.x < batch_seq_len
-                  ? src_padding_mask[blockIdx.x * batch_seq_len + threadIdx.x]
-                  : 1;
-    float val;
+                    ? src_padding_mask[blockIdx.x * batch_seq_len + threadIdx.x]
+                    : 1;
     // float val = threadIdx.x < batch_seq_len ? (float)correlation[idx]
     //                                         : CUDA_FLOAT_INF_NEG;
+    float val;
     if (threadIdx.x < batch_seq_len) {
-      // idx = head_num * batch_seq_len * batch_seq_len
+      // We know that idx = head_num * batch_seq_len * batch_seq_len
       //     + i * batch_seq_len + j;
       int j = idx % batch_seq_len;
       int i = (idx - j) / batch_seq_len % batch_seq_len;
@@ -203,7 +203,7 @@ namespace cuda {
       int bucket_index = get_bucket_num(i, j, true);
       val += (float)pos_emb[bucket_index * 8 + head_idx];
     } else val = CUDA_FLOAT_INF_NEG;
-    
+
     float max_val = blockReduceMax<float>(mask ? CUDA_FLOAT_INF_NEG : val);
     __shared__ float smax;
     if (threadIdx.x == 0) smax = max_val;
