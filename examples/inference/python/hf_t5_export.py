@@ -227,18 +227,15 @@ def replace_second_digit(s):
         "5": "five",
     }
 
-    ans = ''
     seen = False
-    for c in s:
-        if c.isdigit():
-            if seen:
-                ans += table[c]
-            else:
-                seen = True
-                ans += c
-        else:
-            ans += c
-    return ans
+    s = list(s)
+    pos_digit = -1
+    for i in range(len(s)):
+        if s[i].isdigit():
+            pos_digit = i
+    if pos_digit != -1:
+        s[pos_digit] = table[s[pos_digit]]
+    return ''.join(s)
 
 
 def extract_transformer_weights(
@@ -264,7 +261,7 @@ def extract_transformer_weights(
     decoder_state_dict = {}
     for k in reloaded:
         new_k = k
-        if count_digit(k) == 2:
+        if count_digit(k) >= 2:
             new_k = replace_second_digit(k)
         if k.startswith("encoder."):
             encoder_state_dict[new_k] = reloaded[k]
@@ -549,11 +546,11 @@ if __name__ == "__main__":
     if args.generation_method not in ["beam_search", "topk", "topp", "topk_greedy"]:
         args.generation_method = "beam_search"
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_t5_small"  # you can rename it to "lightseq_bart_large" for large model
-    input_huggingface_bart_model = (
-        "t5-small"  # Example: you can try "facebook/bart-large" as well
+    output_lightseq_model_name = "lightseq_t5_base"  # you can rename it to "lightseq_t5_large" for large model
+    input_huggingface_t5_model = (
+        "t5-base"  # Example: you can try "t5-large" as well
     )
-    head_number = 8  # change this to 16 for "bart-large" model
+    head_number = 12  # change this to 16 for "t5-large" model
     beam_size = 4
     max_step = 50  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
@@ -561,7 +558,7 @@ if __name__ == "__main__":
     length_penalty = 1.0
     extract_transformer_weights(
         output_lightseq_model_name,
-        input_huggingface_bart_model,
+        input_huggingface_t5_model,
         head_num=head_number,  # layer number
         generation_method=args.generation_method,
         beam_size=beam_size,

@@ -61,10 +61,10 @@ def main():
     args = parser.parse_args()
 
     print("initializing t5 tokenizer...")
-    tokenizer = T5Tokenizer.from_pretrained("t5-small")
+    tokenizer = T5Tokenizer.from_pretrained("t5-base")
 
     print("creating lightseq model...")
-    ls_model = lsi.T5("lightseq_t5_small.hdf5", 128)
+    ls_model = lsi.T5("lightseq_t5_base.hdf5", 128)
     # ls_model = None
 
     # print("creating huggingface model...")
