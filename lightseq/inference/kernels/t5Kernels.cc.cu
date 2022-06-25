@@ -195,12 +195,13 @@ namespace cuda {
     if (threadIdx.x < batch_seq_len) {
       // We know that idx = head_index * batch_seq_len * batch_seq_len
       //     + i * batch_seq_len + j + batch_num * head_num * batch_seq_len * batch_seq_len;
-
-      int j = idx % batch_seq_len;
-      int i = (idx - j) / batch_seq_len % batch_seq_len;
       int head_num = 8;
+      int need = idx % (head_num * batch_seq_len * batch_seq_len);
+      // need = head_index * batch_seq_len * batch_seq_len + i * batch_seq_len + j;
+      int j = need % batch_seq_len;
+      int i = (need - j) / batch_seq_len % batch_seq_len;
       // int head_idx = (idx - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
-      int head_idx =  ((idx - j) / batch_seq_len - i)/ batch_seq_len % head_num;
+      int head_idx = (need - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
       val = (float)correlation[idx];
       // new_values[0, head, i, j] = relative_attention_bias.weight[relative_position_bucket[i][j]][head]
       int bucket_index = get_bucket_num(i, j, true);

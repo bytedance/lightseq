@@ -500,7 +500,7 @@ def extract_transformer_weights(
     transformer.model_conf.length_penalty = length_penalty
 
     transformer.model_conf.extra_decode_length = extra_decode_length
-    transformer.model_conf.src_padding_id = -1
+    transformer.model_conf.src_padding_id = 0
     transformer.model_conf.trg_start_id = 0
     transformer.model_conf.trg_end_id = 1
 
@@ -554,7 +554,7 @@ if __name__ == "__main__":
         "t5-small"  # Example: you can try "facebook/bart-large" as well
     )
     head_number = 8  # change this to 16 for "bart-large" model
-    beam_size = 1
+    beam_size = 4
     max_step = 50  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50

@@ -45,10 +45,10 @@ __global__ void t5_ker_enc_emb(const T *token_emb,
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 1;
     }
-    value.x = 0.f;
-    value.y = 0.f;
-    value.z = 0.f;
-    value.w = 0.f;
+    // value.x = 0.f;
+    // value.y = 0.f;
+    // value.z = 0.f;
+    // value.w = 0.f;
   } else {
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 0;
@@ -84,10 +84,10 @@ __global__ void t5_ker_enc_emb<__half>(const __half *token_emb, const int *token
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 1;
     }
-    value.x = 0.f;
-    value.y = 0.f;
-    value.z = 0.f;
-    value.w = 0.f;
+    // value.x = 0.f;
+    // value.y = 0.f;
+    // value.z = 0.f;
+    // value.w = 0.f;
   } else {
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 0;

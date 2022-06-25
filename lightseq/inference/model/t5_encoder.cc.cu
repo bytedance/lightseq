@@ -226,14 +226,25 @@ void T5Encoder<OpType_>::self_attention() {
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
   
+
+  // printf _p_d_c
+  #ifdef DEBUG_RESULT
+    std::cout << "encoder before softmax and position bias: " << std::endl;
+    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
+  #endif
+
   t5_ker_correlation_softmax_encself_launcher<_DataType>(
       _batch_size, _batch_seq_len, _tw._head_num, _stream, _p_d_c,
       _p_d_padding_mask, _p_d_src_emb_wei[1]);
 
+  #ifdef DEBUG_RESULT
+    print_vec(_p_d_padding_mask, "_p_d_padding_mask: ", 2 * 22);
+  #endif
   // printf _p_d_c
   #ifdef DEBUG_RESULT
     std::cout << "after softmax: " << std::endl;
-    print_vec(_p_d_c,"_p_d_c matrix: ", 8 * 7 * 7);
+    print_vec(_p_d_c,"_p_d_c matrix: ", 22*22);
+    print_vec(_p_d_c + 8*22*22,"_p_d_c matrix: ", 22*22);
   #endif
 
   /* ---step 3. new_q = correlation * v--- */
