@@ -51,7 +51,7 @@ def warmup(tokenizer, ls_model, hf_model, sentences):
     inputs_id = inputs["input_ids"]
 
     ls_generate(ls_model, tokenizer, inputs_id)
-    hf_generate(hf_model, tokenizer, inputs_id)
+    # hf_generate(hf_model, tokenizer, inputs_id)
 
 
 def main():
@@ -87,7 +87,7 @@ def main():
         inputs_id = inputs["input_ids"]
         
         ls_generate(ls_model, tokenizer, inputs_id)
-        hf_generate(hf_model, tokenizer, inputs_id)
+        # hf_generate(hf_model, tokenizer, inputs_id)
 
         if not args.user_input:
             break

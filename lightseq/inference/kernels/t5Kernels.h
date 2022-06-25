@@ -1,4 +1,4 @@
-#pragma once
+lightseq/inference/kernels/t5#pragma once
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
@@ -20,5 +20,10 @@ namespace cuda {
                                                 const int* src_padding_mask,
                                                 const T *pos_emb);
 
+    template <typename T>
+    void t5_ker_correlation_softmax_decself_launcher(int batch_head_num, int step_num,
+                                                cudaStream_t stream,
+                                                T* correlation,
+                                                const T *pos_emb);
 }  // namespace cuda
 }  // namespace lightseq

@@ -41,7 +41,7 @@ T5Decoder<OpType_>::T5Decoder(int max_batch_size, const int* p_d_padding_mask,
       _type_one(1.f),
       _type_zero(0.f),
       _fzero(0.f),
-      _atten_scaler(sqrt(1.f / tw._dim_per_head)),
+      _atten_scaler(1.f),
       _logit_scaler(_tw._no_scale_embedding ? 1.f
                                             : sqrt(1.f / tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
@@ -422,7 +422,7 @@ template <OperationType OpType_>
 void T5Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
-  launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_trg_emb_wei[1],
+  t5_launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0],
                             _p_d_alive_seq, _p_d_trg_emb_wei[7], _p_d_lang_id,
                             _p_d_cur_step_query, _batch_size, _tw._beam_size,
                             _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
@@ -463,9 +463,15 @@ void T5Decoder<OpType_>::decoder_stack() {
   }
 
   // last layer norm
-  ker_norm_layer_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
+  // ker_norm_layer_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
+  
+  t5_ker_norm_layer_launcher<_DataType>(
+    _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_cur_step_query,
+    _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
+    
+  
   return;
 }
 
@@ -475,11 +481,16 @@ T5Decoder self attention
 template <OperationType OpType_>
 void T5Decoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
-      _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-      _max_thread_per_block, _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
+  //     _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
+  //     _max_thread_per_block, _tw._is_post_ln);
+  
+  t5_ker_norm_layer_launcher<_DataType>(
+    _batch_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
+    _p_d_dec_wei[_weight_offset], _p_d_dec_wei[_weight_offset + 1],
+      _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
@@ -542,13 +553,25 @@ void T5Decoder<OpType_>::self_attention() {
       _tw._dim_per_head, _tw._dim_per_head, &_type_zero, _p_d_c, _CType,
       _cur_step + 1, _cur_step + 1, _step_token_num * _tw._head_num,
       _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
-                                           _cur_step + 1, _stream, _p_d_c);
+
+  
+  // printf _p_d_c
+  #ifdef DEBUG_RESULT
+    std::cout << "decoder before softmax: " << std::endl;
+    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
+  #endif
+
+  t5_ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
+                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[0]);
+
+  // ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
+  //   _cur_step + 1, _stream, _p_d_c);
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_c, "self attn corr(head): ", 5);
+  // printf("_step_token_num = %d, _tw.head_num = %d, _cur_step = %d\n", _step_token_num, _tw._head_num, _cur_step);
+  print_vec(_p_d_c, "self attn corr(head): ", 10);
   print_vec(_p_d_c + _step_token_num * _tw._head_num * (_cur_step + 1) - 5,
-            "self attn corr(tail): ", 5);
+            "self attn corr(tail): ", 10);
 #endif
 
   /* ---step 3. new_q = correlation * v--- */
@@ -574,9 +597,9 @@ void T5Decoder<OpType_>::self_attention() {
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
 #ifdef DEBUG_RESULT
-  print_vec(_p_d_cur_step_query, "self attn out(head): ", 3);
+  print_vec(_p_d_cur_step_query, "self attn out(head): ", 20);
   print_vec(_p_d_cur_step_query + _step_token_num * _tw._hidden_size - 3,
-            "self attn out(tail): ", 3);
+            "self attn out(tail): ", 5);
 #endif
 }
 
@@ -586,11 +609,16 @@ Encode-Decoder attention
 template <OperationType OpType_>
 void T5Decoder<OpType_>::encdec_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
-      _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
-      _max_thread_per_block, _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
+  //     _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
+  //     _max_thread_per_block, _tw._is_post_ln);
+
+t5_ker_norm_layer_launcher<_DataType>(
+  _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
+  _p_d_dec_wei[_weight_offset + 6], _p_d_dec_wei[_weight_offset + 7],
+    _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
@@ -659,11 +687,17 @@ void T5Decoder<OpType_>::encdec_attention() {
 template <OperationType OpType_>
 void T5Decoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
-      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
-      _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
-      _max_thread_per_block, _tw._is_post_ln);
+  // ker_norm_layer_resual_launcher<_DataType>(
+  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
+  //     _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
+  //     _max_thread_per_block, _tw._is_post_ln);
+
+  t5_ker_norm_layer_launcher<_DataType>(
+    _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
+    _p_d_dec_wei[_weight_offset + 12], _p_d_dec_wei[_weight_offset + 13],
+      _max_thread_per_block);
+
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);

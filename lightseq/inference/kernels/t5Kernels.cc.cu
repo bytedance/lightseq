@@ -254,5 +254,69 @@ namespace cuda {
       int token_num, int hidden_size, cudaStream_t stream, __half* matrix, __half* out,
       const __half* scale, const __half* bias, int max_thread_per_block);
 
+
+  /**
+  @brief: t5_ker_correlation_softmax_decself
+  query-key correlation softmax for decoder self attention
+
+  @thread
+  gridDim.x = batch_size * beam_size * head_num
+  blockDim.x = first multiple of WARP_SIZE greater than cur_step + 1
+  
+  @param
+  correlation: [batch_size, beam_size, head_num, cur_step + 1]
+  */
+  template <typename T>
+  __global__ void t5_ker_correlation_softmax_decself(T* correlation, int step_num, const T *pos_emb) {
+    int idx = blockIdx.x * step_num + threadIdx.x;
+    // float val =
+    //     threadIdx.x < step_num ? (float)correlation[idx] : CUDA_FLOAT_INF_NEG;
+
+    float val;
+    if (threadIdx.x < step_num) {
+      // blockIdx.x = head_num + beam_size * 8 + batch_size * 8 * beam_size
+      int j = threadIdx.x;
+      int i = step_num - 1;
+      int head_idx = blockIdx.x % 8;
+      val = (float)correlation[idx];
+      int bucket_index = get_bucket_num(i, j, false);
+      val += (float)pos_emb[bucket_index * 8 + head_idx];
+    } else val = CUDA_FLOAT_INF_NEG;
+  
+    float max_val = blockReduceMax(val);
+    __shared__ float smax;
+    if (threadIdx.x == 0) smax = max_val;
+    __syncthreads();
+
+    val = threadIdx.x < step_num ? expf(val - smax) : 0;
+
+    float rsum = blockReduceSum(val);
+    __shared__ float ssum;
+    if (threadIdx.x == 0) ssum = rsum;
+    __syncthreads();
+
+    if (threadIdx.x < step_num) correlation[idx] = (T)(val / ssum);
+  }
+
+
+  template <typename T>
+  void t5_ker_correlation_softmax_decself_launcher(int batch_head_num, int step_num,
+                                                cudaStream_t stream,
+                                                T* correlation, const T *pos_emb) {
+    int block_dim = step_num;
+    if (step_num < 1024) {
+      block_dim = (step_num + 31) >> 5;
+      block_dim *= 32;
+    }
+    t5_ker_correlation_softmax_decself<<<batch_head_num, block_dim, 0, stream>>>(
+        correlation, step_num, pos_emb);
+  }
+  
+  template void t5_ker_correlation_softmax_decself_launcher<float>(
+      int batch_head_num, int step_num, cudaStream_t stream, float* correlation, const float *pos_emb);
+  
+  template void t5_ker_correlation_softmax_decself_launcher<__half>(
+      int batch_head_num, int step_num, cudaStream_t stream, __half* correlation, const __half *pos_emb);
+  
 }  // namespace cuda
 }  // namespace lightseq

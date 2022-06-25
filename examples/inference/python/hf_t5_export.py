@@ -33,9 +33,9 @@ enc_layer_mapping_dict = OrderedDict(
         # "multihead_project_bias_output": "",
         "ffn_norm_scale": "one layer_norm weight",
         # "ffn_norm_bias": "final_layer_norm bias",
-        "ffn_first_kernel": "DenseReluDense wi weight",
+        "ffn_first_kernel": "DenseReluDense wi weight&&expression_.transpose(0, 1)",
         # "ffn_first_bias": "",
-        "ffn_second_kernel": "DenseReluDense wo weight",
+        "ffn_second_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
         # "ffn_second_bias": "fc2 bias",
     }
 )
@@ -501,8 +501,8 @@ def extract_transformer_weights(
 
     transformer.model_conf.extra_decode_length = extra_decode_length
     transformer.model_conf.src_padding_id = -1
-    transformer.model_conf.trg_start_id = 2
-    transformer.model_conf.trg_end_id = 2
+    transformer.model_conf.trg_start_id = 0
+    transformer.model_conf.trg_end_id = 1
 
     transformer.model_conf.sampling_method = generation_method
     transformer.model_conf.topk = topk
