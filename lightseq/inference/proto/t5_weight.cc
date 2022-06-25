@@ -571,7 +571,7 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   std::string dataset_prefix =
       (source == "src") ? "src_embedding" : "trg_embedding";
   size_t value_size =
-      vocab_size * _hidden_size + 32 * 8 + 2 * _hidden_size;
+      vocab_size * _hidden_size + 32 * _head_num + 2 * _hidden_size;
   if (source != "src") {
     value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
                   _hidden_size * 2 * _n_dec_layer + vocab_size;
@@ -596,9 +596,9 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [=](int size) { return size != 32 * 8; },
+      [=](int size) { return size != 32 * _head_num; },
       "Wrong position_embedding_size !");
-  idx += 32 * 8;
+  idx += 32 * _head_num;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(

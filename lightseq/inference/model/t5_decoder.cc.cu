@@ -560,12 +560,8 @@ void T5Decoder<OpType_>::self_attention() {
     print_vec(_p_d_c,"_p_d_c matrix: ", 10);
   #endif
 
-  #ifdef DEBUG_RESULT
-    std::cout << "decoder before softmax: " << std::endl;
-    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
-  #endif
   t5_ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
-                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[1]);
+                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[1], _tw._head_num);
 
   // ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
   //   _cur_step + 1, _stream, _p_d_c);

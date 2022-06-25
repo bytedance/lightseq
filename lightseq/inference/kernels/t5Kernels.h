@@ -24,6 +24,6 @@ namespace cuda {
     void t5_ker_correlation_softmax_decself_launcher(int batch_head_num, int step_num,
                                                 cudaStream_t stream,
                                                 T* correlation,
-                                                const T *pos_emb);
+                                                const T *pos_emb, int head_num);
 }  // namespace cuda
 }  // namespace lightseq
