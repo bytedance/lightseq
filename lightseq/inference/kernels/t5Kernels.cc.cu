@@ -193,11 +193,14 @@ namespace cuda {
     //                                         : CUDA_FLOAT_INF_NEG;
     float val;
     if (threadIdx.x < batch_seq_len) {
-      // We know that idx = head_num * batch_seq_len * batch_seq_len
-      //     + i * batch_seq_len + j;
+      // We know that idx = head_index * batch_seq_len * batch_seq_len
+      //     + i * batch_seq_len + j + batch_num * head_num * batch_seq_len * batch_seq_len;
+
       int j = idx % batch_seq_len;
       int i = (idx - j) / batch_seq_len % batch_seq_len;
-      int head_idx = (idx - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
+      int head_num = 8;
+      // int head_idx = (idx - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
+      int head_idx =  ((idx - j) / batch_seq_len - i)/ batch_seq_len % head_num;
       val = (float)correlation[idx];
       // new_values[0, head, i, j] = relative_attention_bias.weight[relative_position_bucket[i][j]][head]
       int bucket_index = get_bucket_num(i, j, true);
@@ -279,8 +282,11 @@ namespace cuda {
       int i = step_num - 1;
       int head_idx = blockIdx.x % 8;
       val = (float)correlation[idx];
+      // float before = val;
       int bucket_index = get_bucket_num(i, j, false);
       val += (float)pos_emb[bucket_index * 8 + head_idx];
+      // float diff = val - before;
+      // printf("i %d, j %d, head_idx %d, bucket_index %d, idx %d, before %f after %f diff %f\n", i, j, head_idx, bucket_index, idx, before, val, diff);
     } else val = CUDA_FLOAT_INF_NEG;
   
     float max_val = blockReduceMax(val);
@@ -310,6 +316,7 @@ namespace cuda {
     }
     t5_ker_correlation_softmax_decself<<<batch_head_num, block_dim, 0, stream>>>(
         correlation, step_num, pos_emb);
+    // cudaDeviceSynchronize();
   }
   
   template void t5_ker_correlation_softmax_decself_launcher<float>(

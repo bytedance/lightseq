@@ -42,8 +42,7 @@ T5Decoder<OpType_>::T5Decoder(int max_batch_size, const int* p_d_padding_mask,
       _type_zero(0.f),
       _fzero(0.f),
       _atten_scaler(1.f),
-      _logit_scaler(_tw._no_scale_embedding ? 1.f
-                                            : sqrt(1.f / tw._hidden_size)),
+      _logit_scaler(1.f / sqrt(tw._hidden_size)),
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
@@ -561,8 +560,12 @@ void T5Decoder<OpType_>::self_attention() {
     print_vec(_p_d_c,"_p_d_c matrix: ", 10);
   #endif
 
+  #ifdef DEBUG_RESULT
+    std::cout << "decoder before softmax: " << std::endl;
+    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
+  #endif
   t5_ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
-                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[0]);
+                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[1]);
 
   // ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
   //   _cur_step + 1, _stream, _p_d_c);
