@@ -1,4 +1,4 @@
-lightseq/inference/kernels/t5#pragma once
+#pragma once
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <curand_kernel.h>
