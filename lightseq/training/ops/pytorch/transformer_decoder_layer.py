@@ -255,40 +255,40 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             all_enc_attn_vb = list(map(copy_and_view, all_enc_attn_kvb[1::2]))
 
         weight = {
-            "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
-            "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
-            "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
-            "self_attn_out_proj": copy_and_view(
+            "self_attn.q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn.k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn.v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn.out_proj": copy_and_view(
                 self._get_weights(2), (self.hs, self.hs)
             ),
             "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
-            "encoder_attn_q_proj": copy_and_view(
+            "encoder_attn.q_proj": copy_and_view(
                 self._get_weights(6), (self.hs, self.hs)
             ),
-            "encoder_attn_out_proj": copy_and_view(
+            "encoder_attn.out_proj": copy_and_view(
                 self._get_weights(8), (self.hs, self.hs)
             ),
             "encoder_attn_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
             "fc1": copy_and_view(self._get_weights(12), (self.ims, self.hs)),
             "fc2": copy_and_view(self._get_weights(14), (self.hs, self.ims)),
             "final_layer_norm": copy_and_view(self._get_weights(16), (self.hs,)),
-            "encoder_attn_k_proj": all_enc_attn_kw,
-            "encoder_attn_v_proj": all_enc_attn_vw,
+            "encoder_attn.k_proj": all_enc_attn_kw,
+            "encoder_attn.v_proj": all_enc_attn_vw,
         }
         bias = {
-            "self_attn_q_proj": copy_and_view(self_attn_qb),
-            "self_attn_k_proj": copy_and_view(self_attn_kb),
-            "self_attn_v_proj": copy_and_view(self_attn_vb),
-            "self_attn_out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn.q_proj": copy_and_view(self_attn_qb),
+            "self_attn.k_proj": copy_and_view(self_attn_kb),
+            "self_attn.v_proj": copy_and_view(self_attn_vb),
+            "self_attn.out_proj": copy_and_view(self._get_weights(3)),
             "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
-            "encoder_attn_q_proj": copy_and_view(self._get_weights(7), (self.hs,)),
-            "encoder_attn_out_proj": copy_and_view(self._get_weights(9), (self.hs,)),
+            "encoder_attn.q_proj": copy_and_view(self._get_weights(7), (self.hs,)),
+            "encoder_attn.out_proj": copy_and_view(self._get_weights(9), (self.hs,)),
             "encoder_attn_layer_norm": copy_and_view(self._get_weights(11), (self.hs,)),
             "fc1": copy_and_view(self._get_weights(13)),
             "fc2": copy_and_view(self._get_weights(15)),
             "final_layer_norm": copy_and_view(self._get_weights(17)),
-            "encoder_attn_k_proj": all_enc_attn_kb,
-            "encoder_attn_v_proj": all_enc_attn_vb,
+            "encoder_attn.k_proj": all_enc_attn_kb,
+            "encoder_attn.v_proj": all_enc_attn_vb,
         }
         return weight, bias
 

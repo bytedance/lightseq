@@ -116,5 +116,8 @@ class TransformerEmbeddingLayerBase(nn.Module):
             fp16: bool  # fp16 presion
             local_rank: int  # rank in local node
             trainable_pos: bool = False  # trainable positional embedding
+            no_scale_embedding: bool = False  # scale embedding
+            layernorm_embedding: bool = False  # layernorm for embedding
+            need_offset: bool = False  # position offset for bart
 
         return Config(**kwargs)

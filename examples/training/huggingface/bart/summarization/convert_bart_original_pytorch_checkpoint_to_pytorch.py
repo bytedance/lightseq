@@ -34,7 +34,12 @@ from transformers import (
 from transformers.utils import logging
 
 
-FAIRSEQ_MODELS = ["bart.large", "bart.large.mnli", "bart.large.cnn", "bart_xsum/model.pt"]
+FAIRSEQ_MODELS = [
+    "bart.large",
+    "bart.large.mnli",
+    "bart.large.cnn",
+    "bart_xsum/model.pt",
+]
 extra_arch = {"bart.large": BartModel, "bart.large.mnli": BartForSequenceClassification}
 if version.parse(fairseq.__version__) < version.parse("0.9.0"):
     raise Exception("requires fairseq >= 0.9.0")
@@ -46,10 +51,19 @@ logger = logging.get_logger(__name__)
 SAMPLE_TEXT = " Hello world! cécé herlolip"
 
 mnli_rename_keys = [
-    ("model.classification_heads.mnli.dense.weight", "classification_head.dense.weight"),
+    (
+        "model.classification_heads.mnli.dense.weight",
+        "classification_head.dense.weight",
+    ),
     ("model.classification_heads.mnli.dense.bias", "classification_head.dense.bias"),
-    ("model.classification_heads.mnli.out_proj.weight", "classification_head.out_proj.weight"),
-    ("model.classification_heads.mnli.out_proj.bias", "classification_head.out_proj.bias"),
+    (
+        "model.classification_heads.mnli.out_proj.weight",
+        "classification_head.out_proj.weight",
+    ),
+    (
+        "model.classification_heads.mnli.out_proj.bias",
+        "classification_head.out_proj.bias",
+    ),
 ]
 
 
@@ -60,7 +74,7 @@ def remove_ignore_keys_(state_dict):
         "model.encoder.version",
         "model.decoder.version",
         "_float_tensor",
-        'decoder.output_projection.weight',
+        "decoder.output_projection.weight",
     ]
     for k in ignore_keys:
         state_dict.pop(k, None)
@@ -75,8 +89,9 @@ def load_xsum_checkpoint(checkpoint_path, is_bart_base=False):
     """Checkpoint path should end in model.pt"""
     if is_bart_base:
         from fairseq.models.bart import BARTModel
-        splitnames = checkpoint_path.split('/')
-        dirname = '/'.join(splitnames[:-1])
+
+        splitnames = checkpoint_path.split("/")
+        dirname = "/".join(splitnames[:-1])
         modelname = splitnames[-1]
         bart = BARTModel.from_pretrained(dirname, checkpoint_file=modelname)
         bart.eval()  # disable dropout (or leave in train mode to finetune)
@@ -92,6 +107,7 @@ def upgrade_bart_base_state_dict(state_dict):
     def truncate_emb(key):
         if key in state_dict:
             state_dict[key] = state_dict[key][:-936, :]
+
     truncate_emb("encoder.embed_tokens.weight")
     truncate_emb("decoder.embed_tokens.weight")
     truncate_emb("encoder.output_projection.weight")
@@ -106,11 +122,16 @@ def make_linear_from_emb(emb):
 
 
 @torch.no_grad()
-def convert_bart_checkpoint(checkpoint_path, pytorch_dump_folder_path, hf_checkpoint_name=None, is_bart_base=False):
+def convert_bart_checkpoint(
+    checkpoint_path,
+    pytorch_dump_folder_path,
+    hf_checkpoint_name=None,
+    is_bart_base=False,
+):
     """
     Copy/paste/tweak model's weights to our BERT structure.
     """
-    is_bart_base = (hf_checkpoint_name == "facebook/bart-base" or is_bart_base)
+    is_bart_base = hf_checkpoint_name == "facebook/bart-base" or is_bart_base
     if not os.path.exists(checkpoint_path):
         bart = torch.hub.load("pytorch/fairseq", checkpoint_path).eval()
     else:
@@ -121,13 +142,19 @@ def convert_bart_checkpoint(checkpoint_path, pytorch_dump_folder_path, hf_checkp
         hf_checkpoint_name = checkpoint_path.replace(".", "-")
     config = BartConfig.from_pretrained(hf_checkpoint_name)
     tokens = bart.encode(SAMPLE_TEXT).unsqueeze(0)
-    tokens2 = BartTokenizer.from_pretrained(hf_checkpoint_name).encode(SAMPLE_TEXT, return_tensors="pt").unsqueeze(0)
+    tokens2 = (
+        BartTokenizer.from_pretrained(hf_checkpoint_name)
+        .encode(SAMPLE_TEXT, return_tensors="pt")
+        .unsqueeze(0)
+    )
     assert torch.eq(tokens, tokens2).all()
 
     if checkpoint_path == "bart.large.mnli":
         state_dict = bart.state_dict()
         remove_ignore_keys_(state_dict)
-        state_dict["model.shared.weight"] = state_dict["model.decoder.embed_tokens.weight"]
+        state_dict["model.shared.weight"] = state_dict[
+            "model.decoder.embed_tokens.weight"
+        ]
         for src, dest in mnli_rename_keys:
             rename_key(state_dict, src, dest)
         model = BartForSequenceClassification(config).eval()
@@ -146,7 +173,9 @@ def convert_bart_checkpoint(checkpoint_path, pytorch_dump_folder_path, hf_checkp
             model.load_state_dict(state_dict)
             new_model_outputs = model(tokens).model[0]
         else:
-            model = BartForConditionalGeneration(config).eval()  # an existing summarization ckpt
+            model = BartForConditionalGeneration(
+                config
+            ).eval()  # an existing summarization ckpt
             model.model.load_state_dict(state_dict)
             if hasattr(model, "lm_head"):
                 model.lm_head = make_linear_from_emb(model.model.shared)
@@ -163,14 +192,32 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
-        "--fairseq_path", type=str, help="bart.large, bart.large.cnn or a path to a model.pt on local filesystem."
-    )
-    parser.add_argument("--pytorch_dump_folder_path", default=None, type=str, help="Path to the output PyTorch model.")
-    parser.add_argument(
-        "--hf_config", default=None, type=str, help="Which huggingface architecture to use: bart-large-xsum"
+        "--fairseq_path",
+        type=str,
+        help="bart.large, bart.large.cnn or a path to a model.pt on local filesystem.",
     )
     parser.add_argument(
-        "--is_bart_base", default=False, action='store_true', help="Which huggingface architecture to use: bart-large-xsum"
+        "--pytorch_dump_folder_path",
+        default=None,
+        type=str,
+        help="Path to the output PyTorch model.",
+    )
+    parser.add_argument(
+        "--hf_config",
+        default=None,
+        type=str,
+        help="Which huggingface architecture to use: bart-large-xsum",
+    )
+    parser.add_argument(
+        "--is_bart_base",
+        default=False,
+        action="store_true",
+        help="Which huggingface architecture to use: bart-large-xsum",
     )
     args = parser.parse_args()
-    convert_bart_checkpoint(args.fairseq_path, args.pytorch_dump_folder_path, hf_checkpoint_name=args.hf_config, is_bart_base=args.is_bart_base)
+    convert_bart_checkpoint(
+        args.fairseq_path,
+        args.pytorch_dump_folder_path,
+        hf_checkpoint_name=args.hf_config,
+        is_bart_base=args.is_bart_base,
+    )

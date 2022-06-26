@@ -136,14 +136,14 @@ def hf_state_dict(model):
             for layer_id in range(config.encoder_layers):
                 weight, bias = ls_layer[layer_id].params_dict()
                 layer = hf_layer[layer_id]
-                layer.self_attn.q_proj.weight.data.copy_(weight["self_attn_q_proj"])
-                layer.self_attn.q_proj.bias.data.copy_(bias["self_attn_q_proj"])
-                layer.self_attn.k_proj.weight.data.copy_(weight["self_attn_k_proj"])
-                layer.self_attn.k_proj.bias.data.copy_(bias["self_attn_k_proj"])
-                layer.self_attn.v_proj.weight.data.copy_(weight["self_attn_v_proj"])
-                layer.self_attn.v_proj.bias.data.copy_(bias["self_attn_v_proj"])
-                layer.self_attn.out_proj.weight.data.copy_(weight["self_attn_out_proj"])
-                layer.self_attn.out_proj.bias.data.copy_(bias["self_attn_out_proj"])
+                layer.self_attn.q_proj.weight.data.copy_(weight["self_attn.q_proj"])
+                layer.self_attn.q_proj.bias.data.copy_(bias["self_attn.q_proj"])
+                layer.self_attn.k_proj.weight.data.copy_(weight["self_attn.k_proj"])
+                layer.self_attn.k_proj.bias.data.copy_(bias["self_attn.k_proj"])
+                layer.self_attn.v_proj.weight.data.copy_(weight["self_attn.v_proj"])
+                layer.self_attn.v_proj.bias.data.copy_(bias["self_attn.v_proj"])
+                layer.self_attn.out_proj.weight.data.copy_(weight["self_attn.out_proj"])
+                layer.self_attn.out_proj.bias.data.copy_(bias["self_attn.out_proj"])
                 layer.self_attn_layer_norm.weight.data.copy_(
                     weight["self_attn_layer_norm"]
                 )
@@ -162,14 +162,14 @@ def hf_state_dict(model):
             for layer_id in range(config.decoder_layers):
                 weight, bias = ls_layer[layer_id].params_dict()
                 layer = hf_layer[layer_id]
-                layer.self_attn.q_proj.weight.data.copy_(weight["self_attn_q_proj"])
-                layer.self_attn.q_proj.bias.data.copy_(bias["self_attn_q_proj"])
-                layer.self_attn.k_proj.weight.data.copy_(weight["self_attn_k_proj"])
-                layer.self_attn.k_proj.bias.data.copy_(bias["self_attn_k_proj"])
-                layer.self_attn.v_proj.weight.data.copy_(weight["self_attn_v_proj"])
-                layer.self_attn.v_proj.bias.data.copy_(bias["self_attn_v_proj"])
-                layer.self_attn.out_proj.weight.data.copy_(weight["self_attn_out_proj"])
-                layer.self_attn.out_proj.bias.data.copy_(bias["self_attn_out_proj"])
+                layer.self_attn.q_proj.weight.data.copy_(weight["self_attn.q_proj"])
+                layer.self_attn.q_proj.bias.data.copy_(bias["self_attn.q_proj"])
+                layer.self_attn.k_proj.weight.data.copy_(weight["self_attn.k_proj"])
+                layer.self_attn.k_proj.bias.data.copy_(bias["self_attn.k_proj"])
+                layer.self_attn.v_proj.weight.data.copy_(weight["self_attn.v_proj"])
+                layer.self_attn.v_proj.bias.data.copy_(bias["self_attn.v_proj"])
+                layer.self_attn.out_proj.weight.data.copy_(weight["self_attn.out_proj"])
+                layer.self_attn.out_proj.bias.data.copy_(bias["self_attn.out_proj"])
                 layer.self_attn_layer_norm.weight.data.copy_(
                     weight["self_attn_layer_norm"]
                 )
@@ -182,14 +182,14 @@ def hf_state_dict(model):
                 layer.final_layer_norm.bias.data.copy_(bias["final_layer_norm"])
 
                 layer.encoder_attn.q_proj.weight.data.copy_(
-                    weight["encoder_attn_q_proj"]
+                    weight["encoder_attn.q_proj"]
                 )
-                layer.encoder_attn.q_proj.bias.data.copy_(bias["encoder_attn_q_proj"])
+                layer.encoder_attn.q_proj.bias.data.copy_(bias["encoder_attn.q_proj"])
                 layer.encoder_attn.out_proj.weight.data.copy_(
-                    weight["encoder_attn_out_proj"]
+                    weight["encoder_attn.out_proj"]
                 )
                 layer.encoder_attn.out_proj.bias.data.copy_(
-                    bias["encoder_attn_out_proj"]
+                    bias["encoder_attn.out_proj"]
                 )
                 layer.encoder_attn_layer_norm.weight.data.copy_(
                     weight["encoder_attn_layer_norm"]
@@ -198,10 +198,10 @@ def hf_state_dict(model):
                     bias["encoder_attn_layer_norm"]
                 )
                 if layer_id == 0:
-                    encoder_attn_k_proj_w = weight["encoder_attn_k_proj"]
-                    encoder_attn_k_proj_b = bias["encoder_attn_k_proj"]
-                    encoder_attn_v_proj_w = weight["encoder_attn_v_proj"]
-                    encoder_attn_v_proj_b = bias["encoder_attn_v_proj"]
+                    encoder_attn_k_proj_w = weight["encoder_attn.k_proj"]
+                    encoder_attn_k_proj_b = bias["encoder_attn.k_proj"]
+                    encoder_attn_v_proj_w = weight["encoder_attn.v_proj"]
+                    encoder_attn_v_proj_b = bias["encoder_attn.v_proj"]
                 layer.encoder_attn.k_proj.weight.data.copy_(
                     encoder_attn_k_proj_w[layer_id]
                 )

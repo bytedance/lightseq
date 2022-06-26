@@ -147,14 +147,14 @@ def hf_state_dict(model):
         for layer_id in range(config.num_hidden_layers):
             weight, bias = ls_layer[layer_id].params_dict()
             layer = hf_layer[layer_id]
-            layer.attention.self.query.weight.data.copy_(weight["self_attn_q_proj"])
-            layer.attention.self.query.bias.data.copy_(bias["self_attn_q_proj"])
-            layer.attention.self.key.weight.data.copy_(weight["self_attn_k_proj"])
-            layer.attention.self.key.bias.data.copy_(bias["self_attn_k_proj"])
-            layer.attention.self.value.weight.data.copy_(weight["self_attn_v_proj"])
-            layer.attention.self.value.bias.data.copy_(bias["self_attn_v_proj"])
-            layer.attention.output.dense.weight.data.copy_(weight["self_attn_out_proj"])
-            layer.attention.output.dense.bias.data.copy_(bias["self_attn_out_proj"])
+            layer.attention.self.query.weight.data.copy_(weight["self_attn.q_proj"])
+            layer.attention.self.query.bias.data.copy_(bias["self_attn.q_proj"])
+            layer.attention.self.key.weight.data.copy_(weight["self_attn.k_proj"])
+            layer.attention.self.key.bias.data.copy_(bias["self_attn.k_proj"])
+            layer.attention.self.value.weight.data.copy_(weight["self_attn.v_proj"])
+            layer.attention.self.value.bias.data.copy_(bias["self_attn.v_proj"])
+            layer.attention.output.dense.weight.data.copy_(weight["self_attn.out_proj"])
+            layer.attention.output.dense.bias.data.copy_(bias["self_attn.out_proj"])
             layer.attention.output.LayerNorm.weight.data.copy_(
                 weight["self_attn_layer_norm"]
             )
