@@ -147,6 +147,11 @@ class LSBARTModel(TransformerModel):
         if "encoder.version" not in state_dict:
             return
 
+        if self.args.max_source_positions > 512 or self.args.max_target_positions > 512:
+            raise ValueError(
+                "The value of max_source_positions and max_target_positions should not be greater than 512"
+            )
+
         def truncate_emb(key):
             if key in state_dict:
                 state_dict[key] = state_dict[key][:-1, :]
@@ -223,8 +228,8 @@ class LSBARTModel(TransformerModel):
         for lid in range(self.args.encoder_layers):
             prefix = f"encoder.layers.{lid}."
             para = torch.cat([get_weight(prefix + k) for k in enc_state_list])
-            state_dict[prefix + 'para'] = para
-        
+            state_dict[prefix + "para"] = para
+
         kv = {
             ".weight": [],
             ".bias": [],
@@ -238,7 +243,7 @@ class LSBARTModel(TransformerModel):
         for lid in range(1, self.args.decoder_layers):
             prefix = f"decoder.layers.{lid}."
             para = torch.cat([get_weight(prefix + k) for k in dec_state_list])
-            state_dict[prefix + 'para'] = para
+            state_dict[prefix + "para"] = para
 
         dec_layer0_para = []
         for k in dec_state_list:
@@ -257,10 +262,11 @@ class LSBARTModel(TransformerModel):
             "decoder.layernorm_embedding.weight": "decoder.embed_tokens.layernorm_embedding.weight",
             "decoder.layernorm_embedding.bias": "decoder.embed_tokens.layernorm_embedding.bias",
         }
+
         def rename_key(old, new):
             val = state_dict.pop(old)
             state_dict[new] = val
-        
+
         for k, v in embed_map_dict.items():
             rename_key(k, v)
 
@@ -278,9 +284,9 @@ class LSBARTModel(TransformerModel):
         # add new state
         embedding_weight = state_dict["encoder.embed_tokens.emb_lookup.weight"]
         state_dict["encoder.embed_tokens.embeddings"] = embedding_weight
-        state_dict["encoder.embed_tokens.emb_quant._amax"] = torch.tensor(1.)
+        state_dict["encoder.embed_tokens.emb_quant._amax"] = torch.tensor(1.0)
         state_dict["decoder.embed_tokens.embeddings"] = embedding_weight
-        state_dict["decoder.embed_tokens.emb_quant._amax"] = torch.tensor(1.)
+        state_dict["decoder.embed_tokens.emb_quant._amax"] = torch.tensor(1.0)
         if "decoder.output_projection.weight" not in state_dict:
             state_dict["decoder.output_projection.weight"] = embedding_weight
 
