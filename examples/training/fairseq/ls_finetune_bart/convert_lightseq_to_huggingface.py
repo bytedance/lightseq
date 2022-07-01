@@ -43,12 +43,20 @@ def split_checkpoint_path(checkpoint_path):
     return path.parent, path.name
 
 
-def _upgrade_huggingface_bart_base_state_dict(state_dict, arch):
+def _upgrade_huggingface_bart_base_state_dict(state_dict, arch, hf_config):
+    embed_weight = state_dict["encoder.embed_tokens.weight"]
+    offset = hf_config.vocab_size - embed_weight.shape[0]
+    if offset > 0:
+        h = torch.zeros(offset, embed_weight.shape[1]).to(embed_weight)
+
     def truncate_emb(key):
         if key in state_dict:
-            state_dict[key] = state_dict[key][:-935, :]
+            if offset > 0:
+                state_dict[key] = torch.cat((state_dict[key], h), dim=0)
+            else:
+                state_dict[key] = state_dict[key][:offset, :]
 
-    if arch == "ls_bart_base":
+    if offset != 0:
         truncate_emb("encoder.embed_tokens.weight")
         truncate_emb("decoder.embed_tokens.weight")
         truncate_emb("encoder.output_projection.weight")
@@ -62,8 +70,6 @@ def test_lightseq_bart(checkpoint_path):
 
     args = {
         "arch": "ls_bart_base",
-        "max_source_positions": 512,
-        "max_target_positions": 512,
     }
     fs_bart = (
         BARTModel.from_pretrained(dirname, checkpoint_file=modelname, fp16=False)
@@ -115,14 +121,6 @@ def _upgrade_pytorch_state_dict(state_dict, args, model):
     for k, v in embed_map_dict.items():
         rename_key(state_dict, k, v)
 
-    def extend_position(old):
-        zeros = torch.zeros(512, args.encoder_embed_dim).to(old)
-        new = torch.cat((old, zeros), dim=0)
-        return new
-
-    for k in ["encoder.embed_positions.weight", "decoder.embed_positions.weight"]:
-        state_dict[k] = extend_position(state_dict[k])
-
     # update state dict of encoder
     for lid in range(args.encoder_layers):
         prefix = f"encoder.layers.{lid}."
@@ -153,8 +151,7 @@ def _upgrade_pytorch_state_dict(state_dict, args, model):
             state_dict[prefix + k] = v[lid]
 
 
-def load_huggingface_model(state_dict, hf_checkpoint_name="facebook/bart-base"):
-    config = BartConfig.from_pretrained(hf_checkpoint_name)
+def load_huggingface_model(state_dict, config, hf_checkpoint_name="facebook/bart-base"):
     model = BartForConditionalGeneration(config).eval()
     model.model.load_state_dict(state_dict)
     if hasattr(model, "lm_head"):
@@ -167,6 +164,7 @@ def convert_ls2hf(checkpoint_path, hf_checkpoint_name, pytorch_dump_folder_path)
     device = "cuda:0"
     dirname, modelname = split_checkpoint_path(checkpoint_path)
 
+    hf_config = BartConfig.from_pretrained(hf_checkpoint_name)
     ls_model = (
         LSBARTModel.from_pretrained(dirname, checkpoint_file=modelname, fp16=False)
         .to(device)
@@ -180,12 +178,13 @@ def convert_ls2hf(checkpoint_path, hf_checkpoint_name, pytorch_dump_folder_path)
     if args.arch.startswith("ls"):
         ValueError("Only lightseq model is supported")
 
+    
     # upgrade state dict
     _upgrade_pytorch_state_dict(state_dict, args, model)
-    _upgrade_huggingface_bart_base_state_dict(state_dict, args.arch)
+    _upgrade_huggingface_bart_base_state_dict(state_dict, args.arch, hf_config)
 
     # load huggface model
-    hf_model = load_huggingface_model(state_dict, hf_checkpoint_name).to(device)
+    hf_model = load_huggingface_model(state_dict, hf_config, hf_checkpoint_name).to(device)
 
     # forward
     tokens = ls_model.encode(SAMPLE_TEXT).unsqueeze(0).to(device)
@@ -209,9 +208,9 @@ def convert_ls2hf(checkpoint_path, hf_checkpoint_name, pytorch_dump_folder_path)
         atol=1e-1,
         equal_nan=False,
     )
-
     Path(pytorch_dump_folder_path).mkdir(exist_ok=True)
     hf_model.save_pretrained(pytorch_dump_folder_path)
+    print(f"saved model and config in {pytorch_dump_folder_path}")
 
 
 if __name__ == "__main__":
