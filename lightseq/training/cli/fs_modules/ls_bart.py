@@ -10,14 +10,16 @@ import torch.nn as nn
 
 from fairseq import utils
 from fairseq.models import register_model, register_model_architecture
-from fairseq.models.bart import BARTHubInterface
-from .ls_transformer import LSTransformerModel as TransformerModel
+from fairseq.models.transformer import TransformerModel
+from fairseq.models.bart import BARTHubInterface, BARTModel
+from .ls_transformer import LSTransformerModel
+
 
 logger = logging.getLogger(__name__)
 
 
 @register_model("ls_bart")
-class LSBARTModel(TransformerModel):
+class LSBARTModel(LSTransformerModel):
     def __init__(self, args, encoder, decoder):
         super().__init__(args, encoder, decoder)
 
@@ -144,26 +146,13 @@ class LSBARTModel(TransformerModel):
         )
 
     def upgrade_state_dict_named(self, state_dict, name):
+        self.upgrade_fairseq_state_dict_named(state_dict)
         if "encoder.version" not in state_dict:
             return
-
-        if self.args.max_source_positions > 512 or self.args.max_target_positions > 512:
-            raise ValueError(
-                "The value of max_source_positions and max_target_positions should not be greater than 512"
-            )
 
         def truncate_emb(key):
             if key in state_dict:
                 state_dict[key] = state_dict[key][:-1, :]
-
-        def truncate_pos(key):
-            if key in state_dict:
-                state_dict[key] = state_dict[key][:-512, :]
-
-        loaded_pos_len = state_dict["encoder.embed_positions.weight"].size(0)
-        if loaded_pos_len >= 1024:
-            truncate_pos("encoder.embed_positions.weight")
-            truncate_pos("decoder.embed_positions.weight")
 
         # When finetuning on translation task, remove last row of
         # embedding matrix that corresponds to mask_idx token.
@@ -290,6 +279,71 @@ class LSBARTModel(TransformerModel):
         if "decoder.output_projection.weight" not in state_dict:
             state_dict["decoder.output_projection.weight"] = embedding_weight
 
+    def upgrade_fairseq_state_dict_named(self, state_dict):
+        for lid in range(self.args.encoder_layers):
+            name = f"encoder.layers.{lid}.self_attn"
+            self.upgrade_attn_state_dict_named(state_dict, name)
+            name = f"encoder.layers.{lid}"
+            layer_norm_map = {"0": "self_attn_layer_norm", "1": "final_layer_norm"}
+            for old, new in layer_norm_map.items():
+                for m in ("weight", "bias"):
+                    k = "{}.layer_norms.{}.{}".format(name, old, m)
+                    if k in state_dict:
+                        state_dict["{}.{}.{}".format(name, new, m)] = state_dict[k]
+                        del state_dict[k]
+
+        for i in range(self.args.decoder_layers):
+            name = f"decoder.layers.{i}.self_attn"
+            self.upgrade_attn_state_dict_named(state_dict, name)
+            name = f"decoder.layers.{i}.encoder_attn"
+            self.upgrade_attn_state_dict_named(state_dict, name)
+            name = f"decoder.layers.{i}"
+            # update layer norms
+            layer_norm_map = {
+                "0": "self_attn_layer_norm",
+                "1": "encoder_attn_layer_norm",
+                "2": "final_layer_norm",
+            }
+            for old, new in layer_norm_map.items():
+                for m in ("weight", "bias"):
+                    k = "{}.layers.{}.layer_norms.{}.{}".format(name, i, old, m)
+                    if k in state_dict:
+                        state_dict[
+                            "{}.layers.{}.{}.{}".format(name, i, new, m)
+                        ] = state_dict[k]
+                        del state_dict[k]
+
+    def upgrade_attn_state_dict_named(self, state_dict, name):
+        prefix = name + "." if name != "" else ""
+        items_to_add = {}
+        keys_to_remove = []
+        for k in state_dict.keys():
+            if k.endswith(prefix + "in_proj_weight"):
+                # in_proj_weight used to be q + k + v with same dimensions
+                dim = int(state_dict[k].shape[0] / 3)
+                items_to_add[prefix + "q_proj.weight"] = state_dict[k][:dim]
+                items_to_add[prefix + "k_proj.weight"] = state_dict[k][dim : 2 * dim]
+                items_to_add[prefix + "v_proj.weight"] = state_dict[k][2 * dim :]
+
+                keys_to_remove.append(k)
+
+                k_bias = prefix + "in_proj_bias"
+                if k_bias in state_dict.keys():
+                    dim = int(state_dict[k].shape[0] / 3)
+                    items_to_add[prefix + "q_proj.bias"] = state_dict[k_bias][:dim]
+                    items_to_add[prefix + "k_proj.bias"] = state_dict[k_bias][
+                        dim : 2 * dim
+                    ]
+                    items_to_add[prefix + "v_proj.bias"] = state_dict[k_bias][2 * dim :]
+
+                    keys_to_remove.append(prefix + "in_proj_bias")
+
+        for k in keys_to_remove:
+            del state_dict[k]
+
+        for key, value in items_to_add.items():
+            state_dict[key] = value
+
     def set_beam_size(self, beam):
         """Set beam size for efficient beamable enc-dec attention."""
         beamable = False
@@ -354,8 +408,8 @@ def bart_large_architecture(args):
     args.attention_dropout = getattr(args, "attention_dropout", 0.0)
     args.relu_dropout = getattr(args, "relu_dropout", 0.0)
     args.dropout = getattr(args, "dropout", 0.1)
-    args.max_target_positions = getattr(args, "max_target_positions", 512)
-    args.max_source_positions = getattr(args, "max_source_positions", 512)
+    args.max_target_positions = getattr(args, "max_target_positions", 1024)
+    args.max_source_positions = getattr(args, "max_source_positions", 1024)
     args.adaptive_softmax_cutoff = getattr(args, "adaptive_softmax_cutoff", None)
     args.adaptive_softmax_dropout = getattr(args, "adaptive_softmax_dropout", 0)
     args.share_decoder_input_output_embed = getattr(
