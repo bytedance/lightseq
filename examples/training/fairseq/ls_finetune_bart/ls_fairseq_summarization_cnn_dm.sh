@@ -6,7 +6,7 @@ cd $THIS_DIR/../../..
 if [ ! -d "/tmp/cnn_dm-bin" ]; then
     echo "Downloading dataset"
     wget http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/cnn_dm_data/databin_cnn_dm.tar.gz -P /tmp
-    tar -xvf /tmp/databin_cnn_dm.tar.gz -C /tmp && rm /tmp/databin_cnn_dm.tar.gz 
+    tar -xvf /tmp/databin_cnn_dm.tar.gz -C /tmp && rm /tmp/databin_cnn_dm.tar.gz
 fi
 
 

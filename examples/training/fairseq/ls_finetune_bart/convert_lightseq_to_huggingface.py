@@ -178,13 +178,14 @@ def convert_ls2hf(checkpoint_path, hf_checkpoint_name, pytorch_dump_folder_path)
     if args.arch.startswith("ls"):
         ValueError("Only lightseq model is supported")
 
-    
     # upgrade state dict
     _upgrade_pytorch_state_dict(state_dict, args, model)
     _upgrade_huggingface_bart_base_state_dict(state_dict, args.arch, hf_config)
 
     # load huggface model
-    hf_model = load_huggingface_model(state_dict, hf_config, hf_checkpoint_name).to(device)
+    hf_model = load_huggingface_model(state_dict, hf_config, hf_checkpoint_name).to(
+        device
+    )
 
     # forward
     tokens = ls_model.encode(SAMPLE_TEXT).unsqueeze(0).to(device)
