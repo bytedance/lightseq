@@ -95,6 +95,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                                  'memory usage at the cost of some additional compute')
         parser.add_argument('--offload-activations', action='store_true',
                             help='checkpoint activations at each layer, then save to gpu. Sets --checkpoint-activations.')
+        parser.add_argument('--trainable-position', default=False, action='store_true',
+                            help='trainable positional embedding.')
         # args for "Cross+Self-Attention for Transformer Models" (Peitz et al., 2019)
         parser.add_argument('--no-cross-attention', default=False, action='store_true',
                             help='do not perform cross-attention')
