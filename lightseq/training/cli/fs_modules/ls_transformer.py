@@ -141,13 +141,32 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     @classmethod
     def build_model(cls, args, task):
         src_dict, tgt_dict = task.source_dictionary, task.target_dictionary
-
-        encoder_embed_tokens = cls.build_embedding(
-            args, src_dict, args.encoder_embed_dim, args.max_source_positions
-        )
-        decoder_embed_tokens = cls.build_embedding(
-            args, tgt_dict, args.decoder_embed_dim, args.max_target_positions
-        )
+        if args.share_all_embeddings:
+            if src_dict != tgt_dict:
+                raise ValueError("--share-all-embeddings requires a joined dictionary")
+            if args.encoder_embed_dim != args.decoder_embed_dim:
+                raise ValueError(
+                    "--share-all-embeddings requires --encoder-embed-dim to match --decoder-embed-dim"
+                )
+            encoder_embed_tokens = cls.build_embedding(
+                args, src_dict, args.encoder_embed_dim, args.max_source_positions
+            )
+            emb_lookup = encoder_embed_tokens.emb_lookup
+            decoder_embed_tokens = cls.build_embedding(
+                args,
+                tgt_dict,
+                args.decoder_embed_dim,
+                args.max_target_positions,
+                emb_lookup=emb_lookup,
+            )
+            args.share_decoder_input_output_embed = True
+        else:
+            encoder_embed_tokens = cls.build_embedding(
+                args, src_dict, args.encoder_embed_dim, args.max_source_positions
+            )
+            decoder_embed_tokens = cls.build_embedding(
+                args, tgt_dict, args.decoder_embed_dim, args.max_target_positions
+            )
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
@@ -172,8 +191,13 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         return cls(args, encoder, decoder)
 
     @classmethod
-    def build_embedding(cls, args, dictionary, embed_dim, max_positions, **kwargs):
-        if args.use_torch_layer:
+    def build_embedding(
+        cls, args, dictionary, embed_dim, max_positions, emb_lookup=None, **kwargs
+    ):
+        use_torch_layer = (
+            args.use_torch_layer or args.no_scale_embedding or args.layernorm_embedding
+        )
+        if use_torch_layer:
             from lightseq.training.ops.pytorch.torch_transformer_layers import (
                 TransformerEmbeddingLayer,
             )
@@ -190,9 +214,12 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             dropout=args.dropout,
             fp16=args.fp16,
             local_rank=args.device_id,
-            trainable_pos=args.trainable_position,
+            trainable_pos=(args.encoder_learned_pos or args.decoder_learned_pos),
+            no_scale_embedding=args.no_scale_embedding,
+            layernorm_embedding=args.layernorm_embedding,
+            need_offset=("bart" in args.arch),
         )
-        emb = TransformerEmbeddingLayer(config)
+        emb = TransformerEmbeddingLayer(config, emb_lookup=emb_lookup)
 
         return emb
 
@@ -204,9 +231,9 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     def build_decoder(cls, args, tgt_dict, embed_tokens):
         return LSTransformerDecoder(args, tgt_dict, embed_tokens)
 
-    def forward(self, src_tokens, prev_output_tokens, **kwargs):
+    def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
         encoder_out = self.encoder(src_tokens)
-        decoder_out = self.decoder(prev_output_tokens, encoder_out)
+        decoder_out = self.decoder(prev_output_tokens, encoder_out, features_only)
         return decoder_out
 
 
@@ -224,7 +251,10 @@ class LSTransformerEncoder(FairseqEncoder):
         )
         self.num_layers = len(self.layers)
 
-        self.layer_norm = LayerNorm(embed_dim)
+        if args.encoder_normalize_before:
+            self.layer_norm = LayerNorm(embed_dim)
+        else:
+            self.layer_norm = None
 
     def build_encoder_layer(self, args):
         if args.use_torch_layer:
@@ -236,7 +266,7 @@ class LSTransformerEncoder(FairseqEncoder):
 
         config = TransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
-            max_seq_len=MAX_SEQ_LENGTH,
+            max_seq_len=args.max_source_positions,
             hidden_size=args.encoder_embed_dim,
             intermediate_size=args.encoder_ffn_embed_dim,
             nhead=args.encoder_attention_heads,
@@ -263,8 +293,8 @@ class LSTransformerEncoder(FairseqEncoder):
         # x: [batch_size, seq_len, hidden_size]
         for layer in self.layers:
             x = layer(x, encoder_padding_mask)
-
-        x = self.layer_norm(x)
+        if self.layer_norm is not None:
+            x = self.layer_norm(x)
         self.batch_size = x.shape[0]
         self.beam_size = -1
 
@@ -338,7 +368,12 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
         )
         self.num_layers = len(self.layers)
 
-        self.layer_norm = LayerNorm(embed_dim)
+        if args.decoder_normalize_before and not getattr(
+            args, "no_decoder_final_norm", False
+        ):
+            self.layer_norm = LayerNorm(embed_dim)
+        else:
+            self.layer_norm = None
 
         if args.use_torch_layer:
             self.output_projection = QuantLinear(
@@ -370,7 +405,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
 
         config = TransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
-            max_seq_len=MAX_SEQ_LENGTH,
+            max_seq_len=args.max_target_positions,
             hidden_size=args.decoder_embed_dim,
             intermediate_size=args.decoder_ffn_embed_dim,
             nhead=args.decoder_attention_heads,
@@ -395,7 +430,12 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
         return x, prev_output_tokens
 
     def forward(
-        self, prev_output_tokens, encoder_out, incremental_state=None, **kwargs
+        self,
+        prev_output_tokens,
+        encoder_out,
+        incremental_state=None,
+        features_only=False,
+        **kwargs
     ):
         x, prev_output_tokens = self.forward_embedding(
             prev_output_tokens, incremental_state
@@ -416,9 +456,11 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 incremental_state=incremental_state,
             )
 
-        x = self.layer_norm(x)
+        if self.layer_norm is not None:
+            x = self.layer_norm(x)
 
-        x = self.output_projection(x)
+        if not features_only:
+            x = self.output_projection(x)
         return x, None
 
     def max_positions(self):

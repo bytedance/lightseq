@@ -234,10 +234,10 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
 
         weight = {
-            "self_attn_q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
-            "self_attn_k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
-            "self_attn_v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
-            "self_attn_out_proj": copy_and_view(
+            "self_attn.q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn.k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn.v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn.out_proj": copy_and_view(
                 self._get_weights(2), (self.hs, self.hs)
             ),
             "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
@@ -246,10 +246,10 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
         }
         bias = {
-            "self_attn_q_proj": copy_and_view(self_attn_qb),
-            "self_attn_k_proj": copy_and_view(self_attn_kb),
-            "self_attn_v_proj": copy_and_view(self_attn_vb),
-            "self_attn_out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn.q_proj": copy_and_view(self_attn_qb),
+            "self_attn.k_proj": copy_and_view(self_attn_kb),
+            "self_attn.v_proj": copy_and_view(self_attn_vb),
+            "self_attn.out_proj": copy_and_view(self._get_weights(3)),
             "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
             "fc1": copy_and_view(self._get_weights(7)),
             "fc2": copy_and_view(self._get_weights(9)),

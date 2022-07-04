@@ -197,7 +197,7 @@ ls_emb_config_fp16 = LSTransformerEmbeddingLayer.get_config(
     vocab_size=40480,
     embedding_dim=1024,
     max_batch_tokens=9216,
-    max_seq_len=256,
+    max_seq_len=1024,
     padding_idx=2,
     dropout=0.0,
     fp16=True,
@@ -234,7 +234,7 @@ ls_tra_pos_emb_config_fp16 = LSTransformerEmbeddingLayer.get_config(
     vocab_size=40000,
     embedding_dim=1024,
     max_batch_tokens=9216,
-    max_seq_len=256,
+    max_seq_len=1024,
     padding_idx=1,
     dropout=0.0,
     fp16=True,
@@ -866,7 +866,7 @@ def test_embedding_layer_backward():
 
 @kt.case(dtypes=[torch.float, torch.half], ntest=10, nrepeat=10)
 def test_tra_pos_embedding_layer_forward():
-    batch_size, seq_len = kt.bs_sl(1)
+    batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.int)
