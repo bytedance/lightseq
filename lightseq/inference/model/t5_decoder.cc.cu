@@ -480,11 +480,6 @@ T5Decoder self attention
 template <OperationType OpType_>
 void T5Decoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  // ker_norm_layer_resual_launcher<_DataType>(
-  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
-  //     _p_d_dec_wei[_weight_offset + 1], _p_d_dec_wei[_weight_offset + 5],
-  //     _max_thread_per_block, _tw._is_post_ln);
   
   t5_ker_norm_layer_launcher<_DataType>(
     _batch_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
@@ -563,11 +558,7 @@ void T5Decoder<OpType_>::self_attention() {
   t5_ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
                                            _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[1], _tw._head_num);
 
-  // ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
-  //   _cur_step + 1, _stream, _p_d_c);
-
 #ifdef DEBUG_RESULT
-  // printf("_step_token_num = %d, _tw.head_num = %d, _cur_step = %d\n", _step_token_num, _tw._head_num, _cur_step);
   print_vec(_p_d_c, "self attn corr(head): ", 10);
   print_vec(_p_d_c + _step_token_num * _tw._head_num * (_cur_step + 1) - 5,
             "self attn corr(tail): ", 10);
@@ -686,11 +677,6 @@ t5_ker_norm_layer_launcher<_DataType>(
 template <OperationType OpType_>
 void T5Decoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  // ker_norm_layer_resual_launcher<_DataType>(
-  //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
-  //     _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
-  //     _p_d_dec_wei[_weight_offset + 13], _p_d_dec_wei[_weight_offset + 17],
-  //     _max_thread_per_block, _tw._is_post_ln);
 
   t5_ker_norm_layer_launcher<_DataType>(
     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,

@@ -26,55 +26,37 @@ and the expression will finally be concatenated on axis = -1.
 enc_layer_mapping_dict = OrderedDict(
     {
         "multihead_norm_scale": "zero layer_norm weight",
-        # "multihead_norm_bias": None,
         "multihead_project_kernel_qkv": "SelfAttention q weight&&SelfAttention k weight&&SelfAttention v weight&&expression_.transpose(0, 1)",
-        # "multihead_project_bias_qkv": "SelfAttention q_proj bias&&SelfAttention k_proj bias&&SelfAttention v_proj bias",
         "multihead_project_kernel_output": "SelfAttention o weight&&expression_.transpose(0, 1)",
-        # "multihead_project_bias_output": "",
         "ffn_norm_scale": "one layer_norm weight",
-        # "ffn_norm_bias": "final_layer_norm bias",
         "ffn_first_kernel": "DenseReluDense wi weight&&expression_.transpose(0, 1)",
-        # "ffn_first_bias": "",
         "ffn_second_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
-        # "ffn_second_bias": "fc2 bias",
     }
 )
 
 dec_layer_mapping_dict = OrderedDict(
     {
         "self_norm_scale": "zero layer_norm weight",
-        # "self_norm_bias": "self_attn_layer_norm bias",
         "self_project_kernel_qkv": "SelfAttention q weight&&SelfAttention k weight&&SelfAttention v weight&&expression_.transpose(0, 1)",
-        # "self_project_bias_qkv": "self_attn q_proj bias&&self_attn k_proj bias&&self_attn v_proj bias",
         "self_project_kernel_output": "SelfAttention o weight&&expression_.transpose(0, 1)",
-        # "self_project_bias_output": "self_attn out_proj bias",
         "encdec_norm_scale": "one layer_norm weight",
-        # "encdec_norm_bias": "encoder_attn_layer_norm bias",
         "encdec_project_kernel_q": "EncDecAttention q weight&&expression_.transpose(0, 1)",
-        # "encdec_project_bias_q": "encoder_attn q_proj bias",
         "encdec_project_kernel_output": "EncDecAttention o weight&&expression_.transpose(0, 1)",
-        # "encdec_project_bias_output": "encoder_attn out_proj bias",
         "ffn_norm_scale": "two layer_norm weight",
-        # "ffn_norm_bias": "final_layer_norm bias",
         "ffn_first_kernel": "DenseReluDense wi weight&&expression_.transpose(0, 1)",
-        # "ffn_first_bias": "fc1 bias",
         "ffn_second_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
-        # "ffn_second_bias": "fc2 bias",
     }
 )
 
 src_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "final_layer_norm weight",
-        # "norm_bias": "layernorm_embedding bias",
     }
 )
 
 trg_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "final_layer_norm weight",
-        # "norm_bias": "layernorm_embedding bias",
-        # "shared_bias": "final_logits_bias",
     }
 )
 
@@ -383,112 +365,6 @@ def extract_transformer_weights(
         )
     )
 
-    # change encoder layer norm scale&bias position
-    # tmp_scale, tmp_bias = (
-    #     transformer.src_embedding.norm_scale,
-    #     transformer.src_embedding.norm_bias,
-    # )
-    # for i, encoder in enumerate(transformer.encoder_stack):
-    #     print("***Fix encoder layer {} LayerNorm scale and bias***".format(i))
-    #     new_tmp_scale, new_tmp_bias = (
-    #         encoder.multihead_norm_scale[:],
-    #         encoder.multihead_norm_bias[:],
-    #     )
-    #     encoder.multihead_norm_scale[:], encoder.multihead_norm_bias[:] = (
-    #         tmp_scale,
-    #         tmp_bias,
-    #     )
-    #     print(
-    #         "multihead_norm_scale: {} -> {}\nmultihead_norm_bias: {} -> {}".format(
-    #             new_tmp_scale[:3],
-    #             encoder.multihead_norm_scale[:3],
-    #             new_tmp_bias[:3],
-    #             encoder.multihead_norm_bias[:3],
-    #         )
-    #     )
-    #     tmp_scale, tmp_bias = new_tmp_scale[:], new_tmp_bias[:]
-
-    #     new_tmp_scale, new_tmp_bias = (
-    #         encoder.ffn_norm_scale[:],
-    #         encoder.ffn_norm_bias[:],
-    #     )
-    #     encoder.ffn_norm_scale[:], encoder.ffn_norm_bias[:] = (
-    #         tmp_scale,
-    #         tmp_bias,
-    #     )
-    #     print(
-    #         "ffn_norm_scale: {} -> {}\nffn_norm_bias: {} -> {}".format(
-    #             new_tmp_scale[:3],
-    #             encoder.ffn_norm_scale[:3],
-    #             new_tmp_bias[:3],
-    #             encoder.ffn_norm_bias[:3],
-    #         )
-    #     )
-    #     tmp_scale, tmp_bias = new_tmp_scale[:], new_tmp_bias[:]
-    # transformer.src_embedding.norm_scale[:], transformer.src_embedding.norm_bias[:] = (
-    #     tmp_scale,
-    #     tmp_bias,
-    # )
-
-    # change decoder layer norm scale&bias position
-    # tmp_scale, tmp_bias = (
-    #     transformer.trg_embedding.norm_scale,
-    #     transformer.trg_embedding.norm_bias,
-    # )
-    # for i, decoder in enumerate(transformer.decoder_stack):
-    #     print("***Fix decoder layer {} LayerNorm scale and bias***".format(i))
-    #     new_tmp_scale, new_tmp_bias = (
-    #         decoder.self_norm_scale[:],
-    #         decoder.self_norm_bias[:],
-    #     )
-    #     decoder.self_norm_scale[:], decoder.self_norm_bias[:] = tmp_scale, tmp_bias
-    #     print(
-    #         "self_norm_scale: {} -> {}\nself_norm_bias: {} -> {}".format(
-    #             new_tmp_scale[:3],
-    #             decoder.self_norm_scale[:3],
-    #             new_tmp_bias[:3],
-    #             decoder.self_norm_bias[:3],
-    #         )
-    #     )
-    #     tmp_scale, tmp_bias = new_tmp_scale[:], new_tmp_bias[:]
-
-    #     new_tmp_scale, new_tmp_bias = (
-    #         decoder.encdec_norm_scale[:],
-    #         decoder.encdec_norm_bias[:],
-    #     )
-    #     decoder.encdec_norm_scale[:], decoder.encdec_norm_bias[:] = tmp_scale, tmp_bias
-    #     print(
-    #         "encdec_norm_scale: {} -> {}\nencdec_norm_bias: {} -> {}".format(
-    #             new_tmp_scale[:3],
-    #             decoder.encdec_norm_scale[:3],
-    #             new_tmp_bias[:3],
-    #             decoder.encdec_norm_bias[:3],
-    #         )
-    #     )
-    #     tmp_scale, tmp_bias = new_tmp_scale[:], new_tmp_bias[:]
-
-    #     new_tmp_scale, new_tmp_bias = (
-    #         decoder.ffn_norm_scale[:],
-    #         decoder.ffn_norm_bias[:],
-    #     )
-    #     decoder.ffn_norm_scale[:], decoder.ffn_norm_bias[:] = (
-    #         tmp_scale,
-    #         tmp_bias,
-    #     )
-    #     print(
-    #         "ffn_norm_scale: {} -> {}\nffn_norm_bias: {} -> {}".format(
-    #             new_tmp_scale[:3],
-    #             decoder.ffn_norm_scale[:3],
-    #             new_tmp_bias[:3],
-    #             decoder.ffn_norm_bias[:3],
-    #         )
-    #     )
-    #     tmp_scale, tmp_bias = new_tmp_scale[:], new_tmp_bias[:]
-    # transformer.trg_embedding.norm_scale[:], transformer.trg_embedding.norm_bias[:] = (
-    #     tmp_scale,
-    #     tmp_bias,
-    # )
-
     # fill in conf
 
     transformer.model_conf.head_num = head_num
@@ -551,7 +427,7 @@ if __name__ == "__main__":
         "t5-base"  # Example: you can try "t5-large" as well
     )
     head_number = 12  # change this to 16 for "t5-large" model
-    beam_size = 2
+    beam_size = 1
     max_step = 50  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50

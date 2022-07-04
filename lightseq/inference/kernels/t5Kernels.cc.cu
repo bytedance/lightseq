@@ -32,14 +32,6 @@ namespace cuda {
     uint block_start = blockIdx.x * hidden_size;
     uint start = block_start + threadIdx.x;
     uint end = block_start + hidden_size;
-    // for (uint i = start; i < end; i += blockDim.x) {
-    //   val += matrix[i];
-    // }
-    // step 0. compute mean
-    // __shared__ float s_mean;
-    // float reduce_res = blockReduceSum<float>(val);
-    // if (threadIdx.x == 0) s_mean = reduce_res / float(hidden_size);
-    // __syncthreads();
     
     float val = 0.0;
     // step 1. compute variance
@@ -57,7 +49,6 @@ namespace cuda {
 
     // step 2. layer norm
     for (uint i = start; i < end; i += blockDim.x) {
-      // val = matrix[i] - s_mean;
       out[i] = matrix[i] * s_var * __ldg(&scale[i - block_start]) +
                   __ldg(&bias[i - block_start]);
     }
@@ -78,22 +69,11 @@ namespace cuda {
     float mean_dim = float(half_hidden_size) * 2.f;
 
     float val = 0.0;
-    // step 0. compute mean
-    // for (uint i = start; i < end; i += blockDim.x) {
-    //   float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-    //   val += local_f2.x + local_f2.y;
-    // }
-    // __shared__ float s_mean;
-    // float reduce_res = blockReduceSum<float>(val);
-    // if (threadIdx.x == 0) s_mean = reduce_res / mean_dim;
-    // __syncthreads();
-
+  
     // step 1. compute variance
     val = 0.0;
     for (uint i = start; i < end; i += blockDim.x) {
       float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-      // float tmpx = local_f2.x - s_mean;
-      // float tmpy = local_f2.y - s_mean;
       float tmpx = local_f2.x;
       float tmpy = local_f2.y;
       val += tmpx * tmpx + tmpy * tmpy;
@@ -110,8 +90,6 @@ namespace cuda {
       float2 scale_val = __half22float2(__ldg(&pscale[i - block_start]));
       float2 bias_val = __half22float2(__ldg(&pbias[i - block_start]));
       float2 local_f2 = safe_half2_to_float2(pmatrix[i]);
-      // local_f2.x = (local_f2.x - s_mean) * s_var * scale_val.x + bias_val.x;
-      // local_f2.y = (local_f2.y - s_mean) * s_var * scale_val.y + bias_val.y;
       local_f2.x = local_f2.x * s_var * scale_val.x + bias_val.x;
       local_f2.y = local_f2.y * s_var * scale_val.y + bias_val.y;
       pout[i] = __float22half2_rn(local_f2);
@@ -189,8 +167,7 @@ namespace cuda {
     int mask = threadIdx.x < batch_seq_len
                     ? src_padding_mask[blockIdx.x * batch_seq_len + threadIdx.x]
                     : 1;
-    // float val = threadIdx.x < batch_seq_len ? (float)correlation[idx]
-    //                                         : CUDA_FLOAT_INF_NEG;
+
     float val;
     if (threadIdx.x < batch_seq_len) {
       // We know that idx = head_index * batch_seq_len * batch_seq_len
@@ -199,7 +176,6 @@ namespace cuda {
       // need = head_index * batch_seq_len * batch_seq_len + i * batch_seq_len + j;
       int j = need % batch_seq_len;
       int i = (need - j) / batch_seq_len % batch_seq_len;
-      // int head_idx = (idx - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
       int head_idx = (need - j - i * batch_seq_len) / batch_seq_len / batch_seq_len;
       val = (float)correlation[idx];
       // new_values[0, head, i, j] = relative_attention_bias.weight[relative_position_bucket[i][j]][head]
@@ -272,8 +248,6 @@ namespace cuda {
   template <typename T>
   __global__ void t5_ker_correlation_softmax_decself(T* correlation, int step_num, const T *pos_emb, int head_num) {
     int idx = blockIdx.x * step_num + threadIdx.x;
-    // float val =
-    //     threadIdx.x < step_num ? (float)correlation[idx] : CUDA_FLOAT_INF_NEG;
 
     float val;
     if (threadIdx.x < step_num) {
@@ -281,11 +255,8 @@ namespace cuda {
       int i = step_num - 1;
       int head_idx = blockIdx.x % head_num;
       val = (float)correlation[idx];
-      // float before = val;
       int bucket_index = get_bucket_num(i, j, false);
       val += (float)pos_emb[bucket_index * head_num + head_idx];
-      // float diff = val - before;
-      // printf("i %d, j %d, head_idx %d, bucket_index %d, idx %d, before %f after %f diff %f\n", i, j, head_idx, bucket_index, idx, before, val, diff);
     } else val = CUDA_FLOAT_INF_NEG;
   
     float max_val = blockReduceMax(val);
@@ -315,7 +286,6 @@ namespace cuda {
     }
     t5_ker_correlation_softmax_decself<<<batch_head_num, block_dim, 0, stream>>>(
         correlation, step_num, pos_emb, head_num);
-    // cudaDeviceSynchronize();
   }
   
   template void t5_ker_correlation_softmax_decself_launcher<float>(

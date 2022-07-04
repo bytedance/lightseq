@@ -592,7 +592,7 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   idx += vocab_size * _hidden_size;
 
   offset.push_back(idx);
-  // std::cout << "position embedding " << _max_step << " " << _hidden_size << std::endl;
+  
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,

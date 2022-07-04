@@ -45,20 +45,11 @@ __global__ void t5_ker_enc_emb(const T *token_emb,
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 1;
     }
-    // value.x = 0.f;
-    // value.y = 0.f;
-    // value.z = 0.f;
-    // value.w = 0.f;
   } else {
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 0;
     }
     value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
-    // float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
-    // value.x += pemb.x;
-    // value.y += pemb.y;
-    // value.z += pemb.z;
-    // value.w += pemb.w;
   }
   ((float4 *)output)[idx] = value;
 }
@@ -84,24 +75,15 @@ __global__ void t5_ker_enc_emb<__half>(const __half *token_emb, const int *token
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 1;
     }
-    // value.x = 0.f;
-    // value.y = 0.f;
-    // value.z = 0.f;
-    // value.w = 0.f;
   } else {
     if (dim_idx == 0) {
       pad_mask[tokens_idx] = 0;
     }
     value = ((float4 *)token_emb)[token * hidden_dim + dim_idx];
-    // float4 pemb = ((float4 *)pos_emb)[seq_idx * hidden_dim + dim_idx];
     __half2 *value_h2 = (__half2 *)(&value);
-    // __half2 *pemb_h2 = (__half2 *)(&pemb);
 #pragma unroll
     for (int i = 0; i < 4; i++) {
       float2 value_f2 = __half22float2(value_h2[i]);
-      // float2 pemb_f2 = __half22float2(pemb_h2[i]);
-      // value_f2.x += pemb_f2.x;
-      // value_f2.y += pemb_f2.y;
       value_h2[i] = __float22half2_rn(value_f2);
     }
   }
@@ -199,11 +181,6 @@ __global__ void t5_ker_dec_emb(const T *token_emb, int *tokens,
   emb = token_emb[flat_2dim(dim_idx, token, vocab_size)];
 
   float value = float(emb);
-  // if (multilg_type == 1) {
-  //   // token level multilg, add lang_emb
-  //   value +=
-  //       float(lang_emb[flat_2dim(lang_id[batch_idx], dim_idx, hidden_dim)]);
-  // }
   output[idx] = T(value);
 }
 
