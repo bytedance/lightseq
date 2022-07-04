@@ -27,7 +27,8 @@ def ls_generate(model, tokenizer, inputs_id):
     print("=========lightseq=========")
     print("lightseq generating...")
     ls_res_ids, ls_time = ls_t5(model, inputs_id)
-    print(ls_res_ids)
+    for line in ls_res_ids:
+        print(line)
     ls_res_ids = [ids[0] for ids in ls_res_ids[0]]
     ls_res = tokenizer.batch_decode(ls_res_ids, skip_special_tokens=False)
     print(f"lightseq time: {ls_time}s")
@@ -80,10 +81,13 @@ def main():
 
 
     sentences = [
-        'The <extra_id_0> walks in <extra_id_1> park',
-        'summerize: Tom and Alice go to cinema, and watched the most impactful movie',
-        "She is so <mask> that I can not help glance at <mask>.",
-        "Nothing's gonna <mask> my love for you.",
+        # 'The <extra_id_0> walks in <extra_id_1> park',
+        # 'summerize: Tom and Alice go to cinema, and watched the most impactful movie',
+        # "She is so <mask> that I can not help glance at <mask>.",
+        # "Nothing's gonna <mask> my love for you.",
+        # "Good student <mask> at school.",
+        # "Good student at school."
+        "summarize: good"
     ]
 
     print("====================START warmup====================")
