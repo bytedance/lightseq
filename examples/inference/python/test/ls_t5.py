@@ -74,7 +74,7 @@ def main():
     hf_model.eval()
 
     sentences = [
-        'The <extra_id_0> walks in <extra_id_1> park'
+        'The <extra_id_0> walks in <extra_id_1> park',
         'summerize: Tom and Alice go to cinema, and watched the most impactful movie'
     ]
 
