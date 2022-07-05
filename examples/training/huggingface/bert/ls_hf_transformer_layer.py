@@ -1,3 +1,4 @@
+import torch
 from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
     enable_quant,
 )
@@ -26,6 +27,8 @@ def get_hf_bert_enc_layer_params(layer):
     init_bs.append(layer.output.dense.bias.detach().clone())
     init_ws.append(layer.output.LayerNorm.weight.detach().clone())
     init_bs.append(layer.output.LayerNorm.bias.detach().clone())
+
+    init_ws.append(torch.Tensor(12))
 
     return init_ws, init_bs
 

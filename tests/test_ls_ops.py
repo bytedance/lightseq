@@ -600,6 +600,124 @@ def test_bert_encoder_layer_backward():
 
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+def test_quant_bert_encoder_layer_forward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    hidden_states = kt.rand((batch_size, seq_len, 1024))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+
+    for i in range(NUM_LAYERS):
+        custom_bert_enc_layer_list[i].apply(enable_quant)
+        fairseq_bert_enc_layer_list[i].apply(qat_mode)
+
+    def custom():
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = custom_bert_enc_layer_list[i](res, self_attn_padding_mask)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        res = hidden_states.contiguous().clone()
+        for i in range(NUM_LAYERS):
+            res = fairseq_bert_enc_layer_list[i](res, self_attn_padding_mask)
+        return [
+            res.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+def test_quant_bert_encoder_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+    hidden_size = 1024
+    shs = hidden_size * hidden_size
+
+    hidden_states = kt.rand((batch_size, seq_len, hidden_size))
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+
+    cus_x = hidden_states.clone()
+    for i in range(NUM_LAYERS):
+        cus_x = custom_bert_enc_layer_list[i](cus_x, self_attn_padding_mask)
+    custom_loss = (cus_x / 1000).sum()
+
+    base_x = hidden_states.clone()
+    for i in range(NUM_LAYERS):
+        base_x = fairseq_bert_enc_layer_list[i](base_x, self_attn_padding_mask)
+    fairseq_loss = (base_x / 1000).sum()
+
+    def custom():
+        custom_bert_enc_layer_list.zero_grad()
+        custom_loss.backward(retain_graph=True)
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            """
+            attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            """
+            grads = split_custom_layer_grad(custom_bert_enc_layer_list[i])
+            grad_list.extend(
+                [
+                    grads[8],
+                    grads[9],
+                    grads[6],
+                    grads[7],
+                    grads[10],
+                    grads[11],
+                    grads[2],
+                    grads[3],
+                    grads[0],
+                    grads[1],
+                    grads[4],
+                    grads[5],
+                ]
+            )
+            grad_list.append(
+                torch.Tensor([grads[12][0], grads[12][3], grads[12][6], grads[12][9]])
+            )
+        return grad_list
+
+    def baseline():
+        fairseq_bert_enc_layer_list.zero_grad()
+        fairseq_loss.backward(retain_graph=True)
+        grad_list = []
+        for i in range(NUM_LAYERS - 1, -1, -1):
+            curl = fairseq_bert_enc_layer_list[i]
+            cur_grads = copy_grad_from_paras(
+                [
+                    curl.fc2.weight,
+                    curl.fc2.bias,
+                    curl.fc1.weight,
+                    curl.fc1.bias,
+                    curl.final_layer_norm.weight,
+                    curl.final_layer_norm.bias,
+                    curl.self_attn.out_proj.weight,
+                    curl.self_attn.out_proj.bias,
+                    curl.self_attn.qkv_proj.weight,
+                    curl.self_attn.qkv_proj.bias,
+                    curl.self_attn_layer_norm.weight,
+                    curl.self_attn_layer_norm.bias,
+                ]
+            )
+            cur_cmax_grads = copy_cmax_grad_from_paras(
+                [
+                    curl.self_attn.qkv_proj,
+                    curl.self_attn.out_proj,
+                    curl.fc1,
+                    curl.fc2,
+                ]
+            )
+            grad_list.extend(cur_grads + cur_cmax_grads)
+        return grad_list
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
@@ -1389,10 +1507,10 @@ if __name__ == "__main__":
         [
             # "test_encoder_layer_forward",
             # "test_encoder_layer_backward",
-            # "test_bert_encoder_layer_forward",
-            # "test_bert_encoder_layer_backward",
-            "test_decoder_layer_forward",
-            "test_decoder_layer_backward",
+            "test_bert_encoder_layer_forward",
+            "test_bert_encoder_layer_backward",
+            # "test_decoder_layer_forward",
+            # "test_decoder_layer_backward",
             # "test_decoder_layer_forward_inference",
             # "test_embedding_layer_forward",
             # "test_embedding_layer_backward",
@@ -1404,5 +1522,7 @@ if __name__ == "__main__":
             # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
             # "test_quant_decoder_layer_backward",
+            # "test_quant_bert_encoder_layer_forward",
+            # "test_quant_bert_encoder_layer_backward",
         ]
     )
