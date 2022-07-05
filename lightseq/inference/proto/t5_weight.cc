@@ -466,7 +466,8 @@ void T5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
       get_hdf5_dataset_size(hdf5_file, "decoder_stack/0/ffn_first_kernel") /
       _hidden_size;
 
-  _max_step = 512;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/max_step", H5T_NATIVE_INT,
+                          &_max_step);
 
   if (!only_decoder) {
     _src_vocab_size =

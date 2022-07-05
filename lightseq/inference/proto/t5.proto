@@ -113,6 +113,7 @@ message T5ModelConf {
   // 1 for token level multilingual,
   // 2 for sentence level multilingual
   int32 multilg_type = 15;
+  int32 max_step = 16;
 }
 
 message T5 {

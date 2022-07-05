@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 from operator import attrgetter
 from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
-from export.proto.transformer_pb2 import Transformer
+from export.proto.t5_pb2 import T5 as Transformer
 from transformers import T5ForConditionalGeneration
 from export.util import parse_args
 
@@ -79,6 +79,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
     MODEL_CONF_KEYS = [
         # model_conf
         "head_num",
+        "max_step",
         "beam_size",
         "extra_decode_length",
         "length_penalty",
@@ -368,7 +369,7 @@ def extract_transformer_weights(
     # fill in conf
 
     transformer.model_conf.head_num = head_num
-
+    transformer.model_conf.max_step = max_step
     transformer.model_conf.beam_size = beam_size
     transformer.model_conf.length_penalty = length_penalty
 
