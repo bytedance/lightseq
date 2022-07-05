@@ -489,6 +489,8 @@ void T5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/head_num", H5T_NATIVE_INT,
                            &_head_num);
 
+  _relative_attention_num_buckets = 32;
+
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 12;
   _weight_per_dec_layer = 18;
@@ -571,7 +573,7 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   std::string dataset_prefix =
       (source == "src") ? "src_embedding" : "trg_embedding";
   size_t value_size =
-      vocab_size * _hidden_size + 32 * _head_num + 2 * _hidden_size;
+      vocab_size * _hidden_size + _relative_attention_num_buckets * _head_num + 2 * _hidden_size;
   if (source != "src") {
     value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
                   _hidden_size * 2 * _n_dec_layer + vocab_size;
@@ -596,9 +598,9 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [=](int size) { return size != 32 * _head_num; },
+      [=](int size) { return size != _relative_attention_num_buckets * _head_num; },
       "Wrong position_embedding_size !");
-  idx += 32 * _head_num;
+  idx += _relative_attention_num_buckets * _head_num;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
