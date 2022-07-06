@@ -30,8 +30,7 @@ class T5Weight {
   _DataType float2required(float value);
 
   // parsing function for protobuffer
-  void proto_get_model_config(const T5 &t5,
-                              bool only_decoder = false);
+  void proto_get_model_config(const T5 &t5, bool only_decoder = false);
   std::string proto_parse_emb_wei(const T5EmbeddingLayer &layer,
                                   std::string source);
   std::string proto_parse_enc_wei(const T5 &t5);
@@ -102,7 +101,7 @@ class T5Weight {
   int _weight_per_dec_layer;  // 18
 
   int _head_num;
-  int _relative_attention_num_buckets; // 32
+  int _relative_attention_num_buckets;  // 32
   int _beam_size;
   int _extra_decode_length;
   float _length_penalty;
@@ -125,7 +124,8 @@ class T5Weight {
     std::cout << "hidden size: " << _hidden_size << std::endl;
     std::cout << "inner size: " << _inner_size << std::endl;
     std::cout << "head number: " << _head_num << std::endl;
-    std::cout << "relative attention num buckets: " << _relative_attention_num_buckets << std::endl;
+    std::cout << "relative attention num buckets: "
+              << _relative_attention_num_buckets << std::endl;
     std::cout << "dim per head: " << _dim_per_head << std::endl;
     std::cout << "src vocab size: " << _src_vocab_size << std::endl;
     std::cout << "trg vocab size: " << _trg_vocab_size << std::endl;

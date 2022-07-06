@@ -772,12 +772,11 @@ PYBIND11_MODULE(inference, m) {
       .def("infer", &PyTransformer::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
 
-
   py::class_<PyT5>(m, "T5")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
-      .def("infer", &PyT5::infer,
-           py::return_value_policy::reference_internal, py::arg("input_seq"));
+      .def("infer", &PyT5::infer, py::return_value_policy::reference_internal,
+           py::arg("input_seq"));
 
   py::class_<PyQuantTransformer>(m, "QuantTransformer")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),

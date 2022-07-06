@@ -523,7 +523,7 @@ if __name__ == "__main__":
     )
     head_number = 12  # change this to 16 for "bart-large" model
     beam_size = 4
-    max_step = 50  # max step for generation, it decides GPU memory occupancy
+    max_step = 80  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50
     length_penalty = 1.0

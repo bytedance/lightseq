@@ -11,10 +11,9 @@ Weights in proto file will always be in fp32. For fp16, the weights
 namespace lightseq {
 namespace cuda {
 
-template<typename Type>
-void assign_zero_bias(Type* ptr, int size) {
-  for (int i = 0; i < size; i++)
-    ptr[i] = 0;
+template <typename Type>
+void assign_zero_bias(Type *ptr, int size) {
+  for (int i = 0; i < size; i++) ptr[i] = 0;
 }
 
 /**
@@ -38,20 +37,16 @@ __half T5Weight<OperationType::FP16>::float2required(float value) {
 Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
-void T5Weight<OpType_>::proto_get_model_config(
-    const T5 &t5, bool only_decoder) {
+void T5Weight<OpType_>::proto_get_model_config(const T5 &t5,
+                                               bool only_decoder) {
   _hidden_size = t5.trg_embedding().norm_scale_size();
-  _max_step =
-      t5.trg_embedding().position_embedding_size() / _hidden_size;
+  _max_step = t5.trg_embedding().position_embedding_size() / _hidden_size;
 
-  _inner_size =
-      t5.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+  _inner_size = t5.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   if (!only_decoder) {
-    _src_vocab_size =
-        t5.src_embedding().token_embedding_size() / _hidden_size;
+    _src_vocab_size = t5.src_embedding().token_embedding_size() / _hidden_size;
   }
-  _trg_vocab_size =
-      t5.trg_embedding().token_embedding_size() / _hidden_size;
+  _trg_vocab_size = t5.trg_embedding().token_embedding_size() / _hidden_size;
 
   if (!only_decoder) {
     _n_enc_layer = t5.encoder_stack_size();
@@ -200,8 +195,7 @@ std::string T5Weight<OpType_>::proto_parse_emb_wei(
 Load the weights of encoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string T5Weight<OpType_>::proto_parse_enc_wei(
-    const T5 &t5) {
+std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -309,8 +303,7 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(
 Load the weights of decoder into GPU memory.
 */
 template <OperationType OpType_>
-std::string T5Weight<OpType_>::proto_parse_dec_wei(
-    const T5 &t5) {
+std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -459,7 +452,7 @@ Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
 void T5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
-                                                       bool only_decoder) {
+                                              bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
 
   _inner_size =
@@ -467,7 +460,7 @@ void T5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
       _hidden_size;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/max_step", H5T_NATIVE_INT,
-                          &_max_step);
+                           &_max_step);
 
   if (!only_decoder) {
     _src_vocab_size =
@@ -568,13 +561,14 @@ Compared with the encoder, the decoder has more
 */
 template <OperationType OpType_>
 void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                    std::string source) {
+                                           std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::string dataset_prefix =
       (source == "src") ? "src_embedding" : "trg_embedding";
-  size_t value_size =
-      vocab_size * _hidden_size + _relative_attention_num_buckets * _head_num + 2 * _hidden_size;
+  size_t value_size = vocab_size * _hidden_size +
+                      _relative_attention_num_buckets * _head_num +
+                      2 * _hidden_size;
   if (source != "src") {
     value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
                   _hidden_size * 2 * _n_dec_layer + vocab_size;
@@ -595,11 +589,13 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
   idx += vocab_size * _hidden_size;
 
   offset.push_back(idx);
-  
+
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
       value.data() + idx,
-      [=](int size) { return size != _relative_attention_num_buckets * _head_num; },
+      [=](int size) {
+        return size != _relative_attention_num_buckets * _head_num;
+      },
       "Wrong position_embedding_size !");
   idx += _relative_attention_num_buckets * _head_num;
 
@@ -638,13 +634,13 @@ void T5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-  
+
     // encode_output_project_bias_kv
     assign_zero_bias(value.data() + idx, _hidden_size * 2 * _n_dec_layer);
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-    
+
     // shared_bias
     assign_zero_bias(value.data() + idx, vocab_size);
     idx += vocab_size;
@@ -727,7 +723,6 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    
 
     // multihead_project_bias_qkv
     assign_zero_bias(value.data() + idx, _hidden_size * 3);
@@ -743,7 +738,7 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    
+
     // multihead_project_bias_output
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -770,7 +765,7 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    
+
     // ffn_first_bias
     assign_zero_bias(value.data() + idx, _inner_size);
     idx += _inner_size;
@@ -784,7 +779,7 @@ void T5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    
+
     // ffn_second_bias
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -831,7 +826,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    
+
     // self_norm_bias
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -845,7 +840,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    
+
     // self_project_bias_qkv
     assign_zero_bias(value.data() + idx, _hidden_size * 3);
     idx += _hidden_size * 3;
@@ -873,7 +868,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    
+
     // encdec_norm_bias
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -887,7 +882,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    
+
     // encdec_project_bias_q
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -901,7 +896,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    
+
     // encdec_project_bias_output
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -928,7 +923,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    
+
     // ffn_first_bias
     assign_zero_bias(value.data() + idx, _inner_size);
     idx += _inner_size;
@@ -942,7 +937,7 @@ void T5Weight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    
+
     // ffn_second_bias
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
@@ -963,7 +958,7 @@ Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
 std::string T5Weight<OpType_>::initializing(std::string weight_path,
-                                                     bool only_decoder) {
+                                            bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;

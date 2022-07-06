@@ -16,10 +16,9 @@ namespace cuda {
 
 template <OperationType OpType_>
 T5Encoder<OpType_>::T5Encoder(int max_batch_size, int *p_d_token_id,
-                          int *p_d_padding_mask, _DataType *p_d_output,
-                          const T5Weight<OpType_> &tw,
-                          cudaStream_t stream, cublasHandle_t hd,
-                          const int *p_d_lang_id)
+                              int *p_d_padding_mask, _DataType *p_d_output,
+                              const T5Weight<OpType_> &tw, cudaStream_t stream,
+                              cublasHandle_t hd, const int *p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _p_d_token_id(p_d_token_id),
       _p_d_padding_mask(p_d_padding_mask),
@@ -33,7 +32,7 @@ T5Encoder<OpType_>::T5Encoder(int max_batch_size, int *p_d_token_id,
       _fone((_DataType)1.f),
       _fzero((_DataType)0.f),
 
-      _atten_scaler((_DataType)1.f), // no atten_scaler
+      _atten_scaler((_DataType)1.f),  // no atten_scaler
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024) {}
 
@@ -122,11 +121,10 @@ void T5Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #endif
 
   /* ---step2. encoder feedforward--- */
-  t5_launch_enc_emb<_DataType>(_p_d_src_emb_wei[0],
-                            _p_d_token_id, _p_d_output, _p_d_padding_mask,
-                            _tw._padding_id, batch_size, batch_seq_len,
-                            _tw._hidden_size, _stream, _p_d_src_emb_wei[4],
-                            _p_d_lang_id);
+  t5_launch_enc_emb<_DataType>(_p_d_src_emb_wei[0], _p_d_token_id, _p_d_output,
+                               _p_d_padding_mask, _tw._padding_id, batch_size,
+                               batch_seq_len, _tw._hidden_size, _stream,
+                               _p_d_src_emb_wei[4], _p_d_lang_id);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
@@ -148,9 +146,8 @@ void T5Encoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
   // last layer norm
 
   t5_ker_norm_layer_launcher<_DataType>(
-    _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_output,
-    _p_d_src_emb_wei[2], _p_d_src_emb_wei[3],
-     _max_thread_per_block);
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_output,
+      _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -172,27 +169,27 @@ template <OperationType OpType_>
 void T5Encoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
 
-  #ifdef DEBUG_RESULT
-    printf("_weight_offset = %d\n", _weight_offset);
-    print_vec(_p_d_enc_wei[0], "multihead_norm_scale weight", 10);
-    print_vec(_p_d_enc_wei[1], "multihead_norm_bias weight", 10);
-  #endif
+#ifdef DEBUG_RESULT
+  printf("_weight_offset = %d\n", _weight_offset);
+  print_vec(_p_d_enc_wei[0], "multihead_norm_scale weight", 10);
+  print_vec(_p_d_enc_wei[1], "multihead_norm_bias weight", 10);
+#endif
 
   t5_ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_q,
       _p_d_enc_wei[_weight_offset], _p_d_enc_wei[_weight_offset + 1],
-       _max_thread_per_block);
+      _max_thread_per_block);
 
-  #ifdef DEBUG_RESULT
-    for (int i = 0; i < _batch_size; i++) {       // batch_id
-      for (int j = 0; j < _batch_seq_len; j++) {  // token_id
-        std::cout << "after pre-norm: token-" << j << std::endl;
-        print_vec(_p_d_q + i * _batch_seq_len * _tw._hidden_size +
-                      j * _tw._hidden_size,
-                  "hidden state: ", 10);
-      }
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "after pre-norm: token-" << j << std::endl;
+      print_vec(
+          _p_d_q + i * _batch_seq_len * _tw._hidden_size + j * _tw._hidden_size,
+          "hidden state: ", 10);
     }
-  #endif
+  }
+#endif
 
   /* ---step 1. qkv = ori_q * qkv_wei + bias, and reshape qkv for multi-head
    * gemm--- */
@@ -217,27 +214,26 @@ void T5Encoder<OpType_>::self_attention() {
       _batch_seq_len, _batch_seq_len * _batch_seq_len,
       _batch_size * _tw._head_num, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  
 
-  // printf _p_d_c
-  #ifdef DEBUG_RESULT
-    std::cout << "encoder before softmax and position bias: " << std::endl;
-    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
-  #endif
+// printf _p_d_c
+#ifdef DEBUG_RESULT
+  std::cout << "encoder before softmax and position bias: " << std::endl;
+  print_vec(_p_d_c, "_p_d_c matrix: ", 10);
+#endif
 
   t5_ker_correlation_softmax_encself_launcher<_DataType>(
       _batch_size, _batch_seq_len, _tw._head_num, _stream, _p_d_c,
       _p_d_padding_mask, _p_d_src_emb_wei[1]);
 
-  #ifdef DEBUG_RESULT
-    print_vec(_p_d_padding_mask, "_p_d_padding_mask: ", 2 * 22);
-  #endif
-  // printf _p_d_c
-  #ifdef DEBUG_RESULT
-    std::cout << "after softmax: " << std::endl;
-    print_vec(_p_d_c,"_p_d_c matrix: ", 22*22);
-    print_vec(_p_d_c + 8*22*22,"_p_d_c matrix: ", 22*22);
-  #endif
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_padding_mask, "_p_d_padding_mask: ", 2 * 22);
+#endif
+// printf _p_d_c
+#ifdef DEBUG_RESULT
+  std::cout << "after softmax: " << std::endl;
+  print_vec(_p_d_c, "_p_d_c matrix: ", 22 * 22);
+  print_vec(_p_d_c + 8 * 22 * 22, "_p_d_c matrix: ", 22 * 22);
+#endif
 
   /* ---step 3. new_q = correlation * v--- */
   CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
@@ -262,17 +258,16 @@ void T5Encoder<OpType_>::self_attention() {
       _tw._hidden_size, _p_d_v, _BType, _tw._hidden_size, &_fone, _p_d_output,
       _CType, _tw._hidden_size, _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
-  #ifdef DEBUG_RESULT
-    for (int i = 0; i < _batch_size; i++) {       // batch_id
-      for (int j = 0; j < _batch_seq_len; j++) {  // token_id
-        std::cout << "last of self-attention: token-" << j << std::endl;
-        print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
-                      j * _tw._hidden_size,
-                  "hidden state: ", 10);
-      }
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "last of self-attention: token-" << j << std::endl;
+      print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "hidden state: ", 10);
     }
-  #endif
+  }
+#endif
 
   return;
 }
@@ -281,14 +276,12 @@ template <OperationType OpType_>
 void T5Encoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
 
-
   t5_ker_norm_layer_launcher<_DataType>(
-    _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
-    _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
+      _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
       _max_thread_per_block);
 
-
-  #ifdef DEBUG_RESULT
+#ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id
       std::cout << "after ffn-pre-norm: token-" << j << std::endl;
@@ -297,8 +290,8 @@ void T5Encoder<OpType_>::ffn_add_norm() {
                 "hidden state: ", 10);
     }
   }
-    print_vec(_p_d_enc_wei[_weight_offset + 8], "ffn1_wei: ", 10);
-  #endif
+  print_vec(_p_d_enc_wei[_weight_offset + 8], "ffn1_wei: ", 10);
+#endif
 
   /* ---step 1. first ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -325,17 +318,16 @@ void T5Encoder<OpType_>::ffn_add_norm() {
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
-  #ifdef DEBUG_RESULT
-    for (int i = 0; i < _batch_size; i++) {       // batch_id
-      for (int j = 0; j < _batch_seq_len; j++) {  // token_id
-        std::cout << "last of ffn-layer: token-" << j << std::endl;
-        print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
-                      j * _tw._hidden_size,
-                  "hidden state: ", 10);
-      }
+#ifdef DEBUG_RESULT
+  for (int i = 0; i < _batch_size; i++) {       // batch_id
+    for (int j = 0; j < _batch_seq_len; j++) {  // token_id
+      std::cout << "last of ffn-layer: token-" << j << std::endl;
+      print_vec(_p_d_output + i * _batch_seq_len * _tw._hidden_size +
+                    j * _tw._hidden_size,
+                "hidden state: ", 10);
     }
-  #endif
+  }
+#endif
   return;
 }
 

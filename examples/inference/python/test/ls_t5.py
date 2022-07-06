@@ -5,6 +5,7 @@ import lightseq.inference as lsi
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import sentencepiece
 
+
 def ls_t5(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
@@ -67,17 +68,15 @@ def main():
     print("creating lightseq model...")
     ls_model = lsi.T5("lightseq_t5_base.hdf5", 128)
 
-
     print("creating huggingface model...")
     hf_model = T5ForConditionalGeneration.from_pretrained("t5-base")
     hf_model.to("cuda:0")
     hf_model.eval()
 
     sentences = [
-        'The <extra_id_0> walks in <extra_id_1> park',
-        'summerize: Tom and Alice go to cinema, and watched the most impactful movie'
+        "The <extra_id_0> walks in <extra_id_1> park",
+        "summerize: Tom and Alice go to cinema, and watched the most impactful movie",
     ]
-
 
     print("====================START warmup====================")
     warmup(tokenizer, ls_model, hf_model, sentences)
@@ -90,7 +89,7 @@ def main():
         print("tokenizing the sentences...")
         inputs = tokenizer(sentences, return_tensors="pt", padding=True)
         inputs_id = inputs["input_ids"]
-        
+
         ls_generate(ls_model, tokenizer, inputs_id)
         hf_generate(hf_model, tokenizer, inputs_id)
 

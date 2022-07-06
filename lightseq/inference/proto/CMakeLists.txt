@@ -80,13 +80,8 @@ target_link_libraries(vit_weight PUBLIC utils ${Protobuf_LIBRARIES})
 target_include_directories(vit_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vit_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-
-add_library(
-  t5_weight STATIC t5_weight.cc ${T5_PROTO_SRC}
-                            ${T5_PROTO_HEADER})
+add_library(t5_weight STATIC t5_weight.cc ${T5_PROTO_SRC} ${T5_PROTO_HEADER})
 target_link_libraries(t5_weight PUBLIC utils ${Protobuf_LIBRARIES}
-                                                ${HDF5_LIBRARIES})
-target_include_directories(t5_weight
-                           PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(t5_weight
-                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+                                       ${HDF5_LIBRARIES})
+target_include_directories(t5_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(t5_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

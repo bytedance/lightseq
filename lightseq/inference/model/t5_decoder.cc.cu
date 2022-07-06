@@ -16,10 +16,10 @@ namespace cuda {
 
 template <OperationType OpType_>
 T5Decoder<OpType_>::T5Decoder(int max_batch_size, const int* p_d_padding_mask,
-                          const _DataType* p_d_encoder_output, int* p_d_result,
-                          T5Weight<OpType_>& tw, cudaStream_t stream,
-                          cublasHandle_t hd, bool output_topk,
-                          const int* p_d_lang_id)
+                              const _DataType* p_d_encoder_output,
+                              int* p_d_result, T5Weight<OpType_>& tw,
+                              cudaStream_t stream, cublasHandle_t hd,
+                              bool output_topk, const int* p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -421,11 +421,11 @@ template <OperationType OpType_>
 void T5Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
   // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
-  t5_launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0],
-                            _p_d_alive_seq, _p_d_trg_emb_wei[7], _p_d_lang_id,
-                            _p_d_cur_step_query, _batch_size, _tw._beam_size,
-                            _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
-                            _tw._max_step, _tw._multilg_type, _stream);
+  t5_launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_alive_seq,
+                               _p_d_trg_emb_wei[7], _p_d_lang_id,
+                               _p_d_cur_step_query, _batch_size, _tw._beam_size,
+                               _tw._hidden_size, _tw._trg_vocab_size, _cur_step,
+                               _tw._max_step, _tw._multilg_type, _stream);
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _tw._beam_size; j++) {  // beam_id
@@ -465,12 +465,12 @@ void T5Decoder<OpType_>::decoder_stack() {
   // ker_norm_layer_launcher<_DataType>(
   //     _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
   //     _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
-  
+
   t5_ker_norm_layer_launcher<_DataType>(
-    _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_cur_step_query,
-    _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3], _max_thread_per_block);
-    
-  
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_cur_step_query, _p_d_trg_emb_wei[2], _p_d_trg_emb_wei[3],
+      _max_thread_per_block);
+
   return;
 }
 
@@ -480,11 +480,11 @@ T5Decoder self attention
 template <OperationType OpType_>
 void T5Decoder<OpType_>::self_attention() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
-  
+
   t5_ker_norm_layer_launcher<_DataType>(
-    _batch_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
-    _p_d_dec_wei[_weight_offset], _p_d_dec_wei[_weight_offset + 1],
-      _max_thread_per_block);
+      _batch_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_query_buf1, _p_d_dec_wei[_weight_offset],
+      _p_d_dec_wei[_weight_offset + 1], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "self attn ln(head): ", 5);
@@ -548,15 +548,15 @@ void T5Decoder<OpType_>::self_attention() {
       _cur_step + 1, _cur_step + 1, _step_token_num * _tw._head_num,
       _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-  
-  // printf _p_d_c
-  #ifdef DEBUG_RESULT
-    std::cout << "decoder before softmax: " << std::endl;
-    print_vec(_p_d_c,"_p_d_c matrix: ", 10);
-  #endif
+// printf _p_d_c
+#ifdef DEBUG_RESULT
+  std::cout << "decoder before softmax: " << std::endl;
+  print_vec(_p_d_c, "_p_d_c matrix: ", 10);
+#endif
 
-  t5_ker_correlation_softmax_decself_launcher(_step_token_num * _tw._head_num,
-                                           _cur_step + 1, _stream, _p_d_c, _p_d_trg_emb_wei[1], _tw._head_num);
+  t5_ker_correlation_softmax_decself_launcher(
+      _step_token_num * _tw._head_num, _cur_step + 1, _stream, _p_d_c,
+      _p_d_trg_emb_wei[1], _tw._head_num);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_c, "self attn corr(head): ", 10);
@@ -605,10 +605,10 @@ void T5Decoder<OpType_>::encdec_attention() {
   //     _p_d_dec_wei[_weight_offset + 7], _p_d_dec_wei[_weight_offset + 11],
   //     _max_thread_per_block, _tw._is_post_ln);
 
-t5_ker_norm_layer_launcher<_DataType>(
-  _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
-  _p_d_dec_wei[_weight_offset + 6], _p_d_dec_wei[_weight_offset + 7],
-    _max_thread_per_block);
+  t5_ker_norm_layer_launcher<_DataType>(
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 6],
+      _p_d_dec_wei[_weight_offset + 7], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "encdec attn ln(head): ", 5);
@@ -679,10 +679,9 @@ void T5Decoder<OpType_>::ffn_add_norm() {
   /* ---step 0. layer_norm, add output_bias to "query"--- */
 
   t5_ker_norm_layer_launcher<_DataType>(
-    _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query, _p_d_query_buf1,
-    _p_d_dec_wei[_weight_offset + 12], _p_d_dec_wei[_weight_offset + 13],
-      _max_thread_per_block);
-
+      _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
+      _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
+      _p_d_dec_wei[_weight_offset + 13], _max_thread_per_block);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "ffn ln(head): ", 5);

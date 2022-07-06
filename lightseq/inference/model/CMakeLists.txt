@@ -14,7 +14,6 @@ endif()
 
 target_include_directories(transformer_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-
 set(t5_files t5_decoder.cc.cu t5_encoder.cc.cu)
 add_library(t5_model STATIC ${t5_files})
 target_link_libraries(t5_model PUBLIC cuda_kernels)
@@ -23,11 +22,10 @@ if(DYNAMIC_API)
   target_link_libraries(t5_model PRIVATE CUDA::cublas CUDA::cublasLt)
 else()
   target_link_libraries(t5_model PRIVATE CUDA::cublas_static
-                                                  CUDA::cublasLt_static)
+                                         CUDA::cublasLt_static)
 endif()
 
 target_include_directories(t5_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
 
 set(quant_transformer_files quant_decoder.cc.cu quant_encoder.cc.cu
                             cublas_helper.cc)

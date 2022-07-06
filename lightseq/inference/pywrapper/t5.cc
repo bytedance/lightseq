@@ -4,8 +4,7 @@
 namespace lightseq {
 namespace cuda {
 
-T5::T5(const std::string weight_path,
-                         const int max_batch_size)
+T5::T5(const std::string weight_path, const int max_batch_size)
     : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
       stream_(nullptr),
       hd_(nullptr),
@@ -88,9 +87,7 @@ T5::~T5() {
 
 const int *T5::get_result_ptr() { return d_output_; }
 
-const float *T5::get_score_ptr() {
-  return decoder_->_p_d_alive_seq_score;
-}
+const float *T5::get_score_ptr() { return decoder_->_p_d_alive_seq_score; }
 
 int T5::get_output_seq_len() { return decoder_->_cur_step + 1; };
 

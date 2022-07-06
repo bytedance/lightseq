@@ -200,6 +200,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
 def count_digit(s):
     return sum(1 for c in s if c.isdigit())
 
+
 def replace_second_digit(s):
     table = {
         "0": "zero",
@@ -218,7 +219,7 @@ def replace_second_digit(s):
             pos_digit = i
     if pos_digit != -1:
         s[pos_digit] = table[s[pos_digit]]
-    return ''.join(s)
+    return "".join(s)
 
 
 def extract_transformer_weights(
@@ -296,7 +297,6 @@ def extract_transformer_weights(
             dec_layer_mapping_dict,
         )
 
-
     # fill src_embedding
     if not only_decoder:
         fill_pb_layer(
@@ -305,9 +305,11 @@ def extract_transformer_weights(
             transformer.src_embedding,
             src_emb_mapping_dict,
         )
-        
+
         relative_attention_bias_list = (
-            encoder_state_dict["encoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"]
+            encoder_state_dict[
+                "encoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"
+            ]
             .numpy()
             .reshape([-1])
             .tolist()
@@ -316,7 +318,9 @@ def extract_transformer_weights(
 
         print(
             "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight -> src_embedding.position_embedding, shape: {}, conversion finished!".format(
-                encoder_state_dict["encoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"]
+                encoder_state_dict[
+                    "encoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"
+                ]
                 .numpy()
                 .shape
             )
@@ -338,18 +342,23 @@ def extract_transformer_weights(
         trg_emb_mapping_dict,
     )
 
-
     decoder_relative_attention_bias_list = (
-        decoder_state_dict["decoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"]
+        decoder_state_dict[
+            "decoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"
+        ]
         .numpy()
         .reshape([-1])
         .tolist()
     )
-    
-    transformer.trg_embedding.position_embedding[:] = decoder_relative_attention_bias_list
+
+    transformer.trg_embedding.position_embedding[
+        :
+    ] = decoder_relative_attention_bias_list
     print(
         "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight -> trg_embedding.position_embedding, shape: {}, conversion finished!".format(
-            decoder_state_dict["decoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"]
+            decoder_state_dict[
+                "decoder.block.0.layer.zero.SelfAttention.relative_attention_bias.weight"
+            ]
             .numpy()
             .shape
         )
@@ -423,10 +432,10 @@ if __name__ == "__main__":
     if args.generation_method not in ["beam_search", "topk", "topp", "topk_greedy"]:
         args.generation_method = "beam_search"
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
-    output_lightseq_model_name = "lightseq_t5_base"  # you can rename it to "lightseq_t5_large" for large model
-    input_huggingface_t5_model = (
-        "t5-base"  # Example: you can try "t5-large" as well
+    output_lightseq_model_name = (
+        "lightseq_t5_base"  # you can rename it to "lightseq_t5_large" for large model
     )
+    input_huggingface_t5_model = "t5-base"  # Example: you can try "t5-large" as well
     head_number = 12  # change this to 16 for "t5-large" model
     beam_size = 1
     max_step = 80  # max step for generation, it decides GPU memory occupancy
