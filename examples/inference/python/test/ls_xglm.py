@@ -7,7 +7,6 @@ import lightseq.inference as lsi
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
-
 def ls_xglm(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
@@ -15,7 +14,6 @@ def ls_xglm(model, inputs):
     torch.cuda.synchronize()
     end_time = time.perf_counter()
     return generated_ids, end_time - start_time
-
 
 
 def hf_xglm(model, inputs, tokenizer):

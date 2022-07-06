@@ -1,7 +1,5 @@
 """
-
 Export Hugging Face XGLM models to hdf5 format.
-
 """
 import os
 import h5py
@@ -166,11 +164,11 @@ if __name__ == "__main__":
     generation_method = "topk"
     topk = 1
     topp = 0.75
+
     eos_id = 2
     pad_id = 1
     max_step = 100
     extra_decode_length = 0  # use positive length to avtivate it
-
     extract_xglm_weights(
         output_lightseq_model_name,
         input_huggingface_xglm_model,
