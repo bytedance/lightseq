@@ -518,7 +518,7 @@ int Context::ExecuteGPU(const uint32_t payload_cnt, CustomPayload* payloads,
     if (tw_._multilg_type == 1) {
       batch_seq_len -= 2;
     }
-    if (tw_._multilg_type == 2) {
+    if (tw_._multilg_type == 2 || tw_._multilg_type == 3) {
       batch_seq_len -= 1;
     }
 

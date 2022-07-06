@@ -223,15 +223,16 @@ template <typename T>
 int create_transformer_embedding_layer(int layer_id,
                                        const torch::Tensor &pos_embeddings,
                                        int max_batch_tokens, int embedding_dim,
-                                       int vocab_size, float dropout_ratio,
-                                       int padding_idx) {
+                                       int vocab_size, int max_seq_len,
+                                       float dropout_ratio, int padding_idx,
+                                       bool trainable_pos = false) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   const T *pos_embeddings_ptr = (const T *)pos_embeddings.data_ptr();
 
   auto layer = std::make_shared<TransformerEmbeddingLayer<T>>(
       layer_id, pos_embeddings_ptr, max_batch_tokens, embedding_dim, vocab_size,
-      dropout_ratio, padding_idx);
+      max_seq_len, dropout_ratio, padding_idx, trainable_pos);
 
   s_transformer_embedding_layers[layer_id] = layer;
 

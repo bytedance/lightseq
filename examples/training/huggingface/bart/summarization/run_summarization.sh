@@ -15,23 +15,22 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-export TASK_NAME=sst2
+export TASK_NAME=summarization
 
 python3 -m torch.distributed.launch \
-  --nproc_per_node=1 \
-  $THIS_DIR/run_glue.py \
-  --model_name_or_path bert-base-cased \
-  --task_name $TASK_NAME \
-  --do_train \
-  --do_eval \
-  --max_seq_length 128 \
-  --per_device_train_batch_size 32 \
-  --learning_rate 2e-5 \
-  --num_train_epochs 10 \
-  --output_dir /tmp/$TASK_NAME/ \
-  --overwrite_output_dir \
-  --fp16 \
-  --seed 1234 \
-  --logging_steps 10 \
-  --module_type 1 \
-  --enable_quant false
+    --nproc_per_node=1 \
+    $THIS_DIR/run_summarization.py \
+    --model_name_or_path facebook/bart-base \
+    --do_train \
+    --do_eval \
+    --dataset_name cnn_dailymail \
+    --dataset_config "3.0.0" \
+    --output_dir /tmp/$TASK_NAME \
+    --max_source_length 128 \
+    --per_device_train_batch_size 32 \
+    --per_device_eval_batch_size 32 \
+    --overwrite_output_dir \
+    --seed 1234 \
+    --logging_steps 10 \
+    --fp16 \
+    --predict_with_generate

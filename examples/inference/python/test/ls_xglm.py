@@ -7,7 +7,8 @@ import lightseq.inference as lsi
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 
-def ls_gpt2(model, inputs):
+
+def ls_xglm(model, inputs):
     torch.cuda.synchronize()
     start_time = time.perf_counter()
     generated_ids = model.sample(inputs)
@@ -16,7 +17,8 @@ def ls_gpt2(model, inputs):
     return generated_ids, end_time - start_time
 
 
-def hf_gpt2(model, inputs, tokenizer):
+
+def hf_xglm(model, inputs, tokenizer):
     inputs = inputs.to("cuda:0")
     torch.cuda.synchronize()
     start_time = time.perf_counter()
@@ -29,7 +31,7 @@ def hf_gpt2(model, inputs, tokenizer):
 def ls_generate(model, tokenizer, inputs):
     print("=========lightseq=========")
     print("lightseq generating...")
-    ls_res_ids, ls_time = ls_gpt2(model, inputs)
+    ls_res_ids, ls_time = ls_xglm(model, inputs)
     ls_res = tokenizer.batch_decode(ls_res_ids, skip_special_tokens=True)
     print(f"lightseq time: {ls_time}s")
     print("lightseq results:")
@@ -40,7 +42,7 @@ def ls_generate(model, tokenizer, inputs):
 def hf_generate(model, tokenizer, inputs):
     print("=========huggingface=========")
     print("huggingface generating...")
-    hf_res_ids, hf_time = hf_gpt2(model, inputs, tokenizer)
+    hf_res_ids, hf_time = hf_xglm(model, inputs, tokenizer)
     hf_res = tokenizer.batch_decode(hf_res_ids, skip_special_tokens=True)
     print(f"huggingface time: {hf_time}s")
     print("huggingface results:")
@@ -61,26 +63,23 @@ def main():
     parser.add_argument("--user_input", action="store_true")
     args = parser.parse_args()
 
-    print("initializing gpt tokenizer...")
+    print("initializing xglm tokenizer...")
 
     ls_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
     # lightseq use len(tokenizer) as pad_token in default
     ls_tokenizer.add_special_tokens({"pad_token": "[PAD]"})
-    # print(f"lightseq tokenizer pad token id: {ls_tokenizer.pad_token_id}")
 
     hf_tokenizer = AutoTokenizer.from_pretrained("facebook/incoder-1B")
-    # use EOS as PAD for huggingface to avoid warning according to https://huggingface.co/blog/how-to-generate while avoid reshaping the model embedding
-    # hf_tokenizer.pad_token = hf_tokenizer.eos_token
-    # print(f"huggingface tokenizer pad token id: {hf_tokenizer.pad_token_id}")
 
     print("creating lightseq model...")
+    # XGLM shares the same model architecture as GPT
     ls_model = lsi.Gpt("lightseq_incoder_base.hdf5", max_batch_size=16)
 
     print("creating huggingface model...")
     hf_model = AutoModelForCausalLM.from_pretrained("facebook/incoder-1B")
     hf_model.to("cuda:0")
 
-    # lightseq gpt perplexity supports batch infer with different lengths,
+    # lightseq xglm perplexity supports batch infer with different lengths,
     # but sampling doesn't support
     sentences = ["def quick_sort(nums):"]
 

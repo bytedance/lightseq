@@ -1,5 +1,7 @@
 """
-Export Hugging Face GPT2 models to hdf5 format.
+
+Export Hugging Face XGLM models to hdf5 format.
+
 """
 import os
 import h5py
@@ -47,14 +49,13 @@ src_emb_mapping_dict = OrderedDict(
 )
 
 
-def extract_gpt_weights(
+def extract_xglm_weights(
     output_file,
     model_dir,
     head_num,
     generation_method,
     topk=10,
     topp=0.75,
-    # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id=50256,
     pad_id=50257,
     max_step=100,
@@ -101,8 +102,7 @@ def extract_gpt_weights(
     token_emb = encoder_state_dict["model.embed_tokens.weight"]
 
     # scale embedding
-    d_model = 2048
-    scale = math.sqrt(d_model)
+    scale = math.sqrt(token_emb.shape[1])
     token_embedding = (token_emb.flatten() * scale).tolist()
 
     hdf5_file.create_dataset(
@@ -159,21 +159,21 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
-    output_lightseq_model_name = "lightseq_incoder_base"  # or "lightseq_gpt2_large"
-    input_huggingface_gpt_model = "facebook/incoder-1B"  # or "gpt2-large"
-    head_number = 32  # 20 for "gpt2-large"
+    output_lightseq_model_name = "lightseq_incoder_base"
+    input_huggingface_xglm_model = "facebook/incoder-1B"
+    head_number = 32
     # generation_method should be "topk" or "topp"
     generation_method = "topk"
     topk = 1
-    topp = 1
-    # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
+    topp = 0.75
     eos_id = 2
     pad_id = 1
     max_step = 100
     extra_decode_length = 0  # use positive length to avtivate it
-    extract_gpt_weights(
+
+    extract_xglm_weights(
         output_lightseq_model_name,
-        input_huggingface_gpt_model,
+        input_huggingface_xglm_model,
         head_num=head_number,  # layer number
         generation_method=generation_method,
         topk=topk,

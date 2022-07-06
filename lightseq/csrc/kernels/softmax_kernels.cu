@@ -232,6 +232,10 @@ void launch_attn_softmax<float>(float *inp, const float *attn_mask,
     grid_dim.x = 64;
     ker_attn_softmax<float, 256, 2><<<grid_dim, 256, 0, stream>>>(
         inp, attn_mask, from_len, to_len, mask_future);
+  } else if (to_len <= 1024) {
+    grid_dim.x = 128;
+    ker_attn_softmax<float, 512, 2><<<grid_dim, 512, 0, stream>>>(
+        inp, attn_mask, from_len, to_len, mask_future);
   } else {
     throw std::runtime_error(
         "Sequence length greater than 512 is currently not supported");
@@ -261,6 +265,10 @@ void launch_attn_softmax<__half>(__half *inp, const __half *attn_mask,
   } else if (to_len <= 512) {
     grid_dim.x = 32;
     ker_attn_softmax<__half, 256, 2><<<grid_dim, 256, 0, stream>>>(
+        inp, attn_mask, from_len, to_len, mask_future);
+  } else if (to_len <= 1024) {
+    grid_dim.x = 64;
+    ker_attn_softmax<__half, 512, 2><<<grid_dim, 512, 0, stream>>>(
         inp, attn_mask, from_len, to_len, mask_future);
   } else {
     throw std::runtime_error(

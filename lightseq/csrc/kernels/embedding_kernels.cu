@@ -241,11 +241,9 @@ __global__ void lookup_scale_pos_dropout<__half>(
 template <>
 void launch_lookup_scale_pos_dropout<float>(
     float *output, const int *input, const float *embeddings,
-    const float *pos_embeddings, uint8_t *dropout_mask, int batch_size,
-    int seq_len, int embedding_dim, int padding_idx, float dropout_ratio,
-    int step, cudaStream_t &stream) {
-  int *tokens_position;
-  cudaMalloc(&tokens_position, batch_size * seq_len * 2 * sizeof(int));
+    const float *pos_embeddings, uint8_t *dropout_mask, int *tokens_position,
+    int batch_size, int seq_len, int embedding_dim, int padding_idx,
+    float dropout_ratio, int step, cudaStream_t &stream) {
   int p_threads = min(seq_len, MAX_THREADS);
   dim3 p_grid_dim(batch_size, 1);
   dim3 p_block_dim(p_threads, 1);
@@ -269,18 +267,14 @@ void launch_lookup_scale_pos_dropout<float>(
       output, input, tokens_position, embeddings, pos_embeddings, dropout_mask,
       seq_len, embedding_dim, padding_idx, dropout_ratio, emb_scale, step,
       seed);
-
-  cudaFree(tokens_position);
 }
 
 template <>
 void launch_lookup_scale_pos_dropout<__half>(
     __half *output, const int *input, const __half *embeddings,
-    const __half *pos_embeddings, uint8_t *dropout_mask, int batch_size,
-    int seq_len, int embedding_dim, int padding_idx, float dropout_ratio,
-    int step, cudaStream_t &stream) {
-  int *tokens_position;
-  cudaMalloc(&tokens_position, batch_size * seq_len * 2 * sizeof(int));
+    const __half *pos_embeddings, uint8_t *dropout_mask, int *tokens_position,
+    int batch_size, int seq_len, int embedding_dim, int padding_idx,
+    float dropout_ratio, int step, cudaStream_t &stream) {
   int p_threads = min(seq_len, MAX_THREADS);
   dim3 p_grid_dim(batch_size, 1);
   dim3 p_block_dim(p_threads, 1);
@@ -304,8 +298,6 @@ void launch_lookup_scale_pos_dropout<__half>(
       output, input, tokens_position, embeddings, pos_embeddings, dropout_mask,
       seq_len, embedding_dim, padding_idx, dropout_ratio, emb_scale, step,
       seed);
-
-  cudaFree(tokens_position);
 }
 
 /**
@@ -439,12 +431,165 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
   }
 }
 
+/**
+@brief: d_lookup_scale_trainable_pos_dropout
+backward of embedding layer in fairseq.
+
+@thread
+gridDim.x = batch_size
+gridDim.y = blocks_per_seq
+blockDim.x = tokens_per_block
+blockDim.y = min(embedding_dim, MAX_THREADS)
+
+@param
+input: [batch_size, seq_len]
+grad_output: [batch_size, seq_len, embedding_dim]
+dropout_mask: [batch_size, seq_len, embedding_dim]
+batch_size: the size of the current batch
+seq_len: the sequence length of the current batch
+embedding_dim: dim of the embeddings
+padding_idx: padding index of the sentences (default: 2)
+*/
+
+template <typename T>
+__global__ void d_lookup_scale_trainable_pos_dropout(
+    T *grad_embeddings, const T *grad_output, T *grad_pos_embeddings,
+    const int *input, const uint8_t *dropout_mask, const int *tokens_position,
+    int seq_len, int embedding_dim, int padding_idx, float dropout_ratio,
+    float emb_scale);
+
+template <>
+__global__ void d_lookup_scale_trainable_pos_dropout<float>(
+    float *grad_embeddings, const float *grad_output,
+    float *grad_pos_embeddings, const int *input, const uint8_t *dropout_mask,
+    const int *tokens_position, int seq_len, int embedding_dim, int padding_idx,
+    float dropout_ratio, float emb_scale) {
+  int batch_id = blockIdx.x;
+  int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
+  if (seq_id >= seq_len) return;
+
+  int target_pos = batch_id * seq_len + seq_id;
+  int start = target_pos * embedding_dim + threadIdx.y;
+  int end = (target_pos + 1) * embedding_dim;
+  int tid = input[target_pos];
+  int token_pos_id = tokens_position[target_pos];
+
+  if (tid == padding_idx) {
+    return;
+  }
+
+  const float scale = 1.f / (1.f - dropout_ratio);
+  const float4 *grad_output4 = reinterpret_cast<const float4 *>(grad_output);
+  const uint32_t *dropout_mask4 =
+      reinterpret_cast<const uint32_t *>(dropout_mask);
+
+  for (uint i = start; i < end; i += blockDim.y) {
+    float4 go4 = grad_output4[i];
+    uint32_t m4 = dropout_mask4[i];
+    uint8_t *m4_ptr = reinterpret_cast<uint8_t *>(&m4);
+
+    float4 res4;
+    res4.x = emb_scale * go4.x * m4_ptr[0] * scale;
+    res4.y = emb_scale * go4.y * m4_ptr[1] * scale;
+    res4.z = emb_scale * go4.z * m4_ptr[2] * scale;
+    res4.w = emb_scale * go4.w * m4_ptr[3] * scale;
+    int offset = i - target_pos * embedding_dim;
+    int idx = (tid * (embedding_dim) + offset) << 2;
+    atomicAdd(grad_embeddings + idx, res4.x);
+    atomicAdd(grad_embeddings + idx + 1, res4.y);
+    atomicAdd(grad_embeddings + idx + 2, res4.z);
+    atomicAdd(grad_embeddings + idx + 3, res4.w);
+
+    float4 p_res4;
+    p_res4.x = go4.x * m4_ptr[0] * scale;
+    p_res4.y = go4.y * m4_ptr[1] * scale;
+    p_res4.z = go4.z * m4_ptr[2] * scale;
+    p_res4.w = go4.w * m4_ptr[3] * scale;
+    idx = (token_pos_id * (embedding_dim) + offset) << 2;
+    atomicAdd(grad_pos_embeddings + idx, p_res4.x);
+    atomicAdd(grad_pos_embeddings + idx + 1, p_res4.y);
+    atomicAdd(grad_pos_embeddings + idx + 2, p_res4.z);
+    atomicAdd(grad_pos_embeddings + idx + 3, p_res4.w);
+  }
+}
+
+template <>
+__global__ void d_lookup_scale_trainable_pos_dropout<__half>(
+    __half *grad_embeddings, const __half *grad_output,
+    __half *grad_pos_embeddings, const int *input, const uint8_t *dropout_mask,
+    const int *tokens_position, int seq_len, int embedding_dim, int padding_idx,
+    float dropout_ratio, float emb_scale) {
+  int batch_id = blockIdx.x;
+  int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
+  if (seq_id >= seq_len) return;
+
+  int target_pos = batch_id * seq_len + seq_id;
+  int start = target_pos * embedding_dim + threadIdx.y;
+  int end = (target_pos + 1) * embedding_dim;
+  int tid = input[target_pos];
+  int token_pos_id = tokens_position[target_pos];
+
+  if (tid == padding_idx) {
+    return;
+  }
+
+  const float scale = 1.f / (1.f - dropout_ratio);
+  const float4 *grad_output4 = reinterpret_cast<const float4 *>(grad_output);
+  const uint64_t *dropout_mask4 =
+      reinterpret_cast<const uint64_t *>(dropout_mask);
+  __half2 *grad_embeddings_h2 = reinterpret_cast<__half2 *>(grad_embeddings);
+  __half2 *grad_pos_embeddings_h2 =
+      reinterpret_cast<__half2 *>(grad_pos_embeddings);
+
+  for (uint i = start; i < end; i += blockDim.y) {
+    float4 go4 = grad_output4[i];
+    uint64_t m4 = dropout_mask4[i];
+    uint8_t *m4_ptr = reinterpret_cast<uint8_t *>(&m4);
+    float4 res4;
+    __half2 *go_h2 = reinterpret_cast<__half2 *>(&go4);
+    __half2 *res_h2 = reinterpret_cast<__half2 *>(&res4);
+    __half2 scale_mask_h2[4];
+
+#pragma unroll
+    for (uint j = 0; j < 4; ++j) {
+      scale_mask_h2[j] = __floats2half2_rn(scale * m4_ptr[j << 1],
+                                           scale * m4_ptr[(j << 1) | 1]);
+    }
+    __half2 emb_scale_h2 = __floats2half2_rn(emb_scale, emb_scale);
+
+#pragma unroll
+    for (uint j = 0; j < 4; ++j) {
+      res_h2[j] = __hmul2(emb_scale_h2, go_h2[j]);
+      res_h2[j] = __hmul2(scale_mask_h2[j], res_h2[j]);
+    }
+
+    int offset = i - target_pos * embedding_dim;
+    int idx = (tid * (embedding_dim) + offset) << 2;
+#pragma unroll
+    for (uint j = 0; j < 4; ++j) {
+      atomicAdd(grad_embeddings_h2 + idx + j, res_h2[j]);
+    }
+
+#pragma unroll
+    for (uint j = 0; j < 4; ++j) {
+      res_h2[j] = __hmul2(scale_mask_h2[j], go_h2[j]);
+    }
+
+    idx = (token_pos_id * (embedding_dim) + offset) << 2;
+#pragma unroll
+    for (uint j = 0; j < 4; ++j) {
+      atomicAdd(grad_pos_embeddings_h2 + idx + j, res_h2[j]);
+    }
+  }
+}
+
 template <>
 void launch_d_lookup_scale_pos_dropout<float>(
-    float *grad_embeddings, const float *grad_output, const int *input,
-    const uint8_t *dropout_mask, int batch_size, int seq_len, int embedding_dim,
-    int vocab_size, int padding_idx, float dropout_ratio,
-    cudaStream_t &stream) {
+    float *grad_embeddings, const float *grad_output,
+    float *grad_pos_embeddings, const int *input, const uint8_t *dropout_mask,
+    const int *tokens_position, int batch_size, int seq_len, int embedding_dim,
+    int vocab_size, int max_seq_len, int padding_idx, float dropout_ratio,
+    bool trainable_pos, cudaStream_t &stream) {
   float emb_scale = sqrt(embedding_dim);
   embedding_dim >>= 2;
 
@@ -461,17 +606,33 @@ void launch_d_lookup_scale_pos_dropout<float>(
   dim3 grid_dim(batch_size, blocks_per_seq);
   dim3 block_dim(tokens_per_block, threads_per_token);
 
-  d_lookup_scale_pos_dropout<float><<<grid_dim, block_dim, 0, stream>>>(
-      grad_embeddings, grad_output, input, dropout_mask, seq_len, embedding_dim,
-      padding_idx, dropout_ratio, emb_scale);
+  if (trainable_pos) {
+    total_nums = max_seq_len * embedding_dim;
+    dim3 pos_grid_dim((total_nums + MAX_THREADS - 1) / MAX_THREADS);
+    dim3 pos_block_dim(MAX_THREADS);
+
+    zero_grads<float><<<pos_grid_dim, pos_block_dim, 0, stream>>>(
+        grad_pos_embeddings, total_nums);
+
+    d_lookup_scale_trainable_pos_dropout<float>
+        <<<grid_dim, block_dim, 0, stream>>>(
+            grad_embeddings, grad_output, grad_pos_embeddings, input,
+            dropout_mask, tokens_position, seq_len, embedding_dim, padding_idx,
+            dropout_ratio, emb_scale);
+  } else {
+    d_lookup_scale_pos_dropout<float><<<grid_dim, block_dim, 0, stream>>>(
+        grad_embeddings, grad_output, input, dropout_mask, seq_len,
+        embedding_dim, padding_idx, dropout_ratio, emb_scale);
+  }
 }
 
 template <>
 void launch_d_lookup_scale_pos_dropout<__half>(
-    __half *grad_embeddings, const __half *grad_output, const int *input,
-    const uint8_t *dropout_mask, int batch_size, int seq_len, int embedding_dim,
-    int vocab_size, int padding_idx, float dropout_ratio,
-    cudaStream_t &stream) {
+    __half *grad_embeddings, const __half *grad_output,
+    __half *grad_pos_embeddings, const int *input, const uint8_t *dropout_mask,
+    const int *tokens_position, int batch_size, int seq_len, int embedding_dim,
+    int vocab_size, int max_seq_len, int padding_idx, float dropout_ratio,
+    bool trainable_pos, cudaStream_t &stream) {
   float emb_scale = sqrt(embedding_dim);
   embedding_dim >>= 3;
 
@@ -488,7 +649,22 @@ void launch_d_lookup_scale_pos_dropout<__half>(
   dim3 grid_dim(batch_size, blocks_per_seq);
   dim3 block_dim(tokens_per_block, threads_per_token);
 
-  d_lookup_scale_pos_dropout<__half><<<grid_dim, block_dim, 0, stream>>>(
-      grad_embeddings, grad_output, input, dropout_mask, seq_len, embedding_dim,
-      padding_idx, dropout_ratio, emb_scale);
+  if (trainable_pos) {
+    total_nums = max_seq_len * embedding_dim;
+    dim3 pos_grid_dim((total_nums + MAX_THREADS - 1) / MAX_THREADS);
+    dim3 pos_block_dim(MAX_THREADS);
+
+    zero_grads<__half><<<pos_grid_dim, pos_block_dim, 0, stream>>>(
+        grad_pos_embeddings, total_nums);
+
+    d_lookup_scale_trainable_pos_dropout<__half>
+        <<<grid_dim, block_dim, 0, stream>>>(
+            grad_embeddings, grad_output, grad_pos_embeddings, input,
+            dropout_mask, tokens_position, seq_len, embedding_dim, padding_idx,
+            dropout_ratio, emb_scale);
+  } else {
+    d_lookup_scale_pos_dropout<__half><<<grid_dim, block_dim, 0, stream>>>(
+        grad_embeddings, grad_output, input, dropout_mask, seq_len,
+        embedding_dim, padding_idx, dropout_ratio, emb_scale);
+  }
 }
