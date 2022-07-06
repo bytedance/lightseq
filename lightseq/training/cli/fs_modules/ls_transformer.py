@@ -11,6 +11,7 @@ from fairseq.models import (
 from fairseq.models.fairseq_encoder import EncoderOut
 from fairseq.modules import LayerNorm
 
+from lightseq.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
 from lightseq.training.ops.pytorch.quantization import (
     QuantLinear,
     enable_quant,
@@ -95,8 +96,6 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                                  'memory usage at the cost of some additional compute')
         parser.add_argument('--offload-activations', action='store_true',
                             help='checkpoint activations at each layer, then save to gpu. Sets --checkpoint-activations.')
-        parser.add_argument('--trainable-position', default=False, action='store_true',
-                            help='trainable positional embedding.')
         # args for "Cross+Self-Attention for Transformer Models" (Peitz et al., 2019)
         parser.add_argument('--no-cross-attention', default=False, action='store_true',
                             help='do not perform cross-attention')
@@ -151,13 +150,12 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             encoder_embed_tokens = cls.build_embedding(
                 args, src_dict, args.encoder_embed_dim, args.max_source_positions
             )
-            emb_lookup = encoder_embed_tokens.emb_lookup
             decoder_embed_tokens = cls.build_embedding(
                 args,
                 tgt_dict,
                 args.decoder_embed_dim,
                 args.max_target_positions,
-                emb_lookup=emb_lookup,
+                emb_lookup=encoder_embed_tokens,
             )
             args.share_decoder_input_output_embed = True
         else:
@@ -197,15 +195,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         use_torch_layer = (
             args.use_torch_layer or args.no_scale_embedding or args.layernorm_embedding
         )
-        if use_torch_layer:
-            from lightseq.training.ops.pytorch.torch_transformer_layers import (
-                TransformerEmbeddingLayer,
-            )
-        else:
-            from lightseq.training.ops.pytorch.transformer_embedding_layer import (
-                LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
-            )
-        config = TransformerEmbeddingLayer.get_config(
+        config = TransformerEmbeddingLayerBase.get_config(
             vocab_size=len(dictionary),
             embedding_dim=embed_dim,
             max_batch_tokens=args.max_tokens,
@@ -219,7 +209,22 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             layernorm_embedding=args.layernorm_embedding,
             need_offset=("bart" in args.arch),
         )
-        emb = TransformerEmbeddingLayer(config, emb_lookup=emb_lookup)
+        if use_torch_layer:
+            from lightseq.training.ops.pytorch.torch_transformer_layers import (
+                TransformerEmbeddingLayer,
+            )
+
+            if emb_lookup is not None:
+                emb_lookup = emb_lookup.emb_lookup
+            emb = TransformerEmbeddingLayer(config, emb_lookup=emb_lookup)
+        else:
+            from lightseq.training.ops.pytorch.transformer_embedding_layer import (
+                LSTransformerEmbeddingLayer as TransformerEmbeddingLayer,
+            )
+
+            if emb_lookup is not None:
+                return emb_lookup
+            emb = TransformerEmbeddingLayer(config)
 
         return emb
 
@@ -233,7 +238,9 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
 
     def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
         encoder_out = self.encoder(src_tokens)
-        decoder_out = self.decoder(prev_output_tokens, encoder_out, features_only)
+        decoder_out = self.decoder(
+            prev_output_tokens, encoder_out, features_only=features_only
+        )
         return decoder_out
 
 
