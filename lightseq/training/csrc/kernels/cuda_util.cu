@@ -218,3 +218,11 @@ template void check_nan_inf<float>(const float *data_ptr, int dsize,
 template void check_nan_inf<__half>(const __half *data_ptr, int dsize,
                                     bool check_nan_inf, std::string file,
                                     int line, cudaStream_t stream);
+
+template void check_nan_inf<int8_t>(const int8_t *data_ptr, int dsize,
+                                    bool check_nan_inf, std::string file,
+                                    int line, cudaStream_t stream);
+
+template void check_nan_inf<int32_t>(const int32_t *data_ptr, int dsize,
+                                     bool check_nan_inf, std::string file,
+                                     int line, cudaStream_t stream);

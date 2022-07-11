@@ -25,4 +25,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --best-checkpoint-metric bleu \
     --maximize-best-checkpoint-metric \
     --fp16 \
-    --enable-quant
+    --enable-quant \
+    --finetune-from-model checkpoints/checkpoint_best.pt

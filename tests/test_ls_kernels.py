@@ -810,11 +810,11 @@ def test_launch_dropout_relu_bias_bwd():
         return test_in_grad_cus, test_bias_grad_cus
 
     def baseline():
-        temp = test_out_grad * test_mask * (1 / (1 - 0.1))
-        test_in_grad_base = temp * ((test_input + test_bias) > 0)
-        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1))
+        temp = test_out_grad.float() * test_mask * (1 / (1 - 0.1))
+        test_in_grad_base = temp * ((test_input.float() + test_bias.float()) > 0)
+        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1), dtype=torch.float)
 
-        return test_in_grad_base, test_bias_grad_base
+        return test_in_grad_base.to(kt.dtype), test_bias_grad_base.to(kt.dtype)
 
     return custom, baseline
 
@@ -1320,11 +1320,11 @@ if __name__ == "__main__":
         # "test_launch_concat3_dim1",
         # "test_adam",
         # "test_launch_dropout_relu_bias",
-        # "test_launch_dropout_relu_bias_bwd",
+        "test_launch_dropout_relu_bias_bwd",
         # "test_launch_dropout_gelu_bias",
         # "test_launch_dropout_gelu_bias_bwd",
         # "test_launch_layer_norm_i8O",
-        "test_launch_ln_i8O_bw",
+        # "test_launch_ln_i8O_bw",
         # "test_launch_dropout_relu_bias_i8I_i8O",
         # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
         # "test_launch_dropout_gelu_bias_i8I_i8O",
