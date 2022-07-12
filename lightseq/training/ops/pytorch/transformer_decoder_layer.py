@@ -297,7 +297,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         if self.config.layer_id in _all_layer_grads:
             return
-        grad = torch.empty_like(param)
+        grad = torch.zeros_like(param)
         cuda_module = transformer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
