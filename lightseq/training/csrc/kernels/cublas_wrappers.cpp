@@ -168,6 +168,11 @@ void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
     // make best algo with algoId: 21, customOption: 0, tile: 20, splitK_val: 0, swizzle: 0, reductionScheme: 0, workspaceSize: 0, stages: 17
   cublasLtMatmulAlgo_info algo_info = {21, 0, 20, 0, 0, 0, 0, 17};
 
+  // algoId: 21, customOption: 0, tile: 15, splitK_val: 0, swizzle: 0, reductionScheme: 0, workspaceSize: 0, stages: 24
+  if (m < 500) {
+      algo21_info.tile = 15;
+      algo21_info.stages = 24;
+  }
 
   cudaDataType_t scaleType, Atype, Btype, Ctype;
   cublasComputeType_t computeType;

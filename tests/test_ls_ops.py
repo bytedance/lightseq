@@ -295,7 +295,7 @@ def test_encoder_layer_forward():
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-1, ntest=10)
 def test_quant_encoder_layer_forward():
-    batch_size, seq_len = 128, 128
+    batch_size, seq_len = 32, 32
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
@@ -764,9 +764,9 @@ def test_decoder_layer_forward():
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1, ntest=10)
 def test_quant_decoder_layer_forward():
-    batch_size, enc_seq_len = 32, 64
+    batch_size, enc_seq_len = 16, 35
     _, dec_seq_len = kt.bs_sl(batch_size)
-    dec_seq_len = 64
+    dec_seq_len = 35
     print(
         f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
         f" {dec_seq_len})"
