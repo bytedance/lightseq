@@ -814,6 +814,9 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   buffer += _batch_dim;
 
   T *grad_ff1_inp_ptr = buffer;
+  buffer += _batch_dim;
+
+  T *dequant_ptr = buffer;
   buffer += _batch_tokens * _intermediate_size;
 
   T *grad_ff1_out_ptr = buffer;
@@ -833,7 +836,7 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   }
 
   if (_enable_quant) {
-    _ff2_inp_ptr = grad_ff1_inp_ptr;
+    _ff2_inp_ptr = dequant_ptr;
 
     launch_dequantize<T>(_ff2_inp_ptr, _ff2_inp_i8_ptr, _output_cmax_ptr,
                          _batch_tokens * _intermediate_size, 2, _stream);

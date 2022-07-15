@@ -367,13 +367,13 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 TransformerDecoderLayer,
             )
         else:
-            # from .ls_fs_transformer_decoder_layer import (
-            #     LSFSTransformerDecoderLayer as TransformerDecoderLayer,
-            # )
-
-            from lightseq.training.ops.pytorch.torch_transformer_layers import (
-                TransformerDecoderLayer,
+            from .ls_fs_transformer_decoder_layer import (
+                LSFSTransformerDecoderLayer as TransformerDecoderLayer,
             )
+
+            # from lightseq.training.ops.pytorch.torch_transformer_layers import (
+            #     TransformerDecoderLayer,
+            # )
 
         config = TransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
