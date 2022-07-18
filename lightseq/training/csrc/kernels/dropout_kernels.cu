@@ -1377,6 +1377,159 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
     float ratio, cudaStream_t stream);
 
 /**
+ * @brief fused bias, activation, and dropout backward, with float input
+ *
+ * @thread
+ * gridDim.x = total_count / 1024
+ * blockDim.x = 1024
+ *
+ * @tparam act_type kRelu
+ * @param row_size batch_size * seq_len
+ * @param ratio dropout ratio
+ * @param in_grad [batch_size, seq_len, hidden_size], input grad
+ * @param bias_grad [hidden_size], bias grad
+ * @param out_grad [batch_size, seq_len, hidden_size], output grad
+ * @param mask [batch_size, seq_len, hidden_size], dropout mask
+ * @param hidden_size
+ * @return void
+ */
+template <ActivationType act_type, typename T>
+__global__ void ls_quant_dropout_act_bias_bwd_kernel(
+    T *in_grad, T *bias_grad, T *cmax_in_grad, T *cmax_out_grad, const T *input,
+    const T *cmax_in, const uint8_t *cmask_in, const uint8_t *cmask_out,
+    const T *bias, const T *out_grad, const uint8_t *dropout_mask, int row_size,
+    float ratio, int hidden_size) {
+  const float scale = 1.f / (1.f - ratio);
+  __shared__ float tile[WARP_SIZE][WARP_SIZE + 1];
+
+  cg::thread_block b = cg::this_thread_block();
+  cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
+
+  int col_idx = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
+
+  int stride = hidden_size * WARP_SIZE;
+  float thread_grad_bias = 0;
+
+  float cmax_in_val = cmax_in[0];
+
+  int idx = flat_2dim(threadIdx.y, col_idx, hidden_size);
+
+  float thread_cmax_out_grad = 0;
+  float thread_cmax_in_grad = 0;
+  float thread_in_grad = 0;
+  float temp_cmax_in_grad = 0;
+  float temp_cmax_out_grad = 0;
+  if (col_idx < hidden_size) {
+    for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
+      // float val = out_grad[idx];
+      clip_bwd(thread_in_grad, temp_cmax_out_grad, float{out_grad[idx]},
+               cmask_out[idx], 2);
+      thread_cmax_out_grad += temp_cmax_out_grad;
+
+      float in = input[idx];
+      float b = bias[idx % hidden_size];
+      thread_in_grad = activation_bwd_kernel<act_type, float>(
+          thread_in_grad * scale * static_cast<float>(dropout_mask[idx] & 1),
+          in + b);
+      thread_grad_bias += thread_in_grad;
+
+      clip_bwd(thread_in_grad, temp_cmax_in_grad, thread_in_grad, cmask_in[idx],
+               6);
+      in_grad[idx] = thread_in_grad;
+      thread_cmax_in_grad += temp_cmax_in_grad;
+      idx += stride;
+    }
+  }
+  __shared__ float block_cmax_in_grad, block_cmax_out_grad;
+  if (threadIdx.x == 0 && threadIdx.y == 0) {
+    block_cmax_in_grad = 0;
+    block_cmax_out_grad = 0;
+  }
+  __syncthreads();
+
+  if (thread_cmax_out_grad != 0) {
+    atomicAdd(&block_cmax_out_grad, thread_cmax_out_grad);
+  }
+  if (thread_cmax_in_grad != 0) {
+    atomicAdd(&block_cmax_in_grad, thread_cmax_in_grad);
+  }
+
+  tile[threadIdx.x][threadIdx.y] = thread_grad_bias;
+  __syncthreads();
+  float sum = tile[threadIdx.y][threadIdx.x];
+
+  if (threadIdx.x == 0 && threadIdx.y == 0) {
+    if (block_cmax_in_grad != 0) {
+      atomicAdd(&cmax_in_grad[0], block_cmax_in_grad);
+    }
+    if (block_cmax_out_grad != 0) {
+      atomicAdd(&cmax_out_grad[0], block_cmax_out_grad);
+    }
+  }
+
+  __syncthreads();
+
+  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
+
+  if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;
+  __syncthreads();
+
+  if (threadIdx.y == 0) {
+    int pos = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
+    bias_grad[pos] = tile[0][threadIdx.x];
+  }
+}
+
+template <ActivationType act_type, typename T>
+void launch_ls_quant_dropout_act_bias_bwd(
+    T *in_grad, T *bias_grad, T *cmax_in_grad, T *cmax_out_grad, const T *input,
+    const T *cmax_in, const uint8_t *cmask_in, const uint8_t *cmask_out,
+    const T *bias, const T *out_grad, const uint8_t *dropout_mask, int row_size,
+    int dim, float ratio, cudaStream_t stream) {
+  zero_grad<<<1, 1>>>(cmax_in_grad);
+  zero_grad<<<1, 1>>>(cmax_out_grad);
+  dim3 grid_dim((dim - 1) / WARP_SIZE + 1);
+  dim3 block_dim(WARP_SIZE, WARP_SIZE);
+  ls_quant_dropout_act_bias_bwd_kernel<act_type>
+      <<<grid_dim, block_dim, 0, stream>>>(in_grad, bias_grad, cmax_in_grad,
+                                           cmax_out_grad, input, cmax_in,
+                                           cmask_in, cmask_out, bias, out_grad,
+                                           dropout_mask, row_size, ratio, dim);
+}
+
+template void
+launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, float>(
+    float *in_grad, float *bias_grad, float *cmax_in_grad, float *cmax_out_grad,
+    const float *input, const float *cmax_in, const uint8_t *cmask_in,
+    const uint8_t *cmask_out, const float *bias, const float *out_grad,
+    const uint8_t *dropout_mask, int row_size, int dim, float ratio,
+    cudaStream_t stream);
+
+template void
+launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, __half>(
+    __half *in_grad, __half *bias_grad, __half *cmax_in_grad,
+    __half *cmax_out_grad, const __half *input, const __half *cmax_in,
+    const uint8_t *cmask_in, const uint8_t *cmask_out, const __half *bias,
+    const __half *out_grad, const uint8_t *dropout_mask, int row_size, int dim,
+    float ratio, cudaStream_t stream);
+
+template void
+launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, float>(
+    float *in_grad, float *bias_grad, float *cmax_in_grad, float *cmax_out_grad,
+    const float *input, const float *cmax_in, const uint8_t *cmask_in,
+    const uint8_t *cmask_out, const float *bias, const float *out_grad,
+    const uint8_t *dropout_mask, int row_size, int dim, float ratio,
+    cudaStream_t stream);
+
+template void
+launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
+    __half *in_grad, __half *bias_grad, __half *cmax_in_grad,
+    __half *cmax_out_grad, const __half *input, const __half *cmax_in,
+    const uint8_t *cmask_in, const uint8_t *cmask_out, const __half *bias,
+    const __half *out_grad, const uint8_t *dropout_mask, int row_size, int dim,
+    float ratio, cudaStream_t stream);
+
+/**
  * @brief fused bias, dropout, and residual at the end of Attention and FFN,
  * store dropped position in mask, it's not in-place
  *
