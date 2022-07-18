@@ -53,7 +53,11 @@ __global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
 
   if (i * 8 >= numel) return;
 
-  float clip_max_val = __half2float(clip_max_ptr[1]);
+  float clip_max_val = 0;
+  if (alpha_ptr)
+    clip_max_val = __half2float(clip_max_ptr[1]);
+  else
+    clip_max_val = __half2float(clip_max_ptr[0]);
 
   int64_t *q_weight8_ptr = reinterpret_cast<int64_t *>(q_ptr);
   const float4 *weight8_ptr = reinterpret_cast<const float4 *>(f_ptr);

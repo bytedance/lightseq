@@ -470,8 +470,10 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
     encdec_attn_inp_ptr =
         _pre_or_postLayerNorm ? buffer + 3 * _batch_dim : _gemmQ_inp_ptr;
     // _batch_dim
-    ffn_inp_ptr =
-        _pre_or_postLayerNorm ? buffer + 4 * _batch_dim : _ff1_inp_ptr;
+    ffn_inp_ptr = _pre_or_postLayerNorm
+                      ? buffer + std::max(_intermediate_size * _hidden_size,
+                                          4 * _batch_dim)
+                      : _ff1_inp_ptr;
   }
   self_attn_layer_fw(dec_input_ptr, encdec_attn_inp_ptr, buffer, cache);
 

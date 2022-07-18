@@ -125,9 +125,7 @@ def get_test_bert_encoder(num_layers):
         custom_bert_enc_layer_list.append(custom_enc_layer)
         fairseq_bert_enc_layer_list.append(fairseq_enc_layer)
 
-    return torch.nn.ModuleList(custom_bert_enc_layer_list), torch.nn.ModuleList(
-        fairseq_bert_enc_layer_list
-    )
+    return custom_bert_enc_layer_list, fairseq_bert_enc_layer_list
 
 
 custom_bert_enc_layer_list, fairseq_bert_enc_layer_list = get_test_bert_encoder(
@@ -544,7 +542,8 @@ def test_bert_encoder_layer_backward():
     fairseq_loss = (base_x / 1000).sum()
 
     def custom():
-        custom_bert_enc_layer_list.zero_grad()
+        for i in range(NUM_LAYERS):
+            custom_bert_enc_layer_list[i].zero_grad()
         custom_loss.backward(retain_graph=True)
         grad_list = []
         for i in range(NUM_LAYERS - 1, -1, -1):
@@ -572,7 +571,8 @@ def test_bert_encoder_layer_backward():
         return grad_list
 
     def baseline():
-        fairseq_bert_enc_layer_list.zero_grad()
+        for i in range(NUM_LAYERS):
+            fairseq_bert_enc_layer_list[i].zero_grad()
         fairseq_loss.backward(retain_graph=True)
         grad_list = []
         for i in range(NUM_LAYERS - 1, -1, -1):
@@ -599,7 +599,7 @@ def test_bert_encoder_layer_backward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-1, ntest=10)
 def test_quant_bert_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -630,29 +630,29 @@ def test_quant_bert_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-2, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-2, atol=3, ntest=10)
 def test_quant_bert_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
     hidden_size = 1024
-    shs = hidden_size * hidden_size
 
     hidden_states = kt.rand((batch_size, seq_len, hidden_size))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+    loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
 
-    cus_x = hidden_states.clone()
     for i in range(NUM_LAYERS):
-        cus_x = custom_bert_enc_layer_list[i](cus_x, self_attn_padding_mask)
-    custom_loss = (cus_x / 1000).sum()
-
-    base_x = hidden_states.clone()
-    for i in range(NUM_LAYERS):
-        base_x = fairseq_bert_enc_layer_list[i](base_x, self_attn_padding_mask)
-    fairseq_loss = (base_x / 1000).sum()
+        custom_bert_enc_layer_list[i].apply(enable_quant)
+        fairseq_bert_enc_layer_list[i].apply(qat_mode)
 
     def custom():
-        custom_bert_enc_layer_list.zero_grad()
-        custom_loss.backward(retain_graph=True)
+        for i in range(NUM_LAYERS):
+            custom_bert_enc_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = custom_bert_enc_layer_list[i](res, self_attn_padding_mask)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
         grad_list = []
         for i in range(NUM_LAYERS - 1, -1, -1):
             """
@@ -682,8 +682,14 @@ def test_quant_bert_encoder_layer_backward():
         return grad_list
 
     def baseline():
-        fairseq_bert_enc_layer_list.zero_grad()
-        fairseq_loss.backward(retain_graph=True)
+        for i in range(NUM_LAYERS):
+            fairseq_bert_enc_layer_list[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(NUM_LAYERS):
+            res = fairseq_bert_enc_layer_list[i](res, self_attn_padding_mask)
+        fairseq_loss = (res / 1000).sum()
+        fairseq_loss.data.copy_(loss_data)
+        fairseq_loss.backward()
         grad_list = []
         for i in range(NUM_LAYERS - 1, -1, -1):
             curl = fairseq_bert_enc_layer_list[i]
@@ -1523,7 +1529,7 @@ if __name__ == "__main__":
             # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
             # "test_quant_decoder_layer_backward",
-            # "test_quant_bert_encoder_layer_forward",
-            # "test_quant_bert_encoder_layer_backward",
+            "test_quant_bert_encoder_layer_forward",
+            "test_quant_bert_encoder_layer_backward",
         ]
     )

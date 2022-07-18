@@ -142,6 +142,7 @@ class TransformerEncoderLayer {
     _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
     _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
     _ctx_bufB_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     if (_enable_quant) {
       _gemmQKV_inp_i8_ptr =
           cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
@@ -163,7 +164,6 @@ class TransformerEncoderLayer {
         _gemmQKV_inp_ptr = nullptr;
       }
       _attn_o_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
       _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
       _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
     }
@@ -190,6 +190,7 @@ class TransformerEncoderLayer {
     cuda_free(_qkv_ptr);
     cuda_free(_soft_out_ptr);
     cuda_free(_ctx_bufB_ptr);
+    cuda_free(_ff1_inp_ptr);
     if (_enable_quant) {
       cuda_free(_gemmQKV_inp_i8_ptr);
       cuda_free(_attn_o_inp_i8_ptr);
@@ -201,7 +202,6 @@ class TransformerEncoderLayer {
     } else {
       cuda_free(_gemmQKV_inp_ptr);
       cuda_free(_attn_o_inp_ptr);
-      cuda_free(_ff1_inp_ptr);
       cuda_free(_relu_inp_ptr);
       cuda_free(_ff2_inp_ptr);
     }
@@ -234,7 +234,6 @@ class TransformerEncoderLayer {
         _gemmQKV_inp_ptr = nullptr;
       }
       _attn_o_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
       _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
       _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
     }
@@ -253,7 +252,6 @@ class TransformerEncoderLayer {
     } else {
       cuda_free(_gemmQKV_inp_ptr);
       cuda_free(_attn_o_inp_ptr);
-      cuda_free(_ff1_inp_ptr);
       cuda_free(_relu_inp_ptr);
       cuda_free(_ff2_inp_ptr);
     }

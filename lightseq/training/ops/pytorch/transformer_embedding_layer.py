@@ -142,7 +142,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             func = cuda_module.assign_layer_weight_grad_fp32
-        grad = torch.empty_like(param)
+        grad = torch.zeros_like(param)
         func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 

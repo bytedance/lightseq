@@ -2,7 +2,13 @@ import torch
 from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
     enable_quant,
 )
-from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
+from lightseq.training.ops.pytorch.quantization import (
+    qat_mode,
+    disable_quant,
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
+)
 from lightseq.training.ops.pytorch.torch_transformer_layers import BertEmbeddingLayer
 
 
@@ -28,7 +34,10 @@ def get_hf_bert_enc_layer_params(layer):
     init_ws.append(layer.output.LayerNorm.weight.detach().clone())
     init_bs.append(layer.output.LayerNorm.bias.detach().clone())
 
-    init_ws.append(torch.Tensor(12))
+    act_cmax = act_quant_config.amax.tolist()
+    wei_cmax = weight_quant_config.amax.tolist()
+    init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+    init_ws.append(init_clip_max)
 
     return init_ws, init_bs
 
