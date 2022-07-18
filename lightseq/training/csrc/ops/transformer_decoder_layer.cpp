@@ -228,12 +228,6 @@ void TransformerDecoderLayer<T>::encdec_kv_fw(const T *enc_output_ptr) {
     _encdec_kv_linear.Forward(_batch_size * _src_seq_len, enc_output_ptr,
                               _shared_encdec_kv_ptr, _shared_grad_encdec_kv_ptr,
                               _cublasHandle);
-    launch_fake_quantize<T>(
-        nullptr, nullptr, _shared_grad_encdec_kv_ptr,
-        _shared_grad_encdec_kv_ptr, _encdec_kv_cmax_ptr + 2,
-        _batch_size * _src_seq_len * _shared_nlayer * 2 * _hidden_size, 6,
-        _stream);
-
   } else {
     _encdec_kv_linear.Forward(_batch_size * _src_seq_len, enc_output_ptr,
                               _encdec_attn_kvw_ptr, _shared_grad_encdec_kv_ptr,
