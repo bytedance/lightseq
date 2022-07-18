@@ -19,7 +19,7 @@ __global__ void quantize_kernel<float>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
 
   if (i * 4 >= numel) return;
 
-  float clip_max_val = clip_max_ptr[1];
+  float clip_max_val = clip_max_ptr[0];
 
   int32_t *q_weight4_ptr = reinterpret_cast<int32_t *>(q_ptr);
   const float4 *weight4_ptr = reinterpret_cast<const float4 *>(f_ptr);
@@ -34,11 +34,11 @@ __global__ void quantize_kernel<float>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
   q_weight[3] = quantize(weight4.w, clip_max_val, clip_mask[3], mask_start_bit);
 
   q_weight4_ptr[i] = reinterpret_cast<int32_t *>(q_weight)[0];
-  clip_mask4_ptr[i] = reinterpret_cast<uint32_t *>(clip_mask)[0];
+  clip_mask4_ptr[i] |= reinterpret_cast<uint32_t *>(clip_mask)[0];
 
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
-    float input_cmax = clip_max_ptr[0];
-    float weight_cmax = clip_max_val;
+    float input_cmax = clip_max_val;
+    float weight_cmax = clip_max_ptr[1];
     float output_cmax = clip_max_ptr[2];
     alpha_ptr[0] = input_cmax * weight_cmax / (output_cmax * kQuantRangeI8);
   }
@@ -53,7 +53,7 @@ __global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
 
   if (i * 8 >= numel) return;
 
-  float clip_max_val = __half2float(clip_max_ptr[1]);
+  float clip_max_val = __half2float(clip_max_ptr[0]);
 
   int64_t *q_weight8_ptr = reinterpret_cast<int64_t *>(q_ptr);
   const float4 *weight8_ptr = reinterpret_cast<const float4 *>(f_ptr);
@@ -65,18 +65,18 @@ __global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
   __half2 *weight2_ptr = reinterpret_cast<__half2 *>(&weight8);
 #pragma unroll
   for (int i = 0; i < 4; i++) {
-    q_weight[i * 2] = quantize(weight2_ptr[i].x, clip_max_val, clip_mask[i * 2],
-                               mask_start_bit);
-    q_weight[i * 2 + 1] = quantize(weight2_ptr[i].y, clip_max_val,
+    q_weight[i * 2] = quantize(__half2float(weight2_ptr[i].x), clip_max_val,
+                               clip_mask[i * 2], mask_start_bit);
+    q_weight[i * 2 + 1] = quantize(__half2float(weight2_ptr[i].y), clip_max_val,
                                    clip_mask[i * 2 + 1], mask_start_bit);
   }
 
   q_weight8_ptr[i] = reinterpret_cast<int64_t *>(q_weight)[0];
-  clip_mask8_ptr[i] = reinterpret_cast<uint64_t *>(clip_mask)[0];
+  clip_mask8_ptr[i] |= reinterpret_cast<uint64_t *>(clip_mask)[0];
 
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
-    float input_cmax = __half2float(clip_max_ptr[0]);
-    float weight_cmax = clip_max_val;
+    float input_cmax = clip_max_val;
+    float weight_cmax = __half2float(clip_max_ptr[1]);
     float output_cmax = __half2float(clip_max_ptr[2]);
     alpha_ptr[0] = input_cmax * weight_cmax / (output_cmax * kQuantRangeI8);
   }
@@ -151,7 +151,7 @@ __global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
   output4_ptr[i] = input4;
 
   if (clip_mask_ptr) {
-    clip_mask4_ptr[i] = reinterpret_cast<uint32_t *>(clip_mask)[0];
+    clip_mask4_ptr[i] |= reinterpret_cast<uint32_t *>(clip_mask)[0];
   }
 
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
@@ -172,7 +172,7 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
 
   if (i * 8 >= numel) return;
 
-  float clip_max_val = __half2float(clip_max_ptr[1]);
+  float clip_max_val = __half2float(clip_max_ptr[0]);
 
   const float4 *input8_ptr = reinterpret_cast<const float4 *>(input);
   float4 *output8_ptr = reinterpret_cast<float4 *>(output);
@@ -186,15 +186,15 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
   __half2 *input2_ptr = reinterpret_cast<__half2 *>(&input8);
 #pragma unroll
   for (int i = 0; i < 4; i++) {
-    input2_ptr[i].x = fake_quantize(input2_ptr[i].x, clip_max_val,
+    input2_ptr[i].x = fake_quantize(__half2float(input2_ptr[i].x), clip_max_val,
                                     clip_mask[i * 2], mask_start_bit);
-    input2_ptr[i].y = fake_quantize(input2_ptr[i].y, clip_max_val,
+    input2_ptr[i].y = fake_quantize(__half2float(input2_ptr[i].y), clip_max_val,
                                     clip_mask[i * 2 + 1], mask_start_bit);
   }
 
   output8_ptr[i] = input8;
   if (clip_mask_ptr) {
-    clip_mask8_ptr[i] = reinterpret_cast<uint64_t *>(clip_mask)[0];
+    clip_mask8_ptr[i] |= reinterpret_cast<uint64_t *>(clip_mask)[0];
   }
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
     float input_cmax = __half2float(clip_max_ptr[0]);

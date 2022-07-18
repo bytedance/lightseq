@@ -139,38 +139,11 @@ class TransformerEncoderLayer {
  private:
   void allocate_mem_buffer() {
     // allocate local gpu memory
-    _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
-    _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    _ctx_bufB_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    if (_enable_quant) {
-      _gemmQKV_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-
-      _attn_o_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_i8_ptr = cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _act_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _igemm_alpha_ptr = cuda_malloc<float>(1);
-      _igemm_beta_ptr = cuda_malloc<float>(1);
-      cuda_set<float>(_igemm_beta_ptr, 0, 1);
-    } else {
-      if (_pre_or_postLayerNorm) {
-        _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      } else {
-        _gemmQKV_inp_ptr = nullptr;
-      }
-      _attn_o_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-    }
+    allocate_layer_memory();
 
     // buffer size needed by ffn bw
     size_t sz_ffn_bw = 3 * _max_batch_tokens * _hidden_size +
-                       2 * _max_batch_tokens * _intermediate_size;
+                       _max_batch_tokens * _intermediate_size;
     // buffer size needed by attn bw
     size_t sz_attn_bw = 5 * _max_batch_tokens * _hidden_size +
                         std::max(3 * _max_batch_tokens * _hidden_size,
@@ -183,80 +156,61 @@ class TransformerEncoderLayer {
       std::cout << "Encoder layer #" << _layer_id
                 << " allocate shared memory size: " << smem_size << std::endl;
     }
+    if (!_shared_quant_mem_ptr) {
+      cuda_free(_shared_quant_mem_ptr);
+      size_t quant_smem_size =
+          std::max(_max_batch_tokens * _hidden_size * 4 +
+                       _hidden_size * _hidden_size * 3,
+                   _max_batch_tokens * (_hidden_size + _intermediate_size) +
+                       _hidden_size * _intermediate_size);
+      _shared_quant_mem_ptr = cuda_malloc<int8_t>(quant_smem_size);
+      std::cout << "Encoder layer #" << _layer_id
+                << " allocate shared quant memory size: " << quant_smem_size
+                << std::endl;
+    }
   }
 
   void free_mem_buffer() {
     // free local gpu memory
-    cuda_free(_qkv_ptr);
-    cuda_free(_soft_out_ptr);
-    cuda_free(_ctx_bufB_ptr);
-    if (_enable_quant) {
-      cuda_free(_gemmQKV_inp_i8_ptr);
-      cuda_free(_attn_o_inp_i8_ptr);
-      cuda_free(_ff1_inp_i8_ptr);
-      cuda_free(_act_inp_i8_ptr);
-      cuda_free(_ff2_inp_i8_ptr);
-      cuda_free(_igemm_alpha_ptr);
-      cuda_free(_igemm_beta_ptr);
-    } else {
-      cuda_free(_gemmQKV_inp_ptr);
-      cuda_free(_attn_o_inp_ptr);
-      cuda_free(_ff1_inp_ptr);
-      cuda_free(_relu_inp_ptr);
-      cuda_free(_ff2_inp_ptr);
-    }
+    free_layer_memory();
 
     // free shared gpu memory between layers
     cuda_free(_shared_mem_ptr);
+    cuda_free(_shared_quant_mem_ptr);
     _shared_mem_ptr = nullptr;
+    _shared_quant_mem_ptr = nullptr;
   }
 
-  void allocate_independent_mem_buffer() {
+  void allocate_layer_memory() {
     // allocate local gpu memory
-    if (_enable_quant) {
-      _gemmQKV_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-
-      _attn_o_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_i8_ptr = cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _act_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _igemm_alpha_ptr = cuda_malloc<float>(1);
-      _igemm_beta_ptr = cuda_malloc<float>(1);
-      cuda_set<float>(_igemm_beta_ptr, 0, 1);
+    _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
+    _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    _ctx_bufB_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    if (_pre_or_postLayerNorm) {
+      _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     } else {
-      if (_pre_or_postLayerNorm) {
-        _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      } else {
-        _gemmQKV_inp_ptr = nullptr;
-      }
-      _attn_o_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+      _gemmQKV_inp_ptr = nullptr;
     }
+    _attn_o_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _igemm_alpha_ptr = cuda_malloc<float>(1);
+    _igemm_beta_ptr = cuda_malloc<float>(1);
+    cuda_set<float>(_igemm_beta_ptr, 0, 1);
   }
 
-  void free_independent_mem_buffer() {
-    // free local gpu memory
-    if (_enable_quant) {
-      cuda_free(_gemmQKV_inp_i8_ptr);
-      cuda_free(_attn_o_inp_i8_ptr);
-      cuda_free(_ff1_inp_i8_ptr);
-      cuda_free(_act_inp_i8_ptr);
-      cuda_free(_ff2_inp_i8_ptr);
-      cuda_free(_igemm_alpha_ptr);
-      cuda_free(_igemm_beta_ptr);
-    } else {
-      cuda_free(_gemmQKV_inp_ptr);
-      cuda_free(_attn_o_inp_ptr);
-      cuda_free(_ff1_inp_ptr);
-      cuda_free(_relu_inp_ptr);
-      cuda_free(_ff2_inp_ptr);
-    }
+  void free_layer_memory() {
+    cuda_free(_qkv_ptr);
+    cuda_free(_soft_out_ptr);
+    cuda_free(_ctx_bufB_ptr);
+    cuda_free(_gemmQKV_inp_ptr);
+    cuda_free(_attn_o_inp_ptr);
+    cuda_free(_ff1_inp_ptr);
+    cuda_free(_relu_inp_ptr);
+    cuda_free(_ff2_inp_ptr);
+    cuda_free(_igemm_alpha_ptr);
+    cuda_free(_igemm_beta_ptr);
   }
 
   // const parameter between batch
@@ -308,18 +262,10 @@ class TransformerEncoderLayer {
   // local GPU memory for quant
   float *_igemm_alpha_ptr;
   float *_igemm_beta_ptr;
-  int8_t *_gemmQKV_inp_i8_ptr;
-  int8_t *_attn_qkvw_i8_ptr;
-  int8_t *_attn_o_inp_i8_ptr;
-  int8_t *_attn_ow_i8_ptr;
-  int8_t *_ff1_inp_i8_ptr;
-  int8_t *_act_inp_i8_ptr;
-  int8_t *_ff2_inp_i8_ptr;
-  int8_t *_ff1_w_i8_ptr;
-  int8_t *_ff2_w_i8_ptr;
 
   // shared GPU memory between layer
   static T *_shared_mem_ptr;
+  static int8_t *_shared_quant_mem_ptr;
 
   // weights ptr
   const T *_attn_qkvw_ptr;

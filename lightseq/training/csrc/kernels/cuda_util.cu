@@ -206,6 +206,8 @@ void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
                                    thrust::logical_or<bool>());
   }
   if (res) {
+    print_vec(data_ptr, "data(head)", 20);
+    print_vec(data_ptr + dsize - 20, "data(tail)", 20);
     throw std::runtime_error(msg);
   }
   std::cout << msg << " [check pass]." << std::endl;
@@ -218,3 +220,33 @@ template void check_nan_inf<float>(const float *data_ptr, int dsize,
 template void check_nan_inf<__half>(const __half *data_ptr, int dsize,
                                     bool check_nan_inf, std::string file,
                                     int line, cudaStream_t stream);
+
+// square<T> computes the square of a number f(x) -> x*x
+template <typename T>
+struct _square {
+  __host__ __device__ float operator()(const T &x) const { return x * x; }
+};
+template <>
+struct _square<__half> {
+  __host__ __device__ float operator()(const __half &x) const {
+    return __half2float(x) * __half2float(x);
+  }
+};
+
+template <typename T>
+void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
+                 cudaStream_t stream) {
+  // thrust::cuda::par.on(stream), data_ptr, data_ptr + dsize, _square<T>(), 0,
+  float res = thrust::transform_reduce(thrust::cuda::par.on(stream), data_ptr,
+                                       data_ptr + dsize, _square<T>(), 0,
+                                       thrust::plus<float>());
+  res = std::sqrt(res);
+  std::cout << tensor_name << " norm: " << res << std::endl;
+}
+
+template void check_2norm<float>(const float *data_ptr, std::string tensor_name,
+                                 int dsize, cudaStream_t stream);
+
+template void check_2norm<__half>(const __half *data_ptr,
+                                  std::string tensor_name, int dsize,
+                                  cudaStream_t stream);

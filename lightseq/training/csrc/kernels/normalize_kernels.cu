@@ -242,6 +242,7 @@ __global__ void ker_layer_norm_i8(int8_t *q_out, uint8_t *clip_mask_out,
   uint32_t *clip_mask_out4 =
       reinterpret_cast<uint32_t *>(clip_mask_out) + blockIdx.x * hidden_size;
   float clip_max_val = clip_max_out[0];
+
   for (uint idx = threadIdx.x; idx < hidden_size; idx += blockDim.x) {
     float4 vscale = __ldg((const float4 *)scale + idx);
     float4 vbias = __ldg((const float4 *)bias + idx);
@@ -258,7 +259,7 @@ __global__ void ker_layer_norm_i8(int8_t *q_out, uint8_t *clip_mask_out,
     q_val[3] = quantize(val.w, clip_max_val, clip_mask[3], 2);
 
     q_out4[idx] = reinterpret_cast<int32_t *>(q_val)[0];
-    clip_mask_out4[idx] = reinterpret_cast<uint32_t *>(clip_mask)[0];
+    clip_mask_out4[idx] |= reinterpret_cast<uint32_t *>(clip_mask)[0];
   }
 }
 
@@ -326,13 +327,14 @@ __global__ void ker_layer_norm_i8<__half>(
       val_f2.x = (val_f2.x - s_mean) * s_var * scale_f2.x + bias_f2.x;
       val_f2.y = (val_f2.y - s_mean) * s_var * scale_f2.y + bias_f2.y;
 
-      q_val[i * 2] = quantize(val_f2.x, clip_max_val, clip_mask[i * 2], 2);
-      q_val[i * 2 + 1] =
-          quantize(val_f2.y, clip_max_val, clip_mask[i * 2 + 1], 2);
+      q_val[i * 2] = quantize(__half2float(__float2half(val_f2.x)),
+                              clip_max_val, clip_mask[i * 2], 2);
+      q_val[i * 2 + 1] = quantize(__half2float(__float2half(val_f2.y)),
+                                  clip_max_val, clip_mask[i * 2 + 1], 2);
     }
 
     q_out8[idx] = reinterpret_cast<int64_t *>(q_val)[0];
-    clip_mask_out8[idx] = reinterpret_cast<uint64_t *>(clip_mask)[0];
+    clip_mask_out8[idx] |= reinterpret_cast<uint64_t *>(clip_mask)[0];
   }
 }
 
@@ -801,6 +803,7 @@ void launch_ln_bw<__half>(__half *gamma_grad, __half *betta_grad,
 
 template <>
 void launch_quant_ln_bw<float>(
+
     float *gamma_grad, float *betta_grad, float *inp_grad, float *cmax_grad,
     const float *out_grad, const float *residual_grad, const float *inp_or_out,
     const float *gamma, const float *betta, const float *vars,

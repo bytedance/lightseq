@@ -68,8 +68,8 @@ class TestDecorator(object):
         return x_cmask
 
     def quantize(self, x, cmax):
-        qmask = self.get_cmask(x, cmax)
         x, cmax = x.float(), cmax.float()
+        qmask = self.get_cmask(x, cmax)
         dequant_scale = cmax / 127
         x = x / dequant_scale
         x = (x + 0.5).floor()
@@ -90,13 +90,15 @@ class TestDecorator(object):
         return x.abs().flatten().topk(k)[0][-1]
 
     def tensor_inrange(self, x, y, cmax):
+        x, y, cmax = x.float(), y.float(), cmax.float()
         out = torch.where(y.abs() < cmax, x, self.zeros(1).to(x.dtype))
-        return out
+        return out.to(self.dtype)
 
     def tensor_outrange(self, x, y, cmax):
+        x, y, cmax = x.float(), y.float(), cmax.float()
         out = torch.where(y.abs() >= cmax, x, self.zeros(1).to(x.dtype))
         out = torch.where(y <= -cmax, -out, out)
-        return out
+        return out.to(self.dtype)
 
     def rand(self, shape):
         return self.move((torch.rand(shape) - 0.5) * 2)

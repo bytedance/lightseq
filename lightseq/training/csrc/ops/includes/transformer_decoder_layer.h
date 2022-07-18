@@ -43,7 +43,7 @@ class TransformerDecoderLayer {
   void encdec_attn_layer_fw(const T *input_ptr, const T *enc_mask_ptr,
                             T *output_ptr, T *buffer);
 
-  void ffn_layer_fw(T *inp_ptr, T *out_ptr);
+  void ffn_layer_fw(const T *inp_ptr, T *out_ptr);
 
   void encdec_kv_bw(const T *enc_output_ptr, T *grad_enc_output_ptr);
 
@@ -234,9 +234,11 @@ class TransformerDecoderLayer {
 
   void SetQuantMode(bool enable_quant) {
     if (_enable_quant != enable_quant) {
-      free_layer_memory();
       _enable_quant = enable_quant;
-      allocate_layer_memory();
+      if (_enable_quant) {
+        std::cout << "Decoder layer #" << _layer_id << " enable quantization"
+                  << std::endl;
+      }
     }
   }
 
@@ -248,8 +250,7 @@ class TransformerDecoderLayer {
 
     // buffer size needed by ffn bw
     size_t sz_ffn_bw = 3 * _max_batch_tokens * _hidden_size +
-                       2 * _max_batch_tokens * _intermediate_size;
-
+                       _max_batch_tokens * _intermediate_size;
     // buffer size needed by attn bw
     size_t sz_attn_bw = 5 * _max_batch_tokens * _hidden_size +
                         std::max(3 * _max_batch_tokens * _hidden_size,
@@ -262,9 +263,17 @@ class TransformerDecoderLayer {
                 << " allocate shared memory size: " << smem_size << std::endl;
     }
 
-    if (!_dequant_weight) {
-      _dequant_weight = cuda_malloc<T>(std::max(
-          _intermediate_size * _hidden_size, _hidden_size * _hidden_size * 3));
+    if (!_shared_quant_mem_ptr) {
+      cuda_free(_shared_quant_mem_ptr);
+      size_t quant_smem_size =
+          std::max(_max_batch_tokens * _hidden_size * 4 +
+                       _hidden_size * _hidden_size * 3,
+                   _max_batch_tokens * (_hidden_size + _intermediate_size) +
+                       _hidden_size * _intermediate_size);
+      _shared_quant_mem_ptr = cuda_malloc<int8_t>(quant_smem_size);
+      std::cout << "Decoder layer #" << _layer_id
+                << " allocate shared quant memory size: " << quant_smem_size
+                << std::endl;
     }
   }
 
@@ -309,68 +318,34 @@ class TransformerDecoderLayer {
     _encdec_attn_score_ptr =
         cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
 
-    if (_enable_quant) {
-      _ffn_input_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _encdec_input_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _gemmQKV_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _attn_output_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _gemmQ_inp_i8_ptr = cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _encdec_attn_output_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-
-      _ff1_inp_i8_ptr = cuda_malloc<int8_t>(_max_batch_tokens * _hidden_size);
-      _relu_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_i8_ptr =
-          cuda_malloc<int8_t>(_max_batch_tokens * _intermediate_size);
-
-      _igemm_alpha_ptr = cuda_malloc<float>(1);
-      _igemm_beta_ptr = cuda_malloc<float>(1);
-      cuda_set<float>(_igemm_beta_ptr, 0, 1);
+    if (_pre_or_postLayerNorm) {
+      _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     } else {
-      if (_pre_or_postLayerNorm) {
-        _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      } else {
-        _gemmQKV_inp_ptr = nullptr;
-      }
-      _attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _gemmQ_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _encdec_attn_output_ptr =
-          cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-      _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-      _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+      _gemmQKV_inp_ptr = nullptr;
     }
+    _attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _gemmQ_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _encdec_attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _igemm_alpha_ptr = cuda_malloc<float>(1);
+    _igemm_beta_ptr = cuda_malloc<float>(1);
+    cuda_set<float>(_igemm_beta_ptr, 0, 1);
   }
 
   void free_layer_memory() {
     // free local gpu memory
-    if (_enable_quant) {
-      cuda_free(_gemmQKV_inp_i8_ptr);
-      cuda_free(_attn_output_i8_ptr);
-      cuda_free(_gemmQ_inp_i8_ptr);
-      cuda_free(_encdec_attn_output_i8_ptr);
-      cuda_free(_ff1_inp_i8_ptr);
-      cuda_free(_relu_inp_i8_ptr);
-      cuda_free(_ff2_inp_i8_ptr);
-      cuda_free(_ffn_input_ptr);
-      cuda_free(_encdec_input_ptr);
+    cuda_free(_igemm_alpha_ptr);
+    cuda_free(_igemm_beta_ptr);
+    cuda_free(_gemmQKV_inp_ptr);
+    cuda_free(_attn_output_ptr);
+    cuda_free(_gemmQ_inp_ptr);
+    cuda_free(_encdec_attn_output_ptr);
 
-      cuda_free(_igemm_alpha_ptr);
-      cuda_free(_igemm_beta_ptr);
-
-    } else {
-      cuda_free(_gemmQKV_inp_ptr);
-      cuda_free(_attn_output_ptr);
-      cuda_free(_gemmQ_inp_ptr);
-      cuda_free(_encdec_attn_output_ptr);
-
-      cuda_free(_ff1_inp_ptr);
-      cuda_free(_relu_inp_ptr);
-      cuda_free(_ff2_inp_ptr);
-    }
+    cuda_free(_ff1_inp_ptr);
+    cuda_free(_relu_inp_ptr);
+    cuda_free(_ff2_inp_ptr);
 
     cuda_free(_qkv_ptr);
     cuda_free(_soft_out_ptr);
@@ -380,6 +355,8 @@ class TransformerDecoderLayer {
     cuda_free(_encdec_soft_out_ptr);
     cuda_free(_encdec_attn_score_ptr);
   }
+
+  void zero_mask_grad();
 
   // const parameter between batch
   const size_t _layer_id;
@@ -436,16 +413,6 @@ class TransformerDecoderLayer {
   // local GPU memory for quantization
   float *_igemm_alpha_ptr;
   float *_igemm_beta_ptr;
-  int8_t *_gemmQKV_inp_i8_ptr;
-  int8_t *_attn_output_i8_ptr;
-  int8_t *_gemmQ_inp_i8_ptr;
-  int8_t *_encdec_attn_output_i8_ptr;
-  int8_t *_ff1_inp_i8_ptr;
-  int8_t *_relu_inp_i8_ptr;
-  int8_t *_ff2_inp_i8_ptr;
-  T *_ffn_input_ptr;
-  T *_encdec_input_ptr;
-  T *_self_input_ptr;
 
   // shared GPU memory between layer
   static size_t _shared_nlayer;
@@ -453,7 +420,7 @@ class TransformerDecoderLayer {
   static T *_shared_encdec_kv_ptr;
   static T *_shared_grad_encdec_kv_ptr;
   static T *_shared_infer_encdec_kv_ptr;
-  static T *_dequant_weight;
+  static int8_t *_shared_quant_mem_ptr;
 
   // weights ptr
   const T *_attn_qkvw_ptr;

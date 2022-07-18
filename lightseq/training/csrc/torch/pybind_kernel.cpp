@@ -312,6 +312,18 @@ void torch_launch_ls_quant_dropout_act_bias_bwd(
 }
 
 template <typename T>
+void torch_launch_ls_quant_bias_dropout_residual(
+    torch::Tensor &output, torch::Tensor &mask, const torch::Tensor &input,
+    const torch::Tensor cmax, const torch::Tensor &bias,
+    const torch::Tensor &residual, int total_seq, int hidden_dim, float ratio) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_ls_quant_dropout_res_bias<T>(
+      rptr<T>(output), rptr<uint8_t>(mask), rptr<int8_t>(input), rptr<T>(cmax),
+      rptr<T>(bias), rptr<T>(residual), total_seq * hidden_dim, hidden_dim,
+      ratio, stream);
+}
+
+template <typename T>
 void torch_launch_ls_quantize(torch::Tensor &output,
                               torch::Tensor &clip_max_mask,
                               torch::Tensor &igemm_alpha,
@@ -321,6 +333,14 @@ void torch_launch_ls_quantize(torch::Tensor &output,
   launch_quantize<T>(rptr<int8_t>(output), rptr<uint8_t>(clip_max_mask),
                      rptr<float>(igemm_alpha), rptr<T>(input),
                      rptr<T>(clip_max), numel, 4, stream);
+}
+template <typename T>
+void torch_launch_ls_dequantize(torch::Tensor &output,
+                                const torch::Tensor &input,
+                                const torch::Tensor &clip_max, int numel) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_dequantize<T>(rptr<T>(output), rptr<int8_t>(input), rptr<T>(clip_max),
+                       numel, 4, stream);
 }
 
 template <typename T>
@@ -332,7 +352,7 @@ void torch_launch_fake_quantize(torch::Tensor &clip_max_mask,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_fake_quantize<T>(rptr<uint8_t>(clip_max_mask),
                           rptr<float>(igemm_alpha), rptr<T>(output),
-                          rptr<T>(input), rptr<T>(clip_max), numel, 4, stream);
+                          rptr<T>(input), rptr<T>(clip_max), numel, 2, stream);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
@@ -437,6 +457,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu,
                                                     __half>,
         "Test kernel wrapper");
+  m.def("torch_launch_ls_quant_bias_dropout_residual_fp32",
+        &torch_launch_ls_quant_bias_dropout_residual<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_quant_bias_dropout_residual_fp16",
+        &torch_launch_ls_quant_bias_dropout_residual<__half>,
+        "Test kernel wrapper");
   m.def("torch_launch_quant_bias_add_transform_20314_fp32",
         &torch_launch_quant_bias_add_transform_20314<float>,
         "Test kernel wrapper");
@@ -450,6 +476,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_ls_quantize_fp32", &torch_launch_ls_quantize<float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quantize_fp16", &torch_launch_ls_quantize<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dequantize_fp32", &torch_launch_ls_dequantize<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_ls_dequantize_fp16", &torch_launch_ls_dequantize<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_fake_quantize_fp32", &torch_launch_fake_quantize<float>,
         "Test kernel wrapper");

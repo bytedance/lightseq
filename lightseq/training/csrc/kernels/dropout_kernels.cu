@@ -182,7 +182,7 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
   m[3] = (uint8_t)(rand.w > ratio);
 
   uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  mask4[i] = m4[0];
+  mask4[i] |= m4[0];
 
   float4 input4 = data4[i];
   float4 res4;
@@ -222,7 +222,7 @@ __global__ void ls_dropout_kernel(const int total_count, const float ratio,
   m[6] = (uint8_t)(rand.z > ratio);
   m[7] = (uint8_t)(rand.w > ratio);
   uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  mask8[i] = *m8;
+  mask8[i] |= *m8;
 
   float4 val_float4 = vals_float4[i];
   float4 out_float4;
@@ -272,10 +272,10 @@ __global__ void ls_dropout_bwd_kernel(const int total_count, const float ratio,
 
   float4 input4 = in4[i];
   float4 res4;
-  res4.x = input4.x * scale * static_cast<float>(m[0]);
-  res4.y = input4.y * scale * static_cast<float>(m[1]);
-  res4.z = input4.z * scale * static_cast<float>(m[2]);
-  res4.w = input4.w * scale * static_cast<float>(m[3]);
+  res4.x = input4.x * scale * static_cast<float>(m[0] & 1);
+  res4.y = input4.y * scale * static_cast<float>(m[1] & 1);
+  res4.z = input4.z * scale * static_cast<float>(m[2] & 1);
+  res4.w = input4.w * scale * static_cast<float>(m[3] & 1);
   out4[i] = res4;
 }
 
@@ -300,14 +300,14 @@ __global__ void ls_dropout_bwd_kernel(const int total_count, const float ratio,
   float4 out_float4;
   __half2 *val_half2 = reinterpret_cast<__half2 *>(&val_float4);
   __half2 *out_half2 = reinterpret_cast<__half2 *>(&out_float4);
-  __half2 scale_mask_1 =
-      __halves2half2(scale * __float2half(m[0]), scale * __float2half(m[1]));
-  __half2 scale_mask_2 =
-      __halves2half2(scale * __float2half(m[2]), scale * __float2half(m[3]));
-  __half2 scale_mask_3 =
-      __halves2half2(scale * __float2half(m[4]), scale * __float2half(m[5]));
-  __half2 scale_mask_4 =
-      __halves2half2(scale * __float2half(m[6]), scale * __float2half(m[7]));
+  __half2 scale_mask_1 = __halves2half2(scale * __float2half(m[0] & 1),
+                                        scale * __float2half(m[1] & 1));
+  __half2 scale_mask_2 = __halves2half2(scale * __float2half(m[2] & 1),
+                                        scale * __float2half(m[3] & 1));
+  __half2 scale_mask_3 = __halves2half2(scale * __float2half(m[4] & 1),
+                                        scale * __float2half(m[5] & 1));
+  __half2 scale_mask_4 = __halves2half2(scale * __float2half(m[6] & 1),
+                                        scale * __float2half(m[7] & 1));
   out_half2[0] = __hmul2(val_half2[0], scale_mask_1);
   out_half2[1] = __hmul2(val_half2[1], scale_mask_2);
   out_half2[2] = __hmul2(val_half2[2], scale_mask_3);
@@ -884,7 +884,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
 
   int bias_i = i % (hidden_size >> 2);
   uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  dropout_mask4[i] = m4[0];
+  dropout_mask4[i] |= m4[0];
   int32_t qinput4 = qin4[i];
   int8_t *qinput = reinterpret_cast<int8_t *>(&qinput4);
   const float4 b4 = __ldg(&bias4[bias_i]);
@@ -950,7 +950,7 @@ __global__ void ls_quant_dropout_act_bias_kernel(
   m[6] = (uint8_t)(rand.z > ratio);
   m[7] = (uint8_t)(rand.w > ratio);
   uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  dropout_mask8[i] = *m8;
+  dropout_mask8[i] |= m8[0];
 
   int bias_i = i % (hidden_size >> 3);
   int64_t qinput8 = qin8[i];
@@ -1426,10 +1426,10 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   m[2] = static_cast<uint8_t>(rand.z > ratio);
   m[3] = static_cast<uint8_t>(rand.w > ratio);
 
-  float cmax_val = cmax[2];
+  float cmax_val = cmax[0];
   int bias_i = i % (hidden_size >> 2);
   uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
-  mask4[i] = m4[0];
+  mask4[i] |= m4[0];
   int32_t qinput4 = qdata4[i];
   int8_t *qinput = reinterpret_cast<int8_t *>(&qinput4);
   const float4 b4 = __ldg(&bias4[bias_i]);
@@ -1437,9 +1437,9 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   float4 output4;
 
   output4.x = (dequantize(qinput[0], cmax_val) + b4.x) * scale * m[0] + res4.x;
-  output4.y = (dequantize(qinput[0], cmax_val) + b4.y) * scale * m[1] + res4.y;
-  output4.z = (dequantize(qinput[0], cmax_val) + b4.z) * scale * m[2] + res4.z;
-  output4.w = (dequantize(qinput[0], cmax_val) + b4.w) * scale * m[3] + res4.w;
+  output4.y = (dequantize(qinput[1], cmax_val) + b4.y) * scale * m[1] + res4.y;
+  output4.z = (dequantize(qinput[2], cmax_val) + b4.z) * scale * m[2] + res4.z;
+  output4.w = (dequantize(qinput[3], cmax_val) + b4.w) * scale * m[3] + res4.w;
 
   out4[i] = output4;
 }
@@ -1448,7 +1448,7 @@ __global__ void ls_quant_dropout_res_bias_kernel(
     const int total_count, const float ratio, __half *out, uint8_t *mask,
     const int8_t *qin, const __half *cmax, const __half *bias,
     const __half *residual, const int seed, const int hidden_size) {
-  const __half scale = 1. / (1. - ratio);
+  const __half scale = 1.f / (1.f - ratio);
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1475,9 +1475,9 @@ __global__ void ls_quant_dropout_res_bias_kernel(
   m[6] = static_cast<uint8_t>(rand.z > ratio);
   m[7] = static_cast<uint8_t>(rand.w > ratio);
   uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
-  mask8[i] = m8[0];
+  mask8[i] |= m8[0];
 
-  float cmax_val = __half2float(cmax[2]);
+  float cmax_val = __half2float(cmax[0]);
   int bias_i = i % (hidden_size >> 3);
   int64_t qval8 = qvals8_ptr[i];
   int8_t *qval = reinterpret_cast<int8_t *>(&qval8);
