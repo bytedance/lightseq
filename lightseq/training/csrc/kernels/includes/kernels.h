@@ -400,7 +400,7 @@ __forceinline__ __device__ int8_t quantize(float x, float clip_max,
   clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit));
   float dequant_scale = clip_max / kQuantRangeI8;
   float i8_f = x / dequant_scale;
-  float i8 = floorf(i8_f + 0.5);
+  float i8 = floorf(i8_f + 0.5f);
   i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
   return static_cast<int8_t>(i8);
 }
@@ -411,7 +411,7 @@ __forceinline__ __device__ float fake_quantize(float x, float clip_max,
   clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit));
   float dequant_scale = clip_max / kQuantRangeI8;
   float i8_f = x / dequant_scale;
-  float i8 = floorf(i8_f + 0.5);
+  float i8 = floorf(i8_f + 0.5f);
   i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
   return i8 * dequant_scale;
 }
@@ -425,7 +425,8 @@ __forceinline__ __device__ float fake_quant_i8(float x, float clip_max) {
 }
 
 __forceinline__ __device__ float dequantize(int8_t x, float clip_max) {
-  float res = float(x) * clip_max / kQuantRangeI8;
+  float dequant_scale = clip_max / kQuantRangeI8;
+  float res = static_cast<float>(x) * dequant_scale;
   return fminf(fmaxf(res, -clip_max), clip_max);
 }
 

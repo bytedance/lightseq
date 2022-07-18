@@ -1526,8 +1526,8 @@ if __name__ == "__main__":
             # "test_quant_embedding_layer_backward",
             # "test_quant_encoder_layer_forward",
             # "test_quant_encoder_layer_backward",
-            "test_quant_decoder_layer_forward",
-            "test_quant_decoder_layer_backward",
+            # "test_quant_decoder_layer_forward",
+            # "test_quant_decoder_layer_backward",
             # "test_quant_bert_encoder_layer_forward",
             # "test_quant_bert_encoder_layer_backward",
         ]

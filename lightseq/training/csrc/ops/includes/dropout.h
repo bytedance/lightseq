@@ -21,6 +21,7 @@ class Dropout {
   Dropout(const Config &config, size_t max_ele_num)
       : _config(config), _mask(nullptr) {
     _mask = cuda_malloc<uint8_t>(max_ele_num);
+    _max_ele_num = max_ele_num;
   }
 
   virtual ~Dropout() { cuda_free(_mask); }
@@ -136,6 +137,10 @@ class Dropout {
                                         _config.RATIO(), stream);
   }
 
+  void zero_mask(cudaStream_t stream) {
+    cudaMemsetAsync(_mask, 0, sizeof(uint8_t) * _max_ele_num, stream);
+  }
+
   bool HasDropout() const { return _config.RATIO() > 0.0; }
 
   void SetTrainingMode(bool training) { _config.training = training; }
@@ -145,4 +150,5 @@ class Dropout {
  private:
   uint8_t *_mask;
   Config _config;
+  int _max_ele_num;
 };

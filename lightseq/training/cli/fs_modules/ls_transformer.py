@@ -234,8 +234,6 @@ class LSTransformerEncoder(FairseqEncoder):
                 LSTransformerEncoderLayer as TransformerEncoderLayer,
             )
 
-            # from lightseq.training.ops.pytorch import TransformerEncoderLayer
-
         config = TransformerEncoderLayer.get_config(
             max_batch_tokens=args.max_tokens,
             max_seq_len=MAX_SEQ_LENGTH,
@@ -370,10 +368,6 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             from .ls_fs_transformer_decoder_layer import (
                 LSFSTransformerDecoderLayer as TransformerDecoderLayer,
             )
-
-            # from lightseq.training.ops.pytorch.torch_transformer_layers import (
-            #     TransformerDecoderLayer,
-            # )
 
         config = TransformerDecoderLayer.get_config(
             max_batch_tokens=args.max_tokens,

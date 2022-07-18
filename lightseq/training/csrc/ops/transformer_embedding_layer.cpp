@@ -38,6 +38,7 @@ template <typename T>
 void TransformerEmbeddingLayer<T>::Backward(const T *grad_output_ptr,
                                             const int *input_ptr) {
   cudaStream_t stream = Context::Instance().get_stream();
+
   launch_d_lookup_scale_pos_dropout<T>(
       _grad_embeddings_ptr, _enable_quant ? _grad_clip_max_ptr : nullptr,
       grad_output_ptr, input_ptr, _dropout_mask, _batch_size, _seq_len,
@@ -52,7 +53,13 @@ void TransformerEmbeddingLayer<T>::SetTrainingMode(bool training) {
 
 template <typename T>
 void TransformerEmbeddingLayer<T>::SetQuantMode(bool enable_quant) {
-  _enable_quant = enable_quant;
+  if (enable_quant != _enable_quant) {
+    _enable_quant = enable_quant;
+    if (_enable_quant) {
+      std::cout << "LS Embedding layer #" << _layer_id << " enable quantization"
+                << std::endl;
+    }
+  }
 }
 
 template class TransformerEmbeddingLayer<float>;

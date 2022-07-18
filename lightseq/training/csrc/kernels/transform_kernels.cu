@@ -491,7 +491,7 @@ __global__ void quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
   int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
                              seq_len, trans_count, nhead, head_dim);
 
-  float clip_max_val = static_cast<float>(clip_max[0]);
+  float clip_max_val = clip_max[0];
 
   const float4 *input4 = reinterpret_cast<const float4 *>(input);
   int8_t res[4];
@@ -505,7 +505,7 @@ __global__ void quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
   int32_t *res4 = reinterpret_cast<int32_t *>(output);
   uint32_t *cmask4 = reinterpret_cast<uint32_t *>(clip_mask);
   res4[trg_offset] = reinterpret_cast<int32_t *>(res)[0];
-  cmask4[trg_offset] = reinterpret_cast<uint32_t *>(cmask)[0];
+  cmask4[trg_offset] |= reinterpret_cast<uint32_t *>(cmask)[0];
 }
 
 template <>
@@ -524,7 +524,7 @@ __global__ void quant_transform4d_0213<__half>(
   int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
                              seq_len, trans_count, nhead, head_dim);
 
-  float clip_max_val = static_cast<float>(clip_max[0]);
+  float clip_max_val = __half2float(clip_max[0]);
 
   const float4 *input_f4 = reinterpret_cast<const float4 *>(input);
   int8_t res[8];
@@ -539,7 +539,7 @@ __global__ void quant_transform4d_0213<__half>(
   int64_t *res8 = reinterpret_cast<int64_t *>(output);
   uint64_t *cmask8 = reinterpret_cast<uint64_t *>(clip_mask);
   res8[trg_offset] = reinterpret_cast<int64_t *>(res)[0];
-  cmask8[trg_offset] = reinterpret_cast<uint64_t *>(cmask)[0];
+  cmask8[trg_offset] |= reinterpret_cast<uint64_t *>(cmask)[0];
 }
 
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]

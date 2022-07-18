@@ -176,15 +176,12 @@ __global__ void lookup_scale_pos_dropout<float>(
     scale_mask[2] = dropout_scale * m[2];
     scale_mask[3] = dropout_scale * m[3];
 
+    uint8_t clip_mask[4];
     if (clip_max) {
-      m[0] += uint8_t(get_clip_mask(e4.x, clip_max_val));
-      m[1] += uint8_t(get_clip_mask(e4.y, clip_max_val));
-      m[2] += uint8_t(get_clip_mask(e4.z, clip_max_val));
-      m[3] += uint8_t(get_clip_mask(e4.w, clip_max_val));
-      e4.x = fake_quant_i8(e4.x, clip_max_val);
-      e4.y = fake_quant_i8(e4.y, clip_max_val);
-      e4.z = fake_quant_i8(e4.z, clip_max_val);
-      e4.w = fake_quant_i8(e4.w, clip_max_val);
+      e4.x = fake_quantize(e4.x, clip_max_val, clip_mask[0], 2);
+      e4.y = fake_quantize(e4.y, clip_max_val, clip_mask[1], 2);
+      e4.z = fake_quantize(e4.z, clip_max_val, clip_mask[2], 2);
+      e4.w = fake_quantize(e4.w, clip_max_val, clip_mask[3], 2);
     }
     res4.x = (emb_scale * e4.x + pe4.x) * scale_mask[0];
     res4.y = (emb_scale * e4.y + pe4.y) * scale_mask[1];
@@ -193,6 +190,9 @@ __global__ void lookup_scale_pos_dropout<float>(
 
     output4[i] = res4;
     uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
+    if (clip_max) {
+      m4[0] = m4[0] | reinterpret_cast<uint32_t *>(clip_mask)[0];
+    }
     dropout_mask4[i] = m4[0];
   }
 }
@@ -272,15 +272,13 @@ __global__ void lookup_scale_pos_dropout<__half>(
     }
     __half2 emb_scale_h2 = __floats2half2_rn(emb_scale, emb_scale);
 
-#pragma unroll
+    uint8_t clip_mask[8];
     for (uint j = 0; j < 4; ++j) {
       if (clip_max) {
         float2 f2 = __half22float2(e_h2[j]);
         // fake quant
-        m[j << 1] += uint8_t(get_clip_mask(f2.x, clip_max_val));
-        m[(j << 1) | 1] += uint8_t(get_clip_mask(f2.y, clip_max_val));
-        f2.x = fake_quant_i8(f2.x, clip_max_val);
-        f2.y = fake_quant_i8(f2.y, clip_max_val);
+        f2.x = fake_quantize(f2.x, clip_max_val, clip_mask[j << 1], 2);
+        f2.y = fake_quantize(f2.y, clip_max_val, clip_mask[(j << 1) | 1], 2);
         res_h2[j] = __hmul2(__float22half2_rn(f2), emb_scale_h2);
       } else {
         res_h2[j] = __hmul2(e_h2[j], emb_scale_h2);
@@ -290,6 +288,9 @@ __global__ void lookup_scale_pos_dropout<__half>(
     }
     output4[i] = res4;
     uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
+    if (clip_max) {
+      m8[0] = m8[0] | reinterpret_cast<uint64_t *>(clip_mask)[0];
+    }
     dropout_mask8[i] = m8[0];
   }
 }
@@ -421,7 +422,9 @@ __global__ void d_lookup_scale_pos_dropout<float>(
   const float4 *grad_output4 = reinterpret_cast<const float4 *>(grad_output);
   const uint32_t *dropout_mask4 =
       reinterpret_cast<const uint32_t *>(dropout_mask);
-  float block_g_clip_max = 0;
+  // float block_g_clip_max = 0;
+  float thread_cmax_grad = 0;
+  float temp_cmax_grad = 0;
   for (uint i = start; i < end; i += blockDim.y) {
     float4 go4 = grad_output4[i];
     uint32_t m4 = dropout_mask4[i];
@@ -433,38 +436,34 @@ __global__ void d_lookup_scale_pos_dropout<float>(
     res4.w = emb_scale * go4.w * (m4_ptr[3] & 1) * scale;
     int offset = i - target_pos * embedding_dim;
     int idx = (tid * (embedding_dim) + offset) << 2;
-    atomicAdd(grad_embeddings + idx,
-              res4.x * (is_max_min_mask(m4_ptr[0], 2) == 0));
-    atomicAdd(grad_embeddings + idx + 1,
-              res4.y * (is_max_min_mask(m4_ptr[1], 2) == 0));
-    atomicAdd(grad_embeddings + idx + 2,
-              res4.z * (is_max_min_mask(m4_ptr[2], 2) == 0));
-    atomicAdd(grad_embeddings + idx + 3,
-              res4.w * (is_max_min_mask(m4_ptr[3], 2) == 0));
-    if (grad_clip_max) {
-      block_g_clip_max += (res4.x * is_max_min_mask(m4_ptr[0], 2) +
-                           res4.y * is_max_min_mask(m4_ptr[1], 2) +
-                           res4.z * is_max_min_mask(m4_ptr[2], 2) +
-                           res4.w * is_max_min_mask(m4_ptr[3], 2));
-    }
+    clip_bwd(res4.x, temp_cmax_grad, res4.x, m4_ptr[0], 2);
+    thread_cmax_grad += temp_cmax_grad;
+    clip_bwd(res4.y, temp_cmax_grad, res4.y, m4_ptr[1], 2);
+    thread_cmax_grad += temp_cmax_grad;
+    clip_bwd(res4.z, temp_cmax_grad, res4.z, m4_ptr[2], 2);
+    thread_cmax_grad += temp_cmax_grad;
+    clip_bwd(res4.w, temp_cmax_grad, res4.w, m4_ptr[3], 2);
+    thread_cmax_grad += temp_cmax_grad;
+    atomicAdd(grad_embeddings + idx, res4.x);
+    atomicAdd(grad_embeddings + idx + 1, res4.y);
+    atomicAdd(grad_embeddings + idx + 2, res4.z);
+    atomicAdd(grad_embeddings + idx + 3, res4.w);
   }
 
   if (grad_clip_max) {
-    __shared__ float reduction_s[MAX_THREADS / 32];
-    cg::thread_block cta = cg::this_thread_block();
-    cg::thread_block_tile<32> tile = cg::tiled_partition<32>(cta);
-    float reduce_g_clip_max =
-        cg::reduce(tile, block_g_clip_max, cg::plus<float>());
-    if (tile.thread_rank() == 0) {
-      reduction_s[tile.meta_group_rank()] = reduce_g_clip_max;
+    __shared__ float block_cmax_grad;
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      block_cmax_grad = 0;
     }
-    cg::sync(cta);
-    if (cta.thread_rank() == 0) {
-      reduce_g_clip_max = 0;
-      for (int i = 0; i < tile.meta_group_size(); ++i) {
-        reduce_g_clip_max += reduction_s[i];
+    __syncthreads();
+    if (thread_cmax_grad != 0) {
+      atomicAdd(&block_cmax_grad, thread_cmax_grad);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      if (block_cmax_grad != 0) {
+        atomicAdd(&grad_clip_max[0], block_cmax_grad);
       }
-      atomicAdd(grad_clip_max, reduce_g_clip_max);
     }
   }
 }
@@ -493,6 +492,8 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
       reinterpret_cast<const uint64_t *>(dropout_mask);
   __half2 *grad_embeddings_h2 = reinterpret_cast<__half2 *>(grad_embeddings);
   float block_g_clip_max = 0;
+  float thread_cmax_grad = 0;
+  float temp_cmax_grad = 0;
   for (uint i = start; i < end; i += blockDim.y) {
     float4 go4 = grad_output4[i];
     uint64_t m4 = dropout_mask4[i];
@@ -519,13 +520,13 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
     int idx = (tid * (embedding_dim) + offset) << 2;
 #pragma unroll
     for (uint j = 0; j < 4; ++j) {
-      __half2 g_clip_emb;
-      g_clip_emb.x = is_max_min_mask(m4_ptr[j << 1], 2) == 0 ? res_h2[j].x
-                                                             : __int2half_rn(0);
-      g_clip_emb.y = is_max_min_mask(m4_ptr[(j << 1) | 1], 2) == 0
-                         ? res_h2[j].y
-                         : __int2half_rn(0);
-      atomicAdd(grad_embeddings_h2 + idx + j, g_clip_emb);
+      clip_bwd(res_h2[j].x, temp_cmax_grad, res_h2[j].x, m4_ptr[j << 1], 2);
+      thread_cmax_grad += temp_cmax_grad;
+      clip_bwd(res_h2[j].y, temp_cmax_grad, res_h2[j].y, m4_ptr[(j << 1) | 1],
+               2);
+      thread_cmax_grad += temp_cmax_grad;
+
+      atomicAdd(grad_embeddings_h2 + idx + j, res_h2[j]);
 
       if (grad_clip_max) {
         block_g_clip_max +=
@@ -537,21 +538,19 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
   }
 
   if (grad_clip_max) {
-    __shared__ float reduction_s[MAX_THREADS / 32];
-    cg::thread_block cta = cg::this_thread_block();
-    cg::thread_block_tile<32> tile = cg::tiled_partition<32>(cta);
-    float reduce_g_clip_max =
-        cg::reduce(tile, block_g_clip_max, cg::plus<float>());
-    if (tile.thread_rank() == 0) {
-      reduction_s[tile.meta_group_rank()] = reduce_g_clip_max;
+    __shared__ float block_cmax_grad;
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      block_cmax_grad = 0;
     }
-    cg::sync(cta);
-    if (cta.thread_rank() == 0) {
-      reduce_g_clip_max = 0;
-      for (int i = 0; i < tile.meta_group_size(); ++i) {
-        reduce_g_clip_max += reduction_s[i];
+    __syncthreads();
+    if (thread_cmax_grad != 0) {
+      atomicAdd(&block_cmax_grad, thread_cmax_grad);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      if (block_cmax_grad != 0) {
+        atomicAdd(&grad_clip_max[0], block_cmax_grad);
       }
-      atomicAdd(grad_clip_max, __float2half(reduce_g_clip_max));
     }
   }
 }
