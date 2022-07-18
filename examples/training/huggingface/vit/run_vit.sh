@@ -15,7 +15,9 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-python3 $THIS_DIR/run_vit.py \
+python3 -m torch.distributed.launch \
+    --nproc_per_node=1 \
+    $THIS_DIR/run_vit.py \
     --dataset_name beans \
     --output_dir /tmp/beans_outputs \
     --overwrite_output_dir \

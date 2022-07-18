@@ -82,7 +82,7 @@ def inject_ls_layer(model, training_args, model_args, config):
     else:
         raise NotImplementedError
 
-    if model_args.module_type == 2:
+    if model_args.module_type == 1 or model_args.module_type == 2:
         bert_emb_config = gen_bert_emb_config(training_args, config)
         init_ws = get_hf_bert_emb_layer_params(model.bert.embeddings)
         model.bert.embeddings = BertEmbeddingLayer(bert_emb_config, init_ws)
