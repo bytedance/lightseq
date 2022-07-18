@@ -293,7 +293,7 @@ def test_encoder_layer_forward():
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-1, ntest=10)
 def test_quant_encoder_layer_forward():
-    batch_size, seq_len = 32, 32
+    batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
@@ -403,7 +403,7 @@ def test_encoder_layer_backward():
 
 @kt.case(dtypes=[torch.half], rtol=1e-2, atol=3, ntest=10)
 def test_quant_encoder_layer_backward():
-    batch_size, seq_len = 64, 128
+    batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
     hidden_size = 1024
 
@@ -770,9 +770,8 @@ def test_decoder_layer_forward():
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1, ntest=10)
 def test_quant_decoder_layer_forward():
-    batch_size, enc_seq_len = 16, 35
+    batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
-    dec_seq_len = 35
     print(
         f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
         f" {dec_seq_len})"
@@ -1525,11 +1524,11 @@ if __name__ == "__main__":
             # "test_cross_entropy_layer_backward",
             # "test_quant_embedding_layer_forward",
             # "test_quant_embedding_layer_backward",
-            "test_quant_encoder_layer_forward",
+            # "test_quant_encoder_layer_forward",
             # "test_quant_encoder_layer_backward",
             # "test_quant_decoder_layer_forward",
             # "test_quant_decoder_layer_backward",
-            "test_quant_bert_encoder_layer_forward",
-            "test_quant_bert_encoder_layer_backward",
+            # "test_quant_bert_encoder_layer_forward",
+            # "test_quant_bert_encoder_layer_backward",
         ]
     )
