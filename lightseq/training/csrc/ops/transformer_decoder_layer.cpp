@@ -126,12 +126,10 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
                         _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
 
-    launch_dequantize<T>(buffer, qout_ptr, _attn_qkv_cmax_ptr + 2,
-                         _batch_tokens * _hidden_size * 3, 2, _stream);
-
-    launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
-                                       batch_size, from_len, 3, _heads,
-                                       _hidden_size / _heads, _stream);
+    launch_quant_bias_add_transform_20314(
+        q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
+        _attn_qkv_cmax_ptr + 2, batch_size, from_len, 3, _heads,
+        _hidden_size / _heads, _stream);
 
     CHECK_GPU_ERROR(cudaGetLastError());
 
@@ -197,12 +195,10 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
                              _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
                              _cublasLtHandle, _stream);
 
-    launch_dequantize<T>(output_ptr, qout_ptr, _attn_out_cmax_ptr + 2,
-                         _batch_tokens * _hidden_size, 2, _stream);
+    _attn_dropout.quant_bias_dropout_residual(
+        output_ptr, qout_ptr, _attn_out_cmax_ptr + 2, input_ptr, _attn_ob_ptr,
+        _batch_tokens, _hidden_size, _stream);
 
-    _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
-                                        _attn_ob_ptr, _batch_tokens,
-                                        _hidden_size, _stream);
   } else {
     // [b, nh, s, ad] -> [b, s, nh, ad]
     launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
@@ -294,12 +290,10 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
                              _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
                              _cublasLtHandle, _stream);
 
-    launch_dequantize<T>(buffer, qout_ptr, _encdec_qkv_cmax_ptr + 2,
-                         _batch_tokens * _hidden_size, 2, _stream);
-
-    launch_bias_add_transform_20314<T>(
-        _encdec_q_ptr, buffer, _encdec_attn_qb_ptr, _batch_size, _trg_seq_len,
-        1, _heads, _hidden_size / _heads, _stream);
+    launch_quant_bias_add_transform_20314<T>(
+        _encdec_q_ptr, _encdec_attn_prob_dropout.get_mask(), qout_ptr,
+        _encdec_attn_qb_ptr, _encdec_qkv_cmax_ptr + 2, _batch_size,
+        _trg_seq_len, 1, _heads, _hidden_size / _heads, _stream);
 
     CHECK_GPU_ERROR(cudaGetLastError());
 
@@ -368,12 +362,9 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
                                     _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
                                     _cublasLtHandle, _stream);
 
-    launch_dequantize<T>(output_ptr, qout_ptr, _encdec_out_cmax_ptr + 2,
-                         _batch_tokens * _hidden_size, 2, _stream);
-
-    _encdec_attn_dropout.bias_dropout_residual(
-        output_ptr, output_ptr, input_ptr, _encdec_attn_ob_ptr, _batch_tokens,
-        _hidden_size, _stream);
+    _encdec_attn_dropout.quant_bias_dropout_residual(
+        output_ptr, qout_ptr, _encdec_out_cmax_ptr + 2, input_ptr,
+        _encdec_attn_ob_ptr, _batch_tokens, _hidden_size, _stream);
 
   } else {
     // [batch_size, nhead, trg_seq_len, head_dim] ->
