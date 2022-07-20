@@ -437,7 +437,9 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     i8_buffer_ptr += _batch_tokens * _hidden_size;
     qweight_ptr = i8_buffer_ptr;
 
-    T *fake_inp = inp_ptr + _batch_dim;
+    T *fake_inp = _pre_or_postLayerNorm
+                      ? inp_ptr + _batch_dim
+                      : _shared_buffer_ptr + _intermediate_size * _hidden_size;
     T *fake_weight = _shared_buffer_ptr;
     launch_fake_quantize<T>(_ffn_activation_dropout.get_mask(), nullptr,
                             fake_inp, _ff2_inp_ptr, _output_cmax_ptr,
