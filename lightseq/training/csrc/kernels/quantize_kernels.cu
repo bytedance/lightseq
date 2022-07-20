@@ -116,13 +116,11 @@ template <typename T>
 __global__ void fake_quantize_kernel(uint8_t *clip_mask_ptr, float *alpha_ptr,
                                      T *output, const T *input,
                                      const T *clip_max_ptr, int numel,
-                                     int mask_start_bit);
+                                     int mask_start_bit, bool symmetry);
 template <>
-__global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
-                                            float *alpha_ptr, float *output,
-                                            const float *input,
-                                            const float *clip_max_ptr,
-                                            int numel, int mask_start_bit) {
+__global__ void fake_quantize_kernel<float>(
+    uint8_t *clip_mask_ptr, float *alpha_ptr, float *output, const float *input,
+    const float *clip_max_ptr, int numel, int mask_start_bit, bool symmetry) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 4 >= numel) return;
@@ -140,14 +138,14 @@ __global__ void fake_quantize_kernel<float>(uint8_t *clip_mask_ptr,
 
   uint8_t clip_mask[4];
 
-  input4.x =
-      fake_quantize(input4.x, clip_max_val, clip_mask[0], mask_start_bit);
-  input4.y =
-      fake_quantize(input4.y, clip_max_val, clip_mask[1], mask_start_bit);
-  input4.z =
-      fake_quantize(input4.z, clip_max_val, clip_mask[2], mask_start_bit);
-  input4.w =
-      fake_quantize(input4.w, clip_max_val, clip_mask[3], mask_start_bit);
+  input4.x = fake_quantize(input4.x, clip_max_val, clip_mask[0], mask_start_bit,
+                           symmetry);
+  input4.y = fake_quantize(input4.y, clip_max_val, clip_mask[1], mask_start_bit,
+                           symmetry);
+  input4.z = fake_quantize(input4.z, clip_max_val, clip_mask[2], mask_start_bit,
+                           symmetry);
+  input4.w = fake_quantize(input4.w, clip_max_val, clip_mask[3], mask_start_bit,
+                           symmetry);
   output4_ptr[i] = input4;
 
   if (clip_mask_ptr) {
@@ -167,7 +165,8 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
                                              float *alpha_ptr, __half *output,
                                              const __half *input,
                                              const __half *clip_max_ptr,
-                                             int numel, int mask_start_bit) {
+                                             int numel, int mask_start_bit,
+                                             bool symmetry) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (i * 8 >= numel) return;
@@ -187,9 +186,10 @@ __global__ void fake_quantize_kernel<__half>(uint8_t *clip_mask_ptr,
 #pragma unroll
   for (int i = 0; i < 4; i++) {
     input2_ptr[i].x = fake_quantize(__half2float(input2_ptr[i].x), clip_max_val,
-                                    clip_mask[i * 2], mask_start_bit);
-    input2_ptr[i].y = fake_quantize(__half2float(input2_ptr[i].y), clip_max_val,
-                                    clip_mask[i * 2 + 1], mask_start_bit);
+                                    clip_mask[i * 2], mask_start_bit, symmetry);
+    input2_ptr[i].y =
+        fake_quantize(__half2float(input2_ptr[i].y), clip_max_val,
+                      clip_mask[i * 2 + 1], mask_start_bit, symmetry);
   }
 
   output8_ptr[i] = input8;
@@ -208,7 +208,8 @@ template <>
 void launch_fake_quantize<float>(uint8_t *clip_mask_ptr, float *alpha_ptr,
                                  float *output, const float *input,
                                  const float *clip_max_ptr, int numel,
-                                 int mask_start_bit, cudaStream_t stream) {
+                                 int mask_start_bit, cudaStream_t stream,
+                                 bool symmetry) {
   if (numel % 4 != 0) {
     throw std::runtime_error("violate numel % 4 = 0");
   }
@@ -216,14 +217,15 @@ void launch_fake_quantize<float>(uint8_t *clip_mask_ptr, float *alpha_ptr,
   int grid_dim = numel / ele_per_block;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
-      mask_start_bit);
+      mask_start_bit, symmetry);
 }
 
 template <>
 void launch_fake_quantize<__half>(uint8_t *clip_mask_ptr, float *alpha_ptr,
                                   __half *output, const __half *input,
                                   const __half *clip_max_ptr, int numel,
-                                  int mask_start_bit, cudaStream_t stream) {
+                                  int mask_start_bit, cudaStream_t stream,
+                                  bool symmetry) {
   if (numel % 8 != 0) {
     throw std::runtime_error("violate numel % 8 = 0");
   }
@@ -231,7 +233,7 @@ void launch_fake_quantize<__half>(uint8_t *clip_mask_ptr, float *alpha_ptr,
   int grid_dim = numel / ele_per_block;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
-      mask_start_bit);
+      mask_start_bit, symmetry);
 }
 
 __global__ void dequantize_kernel(float *f_ptr, const int8_t *q_ptr,

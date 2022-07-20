@@ -197,7 +197,8 @@ void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
 template <typename T>
 void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *output,
                           const T *input, const T *clip_max_ptr, int numel,
-                          int mask_start_bit, cudaStream_t stream);
+                          int mask_start_bit, cudaStream_t stream,
+                          bool symmetry = true);
 
 template <typename T>
 void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,
@@ -366,10 +367,11 @@ __forceinline__ __host__ __device__ void decompose_2dim(int src, int dim1,
 }
 
 __forceinline__ __device__ int get_clip_mask(float value, float clip_max,
-                                             int start_bit) {
+                                             int start_bit,
+                                             bool symmetry = true) {
   if (value >= clip_max) {
     return 1 << (start_bit - 1);
-  } else if (value <= -clip_max) {
+  } else if (symmetry && value <= -clip_max) {
     return 1 << (start_bit);
   } else {
     return 0;
@@ -414,13 +416,19 @@ __forceinline__ __device__ int8_t quantize(float x, float clip_max,
 
 __forceinline__ __device__ float fake_quantize(float x, float clip_max,
                                                uint8_t &clip_mask,
-                                               int start_bit) {
-  clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit));
+                                               int start_bit,
+                                               bool symmetry = true) {
+  clip_mask = uint8_t(get_clip_mask(x, clip_max, start_bit, symmetry));
   float dequant_scale = clip_max / kQuantRangeI8;
+  if (!symmetry) dequant_scale /= 2;
   float i8_f = x / dequant_scale;
+  if (!symmetry) i8_f -= kQuantRangeI8;
   float i8 = floorf(i8_f + 0.5f);
   i8 = fminf(fmaxf(i8, -kQuantRangeI8), kQuantRangeI8);
-  return i8 * dequant_scale;
+  if (symmetry)
+    return i8 * dequant_scale;
+  else
+    return (i8 + kQuantRangeI8) * dequant_scale;
 }
 
 __forceinline__ __device__ float fake_quant_i8(float x, float clip_max) {

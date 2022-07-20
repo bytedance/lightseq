@@ -28,14 +28,17 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
       _softmax(typename Softmax<T>::Config(num_heads)),
-      _attn_prob_dropout(typename Dropout<T>::Config(attn_prob_dropout_ratio),
-                         _max_batch_tokens * _heads * _max_seq_len),
+      _attn_prob_dropout(
+          typename Dropout<T>::Config(attn_prob_dropout_ratio),
+          std::max(
+              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
+              _hidden_size * _hidden_size * 3)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _attn_out_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
-                    _max_batch_tokens * _hidden_size),
+                    std::max(_max_batch_tokens, _hidden_size) * _hidden_size),
       // >>> decoder enc-dec attn layer
       _encdec_attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
                       _max_batch_tokens),
@@ -49,24 +52,27 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _encdec_softmax(typename Softmax<T>::Config(num_heads)),
       _encdec_attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),
-          _max_batch_tokens * _heads * _max_seq_len),
+          std::max(
+              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
+              _hidden_size * _hidden_size)),
       _encdec_attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _encdec_attn_out_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
       _encdec_attn_dropout(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
-          _max_batch_tokens * _hidden_size),
+          std::max(_max_batch_tokens, _hidden_size) * _hidden_size),
       // >>> decoder ffn layer
       _ffn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
               _max_batch_tokens),
       _ff1(typename FeedForward<T>::Config(_intermediate_size, hidden_size)),
       _ffn_activation_dropout(
           typename Dropout<T>::Config(activation_dropout_ratio),
-          _max_batch_tokens * _intermediate_size),
+          std::max(_max_batch_tokens, _hidden_size) * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),
-      _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
-                   _max_batch_tokens * _hidden_size),
+      _ffn_dropout(
+          typename Dropout<T>::Config(hidden_output_dropout_ratio),
+          std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
       _enable_quant(false) {
   assert(_hidden_size % _heads == 0);
   allocate_buffer();
@@ -392,7 +398,7 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
 }
 
 template <typename T>
-void TransformerDecoderLayer<T>::ffn_layer_fw(const T *inp_ptr, T *out_ptr) {
+void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   // save _ff1_inp_ptr, _relu_inp_ptr, _ff2_inp_ptr for backward
   if (_enable_quant) {
     int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
@@ -431,8 +437,17 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(const T *inp_ptr, T *out_ptr) {
     i8_buffer_ptr += _batch_tokens * _hidden_size;
     qweight_ptr = i8_buffer_ptr;
 
-    _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
-                 _cublasHandle);
+    T *fake_inp = inp_ptr + _batch_dim;
+    T *fake_weight = _shared_buffer_ptr;
+    launch_fake_quantize<T>(_ffn_activation_dropout.get_mask(), nullptr,
+                            fake_inp, _ff2_inp_ptr, _output_cmax_ptr,
+                            _intermediate_size * _batch_tokens, 2, _stream,
+                            false);
+    launch_fake_quantize<T>(_ffn_dropout.get_mask(), nullptr, fake_weight,
+                            _output_w_ptr, _output_cmax_ptr + 1,
+                            _intermediate_size * _hidden_size, 4, _stream);
+
+    _ff2.Forward(_batch_tokens, fake_inp, fake_weight, out_ptr, _cublasHandle);
 
     _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                        _batch_tokens, _hidden_size, _stream);
@@ -499,7 +514,9 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
       _pre_or_postLayerNorm ? buffer + 3 * _batch_dim : _gemmQ_inp_ptr;
   // _batch_dim
   T *ffn_inp_ptr =
-      _pre_or_postLayerNorm ? buffer + 4 * _batch_dim : _ff1_inp_ptr;
+      _pre_or_postLayerNorm
+          ? buffer + std::max(4 * _batch_dim, _intermediate_size * _hidden_size)
+          : _ff1_inp_ptr;
 
   self_attn_layer_fw(dec_input_ptr, encdec_attn_inp_ptr, buffer, cache);
 

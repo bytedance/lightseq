@@ -43,7 +43,7 @@ class TransformerDecoderLayer {
   void encdec_attn_layer_fw(const T *input_ptr, const T *enc_mask_ptr,
                             T *output_ptr, T *buffer);
 
-  void ffn_layer_fw(const T *inp_ptr, T *out_ptr);
+  void ffn_layer_fw(T *inp_ptr, T *out_ptr);
 
   void encdec_kv_bw(const T *enc_output_ptr, T *grad_enc_output_ptr);
 
