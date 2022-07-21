@@ -129,7 +129,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     launch_quant_bias_add_transform_20314(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
         _attn_qkv_cmax_ptr + 2, batch_size, from_len, 3, _heads,
-        _hidden_size / _heads, _stream);
+        _hidden_size / _heads, _stream, _attn_qkv_cache_cmax_ptr);
 
     CHECK_GPU_ERROR(cudaGetLastError());
 

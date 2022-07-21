@@ -65,7 +65,8 @@ void launch_quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
                                            const int8_t *input, const T *bias,
                                            const T *clip_max, int dim_0,
                                            int dim_1, int dim_2, int dim_3,
-                                           int dim_4, cudaStream_t stream);
+                                           int dim_4, cudaStream_t stream,
+                                           const T *out_clip_max = nullptr);
 
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <typename T>

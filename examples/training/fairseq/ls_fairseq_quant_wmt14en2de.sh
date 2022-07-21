@@ -26,4 +26,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --maximize-best-checkpoint-metric \
     --fp16 \
     --enable-quant \
-    --finetune-from-model checkpoints/checkpoint_best.pt
+    --finetune-from-model checkpoints/checkpoint_best.pt \
+    --save-dir checkpoints/quant

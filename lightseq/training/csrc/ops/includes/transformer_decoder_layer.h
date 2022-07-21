@@ -149,7 +149,9 @@ class TransformerDecoderLayer {
     _output_cmax_ptr = wptr;
     wptr += 3;
     _encdec_kv_cmax_ptr = wptr;
-    wptr += 6;
+    wptr += 5;
+    _attn_qkv_cache_cmax_ptr = wptr;
+    wptr += 1;
 
     if (_layer_id == 0) {
       _encdec_attn_kvw_ptr = wptr;
@@ -218,7 +220,9 @@ class TransformerDecoderLayer {
     _grad_output_cmax_ptr = gptr;
     gptr += 3;
     _grad_encdec_kv_cmax_ptr = gptr;
-    gptr += 6;
+    gptr += 5;
+    _grad_attn_qkv_cache_cmax_ptr = gptr;
+    gptr += 1;
 
     if (_layer_id == 0) {
       _grad_encdec_attn_kvw_ptr = gptr;
@@ -453,6 +457,7 @@ class TransformerDecoderLayer {
   const T *_inter_cmax_ptr;
   const T *_output_cmax_ptr;
   const T *_encdec_kv_cmax_ptr;
+  const T *_attn_qkv_cache_cmax_ptr;
 
   // grads ptr
   T *_grad_attn_qkvw_ptr;
@@ -485,4 +490,5 @@ class TransformerDecoderLayer {
   T *_grad_inter_cmax_ptr;
   T *_grad_output_cmax_ptr;
   T *_grad_encdec_kv_cmax_ptr;
+  T *_grad_attn_qkv_cache_cmax_ptr;
 };

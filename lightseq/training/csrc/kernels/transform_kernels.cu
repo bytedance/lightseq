@@ -265,12 +265,13 @@ template <typename T>
 __global__ void quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
                                                const int8_t *input,
                                                const T *bias, const T *clip_max,
-                                               int dim_3, int dim_4);
+                                               int dim_3, int dim_4,
+                                               const T *out_clip_max);
 
 template <>
 __global__ void quant_bias_add_transform_20314<float>(
     float *output, uint8_t *clip_mask, const int8_t *input, const float *bias,
-    const float *clip_max, int dim_3, int dim_4) {
+    const float *clip_max, int dim_3, int dim_4, const float *out_clip_max) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -292,6 +293,10 @@ __global__ void quant_bias_add_transform_20314<float>(
   float4 vres4;
 
   float clip_max_val = clip_max[0];
+  float out_clip_max_val;
+  if (out_clip_max) out_clip_max_val = out_clip_max[0];
+  // fix me
+  uint8_t clip_mask_val;
 
   for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
     vqkv4 = qkv4[src_offset + i];
@@ -301,6 +306,13 @@ __global__ void quant_bias_add_transform_20314<float>(
     vres4.y = dequantize(qkv[1], clip_max_val) + vbias4.y;
     vres4.z = dequantize(qkv[2], clip_max_val) + vbias4.z;
     vres4.w = dequantize(qkv[3], clip_max_val) + vbias4.w;
+
+    if (out_clip_max) {
+      vres4.x = fake_quantize(vres4.x, out_clip_max_val, clip_mask_val, 6);
+      vres4.y = fake_quantize(vres4.y, out_clip_max_val, clip_mask_val, 6);
+      vres4.z = fake_quantize(vres4.z, out_clip_max_val, clip_mask_val, 6);
+      vres4.w = fake_quantize(vres4.w, out_clip_max_val, clip_mask_val, 6);
+    }
 
     int id3 = i / dim_4;
     int id4 = i % dim_4;
@@ -312,7 +324,7 @@ __global__ void quant_bias_add_transform_20314<float>(
 template <>
 __global__ void quant_bias_add_transform_20314<__half>(
     __half *output, uint8_t *clip_mask, const int8_t *input, const __half *bias,
-    const __half *clip_max, int dim_3, int dim_4) {
+    const __half *clip_max, int dim_3, int dim_4, const __half *out_clip_max) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -337,22 +349,26 @@ __global__ void quant_bias_add_transform_20314<__half>(
   __half2 *h2_res = reinterpret_cast<__half2 *>(&vres4);
 
   float clip_max_val = __half2float(clip_max[0]);
+  float out_clip_max_val;
+  if (out_clip_max) out_clip_max_val = __half2float(out_clip_max[0]);
+  uint8_t clip_mask_val;
 
   for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
     vqkv8 = qkv8[src_offset + i];
     vbias4 = bias4[bias_offset + i];
-    h2_res[0] = __hadd2(__floats2half2_rn(dequantize(qkv[0], clip_max_val),
-                                          dequantize(qkv[1], clip_max_val)),
-                        h2_bias[0]);
-    h2_res[1] = __hadd2(__floats2half2_rn(dequantize(qkv[2], clip_max_val),
-                                          dequantize(qkv[3], clip_max_val)),
-                        h2_bias[1]);
-    h2_res[2] = __hadd2(__floats2half2_rn(dequantize(qkv[4], clip_max_val),
-                                          dequantize(qkv[5], clip_max_val)),
-                        h2_bias[2]);
-    h2_res[3] = __hadd2(__floats2half2_rn(dequantize(qkv[6], clip_max_val),
-                                          dequantize(qkv[7], clip_max_val)),
-                        h2_bias[3]);
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+      h2_res[j] =
+          __hadd2(__floats2half2_rn(dequantize(qkv[j * 2], clip_max_val),
+                                    dequantize(qkv[j * 2 + 1], clip_max_val)),
+                  h2_bias[j]);
+      if (out_clip_max) {
+        h2_res[j].x = __float2half(fake_quantize(
+            __half2float(h2_res[j].x), out_clip_max_val, clip_mask_val, 6));
+        h2_res[j].y = __float2half(fake_quantize(
+            __half2float(h2_res[j].y), out_clip_max_val, clip_mask_val, 6));
+      }
+    }
 
     int id3 = i / dim_4;
     int id4 = i % dim_4;
@@ -365,28 +381,28 @@ template <>
 void launch_quant_bias_add_transform_20314<float>(
     float *output, uint8_t *clip_mask, const int8_t *input, const float *bias,
     const float *clip_max, int dim_0, int dim_1, int dim_2, int dim_3,
-    int dim_4, cudaStream_t stream) {
+    int dim_4, cudaStream_t stream, const float *out_clip_max) {
   dim_4 >>= 2;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
   quant_bias_add_transform_20314<float><<<grid_dim, block_dim, 0, stream>>>(
-      output, clip_mask, input, bias, clip_max, dim_3, dim_4);
+      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max);
 }
 
 template <>
 void launch_quant_bias_add_transform_20314<__half>(
     __half *output, uint8_t *clip_mask, const int8_t *input, const __half *bias,
     const __half *clip_max, int dim_0, int dim_1, int dim_2, int dim_3,
-    int dim_4, cudaStream_t stream) {
+    int dim_4, cudaStream_t stream, const __half *out_clip_max) {
   dim_4 >>= 3;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
   quant_bias_add_transform_20314<__half><<<grid_dim, block_dim, 0, stream>>>(
-      output, clip_mask, input, bias, clip_max, dim_3, dim_4);
+      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max);
 }
 
 /**

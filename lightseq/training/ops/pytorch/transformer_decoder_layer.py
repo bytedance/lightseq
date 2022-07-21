@@ -306,29 +306,29 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         func(param, grad, "TransformerDecoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
-    def split_weights(self):
-        weights = [self._get_weights(i) for i in range(22)]
+    # def split_weights(self):
+    #     weights = [self._get_weights(i) for i in range(22)]
 
-        if self.config.layer_id == 0:
-            _shared_encdec_attn_kv_params["w"] = self._get_weights(19)
-            _shared_encdec_attn_kv_params["b"] = self._get_weights(20)
-        encdec_kvw = _shared_encdec_attn_kv_params["w"]
-        encdec_kvb = _shared_encdec_attn_kv_params["b"]
+    #     if self.config.layer_id == 0:
+    #         _shared_encdec_attn_kv_params["w"] = self._get_weights(19)
+    #         _shared_encdec_attn_kv_params["b"] = self._get_weights(20)
+    #     encdec_kvw = _shared_encdec_attn_kv_params["w"]
+    #     encdec_kvb = _shared_encdec_attn_kv_params["b"]
 
-        hs = self.config.hidden_size
-        offset = hs * hs * 2 * self.config.layer_id
-        encdec_kvw = encdec_kvw.data.narrow(0, offset, hs * hs * 2)
-        offset = hs * 2 * self.config.layer_id
-        encdec_kvb = encdec_kvb.data.narrow(0, offset, hs * 2)
-        weights += [encdec_kvw, encdec_kvb]
-        weights[0] = weights[0].view(-1, hs)
-        weights[2] = weights[2].view(-1, hs)
-        weights[6] = weights[6].view(-1, hs)
-        weights[8] = weights[8].view(-1, hs)
-        weights[12] = weights[12].view(-1, hs)
-        weights[14] = weights[14].view(hs, -1)
-        weights[19] = weights[19].view(-1, hs)
-        return weights
+    #     hs = self.config.hidden_size
+    #     offset = hs * hs * 2 * self.config.layer_id
+    #     encdec_kvw = encdec_kvw.data.narrow(0, offset, hs * hs * 2)
+    #     offset = hs * 2 * self.config.layer_id
+    #     encdec_kvb = encdec_kvb.data.narrow(0, offset, hs * 2)
+    #     weights += [encdec_kvw, encdec_kvb]
+    #     weights[0] = weights[0].view(-1, hs)
+    #     weights[2] = weights[2].view(-1, hs)
+    #     weights[6] = weights[6].view(-1, hs)
+    #     weights[8] = weights[8].view(-1, hs)
+    #     weights[12] = weights[12].view(-1, hs)
+    #     weights[14] = weights[14].view(hs, -1)
+    #     weights[19] = weights[19].view(-1, hs)
+    #     return weights
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         destination = state_dict(

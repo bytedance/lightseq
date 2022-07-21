@@ -28,4 +28,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --use-torch-layer \
     --enable-quant \
     --quant-mode qat \
-    --finetune-from-model checkpoints/checkpoint_best.pt
+    --finetune-from-model checkpoints/checkpoint_best.pt \
+    --save-dir checkpoints/quant
