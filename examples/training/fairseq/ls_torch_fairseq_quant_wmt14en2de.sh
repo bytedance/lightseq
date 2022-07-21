@@ -14,7 +14,7 @@ lightseq-train /tmp/wmt14_en_de/ \
     --arch ls_transformer_wmt_en_de_big_t2t --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
-    --lr 5e-6 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
+    --lr 1e-6 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
     --max-tokens 8192 \
     --eval-bleu \

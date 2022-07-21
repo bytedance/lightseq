@@ -31,5 +31,8 @@ from lightseq.training.ops.pytorch.export_quant import (
     export_ls_embedding_ptq,
     export_ls_encoder_ptq,
     export_ls_decoder_ptq,
+    export_ls_quant_embedding,
+    export_ls_quant_encoder,
+    export_ls_quant_decoder,
     export_quant_pb2hdf5,
 )

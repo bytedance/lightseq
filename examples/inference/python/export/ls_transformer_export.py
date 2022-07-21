@@ -51,8 +51,16 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
     encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
     ls_infer_model = Transformer()
 
-    export_ls_embedding(ls_infer_model, encoder_state_dict, config.max_seq_len, True)
-    export_ls_embedding(ls_infer_model, decoder_state_dict, config.max_seq_len, False)
+    export_ls_embedding(
+        ls_infer_model, encoder_state_dict, config.max_seq_len, config.hidden_size, True
+    )
+    export_ls_embedding(
+        ls_infer_model,
+        decoder_state_dict,
+        config.max_seq_len,
+        config.hidden_size,
+        False,
+    )
     export_ls_encoder(
         ls_infer_model,
         encoder_state_dict,

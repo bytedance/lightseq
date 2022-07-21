@@ -4,7 +4,9 @@ from lightseq.training.ops.pytorch.util import get_pos_embedding
 from lightseq.training import LSTransformerEncoderLayer, LSTransformerDecoderLayer
 
 
-def gather_token_embedding(tensor_names, state_dict, tn_pattern, scale=True):
+def gather_token_embedding(
+    tensor_names, state_dict, tn_pattern, scale=True, emb_dim=None
+):
     target_tn = []
     for tn in tensor_names:
         if tn_pattern in tn.split("."):
@@ -12,8 +14,10 @@ def gather_token_embedding(tensor_names, state_dict, tn_pattern, scale=True):
             continue
     target_tensor = [state_dict[name] for name in target_tn]
     target_tensor = np.concatenate(target_tensor, axis=0)
+    if emb_dim is None:
+        emb_dim = target_tensor.shape[1]
     if scale:
-        target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
+        target_tensor = target_tensor * (emb_dim**0.5)
     return target_tensor, target_tn
 
 
@@ -155,9 +159,17 @@ def fill_encdec_weight(
             )
 
 
-def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
+def export_ls_embedding(
+    file, state_dict, max_length, emb_dim, is_encoder, save_pb=True
+):
     var_name_list = list(state_dict.keys())
-    emb, target_tn = gather_token_embedding(var_name_list, state_dict, "embeddings")
+    emb, target_tn = gather_token_embedding(
+        var_name_list, state_dict, "embeddings", emb_dim=emb_dim
+    )
+    emb_size = emb.flatten().shape[0] - 1
+    assert emb_size % emb_dim == 0
+    emb = emb.flatten()[:-1].reshape(emb_size // emb_dim, emb_dim)
+
     if is_encoder:
         emb_list = emb.flatten().tolist()
         if save_pb:
@@ -179,7 +191,7 @@ def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
         % (target_tn, "src" if is_encoder else "trg")
     )
 
-    pos_emb = get_pos_embedding(max_length, emb.shape[-1])
+    pos_emb = get_pos_embedding(max_length, emb_dim)
     pos_emb_list = pos_emb.flatten().tolist()
     if is_encoder:
         if save_pb:
@@ -314,10 +326,10 @@ def export_ls_decoder(
     enc_out_mapping_dict = OrderedDict(
         {
             "encode_output_project_kernel_kv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
-                offsets[18], offsets[19], 2 * nlayer * hs, hs
+                offsets[19], offsets[20], 2 * nlayer * hs, hs
             ),
             "encode_output_project_bias_kv": "para&&expression_[{0}:{1}]".format(
-                offsets[19], offsets[20]
+                offsets[20], offsets[21]
             ),
         }
     )

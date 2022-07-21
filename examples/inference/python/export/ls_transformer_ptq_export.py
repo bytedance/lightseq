@@ -59,12 +59,14 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         ls_infer_model,
         encoder_state_dict,
         config.max_seq_len,
+        config.hidden_size,
         True,
     )
     export_ls_embedding_ptq(
         ls_infer_model,
         decoder_state_dict,
         config.max_seq_len,
+        config.hidden_size,
         is_encoder=False,
     )
     export_ls_encoder_ptq(
