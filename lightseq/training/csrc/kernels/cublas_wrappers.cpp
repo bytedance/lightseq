@@ -129,7 +129,6 @@ void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
 #else
   CHECK_GPU_ERROR(cublasLtMatmulDescCreate(&matmul_desc, compute_type));
 #endif
-  std::cout << "m " << n << " ; n " << m << " ; k " << k << std::endl;
   cublasLtPointerMode_t scale_mode = CUBLASLT_POINTER_MODE_DEVICE;
   CHECK_GPU_ERROR(cublasLtMatmulDescSetAttribute(
       matmul_desc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scale_dtype,
