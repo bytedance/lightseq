@@ -88,7 +88,7 @@ def fill_quant_pb_layer(
             assert len(target_tensor) == 1
             exec("layer.%s=target_tensor[0]" % proto_name)
         elif "kernel" in proto_name:
-            weight_clip_max = get_kth_value(target_tensor)
+            weight_clip_max = 1
             target_tensor = quantize(target_tensor, global_quant_range, weight_clip_max)
             exec("layer.%s=bytes(target_tensor.flatten().tolist())" % proto_name)
             if proto_name == "encode_output_project_kernel_kv":
