@@ -83,12 +83,11 @@ def fill_quant_pb_layer(
     nlayer=None,
 ):
     for proto_name, ckpt_rule in mapping_dict.items():
-        if "clip_max" in proto_name and "kernel" not in proto_name:
-            exec("layer.%s=act_clip_max" % proto_name)
-            print("%s convert finished!" % proto_name)
-            continue
         target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
-        if "kernel" in proto_name:
+        if "clip_max" in proto_name:
+            assert len(target_tensor) == 1
+            exec("layer.%s=target_tensor[0]" % proto_name)
+        elif "kernel" in proto_name:
             weight_clip_max = get_kth_value(target_tensor)
             target_tensor = quantize(target_tensor, global_quant_range, weight_clip_max)
             exec("layer.%s=bytes(target_tensor.flatten().tolist())" % proto_name)
@@ -494,13 +493,27 @@ def export_ls_quant_encoder(
             "ffn_norm_bias": "para&&expression_[{0}:{1}]".format(
                 offsets[11], offsets[12]
             ),
-            "multihead_ln_clip_max": "None",
-            "multihead_project_output_clip_max": "None",
-            "ffn_ln_clip_max": "None",
-            "ffn_first_act_clip_max": "None",
-            "multihead_qkv_dense_clip_max": "None",
-            "multihead_output_dense_clip_max": "None",
-            "ffn_first_output_clip_max": "None",
+            "multihead_ln_clip_max": "para&&expression_[{0}:{1}][0]".format(
+                offsets[12], offsets[13]
+            ),
+            "multihead_qkv_dense_clip_max": "para&&expression_[{0}:{1}][2]".format(
+                offsets[12], offsets[13]
+            ),
+            "multihead_project_output_clip_max": "para&&expression_[{0}:{1}][3]".format(
+                offsets[12], offsets[13]
+            ),
+            "multihead_output_dense_clip_max": "para&&expression_[{0}:{1}][5]".format(
+                offsets[12], offsets[13]
+            ),
+            "ffn_ln_clip_max": "para&&expression_[{0}:{1}][6]".format(
+                offsets[12], offsets[13]
+            ),
+            "ffn_first_output_clip_max": "para&&expression_[{0}:{1}][8]".format(
+                offsets[12], offsets[13]
+            ),
+            "ffn_first_act_clip_max": "para&&expression_[{0}:{1}][9]".format(
+                offsets[12], offsets[13]
+            ),
         }
     )
     fill_quant_encdec_weight(file, state_dict, mapping_dict, True, save_pb)
@@ -572,18 +585,42 @@ def export_ls_quant_decoder(
             "ffn_norm_bias": "para&&expression_[{0}:{1}]".format(
                 offsets[17], offsets[18]
             ),
-            "self_ln_clip_max": "None",
-            "self_project_output_clip_max": "None",
-            "encdec_ln_clip_max": "None",
-            "encdec_project_output_clip_max": "None",
-            "ffn_ln_clip_max": "None",
-            "ffn_first_act_clip_max": "None",
-            "self_qkv_dense_clip_max": "None",
-            "self_output_dense_clip_max": "None",
-            "encdec_q_dense_clip_max": "None",
-            "encdec_output_dense_clip_max": "None",
-            "ffn_first_output_clip_max": "None",
-            "self_qkv_bias_out_clip_max": "None",
+            "self_ln_clip_max": "para&&expression_[{0}:{1}][0]".format(
+                offsets[18], offsets[19]
+            ),
+            "self_qkv_dense_clip_max": "para&&expression_[{0}:{1}][2]".format(
+                offsets[18], offsets[19]
+            ),
+            "self_project_output_clip_max": "para&&expression_[{0}:{1}][3]".format(
+                offsets[18], offsets[19]
+            ),
+            "self_output_dense_clip_max": "para&&expression_[{0}:{1}][5]".format(
+                offsets[18], offsets[19]
+            ),
+            "encdec_ln_clip_max": "para&&expression_[{0}:{1}][6]".format(
+                offsets[18], offsets[19]
+            ),
+            "encdec_q_dense_clip_max": "para&&expression_[{0}:{1}][8]".format(
+                offsets[18], offsets[19]
+            ),
+            "encdec_project_output_clip_max": "para&&expression_[{0}:{1}][9]".format(
+                offsets[18], offsets[19]
+            ),
+            "encdec_output_dense_clip_max": "para&&expression_[{0}:{1}][11]".format(
+                offsets[18], offsets[19]
+            ),
+            "ffn_ln_clip_max": "para&&expression_[{0}:{1}][12]".format(
+                offsets[18], offsets[19]
+            ),
+            "ffn_first_output_clip_max": "para&&expression_[{0}:{1}][14]".format(
+                offsets[18], offsets[19]
+            ),
+            "ffn_first_act_clip_max": "para&&expression_[{0}:{1}][15]".format(
+                offsets[18], offsets[19]
+            ),
+            "self_qkv_bias_out_clip_max": "para&&expression_[{0}:{1}][23]".format(
+                offsets[18], offsets[19]
+            ),
         }
     )
     enc_out_mapping_dict = OrderedDict(
@@ -594,8 +631,6 @@ def export_ls_quant_decoder(
             "encode_output_project_bias_kv": "para&&expression_[{0}:{1}]".format(
                 offsets[20], offsets[21]
             ),
-            "output_ln_clip_max": "None",
-            "logits_clip_max": "None",
         }
     )
     fill_quant_encdec_weight(

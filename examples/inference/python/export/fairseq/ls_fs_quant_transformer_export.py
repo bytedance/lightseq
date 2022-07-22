@@ -26,21 +26,27 @@ def _extract_weight(state_dict):
     return encoder_state_dict, decoder_state_dict
 
 
-def export_fs_weights(transformer, state_dict):
+def export_fs_weights(transformer, state_dict, args):
     enc_norm_w = state_dict["encoder.layer_norm.weight"].flatten().tolist()
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    dec_shared_b = (
-        torch.zeros(state_dict["decoder.embed_tokens.embeddings"].size(0) - 1)
-        .flatten()
-        .tolist()
-    )
+    output_ln_clip_max = state_dict[
+        "decoder.output_projection.input_quant.clip.clip_value_max"
+    ]
+    logits_clip_max = state_dict["decoder.output_projection.output_quant._amax"]
+
+    emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
+    assert emb_size % args.decoder_embed_dim == 0
+    dec_shared_b = torch.zeros(emb_size // args.decoder_embed_dim).flatten().tolist()
+
     transformer.src_embedding.norm_scale[:] = enc_norm_w
     transformer.src_embedding.norm_bias[:] = enc_norm_b
     transformer.trg_embedding.norm_scale[:] = dec_norm_w
     transformer.trg_embedding.norm_bias[:] = dec_norm_b
     transformer.trg_embedding.shared_bias[:] = dec_shared_b
+    transformer.trg_embedding.output_ln_clip_max = output_ln_clip_max
+    transformer.trg_embedding.logits_clip_max = logits_clip_max
 
 
 def export_ls_fs_quant_transformer(model_path, pb_path, hdf5_path, hdf5):
@@ -82,7 +88,7 @@ def export_ls_fs_quant_transformer(model_path, pb_path, hdf5_path, hdf5):
         args.decoder_layers,
         save_pb=True,
     )
-    export_fs_weights(transformer, state_dict)
+    export_fs_weights(transformer, state_dict, args)
     export_ls_config(
         transformer,
         args.encoder_attention_heads,
