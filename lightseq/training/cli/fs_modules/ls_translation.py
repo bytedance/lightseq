@@ -361,11 +361,10 @@ class ShardIterator:
         data_path = args.data[:-1]
 
         k = 0
-        split = "train"
         data_para = None
-        local_path = "/opt/tiger/begin/lightseq/examples/training/fairseq/hdfs/"
         ftype = "hdfs" if data_path.startswith("hdfs") else "local"
         if ftype == "hdfs":
+            local_path = "/tmp/streaming_load_databin/"
             cls._prepare_databin_from_hdfs(data_path, local_path)
             proc = set_subprocess(f"hadoop fs -ls {data_path}/train*")
             out = str(checkout_subprocess(proc, only_main=False))
@@ -383,7 +382,7 @@ class ShardIterator:
             src, tgt = args.source_lang, args.target_lang
             dataset_impl = args.dataset_impl
             for k in itertools.count():
-                split_k = split + (str(k) if k > 0 else "")
+                split_k = "train" + (str(k) if k > 0 else "")
                 exist1 = split_exists(split_k, src, tgt, src, data_path, dataset_impl)
                 exist2 = split_exists(split_k, tgt, src, src, data_path, dataset_impl)
                 if not exist1 and not exist2:
@@ -391,7 +390,7 @@ class ShardIterator:
                         break
                     else:
                         raise FileNotFoundError(
-                            "Dataset not found: {} ({})".format(split, data_path)
+                            "Dataset not found: train ({})".format(data_path)
                         )
 
         shard_itr = cls(args, k, args.npick, ftype, data_para)
