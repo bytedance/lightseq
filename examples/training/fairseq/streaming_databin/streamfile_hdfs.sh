@@ -2,7 +2,7 @@
 set -ex
 
 THIS_DIR=$(dirname $(readlink -f $0))
-cd $THIS_DIR/../../..
+cd $THIS_DIR/../../../..
 
 databin=/home/tiger/lightseq/examples/training/fairseq/databin
 # hdfs dfs -get hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/datasets/en-fr/onefile_databin $databin
