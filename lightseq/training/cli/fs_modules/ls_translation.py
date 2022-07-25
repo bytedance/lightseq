@@ -398,7 +398,6 @@ class ShardIterator:
 
     def next(self):
         '''Returns the indices of all files for current shard'''
-        print(self.shard_ids)
         if self.ftype == "hdfs":
             if self.cur_id == 0:
                 self._prepare_sharded_trainset_from_hdfs(0)
