@@ -31,6 +31,7 @@ from fairseq.tasks.translation import TranslationTask
 
 logger = logging.getLogger(__name__)
 
+
 def set_dir(filepath):
     if not os.path.exists(filepath):
         os.mkdir(filepath)
@@ -38,9 +39,11 @@ def set_dir(filepath):
         shutil.rmtree(filepath)
         os.mkdir(filepath)
 
+
 def split_exists(split, src, tgt, lang, data_path, dataset_impl):
     filename = os.path.join(data_path, "{}.{}-{}.{}".format(split, src, tgt, lang))
     return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
+
 
 def is_main_worker():
     if dist.is_initialized():
@@ -48,9 +51,11 @@ def is_main_worker():
             return False
     return True
 
+
 def sync_all_workers():
     if dist.is_initialized():
         dist.barrier()
+
 
 def checkout_subprocess(proc, only_main=True):
     if only_main and not is_main_worker():
@@ -70,8 +75,12 @@ def checkout_subprocess(proc, only_main=True):
         raise FileNotFoundError(s_err)
     return s_output
 
+
 def set_subprocess(s):
-    return subprocess.Popen(s.split(' '), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.Popen(
+        s.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+
 
 def load_langpair_dataset(
     data_path,
@@ -204,11 +213,6 @@ def load_langpair_dataset(
 class LSTranslationTask(TranslationTask):
     """
     Translate from one (source) language to another (target) language.
-
-    Args:
-        src_dict (~fairseq.data.Dictionary): dictionary for the source language
-        tgt_dict (~fairseq.data.Dictionary): dictionary for the target language
-
     .. note::
 
         The translation task is compatible with :mod:`fairseq-train`,
@@ -232,7 +236,11 @@ class LSTranslationTask(TranslationTask):
         # fmt: on
 
     def __init__(self, args, src_dict, tgt_dict, shard_itr):
-        super().__init__(args, src_dict, tgt_dict,)
+        super().__init__(
+            args,
+            src_dict,
+            tgt_dict,
+        )
         self.shard_iterator = shard_itr
         self.local_hdfs_path = None
 
@@ -280,7 +288,7 @@ class LSTranslationTask(TranslationTask):
             split (str): name of the split (e.g., train, valid, test)
         """
         paths = utils.split_paths(self.args.data)
-        is_train = (split == getattr(self.args, "train_subset", None))
+        is_train = split == getattr(self.args, "train_subset", None)
         assert len(paths) > 0
         if not is_train:
             # if not training data set, use the first shard for valid and test
@@ -315,26 +323,26 @@ class LSTranslationTask(TranslationTask):
 
 
 class ShardIterator:
-    '''
-        Responsible for providing the indices of all files for current shard.
-        If it is the path of hdfs, there is also responsible for 
-        downloading files and organizing resources.
-    '''
+    """
+    Responsible for providing the indices of all files for current shard.
+    If it is the path of hdfs, there is also responsible for
+    downloading files and organizing resources.
+    """
+
     def __init__(self, args, total, npick, ftype, data_para):
         self.args = args
         self.total = total
         self.npick = npick
-        # local hdfs
+        # hdfs
         self.ftype = ftype
         self.data_para = data_para
         self.pre_procs = None
-        self.last_shard = None
         self.cur_shard = None
         self.init_iterator()
 
     @staticmethod
     def _prepare_databin_from_hdfs(hdfs_path, local_path):
-        '''Download all databin except the training set'''
+        """Download all databin except the training set"""
         if is_main_worker():
             set_dir(local_path)
             proc = set_subprocess(f"hadoop fs -get {hdfs_path}/valid* {local_path}")
@@ -347,26 +355,29 @@ class ShardIterator:
 
     @classmethod
     def build(cls, args):
+        # get data path
+        if not args.data.endswith(":"):
+            raise ValueError("Paths must end with a colon (:)")
+        data_path = args.data[:-1]
+
         k = 0
         split = "train"
         data_para = None
-        # get data path
-        data_path = args.data[:-1]
-        local_path = '/tmp/lightseq_stream_databin_dir/'
-        ftype = "hdfs" if data_path.startswith('hdfs') else "local"
+        local_path = "/opt/tiger/begin/lightseq/examples/training/fairseq/hdfs/"
+        ftype = "hdfs" if data_path.startswith("hdfs") else "local"
         if ftype == "hdfs":
             cls._prepare_databin_from_hdfs(data_path, local_path)
             proc = set_subprocess(f"hadoop fs -ls {data_path}/train*")
             out = str(checkout_subprocess(proc, only_main=False))
             for k in itertools.count():
-                split_k = 'train' + (str(k) if k > 0 else "")
+                split_k = "train" + (str(k) if k > 0 else "")
                 if not split_k in out:
                     break
             # change path
-            args.data = local_path + ':'
+            args.data = local_path + ":"
             data_para = {
-                "real_path":data_path,
-                "local_path":local_path,
+                "real_path": data_path,
+                "local_path": local_path,
             }
         else:
             src, tgt = args.source_lang, args.target_lang
@@ -382,31 +393,39 @@ class ShardIterator:
                         raise FileNotFoundError(
                             "Dataset not found: {} ({})".format(split, data_path)
                         )
-        return cls(args, k, args.npick, ftype, data_para)
+
+        shard_itr = cls(args, k, args.npick, ftype, data_para)
+        if ftype == "hdfs":
+            shard_itr._prepare_sharded_trainset_from_hdfs(0)
+        return shard_itr
 
     def _prepare_sharded_trainset_from_hdfs(self, i):
-        '''Download all training set for i-th shard from hdfs'''
+        """Download all training set for i-th shard from hdfs"""
         if is_main_worker():
             itr = self.shard_ids[i]
+            # Not downloading already downloaded files
+            if self.cur_shard is not None and i == 0:
+                itr = set(itr) - set(self.cur_shard)
             lpath, rpath = self.data_para["local_path"], self.data_para["real_path"]
             procs = []
             for k in itr:
                 split_k = "train" + (str(k) if k > 0 else "")
-                procs.append(set_subprocess(f"hadoop fs -get {rpath}/{split_k}.* {lpath}"))
+                procs.append(
+                    set_subprocess(f"hadoop fs -get {rpath}/{split_k}.* {lpath}")
+                )
             self.pre_procs = procs
         sync_all_workers()
 
     def next(self):
-        '''Returns the indices of all files for current shard'''
+        """Returns the indices of all files for current shard"""
         if self.ftype == "hdfs":
-            if self.cur_id == 0:
-                self._prepare_sharded_trainset_from_hdfs(0)
             checkout_subprocess(self.pre_procs)
-        self.last_shard = self.cur_shard
+
+        self.handle_last()
         self.cur_shard = self.shard_ids[self.cur_id]
         self.prepare_next()
         return self.cur_shard
-    
+
     def pace(self):
         return self.cur_id + 1, len(self.shard_ids)
 
@@ -415,17 +434,22 @@ class ShardIterator:
 
     def prepare_next(self):
         self.cur_id += 1
+        if self.end_of_shards():
+            self.init_iterator()
+
         if self.ftype == "hdfs":
-            if self.last_shard is not None and is_main_worker():
-                for k in self.last_shard:
+            self._prepare_sharded_trainset_from_hdfs(self.cur_id)
+
+    def handle_last(self):
+        if self.ftype == "hdfs":
+            last_shard = self.cur_shard
+            if last_shard is not None and is_main_worker():
+                if self.cur_id == 0:
+                    last_shard = set(last_shard) - set(self.shard_ids[self.cur_id])
+                for k in last_shard:
                     split_k = "train" + (str(k) if k > 0 else "")
                     rm = f'rm -f {self.data_para["local_path"]}/{split_k}.*'
                     os.system(rm)
-            if self.cur_id < len(self.shard_ids):
-                self._prepare_sharded_trainset_from_hdfs(self.cur_id)
-
-        if self.end_of_shards():
-            self.init_iterator()
 
     def init_iterator(self):
         self.shard_ids = self.shuffle_shards()
@@ -436,8 +460,10 @@ class ShardIterator:
         np.random.shuffle(indices)
         shuffled_indices = list(indices)
         iner = list(range(0, self.total, self.npick))
-        if iner[-1] < self.total - 1:
-            iner.append(self.total - 1)
-        res = [tuple(shuffled_indices[iner[i]:iner[i+1]]) 
-                for i in range(0, len(iner) - 1)]
+        if iner[-1] < self.total:
+            iner.append(self.total)
+        res = [
+            tuple(shuffled_indices[iner[i] : iner[i + 1]])
+            for i in range(0, len(iner) - 1)
+        ]
         return res

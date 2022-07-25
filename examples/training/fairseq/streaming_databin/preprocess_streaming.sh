@@ -61,14 +61,14 @@ cd $TMP
 echo "split big file into lots of small files......"
 split -l $N_LINE $TEXT/$trainpref.$SRC src -d -a 6
 for i in `ls src*`; do
-    new_str=$(echo -e $i | sed -r 's/src0*([0-9])/\1/')  
+    new_str=$(echo -e $i | sed -r 's/src0*([0-9])/\1/')
     mv $i train$new_str.$SRC;
 done
 mv train0.$SRC train.$SRC
 
 split -l $N_LINE $TEXT/$trainpref.$TGT tgt -d -a 6
 for i in `ls tgt*`; do
-    new_str=$(echo -e $i | sed -r 's/tgt0*([0-9])/\1/')  
+    new_str=$(echo -e $i | sed -r 's/tgt0*([0-9])/\1/')
     mv $i train$new_str.$TGT;
 done
 mv train0.$TGT train.$TGT
@@ -106,4 +106,3 @@ for i in `ls $TMP/databins/`; do
         cp $j $DESTDIR/$new_name
     done
 done
-
