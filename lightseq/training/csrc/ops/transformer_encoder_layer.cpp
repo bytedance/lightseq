@@ -48,7 +48,8 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           CUBLAS_OP_N)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
-      _enable_quant(false) {
+      _enable_quant(false),
+      _mask_future_tokens(mask_future_tokens) {
   assert(_hidden_size % _heads == 0);
   allocate_mem_buffer();
 }
@@ -91,10 +92,13 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
                         _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
 
+    const T *attn_qkv_cache_cmax =
+        _mask_future_tokens ? _attn_qkv_cache_cmax_ptr : nullptr;
+
     launch_quant_bias_add_transform_20314<T>(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
         _attn_qkv_cmax_ptr + 2, _batch_size, _seq_len, 3, _heads,
-        _hidden_size / _heads, _stream);
+        _hidden_size / _heads, _stream, attn_qkv_cache_cmax);
 
   } else {
     if (_pre_or_postLayerNorm) {

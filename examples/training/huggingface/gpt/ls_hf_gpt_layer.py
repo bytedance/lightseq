@@ -2,6 +2,7 @@ from torch import nn
 
 from lightseq.training.ops.pytorch.quantization import (
     qat_mode,
+    enable_quant,
     disable_quant,
     QuantLinear,
     TensorQuantizer,
@@ -96,15 +97,6 @@ class GptEmbedding(nn.Embedding):
 
 
 def inject_ls_layer(model, training_args, model_args, config):
-    if model_args.module_type == 1:
-        from lightseq.training import ls_hf_gpt_enc_convert
-
-        ls_hf_gpt_enc_convert(model, training_args, config)
-        return
-
-    if model_args.module_type != 2:
-        raise NotImplementedError
-
     init_ws = get_hf_gpt_emb_layer_params(model.transformer)
     model.transformer.wte = GptEmbedding(
         training_args, init_ws[0], config.vocab_size, config.hidden_size
@@ -114,16 +106,28 @@ def inject_ls_layer(model, training_args, model_args, config):
     else:
         model.transformer.wte.apply(disable_quant)
 
-    for i in range(config.num_hidden_layers):
-        gpt_enc_config = gen_gpt_enc_config(training_args, config)
-        init_ws, init_bs = get_hf_gpt_enc_layer_params(model.transformer.h[i], config)
-        model.transformer.h[i] = LSHFGptEncoderLayer(
-            gpt_enc_config, init_ws, init_bs
-        ).cuda()
-        if model_args.enable_quant:
-            model.transformer.h[i].apply(qat_mode)
-        else:
-            model.transformer.h[i].apply(disable_quant)
+    if model_args.module_type == 1:
+        from lightseq.training import ls_hf_gpt_enc_convert
+
+        ls_hf_gpt_enc_convert(model, training_args, config)
+        for i in range(config.num_hidden_layers):
+            if model_args.enable_quant:
+                model.transformer.h[i].apply(enable_quant)
+            else:
+                model.transformer.h[i].apply(disable_quant)
+    elif model_args.module_type == 2:
+        for i in range(config.num_hidden_layers):
+            gpt_enc_config = gen_gpt_enc_config(training_args, config)
+            init_ws, init_bs = get_hf_gpt_enc_layer_params(
+                model.transformer.h[i], config
+            )
+            model.transformer.h[i] = LSHFGptEncoderLayer(
+                gpt_enc_config, init_ws, init_bs
+            ).cuda()
+            if model_args.enable_quant:
+                model.transformer.h[i].apply(qat_mode)
+            else:
+                model.transformer.h[i].apply(disable_quant)
 
     q_lm_head = QuantLinear(config.n_embd, config.vocab_size, bias=False)
     q_lm_head.weight = model.transformer.wte.weight
