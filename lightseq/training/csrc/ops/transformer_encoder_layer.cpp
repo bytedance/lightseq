@@ -327,6 +327,10 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
                             false);
 
   if (_enable_quant) {
+    launch_d_cmax(_grad_attn_ow_ptr, static_cast<T *>(nullptr),
+                  _attn_dropout.get_mask(), _hidden_size * _hidden_size, 4,
+                  _stream);
+
     launch_transform_0213_dcmax<T>(grad_input_ptr, _grad_attn_out_cmax_ptr,
                                    grad_input_buf_ptr, _attn_dropout.get_mask(),
                                    _batch_size, _seq_len, _hidden_size, _heads,
@@ -363,6 +367,11 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
 
   if (_pre_or_postLayerNorm) {
     if (_enable_quant) {
+      launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
+                    _attn_prob_dropout.get_mask(),
+                    _hidden_size * _hidden_size * 3, 4, _stream);
+      CHECK_GPU_ERROR(cudaGetLastError());
+
       _attn_ln.Backward(_grad_attn_nw_ptr, _grad_attn_nb_ptr, grad_input_ptr,
                         _grad_attn_qkv_cmax_ptr, grad_input_buf_ptr,
                         grad_output_ptr, gemmQKV_inp_ptr, _attn_nw_ptr,
@@ -375,6 +384,10 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
     }
   } else {
     if (_enable_quant) {
+      launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
+                    _attn_prob_dropout.get_mask(),
+                    _hidden_size * _hidden_size * 3, 4, _stream);
+
       launch_d_cmax(grad_input_buf_ptr, _grad_attn_qkv_cmax_ptr,
                     _attn_prob_dropout.get_mask(), _batch_dim, 2, _stream);
     }
@@ -418,6 +431,10 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                 grad_ff1_out_ptr, nullptr, false);
 
   if (_enable_quant) {
+    launch_d_cmax(_grad_output_w_ptr, static_cast<T *>(nullptr),
+                  _ffn_dropout.get_mask(), _hidden_size * _intermediate_size, 4,
+                  _stream);
+
     _ffn_activation_dropout.d_quant_bias_act_dropout(
         grad_ff1_out_ptr, _grad_inter_b_ptr, _grad_inter_cmax_ptr + 2,
         _grad_output_cmax_ptr, _relu_inp_ptr,
@@ -440,6 +457,10 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   const T *add_res_ptr = _ff1_inp_ptr;
   if (_pre_or_postLayerNorm) {
     if (_enable_quant) {
+      launch_d_cmax(_grad_inter_w_ptr, static_cast<T *>(nullptr),
+                    _ffn_activation_dropout.get_mask(),
+                    _hidden_size * _intermediate_size, 4, _stream);
+
       _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,
                        _grad_inter_cmax_ptr, grad_ff1_inp_ptr, grad_output_ptr,
                        _ff1_inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
