@@ -464,12 +464,14 @@ __global__ void d_cmax_kernel<float>(float *grad, float *grad_cmax,
   thread_grad_cmax += temp_cmax_g;
 
   grad4[i] = grad4_i;
-  if (thread_grad_cmax != 0) {
-    atomicAdd(&block_grad_cmax, thread_grad_cmax);
-  }
-  __syncthreads();
-  if (threadIdx.x == 0 && block_grad_cmax != 0) {
-    atomicAdd(grad_cmax, block_grad_cmax);
+  if (grad_cmax) {
+    if (thread_grad_cmax != 0) {
+      atomicAdd(&block_grad_cmax, thread_grad_cmax);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0 && block_grad_cmax != 0) {
+      atomicAdd(grad_cmax, block_grad_cmax);
+    }
   }
 }
 
@@ -506,13 +508,14 @@ __global__ void d_cmax_kernel<__half>(__half *grad, __half *grad_cmax,
   }
 
   grad8[i] = grad8_i;
-
-  if (thread_grad_cmax != 0) {
-    atomicAdd(&block_grad_cmax, thread_grad_cmax);
-  }
-  __syncthreads();
-  if (threadIdx.x == 0 && block_grad_cmax != 0) {
-    atomicAdd(grad_cmax, __float2half(block_grad_cmax));
+  if (grad_cmax) {
+    if (thread_grad_cmax != 0) {
+      atomicAdd(&block_grad_cmax, thread_grad_cmax);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0 && block_grad_cmax != 0) {
+      atomicAdd(grad_cmax, __float2half(block_grad_cmax));
+    }
   }
 }
 
@@ -523,7 +526,9 @@ void launch_d_cmax<float>(float *grad_ptr, float *grad_cmax_ptr,
   if (numel % 4 != 0) {
     throw std::runtime_error("violate numel % 4 = 0");
   }
-  zero_grad<<<1, 1>>>(grad_cmax_ptr);
+  if (grad_cmax_ptr) {
+    cudaMemsetAsync(grad_cmax_ptr, 0, sizeof(float), stream);
+  }
   int ele_per_block = MAX_THREADS * 4;
   int grid_dim = numel / ele_per_block;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
@@ -537,7 +542,10 @@ void launch_d_cmax<__half>(__half *grad_ptr, __half *grad_cmax_ptr,
   if (numel % 8 != 0) {
     throw std::runtime_error("violate numel % 8 = 0");
   }
-  zero_grad<<<1, 1>>>(grad_cmax_ptr);
+  if (grad_cmax_ptr) {
+    // zero_grad<<<1, 1>>>(grad_cmax_ptr);
+    cudaMemsetAsync(grad_cmax_ptr, 0, sizeof(__half), stream);
+  }
   int ele_per_block = MAX_THREADS * 8;
   int grid_dim = numel / ele_per_block;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
