@@ -129,3 +129,7 @@ def inject_ls_layer(model, training_args, model_args, config):
     q_lm_head.weight = model.transformer.wte.weight
     q_lm_head.weight_quant = model.transformer.wte.emb_quant
     model.lm_head = q_lm_head
+    if model_args.enable_quant:
+        model.lm_head.apply(qat_mode)
+    else:
+        model.lm_head.apply(disable_quant)
