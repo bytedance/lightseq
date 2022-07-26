@@ -172,9 +172,15 @@ class ModelArguments:
             "with private models)."
         },
     )
-    with_lightseq: bool = field(
-        default=True,
-        metadata={"help": "Whether to use lightseq TransformerEncoder"},
+    module_type: int = field(
+        default=1,
+        metadata={
+            "help": "0: original Hugging Face layer, 1: LightSeq CUDA layer, 2: custom Torch layer"
+        },
+    )
+    enable_quant: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable quantization"},
     )
 
 
@@ -299,8 +305,8 @@ def main():
     )
 
     # Replace with LightSeq encoder layers.
-    if model_args.with_lightseq:
-        inject_ls_enc_layer(model, training_args, config)
+    if model_args.module_type == 1 or model_args.module_type == 2:
+        inject_ls_enc_layer(model, training_args, model_args, config)
 
     feature_extractor = AutoFeatureExtractor.from_pretrained(
         model_args.feature_extractor_name or model_args.model_name_or_path,
