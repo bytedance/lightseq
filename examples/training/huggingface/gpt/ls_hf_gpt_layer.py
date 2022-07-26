@@ -5,7 +5,7 @@ from lightseq.training.ops.pytorch.quantization import (
     disable_quant,
     QuantLinear,
     TensorQuantizer,
-    weight_quant_config,
+    emb_quant_config,
 )
 from lightseq.training.ops.pytorch.torch_transformer_layers import (
     TransformerDecoderLayer,
@@ -74,7 +74,9 @@ class LSHFGptEncoderLayer(TransformerDecoderLayer):
         if attention_mask is not None:
             ls_attention_mask = attention_mask.squeeze()
         else:
-            ls_attention_mask = torch.zeros(hidden_states.size()[:2])
+            ls_attention_mask = torch.zeros(hidden_states.size()[:2]).to(
+                hidden_states.device
+            )
         output = super().forward(hidden_states, ls_attention_mask)
         return output
 
@@ -82,7 +84,7 @@ class LSHFGptEncoderLayer(TransformerDecoderLayer):
 class GptEmbedding(nn.Embedding):
     def __init__(self, training_args, initial_embeddings=None, *args, **kwargs):
         super(GptEmbedding, self).__init__(*args, **kwargs)
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
 
         if initial_embeddings is not None:
             self.weight.data.copy_(copy_para(initial_embeddings, training_args.fp16))

@@ -9,6 +9,7 @@ from lightseq.training.ops.pytorch.quantization import (
     QuantLinear,
     TensorQuantizer,
     weight_quant_config,
+    emb_quant_config,
 )
 from lightseq.training.ops.pytorch.torch_transformer_layers import (
     TransformerDecoderLayer,
@@ -127,7 +128,7 @@ def warmup(
 class GptEmbedding(nn.Embedding):
     def __init__(self, *args, **kwargs):
         super(GptEmbedding, self).__init__(*args, **kwargs)
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
 
     def forward(self, input_ids):
         x = super(GptEmbedding, self).forward(input_ids)
