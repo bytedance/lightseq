@@ -23,6 +23,7 @@ from .quantization import (
     TensorQuantizer,
     act_quant_config,
     weight_quant_config,
+    out_quant_config,
     emb_quant_config,
 )
 
@@ -92,7 +93,7 @@ class MultiheadAttention(nn.Module):
             self.qkv_proj = QuantLinear(embed_dim, 3 * embed_dim, bias=bias)
 
             self.attention_quant = (
-                TensorQuantizer(act_quant_config) if self.is_decoder else None
+                TensorQuantizer(out_quant_config) if self.is_decoder else None
             )
         elif self.encoder_decoder_attention and self.is_decoder:
             self.k_proj = QuantLinear(
@@ -1095,7 +1096,7 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
             persistent=False,
         )
 
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
 
         if initial_weights is None:
             return

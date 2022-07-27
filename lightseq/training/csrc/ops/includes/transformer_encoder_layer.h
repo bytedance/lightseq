@@ -94,7 +94,9 @@ class TransformerEncoderLayer {
     _inter_cmax_ptr = wptr;
     wptr += 3;
     _output_cmax_ptr = wptr;
-    wptr += 3;
+    wptr += 2;
+    _attn_qkv_cache_cmax_ptr = wptr;
+    wptr += 1;
   }
 
   void assign_grad_ptr(T *grads_ptr) {
@@ -133,7 +135,9 @@ class TransformerEncoderLayer {
     _grad_inter_cmax_ptr = gptr;
     gptr += 3;
     _grad_output_cmax_ptr = gptr;
-    gptr += 3;
+    gptr += 2;
+    _grad_attn_qkv_cache_cmax_ptr = gptr;
+    gptr += 1;
   }
 
  private:
@@ -222,6 +226,7 @@ class TransformerEncoderLayer {
   const size_t _max_seq_len;
   const bool _pre_or_postLayerNorm;
   const std::string _activation_fn;
+  const bool _mask_future_tokens;
   // dynamic parameter between batch
   size_t _batch_size;
   size_t _seq_len;
@@ -285,6 +290,7 @@ class TransformerEncoderLayer {
   const T *_attn_out_cmax_ptr;
   const T *_inter_cmax_ptr;
   const T *_output_cmax_ptr;
+  const T *_attn_qkv_cache_cmax_ptr;
 
   // grads ptr
   T *_grad_attn_qkvw_ptr;
@@ -304,4 +310,5 @@ class TransformerEncoderLayer {
   T *_grad_attn_out_cmax_ptr;
   T *_grad_inter_cmax_ptr;
   T *_grad_output_cmax_ptr;
+  T *_grad_attn_qkv_cache_cmax_ptr;
 };

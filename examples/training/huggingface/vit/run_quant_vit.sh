@@ -19,17 +19,18 @@ python3 -m torch.distributed.launch \
   --nproc_per_node=1 \
   $THIS_DIR/run_vit.py \
   --dataset_name beans \
-  --output_dir /tmp/beans_outputs \
+  --output_dir /tmp/quant/beans_outputs \
+  --resume_from_checkpoint /tmp/beans_outputs/ \
   --overwrite_output_dir \
   --remove_unused_columns False \
   --do_train \
   --do_eval \
   --learning_rate 2e-5 \
-  --num_train_epochs 30 \
+  --num_train_epochs 45 \
   --per_device_train_batch_size 8 \
   --per_device_eval_batch_size 8 \
   --logging_steps 10 \
   --seed 1337 \
   --fp16 \
   --module_type 1 \
-  --enable_quant false
+  --enable_quant true
