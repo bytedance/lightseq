@@ -3,18 +3,17 @@ set -ex
 THIS_DIR=$(dirname $(readlink -f $0))
 cd $THIS_DIR/../../..
 
-if [ ! -d "/tmp/wmt14_en_de" ]; then
+if [ ! -d "/tmp/wmt14" ]; then
     echo "Downloading dataset"
-    wget http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/wmt_data/databin_wmt14_en_de.tar.gz -P /tmp
-    tar -zxvf /tmp/databin_wmt14_en_de.tar.gz -C /tmp && rm /tmp/databin_wmt14_en_de.tar.gz
+    hdfs dfs -get hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/datasets/en-fr/onefile_databin /tmp/wmt14
 fi
 
-lightseq-train /tmp/wmt14_en_de/ \
+lightseq-train /tmp/wmt14/ \
     --task translation \
-    --arch ls_transformer_wmt_en_de_big_t2t --share-decoder-input-output-embed \
+    --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
-    --lr 5e-6 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
+    --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
     --max-tokens 8192 \
     --eval-bleu \
@@ -26,6 +25,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --maximize-best-checkpoint-metric \
     --fp16 \
     --use-torch-layer \
-    --enable-quant \
-    --quant-mode qat \
-    --finetune-from-model checkpoints/checkpoint_best.pt
+    --find-unused-parameters \
+    --keep-last-epochs 5 --save-interval-updates 6000
