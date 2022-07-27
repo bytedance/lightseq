@@ -1,13 +1,16 @@
 """
-Export Hugging Face quantized BERT models to hdf5 format.
+Export LightSeq quantized BERT models to hdf5 format.
 """
 import os
 import h5py
 from collections import OrderedDict
 
 import torch
-from lightseq.training.ops.pytorch.export import apply_rule
-from lightseq.training.ops.pytorch.export_quant import quantize
+from lightseq.training.ops.pytorch.export_quant import (
+    export_ls_quant_encoder,
+    fill_quant_hdf5_layer,
+    quantize,
+)
 from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -21,37 +24,6 @@ The sub-pattern of the path is separated by spaces, and the expression starts wi
 You can operate separately on each tensor and support multiple expressions. Multiple matching paths
 and the expression will finally be concatenated on axis = -1.
 """
-enc_layer_mapping_dict = OrderedDict(
-    {
-        # BERT is post_layernorm
-        "multihead_norm_scale": "self_attn_layer_norm weight",
-        "multihead_norm_bias": "self_attn_layer_norm bias",
-        "multihead_project_kernel_qkv": "self_attn qkv_proj weight&&expression_.transpose(0, 1)",
-        "multihead_project_bias_qkv": "self_attn qkv_proj bias",
-        "multihead_project_kernel_output": "self_attn out_proj weight&&expression_.transpose(0, 1)",
-        "multihead_project_bias_output": "self_attn out_proj bias",
-        "ffn_norm_scale": "final_layer_norm weight",
-        "ffn_norm_bias": "final_layer_norm bias",
-        "ffn_first_kernel": "fc1 weight&&expression_.transpose(0, 1)",
-        "ffn_first_bias": "fc1 bias",
-        "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
-        "ffn_second_bias": "fc2 bias",
-        # weight_clip_max
-        "multihead_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant _amax",
-        "multihead_project_kernel_output_clip_max": "self_attn out_proj weight_quant _amax",
-        "ffn_first_kernel_clip_max": "fc1 weight_quant _amax",
-        "ffn_second_kernel_clip_max": "fc2 weight_quant _amax",
-        # act_clip_max
-        "multihead_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
-        "multihead_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
-        "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
-        "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
-        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant _amax",
-        "multihead_output_dense_clip_max": "self_attn out_proj output_quant _amax",
-        "ffn_first_output_clip_max": "fc1 output_quant _amax",
-    }
-)
-
 src_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "embeddings LayerNorm weight",
@@ -59,22 +31,6 @@ src_emb_mapping_dict = OrderedDict(
         "position_embedding": "embeddings position_embeddings weight",
     }
 )
-
-
-def fill_quant_hdf5_layer(
-    tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict
-):
-    for proto_name, ckpt_rule in mapping_dict.items():
-        target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
-        if proto_name.endswith("_clip_max"):
-            hdf5_file.create_dataset(
-                hdf5_dataset_prefix + proto_name, data=float(target_tensor[0])
-            )
-        else:
-            hdf5_file.create_dataset(
-                hdf5_dataset_prefix + proto_name,
-                data=target_tensor,
-            )
 
 
 def extract_bert_weights(
@@ -85,38 +41,21 @@ def extract_bert_weights(
 ):
     # load var names
     state_dict = torch.load(model_dir, "cpu")
-
     var_name_list = list(state_dict.keys())
-
-    for name in var_name_list:
-        if name.endswith("weight_quant._amax"):
-            state_dict[name[:-12]] = torch.Tensor(
-                quantize(state_dict[name[:-12]].numpy(), 127, state_dict[name].numpy())
-            ).to(torch.uint8)
 
     # initialize output file
     print("Saving model to hdf5...")
     print("Writing to {0}".format(output_file))
     hdf5_file = h5py.File(output_file, "w")
 
-    # fill each encoder layer's params
-    enc_tensor_names = {}
+    wte = state_dict["bert.embeddings.word_embeddings.weight"]
+    emb_dim = wte.shape[1]
+    layer_nums = 0
     for name in var_name_list:
-        name_split = name.split(".")
-        if len(name_split) <= 3 or not name_split[3].isdigit():
-            continue
-        layer_id = int(name_split[3])
-        enc_tensor_names.setdefault(layer_id, []).append(name)
+        if name.endswith("para"):
+            layer_nums += 1
 
-    # fill encoder_stack
-    for layer_id in sorted(enc_tensor_names.keys()):
-        fill_quant_hdf5_layer(
-            enc_tensor_names[layer_id],
-            state_dict,
-            hdf5_file,
-            f"encoder_stack/{layer_id}/",
-            enc_layer_mapping_dict,
-        )
+    export_ls_quant_encoder(hdf5_file, state_dict, emb_dim, emb_dim * 4, False)
 
     # fill src_embedding - except for position embedding
     fill_quant_hdf5_layer(
@@ -125,6 +64,7 @@ def extract_bert_weights(
         hdf5_file,
         "src_embedding/",
         src_emb_mapping_dict,
+        layer_nums,
     )
 
     # handling token_embeddings for BERT
@@ -147,9 +87,7 @@ def extract_bert_weights(
     )
 
     # save number of layers metadata
-    hdf5_file.create_dataset(
-        "model_conf/n_encoder_stack", data=len(enc_tensor_names), dtype="i4"
-    )
+    hdf5_file.create_dataset("model_conf/n_encoder_stack", data=layer_nums, dtype="i4")
     # fill in model_conf
     hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
     hdf5_file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
@@ -161,7 +99,7 @@ def extract_bert_weights(
         hdf5_file["src_embedding/norm_scale"][()],
         hdf5_file["src_embedding/norm_bias"][()],
     )
-    for layer_id in sorted(enc_tensor_names.keys()):
+    for layer_id in range(layer_nums):
         new_tmp_scale = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()]
         new_tmp_bias = hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_bias"][()]
         hdf5_file[f"encoder_stack/{layer_id}/multihead_norm_scale"][()] = tmp_scale

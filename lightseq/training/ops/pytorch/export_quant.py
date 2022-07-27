@@ -102,6 +102,42 @@ def fill_quant_pb_layer(
             exec("layer.%s[:]=target_tensor.flatten().tolist()" % proto_name)
 
 
+def fill_quant_hdf5_layer(
+    tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict, nlayer=None
+):
+    for proto_name, ckpt_rule in mapping_dict.items():
+        target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
+        if proto_name.endswith("_clip_max"):
+            hdf5_file.create_dataset(
+                hdf5_dataset_prefix + proto_name, data=float(target_tensor[0])
+            )
+        elif "kernel" in proto_name:
+            weight_clip_max = 1
+            target_tensor = quantize(target_tensor, global_quant_range, weight_clip_max)
+            hdf5_file.create_dataset(
+                hdf5_dataset_prefix + proto_name,
+                data=target_tensor,
+                dtype="uint8",
+            )
+            if proto_name == "encode_output_project_kernel_kv":
+                assert nlayer is not None
+                clip_maxs = np.array([weight_clip_max] * int(nlayer))
+                hdf5_file.create_dataset(
+                    hdf5_dataset_prefix + proto_name + "_clip_max",
+                    data=clip_maxs,
+                )
+            else:
+                hdf5_file.create_dataset(
+                    hdf5_dataset_prefix + proto_name + "_clip_max",
+                    data=float(weight_clip_max),
+                )
+        else:
+            hdf5_file.create_dataset(
+                hdf5_dataset_prefix + proto_name,
+                data=target_tensor,
+            )
+
+
 def fill_ptq_encdec_weight(
     file,
     state_dict,
@@ -174,25 +210,49 @@ def fill_quant_encdec_weight(
     assert len(tensor_names) > 0
 
     for layer_id in sorted(tensor_names.keys()):
-        if is_encoder:
-            layer = file.encoder_stack.add()
+        if save_pb:
+            if is_encoder:
+                layer = file.encoder_stack.add()
+            else:
+                layer = file.decoder_stack.add()
+            fill_quant_pb_layer(
+                tensor_names[layer_id],
+                state_dict,
+                layer,
+                mapping_dict,
+            )
         else:
-            layer = file.decoder_stack.add()
-        fill_quant_pb_layer(
-            tensor_names[layer_id],
-            state_dict,
-            layer,
-            mapping_dict,
-        )
+            if is_encoder:
+                dataset_prefix = f"encoder_stack/{layer_id}/"
+            else:
+                dataset_prefix = f"decoder_stack/{layer_id}/"
+            fill_quant_hdf5_layer(
+                tensor_names[layer_id],
+                state_dict,
+                file,
+                dataset_prefix,
+                mapping_dict,
+                nlayer,
+            )
 
     if not is_encoder:
-        fill_quant_pb_layer(
-            tensor_names[0],
-            state_dict,
-            file.trg_embedding,
-            enc_out_mapping_dict,
-            nlayer,
-        )
+        if save_pb:
+            fill_quant_pb_layer(
+                tensor_names[0],
+                state_dict,
+                file.trg_embedding,
+                enc_out_mapping_dict,
+                nlayer,
+            )
+        else:
+            fill_quant_hdf5_layer(
+                tensor_names[0],
+                state_dict,
+                file,
+                "trg_embedding/",
+                enc_out_mapping_dict,
+                nlayer,
+            )
 
 
 def export_ls_embedding_ptq(
