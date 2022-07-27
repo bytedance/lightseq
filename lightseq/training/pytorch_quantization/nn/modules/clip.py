@@ -58,7 +58,7 @@ class Clip(nn.Module):
                 torch.tensor(clip_value_max)
             )  # pylint: disable=not-callable
         else:
-            self.clip_value_max = clip_value_max
+            self.register_buffer("clip_value_max", torch.tensor(clip_value_max))
 
         # if learn_min :
         #     if not isinstance(clip_value_min, float) and clip_value_min.size != 1:
