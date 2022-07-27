@@ -25,7 +25,7 @@ python3 -m torch.distributed.launch \
   --remove_unused_columns False \
   --do_train \
   --do_eval \
-  --learning_rate 2e-5 \
+  --learning_rate 2e-6 \
   --num_train_epochs 45 \
   --per_device_train_batch_size 8 \
   --per_device_eval_batch_size 8 \
