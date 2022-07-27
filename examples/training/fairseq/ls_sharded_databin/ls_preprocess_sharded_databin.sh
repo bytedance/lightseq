@@ -3,7 +3,7 @@ N_LINE=1000000
 trainpref=train
 validpref=valid
 testpref=test
-workers=60
+workers=70
 extra=''
 
 until [[ -z "$1" ]]
@@ -27,7 +27,7 @@ do
         --destdir)
             shift; DESTDIR=$1;
             shift;;
-        --n-line-per-file)
+        --n-lines-per-file)
             shift; N_LINE=$1;
             shift;;
         --text-dir)
