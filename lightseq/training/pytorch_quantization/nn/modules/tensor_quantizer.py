@@ -103,13 +103,11 @@ class TensorQuantizer(nn.Module):
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
 
         # Clip module consumes a lot of memory, so only create it if learn_amax is True
-        if self._learn_amax:
-            init_amax = quant_desc.amax if quant_desc.amax is not None else 1.0
-            self.clip = Clip(-init_amax, init_amax, learn_min=True, learn_max=True)
-            # It makes more sense to enable clip stage (which learns amax) if learn_amax is true
-            self.enable_clip()
-        if if_clip:
-            self.enable_clip()
+        init_amax = quant_desc.amax if quant_desc.amax is not None else 1.0
+        self.clip = Clip(-init_amax, init_amax, learn_min=quant_desc.learn_amax, learn_max=quant_desc.learn_amax)
+        # It makes more sense to enable clip stage (which learns amax) if learn_amax is true
+        self.enable_clip()
+
 
         if quant_desc.calib_method == "histogram":
             self._calibrator = calib.HistogramCalibrator(
@@ -344,6 +342,7 @@ class TensorQuantizer(nn.Module):
             # ).detach()
             amax = self.clip.clip_value_max
         else:
+            inputs = self.clip(inputs)
             amax = self._get_amax(inputs)
 
         if self._fake_quant:
