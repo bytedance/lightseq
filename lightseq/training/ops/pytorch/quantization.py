@@ -46,10 +46,12 @@ class LSLinear(Function):
         # grad_output, scale = _tensor_quant(grad_output, grad_output_max, 8, False, True)
         # grad_output = (grad_output * scale).to(out_dtype)
         grad_output = LSLinear.quant_transform(grad_output)
-        weight = LSLinear.quant_transform(weight)
+        # weight = LSLinear.quant_transform(weight)
+        weight = weight.to(torch.float16)
         grad_input = F.linear(grad_output, weight.T)
         grad_input = LSLinear.quant_transform(grad_input)
-        inp = LSLinear.quant_transform(inp)
+        # inp = LSLinear.quant_transform(inp)
+        inp = inp.to(torch.float16)
 
         grad_weight = F.linear(
             grad_output.reshape(-1, out_size).T, inp.reshape(-1, in_size).T
