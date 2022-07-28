@@ -512,6 +512,7 @@ def export_ls_quant_encoder(
     hidden_size,
     intermediate_size,
     save_pb=True,
+    has_cache=False,
 ):
     hs, ims = hidden_size, intermediate_size
     offsets = LSTransformerEncoderLayer.gen_offset(hs, ims)
@@ -576,6 +577,10 @@ def export_ls_quant_encoder(
             ),
         }
     )
+    if has_cache:
+        mapping_dict[
+            "self_qkv_bias_out_clip_max"
+        ] = "para&&expression_[{0}:{1}][11]".format(offsets[12], offsets[13])
     fill_quant_encdec_weight(file, state_dict, mapping_dict, True, save_pb)
 
 
