@@ -412,13 +412,12 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                        _hidden_size * _intermediate_size, 4, _stream);
 
     _ff1.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
-                 _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
+                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream);
 
-    launch_dequantize<T>(_relu_inp_ptr, qout_ptr, _inter_cmax_ptr + 2,
-                         _batch_tokens * _intermediate_size, 2, _stream);
-
-    _ffn_activation_dropout.bias_act_dropout(
-        _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
+    _ffn_activation_dropout.fakequant_bias_act_dropout(
+        _ff2_inp_ptr, _ffn_activation_dropout.get_mask(),
+        _ffn_activation_dropout.get_mask(), _relu_inp_i8_ptr, _inter_b_ptr,
+        _inter_cmax_ptr + 2, _output_cmax_ptr, _batch_tokens,
         _intermediate_size, _activation_fn, _stream);
 
     i8_buffer_ptr = _shared_quant_mem_ptr;
@@ -432,15 +431,13 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                       ? inp_ptr + _batch_dim
                       : _shared_buffer_ptr + _intermediate_size * _hidden_size;
     T *fake_weight = _shared_buffer_ptr;
-    launch_fake_quantize<T>(_ffn_activation_dropout.get_mask(), nullptr,
-                            fake_inp, _ff2_inp_ptr, _output_cmax_ptr,
-                            _intermediate_size * _batch_tokens, 2, _stream,
-                            false);
+
     launch_fake_quantize<T>(_ffn_dropout.get_mask(), nullptr, fake_weight,
                             _output_w_ptr, _output_cmax_ptr + 1,
                             _intermediate_size * _hidden_size, 4, _stream);
 
-    _ff2.Forward(_batch_tokens, fake_inp, fake_weight, out_ptr, _cublasHandle);
+    _ff2.Forward(_batch_tokens, _ff2_inp_ptr, fake_weight, out_ptr,
+                 _cublasHandle);
 
     _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                        _batch_tokens, _hidden_size, _stream);
@@ -793,7 +790,7 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
 
     _ffn_activation_dropout.d_quant_bias_act_dropout(
         grad_ff1_out_ptr, _grad_inter_b_ptr, _grad_inter_cmax_ptr + 2,
-        _grad_output_cmax_ptr, _relu_inp_ptr,
+        _grad_output_cmax_ptr, _relu_inp_i8_ptr,
         _ffn_activation_dropout.get_mask(), _inter_cmax_ptr + 2,
         _ffn_activation_dropout.get_mask(), _inter_b_ptr, _batch_tokens,
         _intermediate_size, _activation_fn, _stream);

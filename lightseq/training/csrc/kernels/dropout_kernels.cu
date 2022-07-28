@@ -1055,6 +1055,229 @@ void launch_ls_quant_dropout_act_bias<ActivationType::kRelu, __half>(
 }
 
 /**
+ * @brief fused bias, activation, and dropout at the end of first ffn
+ *
+ * @thread
+ * gridDim.x = hidden_size / 8
+ * blockDim.x = 8
+ * blockDim.y = 1024 / 8 = 128
+ *
+ * @tparam act_type activation function, like kRelu, kGelu
+ * @param total_count total elements
+ * @param ratio drop ratio
+ * @param out [batch_size, seq_len, hidden_size], float and __half
+ * @param in [batch_size, seq_len, hidden_size], float and __half
+ * @param mask [batch_size, seq_len, hidden_size], uint8 type
+ * @param bias [hidden_size], ffn bias
+ * @param seed seed to curand
+ * @param hidden_size
+ * @return void
+ */
+template <ActivationType act_type>
+__global__ void ls_fakequant_dropout_act_bias_kernel(
+    const int total_count, const float ratio, float *qout, uint8_t *cmask_out,
+    uint8_t *cmask_in, uint8_t *dropout_mask, const int8_t *qin,
+    const float *bias, const float *cmax_out, const float *cmax_in,
+    const int seed, const int hidden_size) {
+  const float scale = 1.f / (1.f - ratio);
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 4 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+  uint8_t m[4];
+
+  float output_clip_max = cmax_out[0];
+  float input_clip_max = cmax_in[0];
+
+  float4 *out4 = reinterpret_cast<float4 *>(qout);
+  const int32_t *qin4 = reinterpret_cast<const int32_t *>(qin);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint32_t *dropout_mask4 = reinterpret_cast<uint32_t *>(dropout_mask);
+  uint32_t *in_cmask4 = reinterpret_cast<uint32_t *>(cmask_in);
+  float4 rand = curand_uniform4(&state);
+
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+
+  int bias_i = i % (hidden_size >> 2);
+  uint32_t *m4 = reinterpret_cast<uint32_t *>(m);
+  dropout_mask4[i] |= m4[0];
+  int32_t qinput4 = qin4[i];
+  int8_t *qinput = reinterpret_cast<int8_t *>(&qinput4);
+  const float4 b4 = __ldg(&bias4[bias_i]);
+  uint8_t in_cmask[4];
+  float4 out;
+
+  out.x = fake_quantize(activation_kernel<act_type, float>(
+                            dequantize(qinput[0], output_clip_max) + b4.x) *
+                            scale * m[0],
+                        input_clip_max, in_cmask[0], 2);
+  out.y = fake_quantize(activation_kernel<act_type, float>(
+                            dequantize(qinput[1], output_clip_max) + b4.y) *
+                            scale * m[1],
+                        input_clip_max, in_cmask[1], 2);
+  out.z = fake_quantize(activation_kernel<act_type, float>(
+                            dequantize(qinput[2], output_clip_max) + b4.z) *
+                            scale * m[2],
+                        input_clip_max, in_cmask[2], 2);
+  out.w = fake_quantize(activation_kernel<act_type, float>(
+                            dequantize(qinput[3], output_clip_max) + b4.w) *
+                            scale * m[3],
+                        input_clip_max, in_cmask[3], 2);
+
+  in_cmask4[i] |= reinterpret_cast<uint32_t *>(in_cmask)[0];
+  out4[i] = out;
+}
+
+template <ActivationType act_type>
+__global__ void ls_fakequant_dropout_act_bias_kernel(
+    const int total_count, const float ratio, __half *qout, uint8_t *cmask_out,
+    uint8_t *cmask_in, uint8_t *dropout_mask, const int8_t *qin,
+    const __half *bias, const __half *cmax_out, const __half *cmax_in,
+    const int seed, const int hidden_size) {
+  const float scale = 1.f / (1.f - ratio);
+
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (i * 8 >= total_count) return;
+
+  curandStatePhilox4_32_10_t state;
+  curand_init(seed, i, 0, &state);
+
+  const int64_t *qin8 = reinterpret_cast<const int64_t *>(qin);
+  float4 *qout8 = reinterpret_cast<float4 *>(qout);
+  const float4 *bias4 = reinterpret_cast<const float4 *>(bias);
+  uint64_t *dropout_mask8 = reinterpret_cast<uint64_t *>(dropout_mask);
+  uint64_t *in_cmask8 = reinterpret_cast<uint64_t *>(cmask_in);
+
+  float output_clip_max = __half2float(cmax_out[0]);
+  float input_clip_max = __half2float(cmax_in[0]);
+
+  uint8_t m[8];
+  float4 rand = curand_uniform4(&state);
+  m[0] = (uint8_t)(rand.x > ratio);
+  m[1] = (uint8_t)(rand.y > ratio);
+  m[2] = (uint8_t)(rand.z > ratio);
+  m[3] = (uint8_t)(rand.w > ratio);
+  rand = curand_uniform4(&state);
+  m[4] = (uint8_t)(rand.x > ratio);
+  m[5] = (uint8_t)(rand.y > ratio);
+  m[6] = (uint8_t)(rand.z > ratio);
+  m[7] = (uint8_t)(rand.w > ratio);
+  uint64_t *m8 = reinterpret_cast<uint64_t *>(m);
+  dropout_mask8[i] |= m8[0];
+
+  int bias_i = i % (hidden_size >> 3);
+  int64_t qinput8 = qin8[i];
+  const float4 b4 = __ldg(&bias4[bias_i]);
+
+  int8_t *qinput = reinterpret_cast<int8_t *>(&qinput8);
+  float4 out8;
+  __half2 *out = reinterpret_cast<__half2 *>(&out8);
+  const __half2 *b_half2 = reinterpret_cast<const __half2 *>(&b4);
+
+  __half2 scale_mask[4];
+
+  scale_mask[0] = __floats2half2_rn(scale * m[0], scale * m[1]);
+  scale_mask[1] = __floats2half2_rn(scale * m[2], scale * m[3]);
+  scale_mask[2] = __floats2half2_rn(scale * m[4], scale * m[5]);
+  scale_mask[3] = __floats2half2_rn(scale * m[6], scale * m[7]);
+
+  uint8_t in_cmask[8];
+
+  __half2 temp;
+#pragma unroll
+  for (int j = 0; j < 4; j++) {
+    temp.x = __float2half(dequantize(qinput[j * 2], output_clip_max));
+    temp.y = __float2half(dequantize(qinput[j * 2 + 1], output_clip_max));
+
+    temp =
+        __hmul2(activation_kernel<act_type, __half2>(__hadd2(temp, b_half2[j])),
+                scale_mask[j]);
+
+    out[j].x = __float2half(fake_quantize(__half2float(temp.x), input_clip_max,
+                                          in_cmask[j * 2], 2));
+    out[j].y = __float2half(fake_quantize(__half2float(temp.y), input_clip_max,
+                                          in_cmask[j * 2 + 1], 2));
+  }
+
+  in_cmask8[i] |= reinterpret_cast<uint64_t *>(in_cmask)[0];
+  qout8[i] = out8;
+}
+
+template <>
+void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, float>(
+    float *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
+    const int8_t *qinput, const float *bias, const float *cmax_out,
+    const float *cmax_in, int total_count, int dim, float ratio,
+    cudaStream_t stream) {
+  int grid_dim = total_count >> 10;
+  ls_fakequant_dropout_act_bias_kernel<ActivationType::kGelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, cmask_out, cmask_in, dropout_mask, qinput,
+          bias, cmax_out, cmax_in,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim);
+}
+
+template <>
+void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, __half>(
+    __half *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
+    const int8_t *qinput, const __half *bias, const __half *cmax_out,
+    const __half *cmax_in, int total_count, int dim, float ratio,
+    cudaStream_t stream) {
+  int grid_dim = total_count >> 11;
+  ls_fakequant_dropout_act_bias_kernel<ActivationType::kGelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, cmask_out, cmask_in, dropout_mask, qinput,
+          bias, cmax_out, cmax_in,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim);
+}
+
+template <>
+void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, float>(
+    float *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
+    const int8_t *qinput, const float *bias, const float *cmax_out,
+    const float *cmax_in, int total_count, int dim, float ratio,
+    cudaStream_t stream) {
+  int grid_dim = total_count >> 10;
+  ls_fakequant_dropout_act_bias_kernel<ActivationType::kRelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, cmask_out, cmask_in, dropout_mask, qinput,
+          bias, cmax_out, cmax_in,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim);
+}
+
+template <>
+void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, __half>(
+    __half *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
+    const int8_t *qinput, const __half *bias, const __half *cmax_out,
+    const __half *cmax_in, int total_count, int dim, float ratio,
+    cudaStream_t stream) {
+  int grid_dim = total_count >> 11;
+  ls_fakequant_dropout_act_bias_kernel<ActivationType::kRelu>
+      <<<grid_dim + 1, 256, 0, stream>>>(
+          total_count, ratio, out, cmask_out, cmask_in, dropout_mask, qinput,
+          bias, cmax_out, cmax_in,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count(),
+          dim);
+}
+
+/**
  * @brief fused bias, activation, and dropout backward
  *
  * @thread
@@ -1291,8 +1514,9 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     block_cmax_in_grad = 0;
     block_cmax_out_grad = 0;
   }
-  __syncthreads();
 
+  tile[threadIdx.x][threadIdx.y] = thread_grad_bias;
+  __syncthreads();
   if (thread_cmax_out_grad != 0) {
     atomicAdd(&block_cmax_out_grad, thread_cmax_out_grad);
   }
@@ -1300,9 +1524,9 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     atomicAdd(&block_cmax_in_grad, thread_cmax_in_grad);
   }
 
-  tile[threadIdx.x][threadIdx.y] = thread_grad_bias;
-  __syncthreads();
   float sum = tile[threadIdx.y][threadIdx.x];
+
+  __syncthreads();
 
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     if (block_cmax_in_grad != 0) {
@@ -1312,9 +1536,6 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
       atomicAdd(&cmax_out_grad[0], block_cmax_out_grad);
     }
   }
-
-  __syncthreads();
-
   for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
 
   if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;

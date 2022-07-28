@@ -107,6 +107,28 @@ class Dropout {
     }
   }
 
+  // dropout inside ffn with quantization support.
+  void fakequant_bias_act_dropout(T *output, uint8_t *clip_mask_out,
+                                  uint8_t *clip_mask_in, const int8_t *qinput,
+                                  const T *bias, const T *clip_max_out,
+                                  const T *clip_max_in, int rows, int cols,
+                                  std::string activation_fn,
+                                  cudaStream_t stream) {
+    if (activation_fn == "relu") {
+      launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, T>(
+          output, clip_mask_out, clip_mask_in, _mask, qinput, bias,
+          clip_max_out, clip_max_in, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else if (activation_fn == "gelu") {
+      launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, T>(
+          output, clip_mask_out, clip_mask_in, _mask, qinput, bias,
+          clip_max_out, clip_max_in, rows * cols, cols, _config.RATIO(),
+          stream);
+    } else {
+      throw std::runtime_error("not supported activation: " + activation_fn);
+    }
+  }
+
   void d_quant_bias_act_dropout(T *d_inp_out, T *d_bias_out, T *d_cmax_in,
                                 T *d_cmax_out, const int8_t *qinput,
                                 const uint8_t *cmask_in, const T *cmax_in,
