@@ -8,12 +8,12 @@ import numpy as np
 import torch
 from transformers import BertTokenizer
 
-from proto.transformer_pb2 import Transformer
+from proto.quant_transformer_pb2 import QuantTransformer
 from lightseq.training import (
     export_ls_config,
-    export_ls_embedding,
-    export_ls_encoder,
-    export_ls_decoder,
+    export_ls_quant_embedding,
+    export_ls_quant_encoder,
+    export_ls_quant_decoder,
     LSTransformer,
 )
 import lightseq.inference as lsi
@@ -35,38 +35,46 @@ def export_other_weights(ls_infer_model, state_dict):
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
+    output_ln_clip_max = state_dict[
+        "decoder.output_projection.input_quant.clip.clip_value_max"
+    ]
+    logits_clip_max = state_dict["decoder.output_projection.output_quant._amax"]
+
     emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
     emb_dim = state_dict["encoder.layer_norm.weight"].size(0)
     assert emb_size % emb_dim == 0
     dec_shared_b = torch.zeros(emb_size // emb_dim).flatten().tolist()
+    
     ls_infer_model.src_embedding.norm_scale[:] = enc_norm_w
     ls_infer_model.src_embedding.norm_bias[:] = enc_norm_b
     ls_infer_model.trg_embedding.norm_scale[:] = dec_norm_w
     ls_infer_model.trg_embedding.norm_bias[:] = dec_norm_b
     ls_infer_model.trg_embedding.shared_bias[:] = dec_shared_b
+    ls_infer_model.trg_embedding.output_ln_clip_max = output_ln_clip_max
+    ls_infer_model.trg_embedding.logits_clip_max = logits_clip_max
 
 
 def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
     encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
-    ls_infer_model = Transformer()
+    ls_infer_model = QuantTransformer()
 
-    export_ls_embedding(
+    export_ls_quant_embedding(
         ls_infer_model, encoder_state_dict, config.max_seq_len, config.hidden_size, True
     )
-    export_ls_embedding(
+    export_ls_quant_embedding(
         ls_infer_model,
         decoder_state_dict,
         config.max_seq_len,
         config.hidden_size,
         False,
     )
-    export_ls_encoder(
+    export_ls_quant_encoder(
         ls_infer_model,
         encoder_state_dict,
         config.hidden_size,
         config.intermediate_size,
     )
-    export_ls_decoder(
+    export_ls_quant_decoder(
         ls_infer_model,
         decoder_state_dict,
         config.hidden_size,
@@ -214,7 +222,7 @@ if __name__ == "__main__":
     config = create_config(vocab_size)
 
     export_pb(state_dict, pb_path, pad_id, start_id, end_id, config)
-    ls_infer_model = lsi.Transformer(pb_path, 8)
+    ls_infer_model = lsi.QuantTransformer(pb_path, 8)
 
     src_tokens_np = np.array(src_tokens.cpu())
 

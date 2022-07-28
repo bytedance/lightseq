@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 
 from transformers import BertTokenizer
@@ -5,8 +7,6 @@ from lightseq.training import LSTransformer, LSCrossEntropyLayer, LSAdam
 from lightseq.training.ops.pytorch.quantization import (
     disable_quant,
     enable_quant,
-    ptq_mode,
-    qat_mode,
 )
 
 
@@ -63,7 +63,7 @@ def create_data():
     )
 
 
-def create_model(vocab_size):
+def create_model(vocab_size, args):
     transformer_config = LSTransformer.get_config(
         model="transformer-base",
         max_batch_tokens=2048,
@@ -76,7 +76,10 @@ def create_model(vocab_size):
         local_rank=0,
     )
     model = LSTransformer(transformer_config)
-    # model.apply(enable_quant)
+    if args.enable_quant:
+        model.apply(enable_quant)
+    else:
+        model.apply(disable_quant)
     model.to(dtype=torch.half, device=torch.device("cuda:0"))
     return model
 
@@ -95,6 +98,9 @@ def create_criterion():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--enable_quant", action="store_true")
+    args = parser.parse_args()
     (
         tokenizer,
         src_text,
@@ -108,7 +114,7 @@ if __name__ == "__main__":
         src_seq_len,
         trg_seq_len,
     ) = create_data()
-    model = create_model(vocab_size)
+    model = create_model(vocab_size, args)
     loss_fn = create_criterion()
     opt = LSAdam(model.parameters(), lr=1e-5)
 

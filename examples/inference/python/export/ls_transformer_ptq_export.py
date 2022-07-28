@@ -39,11 +39,10 @@ def export_other_weights(ls_infer_model, state_dict):
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    dec_shared_b = (
-        torch.zeros(state_dict["decoder.embed_tokens.embeddings"].size(0))
-        .flatten()
-        .tolist()
-    )
+    emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
+    emb_dim = state_dict["encoder.layer_norm.weight"].size(0)
+    assert emb_size % emb_dim == 0
+    dec_shared_b = torch.zeros(emb_size // emb_dim).flatten().tolist()
     ls_infer_model.src_embedding.norm_scale[:] = enc_norm_w
     ls_infer_model.src_embedding.norm_bias[:] = enc_norm_b
     ls_infer_model.trg_embedding.norm_scale[:] = dec_norm_w

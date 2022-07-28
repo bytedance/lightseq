@@ -9,6 +9,7 @@ from lightseq.training import (
     LSTransformerDecoderLayer,
 )
 from lightseq.training.ops.pytorch.util import MODEL_ARCH
+from lightseq.training.ops.pytorch.quantization import QuantLinear
 
 
 class LSTransformer(nn.Module):
@@ -152,7 +153,7 @@ class LSTransformerDecoder(nn.Module):
 
         self.layer_norm = nn.LayerNorm(embed_dim)
 
-        self.output_projection = nn.Linear(
+        self.output_projection = QuantLinear(
             self.embed_tokens.config.embedding_dim,
             self.embed_tokens.config.vocab_size,
             bias=False,
@@ -207,5 +208,6 @@ class LSTransformerDecoder(nn.Module):
             self.embed_tokens.config.vocab_size,
             self.embed_tokens.config.embedding_dim,
         )
+        self.output_projection.weight_quant._amax = self.embed_tokens.embeddings[-1]
         x = self.output_projection(x)
         return x
