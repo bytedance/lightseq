@@ -34,7 +34,9 @@ __global__ void quantize_kernel<float>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
   q_weight[3] = quantize(weight4.w, clip_max_val, clip_mask[3], mask_start_bit);
 
   q_weight4_ptr[i] = reinterpret_cast<int32_t *>(q_weight)[0];
-  clip_mask4_ptr[i] |= reinterpret_cast<uint32_t *>(clip_mask)[0];
+  if (clip_mask_ptr) {
+    clip_mask4_ptr[i] |= reinterpret_cast<uint32_t *>(clip_mask)[0];
+  }
 
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
     float input_cmax = clip_max_val;
@@ -72,8 +74,9 @@ __global__ void quantize_kernel<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
   }
 
   q_weight8_ptr[i] = reinterpret_cast<int64_t *>(q_weight)[0];
-  clip_mask8_ptr[i] |= reinterpret_cast<uint64_t *>(clip_mask)[0];
-
+  if (clip_mask_ptr) {
+    clip_mask8_ptr[i] |= reinterpret_cast<uint64_t *>(clip_mask)[0];
+  }
   if (blockIdx.x == 0 && threadIdx.x == 0 && alpha_ptr) {
     float input_cmax = clip_max_val;
     float weight_cmax = __half2float(clip_max_ptr[1]);
@@ -91,7 +94,7 @@ void launch_quantize<float>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
     throw std::runtime_error("violate numel % 4 = 0");
   }
   int ele_per_block = MAX_THREADS * 4;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       q_ptr, clip_mask_ptr, alpha_ptr, f_ptr, clip_max_ptr, numel,
       mask_start_bit);
@@ -106,7 +109,7 @@ void launch_quantize<__half>(int8_t *q_ptr, uint8_t *clip_mask_ptr,
     throw std::runtime_error("violate numel % 8 = 0");
   }
   int ele_per_block = MAX_THREADS * 8;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       q_ptr, clip_mask_ptr, alpha_ptr, f_ptr, clip_max_ptr, numel,
       mask_start_bit);
@@ -125,7 +128,7 @@ __global__ void fake_quantize_kernel<float>(
 
   if (i * 4 >= numel) return;
 
-  float clip_max_val = clip_max_ptr[1];
+  float clip_max_val = clip_max_ptr[0];
 
   const float4 *input4_ptr = reinterpret_cast<const float4 *>(input);
   float4 *output4_ptr = reinterpret_cast<float4 *>(output);
@@ -214,7 +217,7 @@ void launch_fake_quantize<float>(uint8_t *clip_mask_ptr, float *alpha_ptr,
     throw std::runtime_error("violate numel % 4 = 0");
   }
   int ele_per_block = MAX_THREADS * 4;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
       mask_start_bit, symmetry);
@@ -230,7 +233,7 @@ void launch_fake_quantize<__half>(uint8_t *clip_mask_ptr, float *alpha_ptr,
     throw std::runtime_error("violate numel % 8 = 0");
   }
   int ele_per_block = MAX_THREADS * 8;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   fake_quantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       clip_mask_ptr, alpha_ptr, output, input, clip_max_ptr, numel,
       mask_start_bit, symmetry);
@@ -293,7 +296,7 @@ void launch_dequantize<float>(float *f_ptr, const int8_t *q_ptr,
     throw std::runtime_error("violate numel % 4 = 0");
   }
   int ele_per_block = MAX_THREADS * 4;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   dequantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       f_ptr, q_ptr, clip_max_ptr, numel, mask_start_bit);
 }
@@ -306,7 +309,7 @@ void launch_dequantize<__half>(__half *f_ptr, const int8_t *q_ptr,
     throw std::runtime_error("violate numel % 8 = 0");
   }
   int ele_per_block = MAX_THREADS * 8;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   dequantize_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       f_ptr, q_ptr, clip_max_ptr, numel, mask_start_bit);
 }
@@ -414,7 +417,7 @@ void launch_quantize_bwd<float>(float *grad_ptr, float *cmax_grad_ptr,
     throw std::runtime_error("violate numel % 4 = 0");
   }
   int ele_per_block = MAX_THREADS * 4;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   quantize_bwd_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       grad_ptr, cmax_grad_ptr, clip_mask_ptr, numel, mask_start_bit);
 }
@@ -427,7 +430,7 @@ void launch_quantize_bwd<__half>(__half *grad_ptr, __half *cmax_grad_ptr,
     throw std::runtime_error("violate numel % 8 = 0");
   }
   int ele_per_block = MAX_THREADS * 8;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   quantize_bwd_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       grad_ptr, cmax_grad_ptr, clip_mask_ptr, numel, mask_start_bit);
 }
@@ -530,7 +533,7 @@ void launch_d_cmax<float>(float *grad_ptr, float *grad_cmax_ptr,
     cudaMemsetAsync(grad_cmax_ptr, 0, sizeof(float), stream);
   }
   int ele_per_block = MAX_THREADS * 4;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       grad_ptr, grad_cmax_ptr, clip_mask_ptr, numel, mask_start_bit);
 }
@@ -547,7 +550,7 @@ void launch_d_cmax<__half>(__half *grad_ptr, __half *grad_cmax_ptr,
     cudaMemsetAsync(grad_cmax_ptr, 0, sizeof(__half), stream);
   }
   int ele_per_block = MAX_THREADS * 8;
-  int grid_dim = numel / ele_per_block;
+  int grid_dim = numel / ele_per_block + 1;
   d_cmax_kernel<<<grid_dim + 1, MAX_THREADS, 0, stream>>>(
       grad_ptr, grad_cmax_ptr, clip_mask_ptr, numel, mask_start_bit);
 }

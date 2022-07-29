@@ -4,9 +4,12 @@
 
 #include "context.h"
 #include "cross_entropy_layer.h"
+#include "quant_linear_layer.h"
 #include "transformer_decoder_layer.h"
 #include "transformer_embedding_layer.h"
 #include "transformer_encoder_layer.h"
+
+using namespace torch::indexing;
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
@@ -19,6 +22,7 @@
 static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
+static std::unordered_map<int, std::shared_ptr<void>> s_quant_linear_layers;
 
 template <typename T>
 int create_transformer_encoder_layer(
@@ -412,6 +416,64 @@ std::vector<torch::Tensor> cross_entropy_layer_bw(
   return {grad_inputs};
 }
 
+template <typename T>
+int create_quant_linear_layer(const int layer_id, const int in_features,
+                              const int out_features,
+                              const int max_batch_tokens) {
+  auto layer = std::make_shared<QuantLinearLayer<T>>(
+      layer_id, in_features, out_features, max_batch_tokens);
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  Context::Instance().set_stream(stream);
+  s_quant_linear_layers[layer_id] = layer;
+
+  std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
+
+  std::cout << "QuantLinearLayer is created with date type [" << dtype << "]."
+            << std::endl;
+
+  return 0;
+}
+
+template <typename T>
+torch::Tensor quant_linear_layer_fw(const int layer_id,
+                                    const torch::Tensor &inputs,
+                                    const torch::Tensor &weight,
+                                    const torch::Tensor &clip_max,
+                                    bool quant_mode) {
+  CHECK_INPUT(inputs);
+  CHECK_INPUT(weight);
+
+  const T *inputs_ptr = static_cast<const T *>(inputs.data_ptr());
+  const T *weight_ptr = static_cast<const T *>(weight.data_ptr());
+  const T *clip_max_ptr = static_cast<const T *>(clip_max.data_ptr());
+  auto dtype =
+      (std::is_same<T, __half>::value) ? torch::kFloat16 : torch::kFloat32;
+
+  int batch_size = inputs.size(0);
+  int seq_len = inputs.size(1);
+  int in_features = inputs.size(2);
+  int out_features = weight.size(0);
+  int tweaked_out_features = static_cast<int>((out_features + 7) / 8) * 8;
+
+  std::shared_ptr<QuantLinearLayer<T>> layer =
+      std::static_pointer_cast<QuantLinearLayer<T>>(
+          s_quant_linear_layers[layer_id]);
+
+  auto options = torch::TensorOptions()
+                     .dtype(dtype)
+                     .layout(torch::kStrided)
+                     .device(torch::kCUDA, inputs.device().index());
+  auto outputs =
+      torch::empty({batch_size, seq_len, tweaked_out_features}, options);
+  T *outputs_ptr = static_cast<T *>(outputs.data_ptr());
+
+  layer->set_cur_batch_shape(batch_size, seq_len);
+  layer->SetQuantMode(quant_mode);
+  layer->Forward(inputs_ptr, weight_ptr, clip_max_ptr, outputs_ptr);
+
+  return outputs.index({Slice(), Slice(), Slice(None, out_features)});
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_fw_fp32",
         &transformer_encoder_layer_fw<float>,
@@ -479,6 +541,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "LightSeq Cross Entropy backward with fp32 (CUDA)");
   m.def("cross_entropy_layer_bw_fp16", &cross_entropy_layer_bw<__half>,
         "LightSeq Cross Entropy backward with fp16 (CUDA)");
+  m.def("create_quant_linear_layer_fp32", &create_quant_linear_layer<float>,
+        "Create LightSeq Cross Entropy Layer with fp32 (CUDA)");
+  m.def("create_quant_linear_layer_fp16", &create_quant_linear_layer<__half>,
+        "Create LightSeq Cross Entropy Layer with fp16 (CUDA)");
+  m.def("quant_linear_layer_fw_fp32", &quant_linear_layer_fw<float>,
+        "LightSeq Cross Entropy forward with fp32 (CUDA)");
+  m.def("quant_linear_layer_fw_fp16", &quant_linear_layer_fw<__half>,
+        "LightSeq Cross Entropy forward with fp16 (CUDA)");
   m.def("assign_layer_weight_grad_fp32", &assign_layer_weight_grad<float>,
         "Bind layer weights and grads");
   m.def("assign_layer_weight_grad_fp16", &assign_layer_weight_grad<__half>,

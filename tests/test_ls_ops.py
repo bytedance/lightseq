@@ -26,6 +26,7 @@ from lightseq.training.ops.pytorch.transformer_embedding_layer import (
     LSTransformerEmbeddingLayer,
 )
 from lightseq.training.ops.pytorch.cross_entropy_layer import LSCrossEntropyLayer
+from lightseq.training.ops.pytorch.quant_linear_layer import LSQuantLinearLayer
 from lightseq.training.cli.fs_modules.ls_fs_transformer_decoder_layer import (
     LSFSTransformerDecoderLayer,
 )
@@ -258,6 +259,32 @@ custom_cross_entropy_layer_fp32 = generate_cross_entropy_layer(ce_config_fp32)
 custom_cross_entropy_layer_fp16 = generate_cross_entropy_layer(ce_config_fp16)
 custom_cross_entropy_layer_fp32.train()
 custom_cross_entropy_layer_fp16.train()
+
+###################### quant linear layer ######################
+
+ql_config_fp16 = LSQuantLinearLayer.get_config(
+    max_batch_tokens=9216,
+    in_features=1024,
+    out_features=40480,
+    bias=True,
+    fp16=True,
+    local_rank=0,
+)
+ql_config_fp32 = deepcopy(ql_config_fp16)
+ql_config_fp32.fp16 = False
+
+
+def generate_quant_linear_layer(config):
+    dtype = torch.float16 if config.fp16 else torch.float32
+    custom_layer = LSQuantLinearLayer(config)
+    custom_layer.to(torch.device("cuda:0"), dtype=dtype)
+    return custom_layer
+
+
+custom_quant_linear_layer_fp32 = generate_quant_linear_layer(ql_config_fp32)
+custom_quant_linear_layer_fp16 = generate_quant_linear_layer(ql_config_fp16)
+custom_quant_linear_layer_fp32.train()
+custom_quant_linear_layer_fp16.train()
 
 
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
@@ -1507,6 +1534,96 @@ def test_cross_entropy_layer_backward():
     return custom, baseline
 
 
+@kt.case(dtypes=[torch.half], ntest=10)
+def test_quant_linear_layer_forward():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_size = ql_config_fp16.in_features
+    print(
+        f"(batch_size, seq_len, hidden_size): ({batch_size}, {seq_len}, {hidden_size})"
+    )
+
+    inputs = kt.rand((batch_size, seq_len, hidden_size))
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_quant_linear_layer_fp32
+    else:
+        custom_layer = custom_quant_linear_layer_fp16
+
+    weight = custom_layer.weight
+    bias = custom_layer.bias
+    cmax = custom_layer.clip_max
+    print(bias)
+
+    def custom():
+        res = custom_layer(inputs)
+        return [
+            res.contiguous().detach(),
+            # bias.contiguous().detach(),
+        ]
+
+    def baseline():
+        x = kt.dequantize(kt.quantize(inputs, cmax[0])[0], cmax[0])
+        fweight = kt.dequantize(kt.quantize(weight, cmax[1])[0], cmax[1])
+        out = torch.nn.functional.linear(x, fweight)
+
+        out = kt.dequantize(kt.quantize(out, cmax[2])[0], cmax[2])
+        if bias is not None:
+            out = out + bias
+
+        return [
+            out.contiguous().detach(),
+            # bias.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case(dtypes=[torch.half], ntest=10)
+def test_quant_linear_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_size = ql_config_fp16.in_features
+    print(
+        f"(batch_size, seq_len, hidden_size): ({batch_size}, {seq_len}, {hidden_size})"
+    )
+    base_inputs = kt.rand((batch_size, seq_len, hidden_size)).requires_grad_()
+    cus_inputs = base_inputs.clone().detach().requires_grad_()
+
+    if kt.dtype == torch.float:
+        custom_layer = custom_quant_linear_layer_fp32
+    else:
+        custom_layer = custom_quant_linear_layer_fp16
+
+    weight = custom_layer.weight
+    bias = custom_layer.bias
+    cmax = custom_layer.clip_max
+
+    cus_res = custom_layer(cus_inputs)
+    base_res = torch.nn.functional.linear(base_inputs, weight.T)
+    if bias is not None:
+        base_res = base_res + bias
+
+    cus_res = cus_res.sum()
+    base_res = base_res.sum()
+
+    def custom():
+        if cus_inputs.grad is not None:
+            cus_inputs.grad.zero_()
+        cus_res.backward(retain_graph=True)
+        return [
+            cus_inputs.grad.contiguous().detach(),
+        ]
+
+    def baseline():
+        if base_inputs.grad is not None:
+            base_inputs.grad.zero_()
+        base_res.backward(retain_graph=True)
+        return [
+            base_inputs.grad.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
@@ -1526,9 +1643,11 @@ if __name__ == "__main__":
             # "test_quant_embedding_layer_backward",
             # "test_quant_encoder_layer_forward",
             # "test_quant_encoder_layer_backward",
-            "test_quant_decoder_layer_forward",
-            "test_quant_decoder_layer_backward",
+            # "test_quant_decoder_layer_forward",
+            # "test_quant_decoder_layer_backward",
             # "test_quant_bert_encoder_layer_forward",
             # "test_quant_bert_encoder_layer_backward",
+            # "test_quant_linear_layer_forward",
+            # "test_quant_linear_layer_backward",
         ]
     )
