@@ -9,8 +9,8 @@ import h5py
 import numpy as np
 from operator import attrgetter
 from lightseq.training.ops.pytorch.export import gather_token_embedding, fill_pb_layer
-from export.proto.t5_pb2 import T5 as Transformer
-from transformers import T5ForConditionalGeneration
+from export.proto.mt5_pb2 import MT5 as Transformer
+from transformers import MT5ForConditionalGeneration
 from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -29,8 +29,9 @@ enc_layer_mapping_dict = OrderedDict(
         "multihead_project_kernel_qkv": "SelfAttention q weight&&SelfAttention k weight&&SelfAttention v weight&&expression_.transpose(0, 1)",
         "multihead_project_kernel_output": "SelfAttention o weight&&expression_.transpose(0, 1)",
         "ffn_norm_scale": "one layer_norm weight",
-        "ffn_first_kernel": "DenseReluDense wi weight&&expression_.transpose(0, 1)",
-        "ffn_second_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
+        "ffn_first_kernel": "DenseReluDense wi_0 weight&&expression_.transpose(0, 1)",
+        "ffn_second_kernel": "DenseReluDense wi_1 weight&&expression_.transpose(0, 1)",
+        "ffn_third_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
     }
 )
 
@@ -43,8 +44,9 @@ dec_layer_mapping_dict = OrderedDict(
         "encdec_project_kernel_q": "EncDecAttention q weight&&expression_.transpose(0, 1)",
         "encdec_project_kernel_output": "EncDecAttention o weight&&expression_.transpose(0, 1)",
         "ffn_norm_scale": "two layer_norm weight",
-        "ffn_first_kernel": "DenseReluDense wi weight&&expression_.transpose(0, 1)",
-        "ffn_second_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
+        "ffn_first_kernel": "DenseReluDense wi_0 weight&&expression_.transpose(0, 1)",
+        "ffn_second_kernel": "DenseReluDense wi_1 weight&&expression_.transpose(0, 1)",
+        "ffn_third_kernel": "DenseReluDense wo weight&&expression_.transpose(0, 1)",
     }
 )
 
@@ -211,15 +213,17 @@ def replace_second_digit(s):
         "5": "five",
     }
 
-    seen = False
     s = list(s)
     pos_digit = -1
-    for i in range(len(s)):
-        if s[i].isdigit():
-            pos_digit = i
+    cnt = 0
+    for i in range(1, len(s)):
+        if s[i].isdigit() and not s[i-1].isdigit():
+            cnt += 1
+            if cnt == 2:
+                pos_digit = i
     if pos_digit != -1:
         s[pos_digit] = table[s[pos_digit]]
-    return "".join(s)
+    return ''.join(s)
 
 
 def extract_transformer_weights(
@@ -239,7 +243,7 @@ def extract_transformer_weights(
 ):
     transformer = Transformer()
     # load var names
-    reloaded = T5ForConditionalGeneration.from_pretrained(model_dir).state_dict()
+    reloaded = MT5ForConditionalGeneration.from_pretrained(model_dir).state_dict()
 
     encoder_state_dict = {}
     decoder_state_dict = {}
@@ -433,10 +437,10 @@ if __name__ == "__main__":
         args.generation_method = "beam_search"
     # if save_proto is True, extension .pb will be added, otherwise .hdf5 is added
     output_lightseq_model_name = (
-        "lightseq_t5_base"  # you can rename it to "lightseq_t5_large" for large model
+        "lightseq_mt5_base"  # you can rename it to "lightseq_mt5_large" for large model
     )
-    input_huggingface_t5_model = "t5-base"  # Example: you can try "t5-large" as well
-    head_number = 12  # change this to 16 for "t5-large" model
+    input_huggingface_t5_model = "google/mt5-base"  # Example: you can try "google/mt5-large" as well
+    head_number = 12  # change this to 16 for "mt5-large" model
     beam_size = 1
     max_step = 80  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
