@@ -368,6 +368,23 @@ def extract_transformer_weights(
         )
     )
 
+
+    lm_head_weight_list = (
+        reloaded['lm_head.weight']
+        .numpy()
+        .reshape([-1])
+        .tolist()
+    )
+
+    transformer.trg_embedding.lm_head[
+        :
+    ] = lm_head_weight_list
+    print(
+        "lm_head.weight -> trg_embedding.lm_head, shape: {}, conversion finished!".format(
+            reloaded['lm_head.weight'].shape
+        )
+    )
+
     # assert lang in LANG2ID
     trg_tb, _ = gather_token_embedding(
         dec_var_name_list, decoder_state_dict, "shared", scale=False
