@@ -9,14 +9,13 @@ if [ ! -d "/tmp/cnn_dm-bin" ]; then
     tar -xvf /tmp/databin_cnn_dm.tar.gz -C /tmp && rm /tmp/databin_cnn_dm.tar.gz
 fi
 
-
 if [ ! -d "/tmp/bart.large" ]; then
     echo "Downloading pretrained model"
     wget https://dl.fbaipublicfiles.com/fairseq/models/bart.large.tar.gz -P /tmp
     tar -zxvf /tmp/bart.large.tar.gz -C /tmp && rm /tmp/bart.large.tar.gz
 fi
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 lightseq-train /tmp/cnn_dm-bin \
+lightseq-train /tmp/cnn_dm-bin \
     --restore-file /tmp/bart.large/model.pt \
     --max-tokens 2048 \
     --task translation \
