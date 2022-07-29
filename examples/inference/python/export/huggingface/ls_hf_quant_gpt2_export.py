@@ -6,7 +6,11 @@ import h5py
 import numpy as np
 from collections import OrderedDict
 import torch
-from lightseq.training.ops.pytorch.export import export_ls_encoder, fill_hdf5_layer
+from lightseq.training.ops.pytorch.export_quant import (
+    export_ls_quant_encoder,
+    fill_quant_hdf5_layer,
+    quantize,
+)
 from export.util import parse_args
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -24,7 +28,8 @@ src_emb_mapping_dict = OrderedDict(
     {
         "norm_scale": "ln_f weight",
         "norm_bias": "ln_f bias",
-        "token_embedding": "wte weight",
+        "output_ln_clip_max": "lm_head input_quant clip_value_max",
+        "logits_clip_max": "lm_head output_quant _amax",
     }
 )
 
@@ -57,15 +62,31 @@ def extract_gpt_weights(
         if name.endswith("para"):
             layer_nums += 1
 
-    export_ls_encoder(hdf5_file, state_dict, emb_dim, emb_dim * 4, False)
+    export_ls_quant_encoder(hdf5_file, state_dict, emb_dim, emb_dim * 4, False, True)
 
     # fill src_embedding - except for position embedding
-    fill_hdf5_layer(
+    fill_quant_hdf5_layer(
         var_name_list,
         state_dict,
         hdf5_file,
         "src_embedding/",
         src_emb_mapping_dict,
+    )
+
+    # handling token_embeddings for GPT
+    token_embedding = state_dict["transformer.wte.weight"]
+    token_embedding = quantize(
+        token_embedding.numpy(),
+        127,
+        state_dict["transformer.wte.emb_quant.clip.clip_value_max"].numpy(),
+    ).transpose()
+    print(f"processed token_embedding, shape: {token_embedding.shape}")
+    hdf5_file.create_dataset(
+        "src_embedding/token_embedding", data=token_embedding, dtype="uint8"
+    )
+    hdf5_file.create_dataset(
+        "src_embedding/emb_clip_max",
+        data=state_dict["transformer.wte.emb_quant.clip.clip_value_max"],
     )
 
     # special handling for position embedding

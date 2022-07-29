@@ -44,7 +44,7 @@ def export_other_weights(ls_infer_model, state_dict):
     emb_dim = state_dict["encoder.layer_norm.weight"].size(0)
     assert emb_size % emb_dim == 0
     dec_shared_b = torch.zeros(emb_size // emb_dim).flatten().tolist()
-    
+
     ls_infer_model.src_embedding.norm_scale[:] = enc_norm_w
     ls_infer_model.src_embedding.norm_bias[:] = enc_norm_b
     ls_infer_model.trg_embedding.norm_scale[:] = dec_norm_w
