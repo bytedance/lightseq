@@ -75,6 +75,9 @@ class LSQuantLinearLayer(nn.Module):
 
         self.quant_mode = False
 
+        if self.config.local_rank >= 0:
+            torch.cuda.set_device(self.config.local_rank)
+
         self.weight = nn.Parameter(
             torch.empty(
                 (self.config.out_features, self.config.in_features),
@@ -88,14 +91,9 @@ class LSQuantLinearLayer(nn.Module):
             )
         else:
             self.register_parameter("bias", None)
-        # self.clip_max = nn.Parameter(
-        #     torch.empty((3,)),
-        # )
+
         self.register_buffer("clip_max", torch.empty((3,)))
         self.reset_parameters()
-
-        if self.config.local_rank >= 0:
-            torch.cuda.set_device(self.config.local_rank)
 
         # Load cuda modules if needed
         global transformer_cuda_module
