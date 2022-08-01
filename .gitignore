@@ -147,3 +147,9 @@ build/
 *.hdf5
 
 *.out
+quant_n*
+quant_s*
+quant_d*
+tmp
+norelu*
+checkpoint*

@@ -99,6 +99,7 @@ class TensorQuantizer(nn.Module):
         self._if_clip = False
         self._if_calib = if_calib
 
+        self.f_a, self.f_b = 1, 0
         if quant_desc.amax is not None:
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
 
@@ -348,7 +349,7 @@ class TensorQuantizer(nn.Module):
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
                 outputs = fake_tensor_quant(
-                    inputs, amax, self._num_bits, self._unsigned, self._narrow_range
+                    inputs, amax, self._num_bits, self._unsigned, self._narrow_range, self.f_a, self.f_b,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:

@@ -10,6 +10,7 @@ fi
 
 lightseq-train /tmp/wmt14/ \
     --task translation \
+    --save-dir quant_scape_2 \
     --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
@@ -26,6 +27,7 @@ lightseq-train /tmp/wmt14/ \
     --fp16 \
     --use-torch-layer \
     --enable-quant \
-    --quant-mode qat \
-    --keep-last-epochs 5 --save-interval-updates 6000
+    --quant-mode qat  \
+    --keep-last-epochs 2 --save-interval-updates 6000 --keep-interval-updates 2 $@
 
+# --f-a 1.2 --f-b 0.5

@@ -18,6 +18,7 @@ from lightseq.training.ops.pytorch.quantization import (
     disable_quant,
     qat_mode,
     ptq_mode,
+    TensorQuantizer,
 )
 
 
@@ -123,6 +124,10 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='enable quantization')
         parser.add_argument('--quant-mode', type=str,  default="qat", choices=["qat", "ptq"],
                             help='quantization mode')
+        parser.add_argument('--f-a', type=float, metavar='D', default=1,
+                            help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--f-b', type=float, metavar='D', default=0,
+                            help='scalar quantization noise and scalar quantization at training time')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
             '--min-params-to-wrap', type=int, metavar='D', default=DEFAULT_MIN_PARAMS_TO_WRAP,
@@ -169,7 +174,13 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
+        def f_ab(m):
+            if isinstance(m, TensorQuantizer):
+                m.f_a = args.f_a
+                m.f_b = args.f_b
         if args.enable_quant:
+            encoder.apply(f_ab)
+            decoder.apply(f_ab)
             if args.use_torch_layer:
                 if args.quant_mode == "qat":
                     encoder.apply(qat_mode)
