@@ -464,24 +464,25 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
   }
   __shared__ float block_cmax_g;
   if (threadIdx.x == 0 && threadIdx.y == 0) block_cmax_g = 0;
+
+  // Sum the shared buffer.
+  betta_buffer[threadIdx.x][threadIdx.y] = dbetta;
+  gamma_buffer[threadIdx.x][threadIdx.y] = dgamma;
   __syncthreads();
 
   if (thread_cmax_g != 0) {
     atomicAdd(&block_cmax_g, thread_cmax_g);
   }
 
-  // Sum the shared buffer.
-  betta_buffer[threadIdx.x][threadIdx.y] = dbetta;
-  gamma_buffer[threadIdx.x][threadIdx.y] = dgamma;
+  float s1 = betta_buffer[threadIdx.y][threadIdx.x];
+  float s2 = gamma_buffer[threadIdx.y][threadIdx.x];
   __syncthreads();
+
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     if (cmask && block_cmax_g != 0) {
       atomicAdd(&cmax_grad[0], block_cmax_g);
     }
   }
-  float s1 = betta_buffer[threadIdx.y][threadIdx.x];
-  float s2 = gamma_buffer[threadIdx.y][threadIdx.x];
-  __syncthreads();
 
   for (int i = 1; i < TILE_DIM; i <<= 1) {
     s1 += g.shfl_down(s1, i);

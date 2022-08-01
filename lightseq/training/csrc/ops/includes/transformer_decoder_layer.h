@@ -332,6 +332,7 @@ class TransformerDecoderLayer {
     _encdec_attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _relu_inp_i8_ptr = reinterpret_cast<int8_t *>(_relu_inp_ptr);
     _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
     _igemm_alpha_ptr = cuda_malloc<float>(1);
     _igemm_beta_ptr = cuda_malloc<float>(1);
@@ -412,6 +413,7 @@ class TransformerDecoderLayer {
 
   T *_ff1_inp_ptr;
   T *_relu_inp_ptr;
+  int8_t *_relu_inp_i8_ptr;
   T *_ff2_inp_ptr;
 
   // local GPU memory for quantization
