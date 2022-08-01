@@ -94,3 +94,13 @@ else()
   target_link_libraries(vit_model PRIVATE CUDA::cublas_static
                                           CUDA::cublasLt_static)
 endif()
+
+add_library(quant_vit_model STATIC quant_vit_encoder.cc.cu)
+target_link_libraries(quant_vit_model PUBLIC cuda_kernels)
+target_link_libraries(quant_vit_model PUBLIC quant_vit_weight)
+if(DYNAMIC_API)
+  target_link_libraries(quant_vit_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(quant_vit_model PRIVATE CUDA::cublas_static
+                                                CUDA::cublasLt_static)
+endif()
