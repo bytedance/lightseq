@@ -1490,20 +1490,19 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
   float temp_cmax_out_grad = 0;
   if (col_idx < hidden_size) {
     for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
-      // float val = out_grad[idx];
-      clip_bwd(thread_in_grad, temp_cmax_out_grad, float{out_grad[idx]},
-               cmask_out[idx], 2);
-      thread_cmax_out_grad += temp_cmax_out_grad;
+      float val = out_grad[idx];
+      // clip_bwd(thread_in_grad, temp_cmax_out_grad, float{out_grad[idx]},
+      //          cmask_out[idx], 2);
+      // thread_cmax_out_grad += temp_cmax_out_grad;
 
       float in = dequantize(input[idx], cmax_in_val);
       float b = bias[idx % hidden_size];
+      uint8_t mask = dropout_mask[idx];
       thread_in_grad = activation_bwd_kernel<act_type, float>(
-          thread_in_grad * scale * static_cast<float>(dropout_mask[idx] & 1),
-          in + b);
+          val * scale * static_cast<float>(mask & 1), in + b);
       thread_grad_bias += thread_in_grad;
 
-      clip_bwd(thread_in_grad, temp_cmax_in_grad, thread_in_grad, cmask_in[idx],
-               6);
+      clip_bwd(thread_in_grad, temp_cmax_in_grad, thread_in_grad, mask, 6);
       in_grad[idx] = thread_in_grad;
       thread_cmax_in_grad += temp_cmax_in_grad;
       idx += stride;
@@ -1512,14 +1511,14 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
   __shared__ float block_cmax_in_grad, block_cmax_out_grad;
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     block_cmax_in_grad = 0;
-    block_cmax_out_grad = 0;
+    // block_cmax_out_grad = 0;
   }
 
   tile[threadIdx.x][threadIdx.y] = thread_grad_bias;
   __syncthreads();
-  if (thread_cmax_out_grad != 0) {
-    atomicAdd(&block_cmax_out_grad, thread_cmax_out_grad);
-  }
+  // if (thread_cmax_out_grad != 0) {
+  //   atomicAdd(&block_cmax_out_grad, thread_cmax_out_grad);
+  // }
   if (thread_cmax_in_grad != 0) {
     atomicAdd(&block_cmax_in_grad, thread_cmax_in_grad);
   }
@@ -1532,9 +1531,9 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     if (block_cmax_in_grad != 0) {
       atomicAdd(&cmax_in_grad[0], block_cmax_in_grad);
     }
-    if (block_cmax_out_grad != 0) {
-      atomicAdd(&cmax_out_grad[0], block_cmax_out_grad);
-    }
+    // if (block_cmax_out_grad != 0) {
+    //   atomicAdd(&cmax_out_grad[0], block_cmax_out_grad);
+    // }
   }
   for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
 

@@ -57,6 +57,8 @@ class TransformerDecoderLayer {
   void ffn_layer_bw(const T *grad_output_ptr, const T *output_ptr,
                     T *grad_inp_ptr, T *buffer);
 
+  void zero_mask_grad();
+
   void set_cur_batch_shape(int batch_size, int trg_seq_len, int src_seq_len,
                            int step = -1) {
     _batch_size = batch_size;
@@ -360,8 +362,6 @@ class TransformerDecoderLayer {
     cuda_free(_encdec_soft_out_ptr);
     cuda_free(_encdec_attn_score_ptr);
   }
-
-  void zero_mask_grad();
 
   // const parameter between batch
   const size_t _layer_id;

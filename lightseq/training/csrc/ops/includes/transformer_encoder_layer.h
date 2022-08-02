@@ -44,6 +44,8 @@ class TransformerEncoderLayer {
   void ffn_layer_bw(const T *grad_output_ptr, const T *output_ptr,
                     T *grad_inp_ptr, T *buffer);
 
+  void zero_mask_grad();
+
   void set_cur_batch_shape(int batch_size, int seq_len) {
     _batch_size = batch_size;
     _seq_len = seq_len;

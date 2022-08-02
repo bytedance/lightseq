@@ -278,6 +278,7 @@ void TransformerEncoderLayer<T>::Forward(const T *input_ptr,
           ? _shared_mem_ptr +
                 std::max(3 * _batch_dim, _intermediate_size * _hidden_size)
           : _ff1_inp_ptr;
+  zero_mask_grad();
 
   attn_layer_fw(input_ptr, input_mask_ptr, ffn_inp_ptr, attn_buffer);
 
@@ -525,6 +526,15 @@ void TransformerEncoderLayer<T>::SetQuantMode(bool enable_quant) {
                 << std::endl;
     }
   }
+}
+
+template <typename T>
+void TransformerEncoderLayer<T>::zero_mask_grad() {
+  cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 24 * sizeof(T), 0);
+  _attn_prob_dropout.zero_mask(0);
+  _attn_dropout.zero_mask(0);
+  _ffn_activation_dropout.zero_mask(0);
+  _ffn_dropout.zero_mask(0);
 }
 
 template <typename T>
