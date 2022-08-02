@@ -8,6 +8,11 @@
 
 #include "cuda_util.h"
 
+typedef struct {
+  int algoId, customOption, tile, splitK_val, swizzle, reductionScheme,
+      workspaceSize, stages;
+} cublasLtMatmulAlgo_info;
+
 int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
                    cublasOperation_t transb, int m, int n, int k,
                    const float *alpha, const float *beta, const float *A,
@@ -125,7 +130,6 @@ void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
 #else
   CHECK_GPU_ERROR(cublasLtMatmulDescCreate(&matmul_desc, compute_type));
 #endif
-
   cublasLtPointerMode_t scale_mode = CUBLASLT_POINTER_MODE_DEVICE;
   CHECK_GPU_ERROR(cublasLtMatmulDescSetAttribute(
       matmul_desc, CUBLASLT_MATMUL_DESC_SCALE_TYPE, &scale_dtype,
@@ -161,9 +165,55 @@ void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
         sizeof(stridec)));
   }
 
+  // make best algo with algoId: 21, customOption: 0, tile: 20, splitK_val: 0,
+  // swizzle: 0, reductionScheme: 0, workspaceSize: 0, stages: 17
+  cublasLtMatmulAlgo_info algo_info = {21, 0, 20, 0, 0, 0, 0, 17};
+
+  // algoId: 21, customOption: 0, tile: 15, splitK_val: 0, swizzle: 0,
+  // reductionScheme: 0, workspaceSize: 0, stages: 24
+  if (m < 500) {
+    algo_info.tile = 15;
+    algo_info.stages = 24;
+  }
+
+  cublasComputeType_t computeType = CUBLAS_COMPUTE_32I;
+  cudaDataType_t scaleType = CUDA_R_32F;
+  cudaDataType_t Atype = CUDA_R_8I;
+  cudaDataType_t Btype = CUDA_R_8I;
+  cudaDataType_t Ctype = CUDA_R_8I;
+
+  // get algo
+  cublasLtMatmulAlgo_t algo2;
+  char *workSpace2 = NULL;
+  int workspaceSize = 0;
+  workspaceSize = algo_info.workspaceSize;
+  cublasLtMatmulAlgoInit(cublasLt_handle, computeType, CUDA_R_32F, CUDA_R_8I,
+                         CUDA_R_8I, CUDA_R_8I, CUDA_R_8I, algo_info.algoId,
+                         &algo2);
+  cublasLtMatmulAlgoConfigSetAttribute(
+      &algo2, CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION, &(algo_info.customOption),
+      sizeof(algo_info.customOption));
+  cublasLtMatmulAlgoConfigSetAttribute(&algo2, CUBLASLT_ALGO_CONFIG_TILE_ID,
+                                       &(algo_info.tile),
+                                       sizeof(algo_info.tile));
+  cublasLtMatmulAlgoConfigSetAttribute(&algo2, CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
+                                       &(algo_info.splitK_val),
+                                       sizeof(algo_info.splitK_val));
+  cublasLtMatmulAlgoConfigSetAttribute(
+      &algo2, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(algo_info.swizzle),
+      sizeof(algo_info.swizzle));
+  cublasLtMatmulAlgoConfigSetAttribute(
+      &algo2, CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
+      &(algo_info.reductionScheme), sizeof(int));
+  cublasLtMatmulAlgoConfigSetAttribute(&algo2, CUBLASLT_ALGO_CONFIG_STAGES_ID,
+                                       &(algo_info.stages),
+                                       sizeof(algo_info.stages));
+
   CHECK_GPU_ERROR(cublasLtMatmul(
       cublasLt_handle, matmul_desc, alpha, input_a, desc_a, input_b, desc_b,
-      beta, output_c, desc_c, output_c, desc_c, NULL, NULL, 0, stream));
+      // beta, output_c, desc_c, output_c, desc_c, NULL, NULL, 0, stream));
+      beta, output_c, desc_c, output_c, desc_c, &algo2, workSpace2,
+      workspaceSize, stream));
 
   CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(matmul_desc));
   CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(desc_a));
