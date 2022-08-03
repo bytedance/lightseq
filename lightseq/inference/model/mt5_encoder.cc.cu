@@ -322,15 +322,8 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
   //     print_vec(_p_d_ffn_buf2, "result: ", 10);
   // #endif
 
-  /* ---step 2. second ffn layer--- */
-  // CHECK_GPU_ERROR(cublasGemmEx(
-  //     _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
-  //     _tw._inner_size, &_fone, _p_d_enc_wei[_weight_offset + 10], _AType,
-  //     _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
-  //     _p_d_output, _CType, _tw._hidden_size, _computeType,
-  //     CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-  // right one
+  /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
       _tw._hidden_size, &_fone, _p_d_enc_wei[_weight_offset + 10], _AType,
@@ -351,8 +344,21 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       std::cout << "result of gelu first and element wise multiply" << std::endl;
       print_vec(_p_d_ffn_buf2, "result: ", 10);
   #endif
-  
-  
+
+  #ifdef DEBUG_RESULT
+      std::cout << "weight of wo" << std::endl;
+      print_vec(_p_d_enc_wei[_weight_offset + 12], "result: ", 10);
+  #endif
+
+  /* ---step 3. third ffn layer--- */
+  CHECK_GPU_ERROR(cublasGemmEx(
+      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
+      _tw._inner_size, &_fone, _p_d_enc_wei[_weight_offset + 12], _AType,
+      _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
+      _p_d_output, _CType, _tw._hidden_size, _computeType,
+      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
     for (int j = 0; j < _batch_seq_len; j++) {  // token_id

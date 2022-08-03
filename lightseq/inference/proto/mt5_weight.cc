@@ -486,7 +486,7 @@ void MT5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
   _relative_attention_num_buckets = 32;
 
   _dim_per_head = _hidden_size / _head_num;
-  _weight_per_enc_layer = 12;
+  _weight_per_enc_layer = 13;
   _weight_per_dec_layer = 18;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
@@ -690,7 +690,7 @@ void MT5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
        _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
-       _hidden_size) *
+       _hidden_size + _hidden_size * _inner_size) *
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
@@ -784,7 +784,15 @@ void MT5Weight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     assign_zero_bias(value.data() + idx, _hidden_size);
     idx += _hidden_size;
 
-  }  // for
+    offset.push_back(idx);
+
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/ffn_third_kernel", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != _hidden_size * _inner_size; },
+        "Wrong ffn_third_kernel_size !");
+    idx += _hidden_size * _inner_size;
+  }
 
   std::vector<_DataType> raw_value;
   raw_value.reserve(value.size());
