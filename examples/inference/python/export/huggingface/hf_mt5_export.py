@@ -414,7 +414,7 @@ def extract_transformer_weights(
     transformer.model_conf.diverse_lambda = 0
     transformer.model_conf.is_post_ln = True
     transformer.model_conf.no_scale_embedding = True
-    transformer.model_conf.use_gelu = False
+    transformer.model_conf.use_gelu = True
 
     if save_proto:
         output_file += ".pb"

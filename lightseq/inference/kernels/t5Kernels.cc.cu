@@ -303,5 +303,57 @@ template void t5_ker_correlation_softmax_decself_launcher<__half>(
     int batch_head_num, int step_num, cudaStream_t stream, __half* correlation,
     const __half* pos_emb, int head_num);
 
+
+/**
+@brief: ker_gelu_first_elementmul
+input activated by gelu, then element-wise add to input2, result save to input
+
+@thread
+gridDim.x = batch_size * batch_seq_len
+blockDim.x = max_thread_per_block
+
+@param
+input: [batch_size * batch_seq_len, feature_dim]
+bias: [feature_dim]
+feature_dim: the dim of input feature
+*/
+template <typename T>
+__global__ void ker_gelu_first_elementmul(T* input, const T* input2, int feature_dim) {
+  int offset = blockIdx.x * feature_dim;
+  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
+    int cur_offset = offset + idx;
+    input[cur_offset] = gelu<float>(input[cur_offset]) * input2[cur_offset];
+  }
+}
+
+/* fp16 version */
+template <>
+__global__ void ker_gelu_first_elementmul<__half>(__half* input, const __half* input2,
+                                      int feature_dim) {
+  int offset = blockIdx.x * feature_dim;
+  half2* pinput = (half2*)input;
+  const half2* pinput2 = (const half2*)input2;
+  for (int idx = threadIdx.x; idx < feature_dim; idx += blockDim.x) {
+    int cur_offset = offset + idx;
+    pinput[cur_offset] = __hmul2(gelu<half2>(pinput[cur_offset]), pinput2[cur_offset]);
+  }
+}
+
+template <typename T>
+void ker_gelu_first_elementmul_launcher(int batch_token_num, int block_dim,
+                            cudaStream_t stream, T* input, const T* input2,
+                            int feature_dim) {
+  ker_gelu_first_elementmul<T>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, input2, feature_dim);
+}
+
+template <>
+void ker_gelu_first_elementmul_launcher<__half>(int batch_token_num, int block_dim,
+                                    cudaStream_t stream, __half* input,
+                                    const __half* input2, int feature_dim) {
+  ker_gelu_first_elementmul<__half>
+      <<<batch_token_num, block_dim, 0, stream>>>(input, input2, feature_dim / 2);
+}
+
 }  // namespace cuda
 }  // namespace lightseq

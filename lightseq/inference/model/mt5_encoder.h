@@ -60,7 +60,8 @@ class MT5Encoder {
   _DataType *_p_d_c;
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
-
+  _DataType *_p_d_ffn_buf3;
+  
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
