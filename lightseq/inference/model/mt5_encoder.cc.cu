@@ -343,7 +343,7 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       print_vec(_p_d_ffn_buf3, "result: ", 10);
   #endif
 
-  ker_bias_gelu_launcher<_DataType>(
+  ker_gelu_first_elementmul_launcher<_DataType>(
     _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
     _p_d_ffn_buf3, _tw._inner_size);
 
@@ -351,6 +351,7 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       std::cout << "result of gelu first and element wise multiply" << std::endl;
       print_vec(_p_d_ffn_buf2, "result: ", 10);
   #endif
+  
   
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id

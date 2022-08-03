@@ -355,5 +355,15 @@ void ker_gelu_first_elementmul_launcher<__half>(int batch_token_num, int block_d
       <<<batch_token_num, block_dim, 0, stream>>>(input, input2, feature_dim / 2);
 }
 
+
+template void ker_gelu_first_elementmul_launcher<float>(int batch_token_num, int block_dim,
+                                            cudaStream_t stream, float* input,
+                                            const float* input2, int feature_dim);
+
+template void ker_gelu_first_elementmul_launcher<__half>(int batch_token_num, int block_dim,
+                                             cudaStream_t stream, __half* input,
+                                             const __half* input2,
+                                             int feature_dim);
+
 }  // namespace cuda
 }  // namespace lightseq
