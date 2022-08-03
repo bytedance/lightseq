@@ -487,7 +487,7 @@ void MT5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
 
   _dim_per_head = _hidden_size / _head_num;
   _weight_per_enc_layer = 13;
-  _weight_per_dec_layer = 18;
+  _weight_per_dec_layer = 19;
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
                            &_beam_size);

@@ -97,8 +97,8 @@ class MT5Weight {
   int _n_enc_layer;  // number of encoder layer
   int _n_dec_layer;  // number of decoder layer
   int _dim_per_head;
-  int _weight_per_enc_layer;  // 12
-  int _weight_per_dec_layer;  // 18
+  int _weight_per_enc_layer;  // 13
+  int _weight_per_dec_layer;  // 19
 
   int _head_num;
   int _relative_attention_num_buckets;  // 32
