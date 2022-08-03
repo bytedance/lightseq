@@ -110,6 +110,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "shared_bias",
         "lang_emb",
         "trg_vocab_mask",
+        "lm_head"
     ]
 
     ENCODER_LAYER_KEYS = [
@@ -373,6 +374,7 @@ def extract_transformer_weights(
 
     lm_head_weight_list = (
         reloaded['lm_head.weight']
+        .transpose(0,1)
         .numpy()
         .reshape([-1])
         .tolist()

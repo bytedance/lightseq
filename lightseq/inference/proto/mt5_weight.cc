@@ -571,7 +571,7 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
                       2 * _hidden_size;
   if (source != "src") {
     value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
-                  _hidden_size * 2 * _n_dec_layer + vocab_size;
+                  _hidden_size * 2 * _n_dec_layer + vocab_size + vocab_size * _hidden_size;
   }
 
   std::vector<int> offset;
@@ -644,6 +644,16 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
     // shared_bias
     assign_zero_bias(value.data() + idx, vocab_size);
     idx += vocab_size;
+
+    offset.push_back(idx);
+    read_hdf5_dataset_data(
+        hdf5_file, dataset_prefix + "/lm_head",
+        H5T_NATIVE_FLOAT, value.data() + idx,
+        [=](int size) {
+          return size != vocab_size * _hidden_size;
+        },
+        "Wrong lm_head_size !");
+    idx += vocab_size * _hidden_size;
 
     std::vector<_DataType> raw_value;
     raw_value.reserve(value.size());

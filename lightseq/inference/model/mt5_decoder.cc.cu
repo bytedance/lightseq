@@ -225,8 +225,8 @@ std::string MT5Decoder<OpType_>::check() {
   if (_tw._dim_per_head & 1) {
     return "violate dim_per_head % 2 = 0";
   }
-  if (_tw._multilg_type == 0 && _p_d_trg_emb_wei.size() != 7) {
-    return "violate p_d_trg_emb_wei.size() = 7";
+  if (_tw._multilg_type == 0 && _p_d_trg_emb_wei.size() != 8) {
+    return "violate p_d_trg_emb_wei.size() = 8";
   }
   if (_tw._multilg_type != 0 && _p_d_trg_emb_wei.size() != 8) {
     return "violate p_d_trg_emb_wei.size() = 8";
@@ -382,9 +382,13 @@ bool MT5Decoder<OpType_>::run_step() {
   decoder_stack();
   /* --- Project hidden states to vocab logits--- */
 
+  #ifdef DEBUG_RESULT
+    print_vec(_p_d_trg_emb_wei[7], "lm_head confirm", 10);
+  #endif
+
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
-      _tw._hidden_size, &_logit_scaler, _p_d_trg_emb_wei[0], _AType,
+      _tw._hidden_size, &_logit_scaler, _p_d_trg_emb_wei[7], _AType,
       _tw._trg_vocab_size, _p_d_cur_step_query, _BType, _tw._hidden_size,
       // &_type_zero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, _computeType,
       &_fzero, _p_d_logit_buf, _CType, _tw._trg_vocab_size, CUDA_R_32F,
@@ -423,7 +427,7 @@ Decode embedding
 template <OperationType OpType_>
 void MT5Decoder<OpType_>::embedding() {
   // _p_d_trg_emb_wei: {token_emb, position_emb, norm_scale, norm_bias,
-  // enc_out_kernel_kv, enc_out_bias_kv, logit_bias}
+  // enc_out_kernel_kv, enc_out_bias_kv, logit_bias, lm_head}
   t5_launch_dec_emb<_DataType>(_p_d_trg_emb_wei[0], _p_d_alive_seq,
                                _p_d_trg_emb_wei[7], _p_d_lang_id,
                                _p_d_cur_step_query, _batch_size, _tw._beam_size,
