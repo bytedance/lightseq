@@ -346,8 +346,8 @@ class FakeTensorQuantFunction(Function):
         if not unsigned:
             ctx.f_a = f_a
             ctx.f_b = f_b
-            diff = torch.abs((inputs - outputs)/scale)
-            ctx.save_for_backward(diff.max() - diff)
+            # diff = torch.abs((inputs - outputs)/scale)
+            ctx.save_for_backward(inputs - outputs)
         return outputs
 
     @staticmethod
