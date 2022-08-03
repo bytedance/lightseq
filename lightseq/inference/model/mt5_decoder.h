@@ -98,6 +98,7 @@ class MT5Decoder {
   std::vector<_DataType*> _p_d_encdec_v_bgeem;
   _DataType* _p_d_query_buf1;
   _DataType* _p_d_query_buf2;
+  _DataType* _p_d_query_buf3;
   _DataType* _p_d_c;
   _DataType* _p_d_encoder_out_buf;
   _DataType* _p_d_logit_buf;
