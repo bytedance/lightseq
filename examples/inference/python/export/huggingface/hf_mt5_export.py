@@ -126,6 +126,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
+        "ffn_third_kernel"
     ]
 
     DECODER_LAYER_KEYS = [
@@ -148,6 +149,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
+        "ffn_third_kernel"
     ]
     base_attr_to_keys = {
         "src_embedding": EMBEDDING_KEYS,
