@@ -46,3 +46,12 @@ void cublaslt_igemm(const int8_t *input_a, const int8_t *input_b,
                     int64_t stridea, int64_t strideb, int64_t stridec,
                     const ScaleType *alpha, const ScaleType *beta,
                     cublasLtHandle_t cublasLt_handle, cudaStream_t stream);
+
+inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
+
+void cublasLtMM_withAlgo_i8IO(int8_t *res, int batchCount, int m, int n, int k,
+                              int64_t stridea, int64_t strideb, int64_t stridec,
+                              const float *alpha, const float *beta,
+                              const int8_t *ATransform, const int8_t *kernel,
+                              cublasLtHandle_t cublasLt_handle,
+                              cudaStream_t stream, bool use_ORDER_COL32_2R_4R4);

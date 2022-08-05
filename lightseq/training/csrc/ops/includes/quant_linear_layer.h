@@ -35,7 +35,7 @@ class QuantLinearLayer {
     _quant_weight_ptr = cuda_malloc<int8_t>(_in_features * _out_features);
     _quant_output_ptr =
         cuda_malloc<int8_t>(_max_batch_tokens * tweaked_out_features);
-    _igemm_alpha_ptr = cuda_malloc<float>(1);
+    _igemm_alpha_ptr = cuda_malloc<float>(_max_batch_tokens);
     _igemm_beta_ptr = cuda_malloc<float>(1);
     cuda_set<float>(_igemm_beta_ptr, 0, 1);
   }

@@ -336,7 +336,7 @@ class TransformerDecoderLayer {
     _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
     _relu_inp_i8_ptr = reinterpret_cast<int8_t *>(_relu_inp_ptr);
     _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-    _igemm_alpha_ptr = cuda_malloc<float>(1);
+    _igemm_alpha_ptr = cuda_malloc<float>(_max_batch_tokens);
     _igemm_beta_ptr = cuda_malloc<float>(1);
     cuda_set<float>(_igemm_beta_ptr, 0, 1);
   }
