@@ -83,3 +83,4 @@ class FeedForward {
 
  private:
   Config config_;
+};
