@@ -5,6 +5,9 @@ from dataclasses import dataclass, asdict
 from copy import deepcopy
 
 FLOAT_MAX = float(1e9)
+INTERVAL = 32
+BORDER = 512
+MAX_BSZ = 20000
 COMMON_SHAPE = [(512, 2048), (768, 3072), (1024, 4096)]
 SM = [75, 80]
 
@@ -123,11 +126,20 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
         )
     else:
         raise ValueError("Wrong gemm shapes to be searched.")
+    print("Search best gemm algorithms for shapes (m, n, k):")
+    for shape in nk_set:
+        print("  - (m, {}, {})".format(shape[0], shape[1]))
+    print("where m is in the range [{}, {}].\n".format(min_bsz, max_bsz))
+
     mkdir(dir_name)
     rm(tmp_output_file)
     rm(tmp_shell)
     if os.path.exists(output_json_file):
-        print("The best config of the gemm shapes to be searched already exists.")
+        print(
+            "The best config of the gemm shapes to be searched already exists ({}).".format(
+                output_json_file
+            )
+        )
         return
 
     # compile the gemm_test library
@@ -135,7 +147,9 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
 
     with open(tmp_shell, "w") as fin:
         for n, k in nk_set:
-            for bsz in range(min_bsz, max_bsz + 1):
+            for bsz in range(min_bsz, min(max_bsz, BORDER), 1):
+                fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
+            for bsz in range(BORDER, max_bsz + 1, INTERVAL):
                 fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
     os.system("sh {} > {}".format(tmp_shell, tmp_output_file))
 
@@ -179,14 +193,20 @@ def check_args(args):
         and args.hidden_dim > 0
         and (args.inner_dim is None or args.inner_dim > 0)
         and (args.vocab_size is None or args.vocab_size > 0)
-        and 1 <= args.min_bsz <= args.max_bsz <= 20000
+        and 1 <= args.min_bsz <= args.max_bsz <= MAX_BSZ
     )
+    if args.min_bsz > BORDER:
+        args.min_bsz = (args.min_bsz // INTERVAL) * INTERVAL
+        print("Adjust the min_bsz to {}.".format(args.min_bsz))
+    if args.max_bsz > BORDER:
+        args.max_bsz = ((args.max_bsz + INTERVAL - 1) // INTERVAL) * INTERVAL
+        print("Adjust the max_bsz to {}.".format(args.max_bsz))
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="search for the best int8 gemm algorithm",
-        usage="python gemm_test.py -hd 1024 -id 4096 -v 32000 -minb 1 -maxb 20000",
+        usage="python gemm_test.py -hd 1024 -id 4096 -v 32000 -minb 1 -maxb 100",
     )
     parser.add_argument(
         "--hidden_dim",
@@ -217,7 +237,7 @@ def parse_args():
         "--max_bsz",
         "-maxb",
         type=int,
-        default=20000,
+        default=MAX_BSZ,
         help="maximal batch token size",
     )
     args = parser.parse_args()
