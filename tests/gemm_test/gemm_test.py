@@ -151,6 +151,7 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
                 fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
             for bsz in range(BORDER, max_bsz + 1, INTERVAL):
                 fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
+    print("Start searching...")
     os.system("sh {} > {}".format(tmp_shell, tmp_output_file))
 
     best_gemm_algos = extract(tmp_output_file)
