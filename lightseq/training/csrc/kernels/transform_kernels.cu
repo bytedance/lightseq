@@ -266,12 +266,14 @@ __global__ void quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
                                                const int8_t *input,
                                                const T *bias, const T *clip_max,
                                                int dim_3, int dim_4,
-                                               const T *out_clip_max);
+                                               const T *out_clip_max,
+                                               bool in_col32);
 
 template <>
 __global__ void quant_bias_add_transform_20314<float>(
     float *output, uint8_t *clip_mask, const int8_t *input, const float *bias,
-    const float *clip_max, int dim_3, int dim_4, const float *out_clip_max) {
+    const float *clip_max, int dim_3, int dim_4, const float *out_clip_max,
+    bool in_col32) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -299,7 +301,19 @@ __global__ void quant_bias_add_transform_20314<float>(
   uint8_t clip_mask_val;
 
   for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
-    vqkv4 = qkv4[src_offset + i];
+    int input_index;
+    if (in_col32) {
+      int idx = src_offset + i;
+      int batch_tokens = dim_0 * dim_1;
+      int hidden_size = dim_2 * dim_34 * 4;
+      int row_id = (idx * 4) / hidden_size;
+      int col_id = (idx * 4) % hidden_size;
+      input_index =
+          row_major2flat_col32(row_id, col_id, batch_tokens, hidden_size) / 4;
+    } else {
+      input_index = src_offset + i;
+    }
+    vqkv4 = qkv4[input_index];
     vbias4 = bias4[bias_offset + i];
     int8_t *qkv = reinterpret_cast<int8_t *>(&vqkv4);
     vres4.x = dequantize(qkv[0], clip_max_val) + vbias4.x;
@@ -324,7 +338,8 @@ __global__ void quant_bias_add_transform_20314<float>(
 template <>
 __global__ void quant_bias_add_transform_20314<__half>(
     __half *output, uint8_t *clip_mask, const int8_t *input, const __half *bias,
-    const __half *clip_max, int dim_3, int dim_4, const __half *out_clip_max) {
+    const __half *clip_max, int dim_3, int dim_4, const __half *out_clip_max,
+    bool in_col32) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -354,7 +369,19 @@ __global__ void quant_bias_add_transform_20314<__half>(
   uint8_t clip_mask_val;
 
   for (std::size_t i = threadIdx.x; i < dim_34; i += blockDim.x) {
-    vqkv8 = qkv8[src_offset + i];
+    int input_index;
+    if (in_col32) {
+      int idx = src_offset + i;
+      int hidden_size = dim_2 * dim_34 * 8;
+      int batch_tokens = dim_0 * dim_1;
+      int row_id = (idx * 8) / hidden_size;
+      int col_id = (idx * 8) % hidden_size;
+      input_index =
+          row_major2flat_col32(row_id, col_id, batch_tokens, hidden_size) / 8;
+    } else {
+      input_index = src_offset + i;
+    }
+    vqkv8 = qkv8[input_index];
     vbias4 = bias4[bias_offset + i];
 #pragma unroll
     for (int j = 0; j < 4; ++j) {
@@ -381,28 +408,30 @@ template <>
 void launch_quant_bias_add_transform_20314<float>(
     float *output, uint8_t *clip_mask, const int8_t *input, const float *bias,
     const float *clip_max, int dim_0, int dim_1, int dim_2, int dim_3,
-    int dim_4, cudaStream_t stream, const float *out_clip_max) {
+    int dim_4, cudaStream_t stream, const float *out_clip_max, bool in_col32) {
   dim_4 >>= 2;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
   quant_bias_add_transform_20314<float><<<grid_dim, block_dim, 0, stream>>>(
-      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max);
+      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max,
+      in_col32);
 }
 
 template <>
 void launch_quant_bias_add_transform_20314<__half>(
     __half *output, uint8_t *clip_mask, const int8_t *input, const __half *bias,
     const __half *clip_max, int dim_0, int dim_1, int dim_2, int dim_3,
-    int dim_4, cudaStream_t stream, const __half *out_clip_max) {
+    int dim_4, cudaStream_t stream, const __half *out_clip_max, bool in_col32) {
   dim_4 >>= 3;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
 
   quant_bias_add_transform_20314<__half><<<grid_dim, block_dim, 0, stream>>>(
-      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max);
+      output, clip_mask, input, bias, clip_max, dim_3, dim_4, out_clip_max,
+      in_col32);
 }
 
 /**
@@ -739,7 +768,6 @@ void launch_transform_0213_dcmax<float>(float *output, float *grad_cmax,
   hidden_dim >>= 2;
   int head_dim = hidden_dim / nhead;
 
-  zero_grad<<<1, 1>>>(grad_cmax);
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 
@@ -757,7 +785,6 @@ void launch_transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
 
-  zero_grad<<<1, 1>>>(grad_cmax);
   dim3 grid_dim(batch_size, seq_len);
   dim3 block_dim(min(hidden_dim, MAX_THREADS));
 

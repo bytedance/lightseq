@@ -14,6 +14,8 @@ const float kQuantRangeI8 = 127.0f;
 
 enum class ActivationType { kRelu, kGelu };
 
+enum LSLayout { kRowMajor, kColMajor, kCol32, kCOL4_4R2_8C, kCOL32_2R_4R4 };
+
 void launch_curand_init(int total_count, int dim, cudaStream_t stream);
 
 template <typename T>
@@ -66,7 +68,8 @@ void launch_quant_bias_add_transform_20314(T *output, uint8_t *clip_mask,
                                            const T *clip_max, int dim_0,
                                            int dim_1, int dim_2, int dim_3,
                                            int dim_4, cudaStream_t stream,
-                                           const T *out_clip_max = nullptr);
+                                           const T *out_clip_max = nullptr,
+                                           bool in_col32 = false);
 
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <typename T>
@@ -124,14 +127,16 @@ template <ActivationType act_type, typename T>
 void launch_ls_fakequant_dropout_act_bias(
     T *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const T *bias, const T *cmax_out, const T *cmax_in,
-    int total_count, int dim, float ratio, cudaStream_t stream);
+    int total_count, int dim, float ratio, cudaStream_t stream,
+    bool in_col32 = false);
 
 template <typename T>
 void launch_ls_quant_dropout_res_bias(T *out, uint8_t *mask,
                                       const int8_t *qvals, const T *cmax,
                                       const T *bias, const T *residual,
                                       int total_count, int dim, float ratio,
-                                      cudaStream_t stream);
+                                      cudaStream_t stream,
+                                      bool in_col32 = false);
 
 template <ActivationType act_type, typename T>
 void launch_ls_quant_dropout_act_bias_bwd(
@@ -202,6 +207,12 @@ void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
                      int mask_start_bit, cudaStream_t stream);
 
 template <typename T>
+void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
+                     const T *f_ptr, const T *clip_max_ptr, int batch_tokens,
+                     int hidden_size, int mask_start_bit, cudaStream_t stream,
+                     LSLayout out_layout = kRowMajor);
+
+template <typename T>
 void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *output,
                           const T *input, const T *clip_max_ptr, int numel,
                           int mask_start_bit, cudaStream_t stream,
@@ -210,6 +221,11 @@ void launch_fake_quantize(uint8_t *clip_mask_ptr, float *alpha_ptr, T *output,
 template <typename T>
 void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,
                        int numel, int mask_start_bit, cudaStream_t stream);
+
+template <typename T>
+void launch_dequantize(T *f_ptr, const int8_t *q_ptr, const T *clip_max_ptr,
+                       int batch_tokens, int hidden_size, int mask_start_bit,
+                       cudaStream_t stream, bool in_col32 = false);
 
 template <typename T>
 void launch_quantize_bwd(T *grad_ptr, T *cmax_grad_ptr,
@@ -450,6 +466,14 @@ __forceinline__ __device__ float dequantize(int8_t x, float clip_max) {
   float dequant_scale = clip_max / kQuantRangeI8;
   float res = static_cast<float>(x) * dequant_scale;
   return fminf(fmaxf(res, -clip_max), clip_max);
+}
+
+/* row major index to col32 index */
+__forceinline__ __host__ __device__ int row_major2flat_col32(int row_id,
+                                                             int col_id,
+                                                             int row_size,
+                                                             int col_size) {
+  return ((col_id & 0xffffe0) * row_size) + (row_id << 5) + (col_id & 31);
 }
 
 template <typename T>

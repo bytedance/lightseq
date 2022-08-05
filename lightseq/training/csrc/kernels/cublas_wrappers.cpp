@@ -222,3 +222,124 @@ template void cublaslt_igemm<int8_t, float>(
     int batch_count, int m, int n, int k, int64_t stridea, int64_t strideb,
     int64_t stridec, const float *alpha, const float *beta,
     cublasLtHandle_t cublasLt_handle, cudaStream_t stream);
+
+/**
+ * @brief cublasLt imma gemm for i8 in i8 out
+ *
+ * @param res
+ * @param batchCount
+ * @param m
+ * @param n
+ * @param k
+ * @param stridea
+ * @param strideb
+ * @param stridec
+ * @param alpha
+ * @param ATransform
+ * @param kernel
+ * @param cublasLt_handle
+ * @param stream
+ * @param use_ORDER_COL32_2R_4R4
+ */
+void cublasLtMM_withAlgo_i8IO(int8_t *res, int batchCount, int m, int n, int k,
+                              int64_t stridea, int64_t strideb, int64_t stridec,
+                              const float *alpha, const float *beta,
+                              const int8_t *ATransform, const int8_t *kernel,
+                              cublasLtHandle_t cublasLt_handle,
+                              cudaStream_t stream,
+                              bool use_ORDER_COL32_2R_4R4) {
+  cublasOperation_t opTranspose = CUBLAS_OP_T;
+  cudaDataType_t scaleType = CUDA_R_32F;
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  cublasComputeType_t computeType = CUBLAS_COMPUTE_32I;
+#else
+  cudaDataType_t computeType = CUDA_R_32I;
+#endif
+  cublasLtMatmulDesc_t matmulDesc;
+  cublasLtMatrixLayout_t AtransformDesc = NULL;
+  cublasLtMatrixLayout_t BtransformDesc = NULL;
+  cublasLtMatrixLayout_t CtransformDesc = NULL;
+  cublasLtOrder_t order_COL32 = CUBLASLT_ORDER_COL32;
+
+  cublasLtOrder_t order_matrixB;
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  if (use_ORDER_COL32_2R_4R4)
+    order_matrixB = CUBLASLT_ORDER_COL32_2R_4R4;
+  else
+    order_matrixB = CUBLASLT_ORDER_COL4_4R2_8C;
+#else
+  order_matrixB = CUBLASLT_ORDER_COL4_4R2_8C;
+#endif
+
+  int ldaTransform = 32 * m;
+
+  int ldbTransform;
+  if (use_ORDER_COL32_2R_4R4)
+    ldbTransform = 32 * ((n + 32 - 1) / 32) * 32;
+  else
+    ldbTransform = 32 * ((n + 8 - 1) / 8) * 8;
+
+  int ldcTransform = 32 * m;
+
+  cublasLtPointerMode_t scale_mode =
+      CUBLASLT_POINTER_MODE_ALPHA_DEVICE_VECTOR_BETA_ZERO;
+
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 11000
+  cublasLtMatmulDescCreate(&matmulDesc, computeType, scaleType);
+#else
+  cublasLtMatmulDescCreate(&matmulDesc, computeType);
+#endif
+  cublasLtMatmulDescSetAttribute(matmulDesc, CUBLASLT_MATMUL_DESC_TRANSB,
+                                 &opTranspose, sizeof(cublasOperation_t));
+  cublasLtMatmulDescSetAttribute(matmulDesc, CUBLASLT_MATMUL_DESC_SCALE_TYPE,
+                                 &scaleType, sizeof(scaleType));
+  cublasLtMatmulDescSetAttribute(matmulDesc, CUBLASLT_MATMUL_DESC_POINTER_MODE,
+                                 &scale_mode, sizeof(scale_mode));
+
+  cublasLtMatrixLayoutCreate(&AtransformDesc, CUDA_R_8I, m, k, ldaTransform);
+  cublasLtMatrixLayoutSetAttribute(AtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
+                                   &order_COL32, sizeof(order_COL32));
+  cublasLtMatrixLayoutCreate(&BtransformDesc, CUDA_R_8I, n, k, ldbTransform);
+  cublasLtMatrixLayoutSetAttribute(BtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
+                                   &order_matrixB, sizeof(order_matrixB));
+  cublasLtMatrixLayoutCreate(&CtransformDesc, CUDA_R_8I, m, n, ldcTransform);
+  cublasLtMatrixLayoutSetAttribute(CtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER,
+                                   &order_COL32, sizeof(order_COL32));
+  if (batchCount > 1) {
+    cublasLtMatrixLayoutSetAttribute(AtransformDesc,
+                                     CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        AtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridea,
+        sizeof(stridea));
+    cublasLtMatrixLayoutSetAttribute(BtransformDesc,
+                                     CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        BtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &strideb,
+        sizeof(strideb));
+    cublasLtMatrixLayoutSetAttribute(CtransformDesc,
+                                     CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+                                     &batchCount, sizeof(batchCount));
+    cublasLtMatrixLayoutSetAttribute(
+        CtransformDesc, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stridec,
+        sizeof(stridec));
+  }
+
+  CHECK_GPU_ERROR(cublasLtMatmul(cublasLt_handle, matmulDesc, alpha, ATransform,
+                                 AtransformDesc, kernel, BtransformDesc, beta,
+                                 res, CtransformDesc, res, CtransformDesc, NULL,
+                                 NULL, 0, stream));
+  // float alpha_test = 1.f/127;
+  // float beta_test = 0.f;
+  // CHECK_GPU_ERROR(cublasLtMatmul(cublasLt_handle, matmulDesc, &alpha_test,
+  // ATransform,
+  //                                AtransformDesc, kernel, BtransformDesc,
+  //                                &beta_test, res, CtransformDesc, res,
+  //                                CtransformDesc, NULL, NULL, 0, stream));
+
+  CHECK_GPU_ERROR(cublasLtMatmulDescDestroy(matmulDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(AtransformDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(BtransformDesc));
+  CHECK_GPU_ERROR(cublasLtMatrixLayoutDestroy(CtransformDesc));
+}
