@@ -6,9 +6,7 @@ from copy import deepcopy
 FLOAT_MAX = float(1e9)
 INTERVAL = 32
 BORDER = 512
-MAX_BSZ = 20000
-COMMON_SHAPE = [(512, 2048), (768, 3072), (1024, 4096)]
-SM = [75, 80]
+MAX_BSZ = 10000
 
 
 @dataclass
@@ -111,17 +109,10 @@ def extract(log):
     return best_gemm_algos
 
 
-def search(min_bsz, max_bsz, nk_set, sm):
-    dir_name = "configs"
-    tmp_output_file = "{}/tmp_output.log".format(dir_name)
-    tmp_shell = "{}/tmp_gemm_test.sh".format(dir_name)
-    output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
-    print("Search best gemm algorithms for shapes (m, n, k):")
-    for shape in nk_set:
-        print("  - (m, {}, {})".format(shape[0], shape[1]))
-    print("where m is in the range [{}, {}].\n".format(min_bsz, max_bsz))
+def search(mnk_set, output_cfg_file):
+    tmp_output_file = "tmp_output.log"
+    tmp_shell = "tmp_gemm_test.sh"
 
-    mkdir(dir_name)
     rm(tmp_output_file)
     rm(tmp_shell)
 
@@ -129,26 +120,8 @@ def search(min_bsz, max_bsz, nk_set, sm):
     os.system("nvcc -o gemm gemm.cpp -lcublasLt -lcublas")
 
     with open(tmp_shell, "w") as fin:
-        for n, k in nk_set:
-            if min_bsz > BORDER:
-                for bsz in range(min_bsz, max_bsz + 1, INTERVAL):
-                    fin.write(
-                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
-                    )
-            elif max_bsz < BORDER:
-                for bsz in range(min_bsz, max_bsz + 1, 1):
-                    fin.write(
-                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
-                    )
-            else:
-                for bsz in range(min_bsz, BORDER, 1):
-                    fin.write(
-                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
-                    )
-                for bsz in range(BORDER, max_bsz + 1, INTERVAL):
-                    fin.write(
-                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
-                    )
+        for m, n, k in mnk_set:
+            fin.write("./gemm {} {} {} >> {}\n".format(m, n, k, tmp_output_file))
     print("Start searching...")
     os.system("sh {} > {}".format(tmp_shell, tmp_output_file))
 
@@ -183,47 +156,37 @@ def search(min_bsz, max_bsz, nk_set, sm):
 
 def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
     sm = get_sm()
+    if sm < 75:
+        raise RuntimeError("int8 gemm is only supported on GPUs with SM >= 75.")
 
-    nk_sm = []
+    # All (m, n, k) which may be searched.
+    mnk_set = set()
+    for bsz in range(min_bsz, max_bsz + 1):
+        m = bsz if bsz < BORDER else ((bsz + INTERVAL - 1) // INTERVAL) * INTERVAL
+        if hidden_dim is not None and inner_dim is not None:
+            nk = base_nk(hidden_dim, inner_dim)
+            for n, k in nk:
+                mnk_set.add((m, n, k))
+        if hidden_dim is not None and vocab_size is not None:
+            mnk_set.add((m, vocab_size, hidden_dim))
+
+    # Existing (m, n, k).
     dir_name = "configs"
     mkdir(dir_name)
-    summary_file = "{}/summary.info".format(dir_name)
-    if os.path.exists(summary_file):
-        with open(summary_file, "r") as fin:
+    output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
+    exist_mnk_set = set()
+    if os.path.exists(output_cfg_file):
+        with open(output_cfg_file, "r") as fin:
             for line in fin:
-                nk_sm.append(tuple([int(x) for x in line.split()]))
+                m, n, k = [int(x) for x in line.split()[:3]]
+                exist_mnk_set.add((m, n, k))
 
-    layer_nk_set = []
-    logit_nk_set = []
-    if (
-        hidden_dim is not None
-        and inner_dim is not None
-        and (hidden_dim, inner_dim, sm) not in nk_sm
-    ):
-        layer_nk_set = base_nk(hidden_dim, inner_dim)
-        for n, k in layer_nk_set:
-            nk_sm.append((n, k, sm))
-    if (
-        hidden_dim is not None
-        and vocab_size is not None
-        and (vocab_size, hidden_dim, sm) not in nk_sm
-    ):
-        logit_nk_set.append((vocab_size, hidden_dim))
-        for n, k in logit_nk_set:
-            nk_sm.append((n, k, sm))
-    if len(layer_nk_set) <= 0 and len(logit_nk_set) <= 0:
+    # (m, n, k) to be searched.
+    mnk_set -= exist_mnk_set
+    if len(mnk_set) <= 0:
         print("No gemm shapes need to be searched.")
         return
-
-    if len(layer_nk_set) > 0:
-        search(min_bsz, max_bsz, layer_nk_set, sm)
-
-    if len(logit_nk_set) > 0:
-        search(min_bsz, max_bsz, logit_nk_set, sm)
-
-    with open(summary_file, "w") as fout:
-        for n, k, sm in nk_sm:
-            fout.write("{:>5d} {:>5d} {:>2d}\n".format(n, k, sm))
+    search(mnk_set, output_cfg_file)
 
 
 def check_args(args):
@@ -233,7 +196,7 @@ def check_args(args):
         and args.hidden_dim > 0
         and (args.inner_dim is None or args.inner_dim > 0)
         and (args.vocab_size is None or args.vocab_size > 0)
-        and 1 <= args.min_bsz <= args.max_bsz <= MAX_BSZ
+        and 1 <= args.min_bsz <= args.max_bsz
     )
     if args.min_bsz > BORDER:
         args.min_bsz = (args.min_bsz // INTERVAL) * INTERVAL
