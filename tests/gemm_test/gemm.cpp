@@ -614,7 +614,9 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   // Print timing and perf details
   for (int i = 0; i < AlgoCount; i++) {
     printf("INT8 NT-gemm %s INT8 IO cublasLt %03d : ",
-           RUN_WITH_A100 ? "ORDER_COL32_2R_4R4" : "order_COL4_4R2_8C", i);
+           RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                         : "CUBLASLT_ORDER_COL4_4R2_8C",
+           i);
     printPerfStructure(m, n, k, perfResults[i], best_algo, i);
     break;
   }
@@ -788,7 +790,8 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
     printf(
         "INT8 NT-gemm with B = %s cublasLtMatmul INT8 output "
         "best algo %d exec_time %f(ms)\n",
-        RUN_WITH_A100 ? "ORDER_COL32_2R_4R4" : "order_COL4_4R2_8C",
+        RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                      : "CUBLASLT_ORDER_COL4_4R2_8C",
         INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
   } else {
     std::cout << cublasStat << std::endl;
@@ -1027,7 +1030,7 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
   std::sort(perfResults, perfResults + AlgoCount, time_compare);
   // Print timing and perf details
   for (int i = 0; i < AlgoCount; i++) {
-    printf("INT8 TN-gemm COL-MAJOR INT8 IO cublasLt %03d : ", i);
+    printf("INT8 TN-gemm CUBLASLT_ORDER_COL INT8 IO cublasLt %03d : ", i);
     printPerfStructure(m, n, k, perfResults[i], best_algo, i);
     break;
   }
@@ -1150,7 +1153,8 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
   time_used /= (iters - 1);
   if (cublasStat == CUBLAS_STATUS_SUCCESS) {
     printf(
-        "INT8 TN-gemm with B = ORDER_COL_MAJOR cublasLtMatmul INT8 output best "
+        "INT8 TN-gemm with B = CUBLASLT_ORDER_COL cublasLtMatmul INT8 output "
+        "best "
         "algo %d exec_time %f(ms)\n",
         INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
   }

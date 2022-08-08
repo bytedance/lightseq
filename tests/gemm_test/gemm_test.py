@@ -1,6 +1,5 @@
 import argparse
 import os
-import json
 from dataclasses import dataclass, asdict
 from copy import deepcopy
 
@@ -16,10 +15,10 @@ SM = [75, 80]
 class GemmAlgoInfo:
     sm: int = 80
     shape: tuple = (1, 1024, 1024)
-    data_order: str = "ORDER_COL_MAJOR"
+    data_order: str = "CUBLASLT_ORDER_COL"
     algo_id: int = 0
     tile: int = 0
-    slpitk: int = 0
+    splitk: int = 0
     reduc: int = 0
     swizzle: int = 0
     custom: int = 0
@@ -66,7 +65,7 @@ def extract(log):
         algo_info.data_order = line.split()[2]
         algo_info.algo_id = int(line.split("Id=")[1].split(",")[0])
         algo_info.tile = int(line.split("tileIdx=")[1].split("(")[0])
-        algo_info.slpitk = int(line.split("splitK=")[1].split()[0])
+        algo_info.splitk = int(line.split("splitK=")[1].split()[0])
         algo_info.reduc = int(line.split("reduc=")[1].split()[0])
         algo_info.swizzle = int(line.split("swizzle=")[1].split()[0])
         algo_info.custom = int(line.split("custom=")[1].split()[0])
@@ -117,11 +116,11 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
     tmp_output_file = "{}/tmp_output.log".format(dir_name)
     tmp_shell = "{}/tmp_gemm_test.sh".format(dir_name)
     if len(nk_set) == 4:
-        output_json_file = "{}/h{}_i{}_b{}-{}.json".format(
+        output_cfg_file = "{}/h{}_i{}_b{}-{}.cfg".format(
             dir_name, hidden_dim, inner_dim, min_bsz, max_bsz
         )
     elif len(nk_set) == 1:
-        output_json_file = "{}/h{}_v{}_b{}-{}.json".format(
+        output_cfg_file = "{}/h{}_v{}_b{}-{}.cfg".format(
             dir_name, hidden_dim, vocab_size, min_bsz, max_bsz
         )
     else:
@@ -134,10 +133,10 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
     mkdir(dir_name)
     rm(tmp_output_file)
     rm(tmp_shell)
-    if os.path.exists(output_json_file):
+    if os.path.exists(output_cfg_file):
         print(
             "The best config of the gemm shapes to be searched already exists ({}).".format(
-                output_json_file
+                output_cfg_file
             )
         )
         return
@@ -156,8 +155,28 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
 
     best_gemm_algos = extract(tmp_output_file)
     best_gemm_algos_dict = [asdict(x) for x in best_gemm_algos]
-    with open(output_json_file, "w") as fout:
-        json.dump(best_gemm_algos_dict, fout, indent=2)
+    with open(output_cfg_file, "w") as fout:
+        for d in best_gemm_algos_dict:
+            fout.write(
+                "{:>5d} {:>4d} {:>4d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}\n".format(
+                    d["shape"][0],
+                    d["shape"][1],
+                    d["shape"][2],
+                    d["algo_id"],
+                    d["tile"],
+                    d["splitk"],
+                    d["reduc"],
+                    d["swizzle"],
+                    d["custom"],
+                    d["stages"],
+                    d["workspace"],
+                    d["fp16_time"],
+                    d["int8_time"],
+                    d["speedup"],
+                    d["sm"],
+                    d["data_order"],
+                )
+            )
 
     rm(tmp_output_file)
     rm(tmp_shell)
