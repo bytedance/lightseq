@@ -26,7 +26,11 @@ class LSLinear(Function):
 
     @staticmethod
     def quant_transform(tensor):
-        tensor_max = tensor.abs().flatten().topk(100)[0][-1]
+        # tensor_max = tensor.abs().flatten().topk(100)[0][-1]
+        # tensor_max = tensor.abs().max()
+        tensor_max = torch.tensor(0.1, dtype=torch.half)
+
+        # print(tensor_max)
         out_dtype = torch.float16
         tensor, scale = _tensor_quant(tensor, tensor_max, 8, False, True)
         tensor = (tensor * scale).to(out_dtype)
@@ -37,38 +41,20 @@ class LSLinear(Function):
         (inp, weight) = ctx.saved_tensors
         out_size, in_size = weight.size()
         bsz, seq_len, _ = inp.size()
-        # out_dtype = grad_output.dtype
-        # reduce_dim = tuple(range(grad_output.dim() - 1))
-        # grad_output_max = grad_output.abs().max()
-        # grad_output_max = grad_output.abs().amax(reduce_dim)
-        # grad_output_max = grad_output.abs().float().quantile(0.9999)
-        # grad_output_max = grad_output.abs().flatten().topk(100)[0][-1]
-        # grad_output, scale = _tensor_quant(grad_output, grad_output_max, 8, False, True)
-        # grad_output = (grad_output * scale).to(out_dtype)
+        
         grad_output = LSLinear.quant_transform(grad_output)
-        # weight = LSLinear.quant_transform(weight)
+
         weight = weight.to(torch.float16)
         grad_input = F.linear(grad_output, weight.T)
         grad_input = LSLinear.quant_transform(grad_input)
-        # inp = LSLinear.quant_transform(inp)
+
         inp = inp.to(torch.float16)
 
         grad_weight = F.linear(
             grad_output.reshape(-1, out_size).T, inp.reshape(-1, in_size).T
         )
         grad_weight = LSLinear.quant_transform(grad_weight)
-        # grad_input_max = grad_input.abs().amax(reduce_dim)
-        # # grad_input_max = grad_input.abs().float().quantile(0.9999)
-        # grad_input, scale = _tensor_quant(grad_input, grad_input_max, 8, False, True)
-        # grad_input = (grad_input * scale).to(out_dtype)
 
-        # grad_weight = LSLinear.quant_transform(grad_weight)
-        # grad_weight_max = grad_weight.abs().max()
-        # grad_weight_max = grad_weight.abs().amax(-1).unsqueeze(-1)
-        # grad_weight_max = grad_weight.abs().float().quantile(0.9999)
-        # grad_weight_max = grad_weight.abs().flatten().topk(100)[0][-1]
-        # grad_weight, scale = _tensor_quant(grad_weight, grad_weight_max, 8, False, True)
-        # grad_weight = (grad_weight * scale).to(out_dtype)
         return (grad_input, grad_weight)
 
 
