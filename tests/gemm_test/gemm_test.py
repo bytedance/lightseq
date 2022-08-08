@@ -1,6 +1,7 @@
 import argparse
 import os
-from dataclasses import dataclass, asdict
+import functools
+from dataclasses import dataclass
 from copy import deepcopy
 
 FLOAT_MAX = float(1e9)
@@ -39,6 +40,15 @@ def rm(file):
 def mkdir(path):
     if not os.path.exists(path):
         os.mkdir(path)
+
+
+def sign(x):
+    if x > 0:
+        return 1
+    elif x < 0:
+        return -1
+    else:
+        return 0
 
 
 def get_sm():
@@ -109,7 +119,7 @@ def extract(log):
     return best_gemm_algos
 
 
-def search(mnk_set, output_cfg_file):
+def search(mnk_set, output_cfg_file, output_cfg_str):
     tmp_output_file = "tmp_output.log"
     tmp_shell = "tmp_gemm_test.sh"
 
@@ -126,29 +136,40 @@ def search(mnk_set, output_cfg_file):
     os.system("sh {} > {}".format(tmp_shell, tmp_output_file))
 
     best_gemm_algos = extract(tmp_output_file)
-    best_gemm_algos_dict = [asdict(x) for x in best_gemm_algos]
-    with open(output_cfg_file, "a") as fout:
-        for d in best_gemm_algos_dict:
-            fout.write(
-                "{:>5d} {:>5d} {:>5d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}\n".format(
-                    d["shape"][0],
-                    d["shape"][1],
-                    d["shape"][2],
-                    d["algo_id"],
-                    d["tile"],
-                    d["splitk"],
-                    d["reduc"],
-                    d["swizzle"],
-                    d["custom"],
-                    d["stages"],
-                    d["workspace"],
-                    d["fp16_time"],
-                    d["int8_time"],
-                    d["speedup"],
-                    d["sm"],
-                    d["data_order"],
-                )
-            )
+    for d in best_gemm_algos:
+        d_str = "{:>5d} {:>5d} {:>5d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}".format(
+            d.shape[0],
+            d.shape[1],
+            d.shape[2],
+            d.algo_id,
+            d.tile,
+            d.splitk,
+            d.reduc,
+            d.swizzle,
+            d.custom,
+            d.stages,
+            d.workspace,
+            d.fp16_time,
+            d.int8_time,
+            d.speedup,
+            d.sm,
+            d.data_order,
+        )
+        output_cfg_str.append((d.shape[0], d.shape[1], d.shape[2], d_str))
+
+    def cmp(x, y):
+        if x[2] != y[2]:
+            return sign(x[2] - y[2])
+        elif x[1] != y[1]:
+            return sign(x[1] - y[1])
+        else:
+            return sign(x[0] - y[0])
+
+    output_cfg_str.sort(key=functools.cmp_to_key(cmp))
+
+    with open(output_cfg_file, "w") as fout:
+        for s in output_cfg_str:
+            fout.write(s[3] + "\n")
 
     rm(tmp_output_file)
     rm(tmp_shell)
@@ -169,24 +190,28 @@ def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
                 mnk_set.add((m, n, k))
         if hidden_dim is not None and vocab_size is not None:
             mnk_set.add((m, vocab_size, hidden_dim))
+        elif hidden_dim is not None:
+            pass
 
     # Existing (m, n, k).
     dir_name = "configs"
     mkdir(dir_name)
     output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
     exist_mnk_set = set()
+    output_cfg_str = []
     if os.path.exists(output_cfg_file):
         with open(output_cfg_file, "r") as fin:
             for line in fin:
                 m, n, k = [int(x) for x in line.split()[:3]]
                 exist_mnk_set.add((m, n, k))
+                output_cfg_str.append((m, n, k, line.rstrip()))
 
     # (m, n, k) to be searched.
     mnk_set -= exist_mnk_set
     if len(mnk_set) <= 0:
         print("No gemm shapes need to be searched.")
         return
-    search(mnk_set, output_cfg_file)
+    search(mnk_set, output_cfg_file, output_cfg_str)
 
 
 def check_args(args):
