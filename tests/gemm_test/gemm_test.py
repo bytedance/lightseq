@@ -111,20 +111,11 @@ def extract(log):
     return best_gemm_algos
 
 
-def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
-    dir_name = "configs_sm{}".format(sm)
+def search(min_bsz, max_bsz, nk_set, sm):
+    dir_name = "configs"
     tmp_output_file = "{}/tmp_output.log".format(dir_name)
     tmp_shell = "{}/tmp_gemm_test.sh".format(dir_name)
-    if len(nk_set) == 4:
-        output_cfg_file = "{}/h{}_i{}_b{}-{}.cfg".format(
-            dir_name, hidden_dim, inner_dim, min_bsz, max_bsz
-        )
-    elif len(nk_set) == 1:
-        output_cfg_file = "{}/h{}_v{}_b{}-{}.cfg".format(
-            dir_name, hidden_dim, vocab_size, min_bsz, max_bsz
-        )
-    else:
-        raise ValueError("Wrong gemm shapes to be searched.")
+    output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
     print("Search best gemm algorithms for shapes (m, n, k):")
     for shape in nk_set:
         print("  - (m, {}, {})".format(shape[0], shape[1]))
@@ -133,32 +124,40 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
     mkdir(dir_name)
     rm(tmp_output_file)
     rm(tmp_shell)
-    if os.path.exists(output_cfg_file):
-        print(
-            "The best config of the gemm shapes to be searched already exists ({}).".format(
-                output_cfg_file
-            )
-        )
-        return
 
     # compile the gemm_test library
     os.system("nvcc -o gemm gemm.cpp -lcublasLt -lcublas")
 
     with open(tmp_shell, "w") as fin:
         for n, k in nk_set:
-            for bsz in range(min_bsz, min(max_bsz, BORDER), 1):
-                fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
-            for bsz in range(BORDER, max_bsz + 1, INTERVAL):
-                fin.write("./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file))
+            if min_bsz > BORDER:
+                for bsz in range(min_bsz, max_bsz + 1, INTERVAL):
+                    fin.write(
+                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
+                    )
+            elif max_bsz < BORDER:
+                for bsz in range(min_bsz, max_bsz + 1, 1):
+                    fin.write(
+                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
+                    )
+            else:
+                for bsz in range(min_bsz, BORDER, 1):
+                    fin.write(
+                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
+                    )
+                for bsz in range(BORDER, max_bsz + 1, INTERVAL):
+                    fin.write(
+                        "./gemm {} {} {} >> {}\n".format(bsz, n, k, tmp_output_file)
+                    )
     print("Start searching...")
     os.system("sh {} > {}".format(tmp_shell, tmp_output_file))
 
     best_gemm_algos = extract(tmp_output_file)
     best_gemm_algos_dict = [asdict(x) for x in best_gemm_algos]
-    with open(output_cfg_file, "w") as fout:
+    with open(output_cfg_file, "a") as fout:
         for d in best_gemm_algos_dict:
             fout.write(
-                "{:>5d} {:>4d} {:>4d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}\n".format(
+                "{:>5d} {:>5d} {:>5d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}\n".format(
                     d["shape"][0],
                     d["shape"][1],
                     d["shape"][2],
@@ -185,25 +184,46 @@ def search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, nk_set, sm):
 def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
     sm = get_sm()
 
+    nk_sm = []
+    dir_name = "configs"
+    mkdir(dir_name)
+    summary_file = "{}/summary.info".format(dir_name)
+    if os.path.exists(summary_file):
+        with open(summary_file, "r") as fin:
+            for line in fin:
+                nk_sm.append(tuple([int(x) for x in line.split()]))
+
     layer_nk_set = []
     logit_nk_set = []
     if (
         hidden_dim is not None
         and inner_dim is not None
-        and ((hidden_dim, inner_dim) not in COMMON_SHAPE or sm not in SM)
+        and (hidden_dim, inner_dim, sm) not in nk_sm
     ):
         layer_nk_set = base_nk(hidden_dim, inner_dim)
-    if hidden_dim is not None and vocab_size is not None:
+        for n, k in layer_nk_set:
+            nk_sm.append((n, k, sm))
+    if (
+        hidden_dim is not None
+        and vocab_size is not None
+        and (vocab_size, hidden_dim, sm) not in nk_sm
+    ):
         logit_nk_set.append((vocab_size, hidden_dim))
+        for n, k in logit_nk_set:
+            nk_sm.append((n, k, sm))
     if len(layer_nk_set) <= 0 and len(logit_nk_set) <= 0:
         print("No gemm shapes need to be searched.")
         return
 
     if len(layer_nk_set) > 0:
-        search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, layer_nk_set, sm)
+        search(min_bsz, max_bsz, layer_nk_set, sm)
 
     if len(logit_nk_set) > 0:
-        search(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, logit_nk_set, sm)
+        search(min_bsz, max_bsz, logit_nk_set, sm)
+
+    with open(summary_file, "w") as fout:
+        for n, k, sm in nk_sm:
+            fout.write("{:>5d} {:>5d} {:>2d}\n".format(n, k, sm))
 
 
 def check_args(args):
