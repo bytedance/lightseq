@@ -20,6 +20,7 @@ class TransformerBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
+            "csrc/kernels/cublas_algo_map.cpp",
             "csrc/kernels/cublas_wrappers.cpp",
             "csrc/kernels/quantize_kernels.cu",
             "csrc/kernels/transform_kernels.cu",

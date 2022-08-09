@@ -11,8 +11,7 @@ cublasAlgoMap::cublasAlgoMap(const std::string filename)
 
 cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map)
     : _config_filename(algo_map._config_filename),
-      _algo_map(algo_map._algo_map),
-{}
+      _algo_map(algo_map._algo_map) {}
 
 cublasAlgoMap::~cublasAlgoMap() { _algo_map.clear(); }
 
@@ -55,15 +54,21 @@ void cublasAlgoMap::loadGemmConfig() {
   fclose(fd);
 }
 
-bool cublasAlgoMap::isExist(const int m, const int n, const int k) {
+bool cublasAlgoMap::isExist(int m, int n, int k) {
   std::vector<int> mnk = {m, n, k};
+  if (_algo_map.find(mnk) != _algo_map.end()) return true;
+
+  if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
+  mnk = {m, n, k};
   return _algo_map.find(mnk) != _algo_map.end();
 }
 
-cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(const int m, const int n,
-                                               const int k) {
-  if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
+cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k) {
   std::vector<int> mnk = {m, n, k};
+  if (_algo_map.find(mnk) != _algo_map.end()) return _algo_map[mnk];
+
+  if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
+  mnk = {m, n, k};
   if (_algo_map.find(mnk) != _algo_map.end()) {
     return _algo_map[mnk];
   } else {

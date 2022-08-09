@@ -152,7 +152,21 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
             fout.write(s[3] + "\n")
 
 
-def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
+def check_args(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
+    assert (
+        hidden_dim is not None
+        and (inner_dim is not None or vocab_size is not None)
+        and hidden_dim > 0
+        and (inner_dim is None or inner_dim > 0)
+        and (vocab_size is None or vocab_size > 0)
+        and 1 <= min_bsz <= max_bsz
+    )
+
+
+def gemm_test(
+    hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz, dir_name="/tmp/igemm_configs"
+):
+    check_args(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz)
     sm = cuda_module.get_sm_version()
     if sm < 75:
         raise RuntimeError("int8 gemm is only supported on GPUs with SM >= 75.")
@@ -178,7 +192,6 @@ def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
             pass
 
     # Existing (m, n, k).
-    dir_name = "configs"
     mkdir(dir_name)
     output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
     exist_mnk_set = set()

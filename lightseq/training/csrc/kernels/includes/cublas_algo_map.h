@@ -4,17 +4,19 @@
 */
 #pragma once
 
+#include <iostream>
 #include <map>
 #include <string>
 #include <utility>
 #include <fstream>
+#include <vector>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublasLt.h>
 
 #define STRIDE 32
 #define BORDER 512
-#define IGEMM_SM80_CONFIG "igemm_sm80.cfg"
+#define IGEMM_SM80_CONFIG "/tmp/igemm_configs/igemm_sm80.cfg"
 
 typedef struct {
   int algoId, customOption, tile, splitK_val, swizzle, reductionScheme,
