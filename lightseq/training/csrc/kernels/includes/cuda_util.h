@@ -40,3 +40,5 @@ void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
 template <typename T>
 void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
                  cudaStream_t stream);
+
+int getSMVersion();

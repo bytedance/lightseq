@@ -250,3 +250,11 @@ template void check_2norm<float>(const float *data_ptr, std::string tensor_name,
 template void check_2norm<__half>(const __half *data_ptr,
                                   std::string tensor_name, int dsize,
                                   cudaStream_t stream);
+
+int getSMVersion() {
+  int device{-1};
+  CHECK_GPU_ERROR(cudaGetDevice(&device));
+  cudaDeviceProp props;
+  CHECK_GPU_ERROR(cudaGetDeviceProperties(&props, device));
+  return props.major * 10 + props.minor;
+}

@@ -355,6 +355,8 @@ void torch_launch_fake_quantize(torch::Tensor &clip_max_mask,
                           rptr<T>(input), rptr<T>(clip_max), numel, 2, stream);
 }
 
+int get_sm_version() { return getSMVersion(); }
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -485,4 +487,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Test kernel wrapper");
   m.def("torch_launch_fake_quantize_fp16", &torch_launch_fake_quantize<__half>,
         "Test kernel wrapper");
+  m.def("get_sm_version", &get_sm_version, "Test kernel wrapper");
 }

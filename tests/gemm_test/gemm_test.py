@@ -4,6 +4,10 @@ import functools
 from dataclasses import dataclass
 from copy import deepcopy
 
+from lightseq.training.ops.pytorch.builder import KernelBuilder
+
+cuda_module = KernelBuilder().load()
+
 FLOAT_MAX = float(1e9)
 STRIDE = 32
 BORDER = 512
@@ -49,19 +53,6 @@ def sign(x):
         return -1
     else:
         return 0
-
-
-def get_sm():
-    tmp_output_file = "tmp_output.log"
-    os.system("nvcc -o get_gpu_info get_gpu_info.cpp")
-    os.system("./get_gpu_info > {}".format(tmp_output_file))
-
-    with open(tmp_output_file, "r") as fin:
-        sm = int(fin.readline())
-        assert sm > 0
-    rm(tmp_output_file)
-
-    return sm
 
 
 def extract(log):
@@ -176,7 +167,7 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
 
 
 def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
-    sm = get_sm()
+    sm = cuda_module.get_sm_version()
     if sm < 75:
         raise RuntimeError("int8 gemm is only supported on GPUs with SM >= 75.")
 
