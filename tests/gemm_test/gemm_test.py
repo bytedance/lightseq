@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 
 FLOAT_MAX = float(1e9)
-INTERVAL = 32
+STRIDE = 32
 BORDER = 512
 MAX_BSZ = 10000
 
@@ -183,7 +183,7 @@ def gemm_test(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
     # All (m, n, k) which may be searched.
     mnk_set = set()
     for bsz in range(min_bsz, max_bsz + 1):
-        m = bsz if bsz < BORDER else ((bsz + INTERVAL - 1) // INTERVAL) * INTERVAL
+        m = bsz if bsz < BORDER else ((bsz + STRIDE - 1) // STRIDE) * STRIDE
         if hidden_dim is not None and inner_dim is not None:
             nk = base_nk(hidden_dim, inner_dim)
             for n, k in nk:
@@ -224,10 +224,10 @@ def check_args(args):
         and 1 <= args.min_bsz <= args.max_bsz
     )
     if args.min_bsz > BORDER:
-        args.min_bsz = (args.min_bsz // INTERVAL) * INTERVAL
+        args.min_bsz = (args.min_bsz // STRIDE) * STRIDE
         print("Adjust the min_bsz to {}.".format(args.min_bsz))
     if args.max_bsz > BORDER:
-        args.max_bsz = ((args.max_bsz + INTERVAL - 1) // INTERVAL) * INTERVAL
+        args.max_bsz = ((args.max_bsz + STRIDE - 1) // STRIDE) * STRIDE
         print("Adjust the max_bsz to {}.".format(args.max_bsz))
 
 
