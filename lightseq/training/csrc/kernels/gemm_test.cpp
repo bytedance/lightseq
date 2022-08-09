@@ -1,4 +1,7 @@
-/*
+/* Copyright 2021 The LightSeq Team
+   Copyright NVIDIA FasterTransformer
+   This file is adapted from NVIDIA FasterTransformer
+
 This is the sample code to profile :
     1. FP16 NN-gemm + cublas (using tensor core);
     2. INT8 NT-gemm + cublasLt + INT8 Output. (using tensor core + IMMA specific
@@ -23,6 +26,7 @@ using namespace std;
 #include <cublasLt.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
+#include "kernels.h"
 
 #define Value 127
 #define checkCudaAPIErrors(F)                                       \
@@ -33,6 +37,9 @@ using namespace std;
   }
 
 int RUN_WITH_A100 = 1;
+string gemm_test_result = "";
+char tmp_cstr[1024];
+string tmp_str;
 
 // mat is column-major
 template <typename T>
@@ -288,13 +295,17 @@ void printPerfStructure(int m, int n, int k, const customMatmulPerf_t& perf,
                                        CUBLASLT_ALGO_CONFIG_STAGES_ID, &stages,
                                        sizeof(stages), NULL);
 
-  printf(
+  memset(tmp_cstr, 0, sizeof tmp_cstr);
+  sprintf(
+      tmp_cstr,
       "algo={ Id=%d, tileIdx=%d (%s) splitK=%d reduc=%d swizzle=%d custom=%d "
       "stages=%d} status %d "
       "time %fms workspace=%d mathMode=%d waves=%f\n",
       algoId, tile, matmulTileName[tile], numSplitsK, reductionScheme, swizzle,
       customOption, stages, perf.status, perf.time, (int)perf.workspaceSize,
       (int)perf.mathMode, perf.wavesCount);
+  tmp_str = string(tmp_cstr);
+  gemm_test_result += tmp_str;
   if (algoI == 0) {
     best_algo.algoId = algoId;
     best_algo.customOption = customOption;
@@ -613,10 +624,13 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   std::sort(perfResults, perfResults + AlgoCount, time_compare);
   // Print timing and perf details
   for (int i = 0; i < AlgoCount; i++) {
-    printf("INT8 NT-gemm %s INT8 IO cublasLt %03d : ",
-           RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
-                         : "CUBLASLT_ORDER_COL4_4R2_8C",
-           i);
+    memset(tmp_cstr, 0, sizeof tmp_cstr);
+    sprintf(tmp_cstr, "INT8 NT-gemm %s INT8 IO cublasLt %03d : ",
+            RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                          : "CUBLASLT_ORDER_COL4_4R2_8C",
+            i);
+    tmp_str = string(tmp_cstr);
+    gemm_test_result += tmp_str;
     printPerfStructure(m, n, k, perfResults[i], best_algo, i);
     break;
   }
@@ -787,12 +801,15 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
   cudaEventElapsedTime(&time_used, start, stop);
   time_used /= (iters - 1);
   if (cublasStat == CUBLAS_STATUS_SUCCESS) {
-    printf(
-        "INT8 NT-gemm with B = %s cublasLtMatmul INT8 output "
-        "best algo %d exec_time %f(ms)\n",
-        RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
-                      : "CUBLASLT_ORDER_COL4_4R2_8C",
-        INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
+    memset(tmp_cstr, 0, sizeof tmp_cstr);
+    sprintf(tmp_cstr,
+            "INT8 NT-gemm with B = %s cublasLtMatmul INT8 output "
+            "best algo %d exec_time %f(ms)\n",
+            RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                          : "CUBLASLT_ORDER_COL4_4R2_8C",
+            INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
+    tmp_str = string(tmp_cstr);
+    gemm_test_result += tmp_str;
   } else {
     std::cout << cublasStat << std::endl;
   }
@@ -1030,7 +1047,11 @@ int LtIgemmCustomFindINT8OutputColMajor(cublasLtHandle_t ltHandle, int m, int n,
   std::sort(perfResults, perfResults + AlgoCount, time_compare);
   // Print timing and perf details
   for (int i = 0; i < AlgoCount; i++) {
-    printf("INT8 TN-gemm CUBLASLT_ORDER_COL INT8 IO cublasLt %03d : ", i);
+    memset(tmp_cstr, 0, sizeof tmp_cstr);
+    sprintf(tmp_cstr,
+            "INT8 TN-gemm CUBLASLT_ORDER_COL INT8 IO cublasLt %03d : ", i);
+    tmp_str = string(tmp_cstr);
+    gemm_test_result += tmp_str;
     printPerfStructure(m, n, k, perfResults[i], best_algo, i);
     break;
   }
@@ -1152,11 +1173,15 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
   cudaEventElapsedTime(&time_used, start, stop);
   time_used /= (iters - 1);
   if (cublasStat == CUBLAS_STATUS_SUCCESS) {
-    printf(
+    memset(tmp_cstr, 0, sizeof tmp_cstr);
+    sprintf(
+        tmp_cstr,
         "INT8 TN-gemm with B = CUBLASLT_ORDER_COL cublasLtMatmul INT8 output "
         "best "
         "algo %d exec_time %f(ms)\n",
         INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
+    tmp_str = string(tmp_cstr);
+    gemm_test_result += tmp_str;
   }
 
   if (Cdesc2) cublasLtMatrixLayoutDestroy(Cdesc2);
@@ -1169,18 +1194,12 @@ void int8gemm_with_cublasLtMatmul_COL_MAJOR(
   checkCudaAPIErrors(cudaEventDestroy(stop));
 }
 
-int main(int argc, char** argv) {
-  if (argc < 4) {
-    fprintf(stderr, "./usage m, n, k\n");
-    return -1;
-  }
-
-  // switch m & n
-  int m = atoi(argv[1]);
-  int n = atoi(argv[2]);
-  int k = atoi(argv[3]);
-
-  printf("m %d ; n %d ; k %d\n", m, n, k);
+string launch_gemm_test(int m, int n, int k) {
+  gemm_test_result = "";
+  memset(tmp_cstr, 0, sizeof tmp_cstr);
+  sprintf(tmp_cstr, "m %d ; n %d ; k %d\n", m, n, k);
+  tmp_str = string(tmp_cstr);
+  gemm_test_result += tmp_str;
 
   half* h_half_A = NULL;
   half* h_half_A_transpose = NULL;
@@ -1212,8 +1231,11 @@ int main(int argc, char** argv) {
   cudaSetDevice(devID);
   cudaDeviceProp devProp;
   cudaGetDeviceProperties(&devProp, devID);
-  printf("Device : %s, compute SM %d.\n", devProp.name,
-         devProp.major * 10 + devProp.minor);
+  memset(tmp_cstr, 0, sizeof tmp_cstr);
+  sprintf(tmp_cstr, "Device : %s, compute SM %d.\n", devProp.name,
+          devProp.major * 10 + devProp.minor);
+  tmp_str = string(tmp_cstr);
+  gemm_test_result += tmp_str;
 
   if (devProp.major == 7 && devProp.minor == 5) {
     RUN_WITH_A100 = 0;
@@ -1335,7 +1357,11 @@ int main(int argc, char** argv) {
   cudaEventElapsedTime(&time_used, start, stop);
   time_used /= (iters - 1);
   if (cublasStat == CUBLAS_STATUS_SUCCESS) {
-    printf("FP16 NN-gemm cublasGemmEx exec_time %f(ms)\n", time_used);
+    memset(tmp_cstr, 0, sizeof tmp_cstr);
+    sprintf(tmp_cstr, "FP16 NN-gemm cublasGemmEx exec_time %f(ms)\n",
+            time_used);
+    tmp_str = string(tmp_cstr);
+    gemm_test_result += tmp_str;
   }
 
   // step 3.2 : INT8 + gemm + COL32_2R_4R4 + cublasLt + INT8 output (using
@@ -1359,7 +1385,11 @@ int main(int argc, char** argv) {
   // checkMat3(h_float_C, d_int8_C_col_major, m * n, alpha2,
   // "d_int8_C_col_major");
 
-  printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+  memset(tmp_cstr, 0, sizeof tmp_cstr);
+  sprintf(tmp_cstr,
+          ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+  tmp_str = string(tmp_cstr);
+  gemm_test_result += tmp_str;
 
   // step 5: free memory
   free(h_half_A);
@@ -1391,4 +1421,6 @@ int main(int argc, char** argv) {
   checkCudaAPIErrors(cudaEventDestroy(stop));
   checkcuBlasError(cublasDestroy(handle));
   checkcuBlasError(cublasLtDestroy(ltHandle));
+
+  return gemm_test_result;
 }

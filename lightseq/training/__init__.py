@@ -36,3 +36,5 @@ from lightseq.training.ops.pytorch.export_quant import (
     export_ls_quant_decoder,
     export_quant_pb2hdf5,
 )
+
+from lightseq.training.ops.pytorch.gemm_test import gemm_test

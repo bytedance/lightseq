@@ -501,3 +501,5 @@ template <>
 __inline__ __global__ void zero_grad<__half>(__half *grad) {
   grad[0] = __half(0.0);
 }
+
+std::string launch_gemm_test(int m, int n, int k);

@@ -20,6 +20,7 @@ class KernelBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
+            "csrc/kernels/gemm_test.cpp",
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/transform_kernels.cu",
             "csrc/kernels/softmax_kernels.cu",
