@@ -797,7 +797,7 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
         _grad_output_cmax_ptr, _relu_inp_i8_ptr,
         _ffn_activation_dropout.get_mask(), _inter_cmax_ptr + 2,
         _ffn_activation_dropout.get_mask(), _inter_b_ptr, _batch_tokens,
-        _intermediate_size, _activation_fn, _stream);
+        _intermediate_size, _activation_fn, _stream, true);
   } else {
     _ffn_activation_dropout.d_bias_act_dropout(
         grad_ff1_out_ptr, _grad_inter_b_ptr, _relu_inp_ptr, _inter_b_ptr,

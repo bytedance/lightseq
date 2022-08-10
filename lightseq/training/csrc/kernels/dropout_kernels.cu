@@ -1489,7 +1489,8 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
     T *in_grad, T *bias_grad, T *cmax_in_grad, T *cmax_out_grad,
     const int8_t *input, const T *cmax_in, const uint8_t *cmask_in,
     const uint8_t *cmask_out, const T *bias, const T *out_grad,
-    const uint8_t *dropout_mask, int row_size, float ratio, int hidden_size) {
+    const uint8_t *dropout_mask, int row_size, float ratio, int hidden_size,
+    bool in_col32) {
   const float scale = 1.f / (1.f - ratio);
   __shared__ float tile[WARP_SIZE][WARP_SIZE + 1];
 
@@ -1510,14 +1511,25 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
   float thread_in_grad = 0;
   float temp_cmax_in_grad = 0;
   float temp_cmax_out_grad = 0;
+
+  int input_index;
+
   if (col_idx < hidden_size) {
     for (int r = threadIdx.y; r < row_size; r += WARP_SIZE) {
       float val = out_grad[idx];
       // clip_bwd(thread_in_grad, temp_cmax_out_grad, float{out_grad[idx]},
       //          cmask_out[idx], 2);
       // thread_cmax_out_grad += temp_cmax_out_grad;
+      if (in_col32) {
+        int row_id = idx / hidden_size;
+        int col_id = idx % hidden_size;
+        input_index =
+            row_major2flat_col32(row_id, col_id, row_size, hidden_size);
+      } else {
+        input_index = idx;
+      }
 
-      float in = dequantize(input[idx], cmax_in_val);
+      float in = dequantize(input[input_index], cmax_in_val);
       float b = bias[idx % hidden_size];
       uint8_t mask = dropout_mask[idx];
       thread_in_grad = activation_bwd_kernel<act_type, float>(
@@ -1574,16 +1586,16 @@ void launch_ls_quant_dropout_act_bias_bwd(
     const int8_t *input, const T *cmax_in, const uint8_t *cmask_in,
     const uint8_t *cmask_out, const T *bias, const T *out_grad,
     const uint8_t *dropout_mask, int row_size, int dim, float ratio,
-    cudaStream_t stream) {
+    cudaStream_t stream, bool in_col32) {
   zero_grad<<<1, 1>>>(cmax_in_grad);
   zero_grad<<<1, 1>>>(cmax_out_grad);
   dim3 grid_dim((dim - 1) / WARP_SIZE + 1);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
   ls_quant_dropout_act_bias_bwd_kernel<act_type>
-      <<<grid_dim, block_dim, 0, stream>>>(in_grad, bias_grad, cmax_in_grad,
-                                           cmax_out_grad, input, cmax_in,
-                                           cmask_in, cmask_out, bias, out_grad,
-                                           dropout_mask, row_size, ratio, dim);
+      <<<grid_dim, block_dim, 0, stream>>>(
+          in_grad, bias_grad, cmax_in_grad, cmax_out_grad, input, cmax_in,
+          cmask_in, cmask_out, bias, out_grad, dropout_mask, row_size, ratio,
+          dim, in_col32);
 }
 
 template void
@@ -1592,7 +1604,7 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, float>(
     const int8_t *input, const float *cmax_in, const uint8_t *cmask_in,
     const uint8_t *cmask_out, const float *bias, const float *out_grad,
     const uint8_t *dropout_mask, int row_size, int dim, float ratio,
-    cudaStream_t stream);
+    cudaStream_t stream, bool in_col32);
 
 template void
 launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, __half>(
@@ -1600,7 +1612,7 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, __half>(
     __half *cmax_out_grad, const int8_t *input, const __half *cmax_in,
     const uint8_t *cmask_in, const uint8_t *cmask_out, const __half *bias,
     const __half *out_grad, const uint8_t *dropout_mask, int row_size, int dim,
-    float ratio, cudaStream_t stream);
+    float ratio, cudaStream_t stream, bool in_col32);
 
 template void
 launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, float>(
@@ -1608,7 +1620,7 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, float>(
     const int8_t *input, const float *cmax_in, const uint8_t *cmask_in,
     const uint8_t *cmask_out, const float *bias, const float *out_grad,
     const uint8_t *dropout_mask, int row_size, int dim, float ratio,
-    cudaStream_t stream);
+    cudaStream_t stream, bool in_col32);
 
 template void
 launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
@@ -1616,7 +1628,7 @@ launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, __half>(
     __half *cmax_out_grad, const int8_t *input, const __half *cmax_in,
     const uint8_t *cmask_in, const uint8_t *cmask_out, const __half *bias,
     const __half *out_grad, const uint8_t *dropout_mask, int row_size, int dim,
-    float ratio, cudaStream_t stream);
+    float ratio, cudaStream_t stream, bool in_col32);
 
 /**
  * @brief fused bias, activation, and dropout backward, with float input

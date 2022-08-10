@@ -144,7 +144,7 @@ void launch_ls_quant_dropout_act_bias_bwd(
     const int8_t *input, const T *cmax_in, const uint8_t *cmask_in,
     const uint8_t *cmask_out, const T *bias, const T *out_grad,
     const uint8_t *dropout_mask, int row_size, int dim, float ratio,
-    cudaStream_t stream);
+    cudaStream_t stream, bool in_col32 = false);
 
 template <ActivationType act_type, typename T>
 void launch_ls_quant_dropout_act_bias_bwd(

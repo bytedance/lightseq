@@ -134,17 +134,17 @@ class Dropout {
                                 const uint8_t *cmask_in, const T *cmax_in,
                                 const uint8_t *cmask_out, const T *bias,
                                 int rows, int cols, std::string activation_fn,
-                                cudaStream_t stream) {
+                                cudaStream_t stream, bool in_col32 = false) {
     if (activation_fn == "relu") {
       launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, T>(
           d_inp_out, d_bias_out, d_cmax_in, d_cmax_out, qinput, cmax_in,
           cmask_in, cmask_out, bias, d_inp_out, _mask, rows, cols,
-          _config.RATIO(), stream);
+          _config.RATIO(), stream, in_col32);
     } else if (activation_fn == "gelu") {
       launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, T>(
           d_inp_out, d_bias_out, d_cmax_in, d_cmax_out, qinput, cmax_in,
           cmask_in, cmask_out, bias, d_inp_out, _mask, rows, cols,
-          _config.RATIO(), stream);
+          _config.RATIO(), stream, in_col32);
     } else {
       throw std::runtime_error("not supported activation: " + activation_fn);
     }
