@@ -58,7 +58,10 @@ class Clip(nn.Module):
                 torch.tensor(clip_value_max)
             )  # pylint: disable=not-callable
         else:
-            self.register_buffer("clip_value_max", torch.tensor(clip_value_max))
+            self.clip_value_max = Parameter(
+                torch.tensor(clip_value_max),
+                requires_grad=False
+            ) 
 
         # if learn_min :
         #     if not isinstance(clip_value_min, float) and clip_value_min.size != 1:
@@ -74,5 +77,6 @@ class Clip(nn.Module):
 
     def forward(self, inputs):
         self.clip_value_min = -self.clip_value_max
-        outputs = QF.clip(inputs, self.clip_value_min, self.clip_value_max)
+        outputs = torch.clamp(inputs, self.clip_value_min, self.clip_value_max)
+        # outputs = QF.clip(inputs, self.clip_value_min, self.clip_value_max)
         return outputs

@@ -331,36 +331,21 @@ class FakeTensorQuantFunction(Function):
     """
 
     @staticmethod
-    def forward(ctx, inputs, amax, num_bits=8, unsigned=False, narrow_range=True, f_a=1, f_b=0):
+    def forward(ctx, inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
         # ctx.save_for_backward(inputs, amax)
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
         outputs = (outputs * scale).to(inputs.dtype)
-        ctx.unsigned = unsigned
-        # assert ((inputs - outputs).max()*2 - scale) < 0.01
-        # diff = torch.abs((inputs - outputs)/scale)
-        # print(scale, unsigned)
-        # print(diff.max())
-        # import pdb; pdb.set_trace()
-        if not unsigned:
-            ctx.f_a = f_a
-            ctx.f_b = f_b
-            # diff = torch.abs((inputs - outputs)/scale)
-            ctx.save_for_backward(inputs - outputs)
+        amax.data = amax * 0.9995 + 0.0005 * torch.max(inputs)
         return outputs
 
     @staticmethod
     def backward(ctx, grad_outputs):
-        if not ctx.unsigned:
-            diff = ctx.saved_tensors[0]
-            scale = ctx.f_a - ctx.f_b * diff
-            grad_outputs = scale * grad_outputs
         # inputs, amax = ctx.saved_tensors
         # zero = grad_outputs.new_zeros(1)
         # grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
-        return grad_outputs, None, None, None, None, None, None
-
+        return grad_outputs, None, None, None, None
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
     """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""

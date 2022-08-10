@@ -8,13 +8,13 @@ if [ ! -d "/tmp/wmt14" ]; then
     hdfs dfs -get hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/datasets/en-fr/onefile_databin /tmp/wmt14
 fi
 
-lightseq-train /tmp/wmt14/ \
+CUDA_VISIBLE_DEVICES=0 lightseq-train /tmp/wmt14/ \
     --task translation \
-    --save-dir quant_scape_2 \
+    --save-dir quant_scape2 \
     --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
-    --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
+    --lr 5e-6 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
     --max-tokens 8192 \
     --eval-bleu \
@@ -27,6 +27,7 @@ lightseq-train /tmp/wmt14/ \
     --fp16 \
     --use-torch-layer \
     --enable-quant \
+    --finetune-from-model fp16/checkpoint_best.pt \
     --quant-mode qat --max-epoch 30
 
-hdfs dfs -put quant_scape_2/* hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/pretrain_model/wmt14en-fr/int8_torch/
+# hdfs dfs -put quant_scape_2/* hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/pretrain_model/wmt14en-fr/int8_torch/

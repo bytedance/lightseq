@@ -336,20 +336,15 @@ class TensorQuantizer(nn.Module):
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""
-        if self._learn_amax:
-            inputs = self.clip(inputs)
-            # amax = torch.max(
-            #     -self.clip.clip_value_min, self.clip.clip_value_max
-            # ).detach()
-            amax = self.clip.clip_value_max
-        else:
-            inputs = self.clip(inputs)
-            amax = self._get_amax(inputs)
+        inputs = self.clip(inputs)
+
+        amax = self.clip.clip_value_max
+
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
                 outputs = fake_tensor_quant(
-                    inputs, amax, self._num_bits, self._unsigned, self._narrow_range, self.f_a, self.f_b,
+                    inputs, amax, self._num_bits, self._unsigned, self._narrow_range
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
