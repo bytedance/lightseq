@@ -46,5 +46,4 @@ class Tensor {
   void reset_fixed();
 };
 
-
 }  // namespace lightseq

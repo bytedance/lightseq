@@ -16,12 +16,12 @@ void pybind_test_2_layer() {
     host_input.push_back(i * 100);
   }
 
-  int* arr = (int*)cuda_malloc<char>(mx_size * 4 * sizeof(int));  
-  cudaMemcpy((void*)arr, host_input.data(), 
-    sizeof(int) * mx_size * 4, cudaMemcpyHostToDevice);
+  int* arr = (int*)cuda_malloc<char>(mx_size * 4 * sizeof(int));
+  cudaMemcpy((void*)arr, host_input.data(), sizeof(int) * mx_size * 4,
+             cudaMemcpyHostToDevice);
 
-//   print_vec(arr, "input_arr", mx_size * 4);
-    
+  //   print_vec(arr, "input_arr", mx_size * 4);
+
   int* wei1 = (int*)arr;
   int* wei2 = wei1 + mx_size;
   int* grad1 = wei2 + mx_size;
@@ -32,7 +32,6 @@ void pybind_test_2_layer() {
   Variable* input = new Variable("inputA", mx_size, sizeof(int), sizeof(int));
   Variable* output = (*layer)(input);
 
-
   // ================= before forward =================
   int size = 5;
   layer->before_forward(size);
@@ -42,11 +41,11 @@ void pybind_test_2_layer() {
   std::vector<int> temp_inp{};
   for (int i = 0; i < 10; i++) {
     temp_inp.push_back(i);
-  }  
-  cudaMemcpy((void*)input_ptr, temp_inp.data(), 
-    sizeof(int) * 10, cudaMemcpyHostToDevice);
-  
-//   print_vec(input_ptr, "input_ptr", mx_size);
+  }
+  cudaMemcpy((void*)input_ptr, temp_inp.data(), sizeof(int) * 10,
+             cudaMemcpyHostToDevice);
+
+  //   print_vec(input_ptr, "input_ptr", mx_size);
 
   input->set_value(input_ptr);
 

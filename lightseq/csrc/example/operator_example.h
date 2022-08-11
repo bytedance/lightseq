@@ -33,17 +33,17 @@ class AddOperator : public Operator {
     T1* temp_inpA = (T1*)malloc(sizeof(T1) * _mx_size);
     T1* temp_inpB = (T1*)malloc(sizeof(T1) * _mx_size);
 
-    cudaMemcpy(temp_inpA, inpA_ptr, 
-      sizeof(T1) * _mx_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(temp_inpB, inpB_ptr, 
-      sizeof(T1) * _mx_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(temp_inpA, inpA_ptr, sizeof(T1) * _mx_size,
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(temp_inpB, inpB_ptr, sizeof(T1) * _mx_size,
+               cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < this->_size; i++) {
       temp_out[i] = temp_inpA[i] + temp_inpB[i];
     }
 
-    cudaMemcpy(out_ptr, temp_out, 
-      sizeof(T1) * _mx_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(out_ptr, temp_out, sizeof(T1) * _mx_size,
+               cudaMemcpyHostToDevice);
   }
 
   void before_backward(size_t size) { _size = size; }

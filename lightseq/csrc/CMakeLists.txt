@@ -8,10 +8,8 @@ set(CMAKE_CUDA_ARCHITECTURES
     75
     80
     86
-    87
-)
+    87)
 find_package(CUDA 11.6 REQUIRED)
-
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
@@ -40,11 +38,8 @@ set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(COMMON_HEADER_DIRS 
-    ${PROJECT_SOURCE_DIR} 
-    ${CUDA_PATH}/include 
-    core/includes
-    kernels/includes)
+set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include core/includes
+                       kernels/includes)
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
 include_directories(${COMMON_HEADER_DIRS})
