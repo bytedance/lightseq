@@ -530,7 +530,7 @@ void TransformerEncoderLayer<T>::SetQuantMode(bool enable_quant) {
 
 template <typename T>
 void TransformerEncoderLayer<T>::zero_mask_grad() {
-  cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 24 * sizeof(T), 0);
+  cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 12 * sizeof(T), 0);
   _attn_prob_dropout.zero_mask(0);
   _attn_dropout.zero_mask(0);
   _ffn_activation_dropout.zero_mask(0);

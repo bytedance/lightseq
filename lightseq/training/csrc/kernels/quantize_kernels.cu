@@ -500,6 +500,10 @@ __global__ void d_cmax_kernel<float>(float *grad, float *grad_cmax,
 
   grad4[i] = grad4_i;
   if (grad_cmax) {
+    if (threadIdx.x == 0) {
+      block_grad_cmax = 0;
+    }
+    __syncthreads();
     if (thread_grad_cmax != 0) {
       atomicAdd(&block_grad_cmax, thread_grad_cmax);
     }
@@ -544,6 +548,11 @@ __global__ void d_cmax_kernel<__half>(__half *grad, __half *grad_cmax,
 
   grad8[i] = grad8_i;
   if (grad_cmax) {
+    if (threadIdx.x == 0) {
+      block_grad_cmax = 0;
+    }
+    __syncthreads();
+
     if (thread_grad_cmax != 0) {
       atomicAdd(&block_grad_cmax, thread_grad_cmax);
     }
