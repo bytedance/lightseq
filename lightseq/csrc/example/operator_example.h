@@ -29,11 +29,21 @@ class AddOperator : public Operator {
     const T1* inpB_ptr = (T1*)this->parent(1)->value();
     T1* out_ptr = (T1*)this->child(0)->value();
 
+    T1* temp_out = (T1*)malloc(sizeof(T1) * _mx_size);
+    T1* temp_inpA = (T1*)malloc(sizeof(T1) * _mx_size);
+    T1* temp_inpB = (T1*)malloc(sizeof(T1) * _mx_size);
+
+    cudaMemcpy(temp_inpA, inpA_ptr, 
+      sizeof(T1) * _mx_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(temp_inpB, inpB_ptr, 
+      sizeof(T1) * _mx_size, cudaMemcpyDeviceToHost);
+
     for (int i = 0; i < this->_size; i++) {
-      out_ptr[i] = inpA_ptr[i] + inpB_ptr[i];
-      // printf("%d %d %d\n", (int)out_ptr[i], (int)inpA_ptr[i],
-      // (int)inpB_ptr[i]);
+      temp_out[i] = temp_inpA[i] + temp_inpB[i];
     }
+
+    cudaMemcpy(out_ptr, temp_out, 
+      sizeof(T1) * _mx_size, cudaMemcpyHostToDevice);
   }
 
   void before_backward(size_t size) { _size = size; }

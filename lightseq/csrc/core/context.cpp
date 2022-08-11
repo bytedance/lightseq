@@ -53,12 +53,14 @@ void Context::build() {
   memory_manager_->calculate_buffer_();
   _built = true;
 
-  // thread_context_ptr.reset(nullptr);
+  thread_context_ptr.reset();
 
 #ifdef DEBUG
   draw_all_context();
 #endif
 }
+
+thread_local ContextPtr thread_context_ptr = nullptr;
 
 void Context::draw_all_context() {}
 

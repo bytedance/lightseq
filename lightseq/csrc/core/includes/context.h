@@ -23,10 +23,17 @@ class Context {  // model only
   int _node_idx = 0;
   MemoryManagerPtr memory_manager_;
 
+  cudaStream_t _stream;
+  cublasHandle_t _cublasHandle;
+
  public:
   Context(bool training = false)
       : memory_manager_(new MemoryManager()), _is_training(training) {}
   virtual ~Context();
+
+  cudaStream_t get_stream() { return _stream; }
+
+  cublasHandle_t get_cublashandle() { return _cublasHandle; }
 
   static void new_thread_context(bool training = false);
 

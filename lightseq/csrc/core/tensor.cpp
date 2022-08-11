@@ -71,4 +71,6 @@ void Tensor::reset_fixed() {
   *this = Tensor(this->_name, tensor_size_, false);
 }
 
+int Tensor::global_tensor_id_ = 0;
+
 }  // namespace lightseq

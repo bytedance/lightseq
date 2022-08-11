@@ -1,13 +1,20 @@
 find_package(Threads REQUIRED)
+find_package(CUDAToolkit)
 
-include_directories(includes)
+add_library(core STATIC 
+    context.cpp
+    node.cpp
+    manager.cpp
+    layer.cpp
+    tensor.cpp
+)
 
-add_library(node SHARED node.cpp)
+target_link_libraries(core PUBLIC cuda_kernels)
 
-add_library(context SHARED context.cpp)
 
-add_library(manager SHARED manager.cpp)
-
-add_library(layer SHARED layer.cpp)
-
-add_library(tensor SHARED tensor.cpp)
+if(DYNAMIC_API)
+  target_link_libraries(core PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(core PRIVATE CUDA::cublas_static
+                                          CUDA::cublasLt_static)
+endif()
