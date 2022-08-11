@@ -4,17 +4,18 @@
 
 namespace lightseq {
 
-template<class T1, class T2>
+template <class T1, class T2>
 class AddOperator : public Operator {
  private:
   size_t _size;
   size_t _mx_size;
 
  public:
-  AddOperator(size_t mx_size): Operator("add_op"), _mx_size(mx_size) {}
+  AddOperator(size_t mx_size) : Operator("add_op"), _mx_size(mx_size) {}
 
   Variable* operator()(Variable* inp_1, Variable* inp_2) {
-    Variable* result = new Variable(this->_name + "-out", _mx_size, sizeof(T1), sizeof(T2));
+    Variable* result =
+        new Variable(this->_name + "-out", _mx_size, sizeof(T1), sizeof(T2));
     this->set_parents({inp_1, inp_2});
     this->set_children({result});
     return result;
@@ -30,7 +31,8 @@ class AddOperator : public Operator {
 
     for (int i = 0; i < this->_size; i++) {
       out_ptr[i] = inpA_ptr[i] + inpB_ptr[i];
-      // printf("%d %d %d\n", (int)out_ptr[i], (int)inpA_ptr[i], (int)inpB_ptr[i]);
+      // printf("%d %d %d\n", (int)out_ptr[i], (int)inpA_ptr[i],
+      // (int)inpB_ptr[i]);
     }
   }
 
@@ -54,4 +56,4 @@ class AddOperator : public Operator {
 };
 
 template class AddOperator<int, int>;
-}
+}  // namespace lightseq

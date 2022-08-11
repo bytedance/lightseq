@@ -26,4 +26,4 @@ using TensorPtr = std::shared_ptr<Tensor>;
 
 thread_local ContextPtr thread_context_ptr;
 
-}
+}  // namespace lightseq

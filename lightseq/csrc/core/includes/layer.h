@@ -35,4 +35,4 @@ class Layer {
 
 // std::map<std::string, int> Layer::_name_cnt = {};
 
-}
+}  // namespace lightseq

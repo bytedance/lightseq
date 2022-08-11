@@ -12,7 +12,7 @@
 namespace lightseq {
 
 class Context {  // model only
-private:
+ private:
   std::vector<Node*> _all_node_vec{};
   std::vector<Layer*> _root_layers{};
   std::deque<Layer*> _layer_context;
@@ -23,7 +23,7 @@ private:
   int _node_idx = 0;
   MemoryManagerPtr memory_manager_;
 
-public:
+ public:
   Context(bool training = false)
       : memory_manager_(new MemoryManager()), _is_training(training) {}
   virtual ~Context();
@@ -42,9 +42,9 @@ public:
   // property field
   bool is_training() { return _is_training; }
   int node_idx() { return _node_idx; }
-  void update_node_idx() { 
-    if (_built) return; 
-    _node_idx ++; 
+  void update_node_idx() {
+    if (_built) return;
+    _node_idx++;
   }
   bool built() { return _built; }
   MemoryManagerPtr memory_manager_ptr() { return memory_manager_; }
@@ -62,4 +62,4 @@ public:
   void draw_all_context();
 };
 
-}
+}  // namespace lightseq

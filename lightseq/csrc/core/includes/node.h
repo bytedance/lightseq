@@ -24,7 +24,7 @@ class Node {
 
  public:
   Node(std::string name);
-  std::string name(){ return _name; }
+  std::string name() { return _name; }
   virtual ~Node();
 
   void set_parents(std::vector<Node*> parents);
@@ -43,11 +43,10 @@ class Node {
   void clear_fw_flag() { _fw_flag = false; }
   void clear_bw_flag() { _bw_flag = false; }
 
-  bool is_cover(); // true means assign, false means accumulate
+  bool is_cover();  // true means assign, false means accumulate
 };
 
 // std::map<std::string, int> Node::_name_cnt = {};
-
 
 class Variable : public Node {
  private:
@@ -56,18 +55,24 @@ class Variable : public Node {
   TensorPtr _grad;
 
  public:
-  Variable(std::string name, size_t mx_size, size_t sizeof_value, size_t sizeof_grad);
-  virtual ~Variable() {  }
+  Variable(std::string name, size_t mx_size, size_t sizeof_value,
+           size_t sizeof_grad);
+  virtual ~Variable() {}
 
-  template<class T1, class T2> explicit Variable(std::string name, size_t mx_size, const T1* para_ptr, T2* grad_ptr = nullptr);  // for parameter
+  template <class T1, class T2>
+  explicit Variable(std::string name, size_t mx_size, const T1* para_ptr,
+                    T2* grad_ptr = nullptr);  // for parameter
 
   void fixed_memory();  // Convert VariableNode to IONode
 
-  template<class T> void set_value(T* value_ptr);
+  template <class T>
+  void set_value(T* value_ptr);
 
-  template<class T> void set_value(const T* value_ptr);
+  template <class T>
+  void set_value(const T* value_ptr);
 
-  template<class T> void set_grad(T* grad_ptr);
+  template <class T>
+  void set_grad(T* grad_ptr);
 
   char* value();
 
@@ -79,13 +84,17 @@ class Variable : public Node {
 class Operator : public Node {
  public:
   Operator(std::string name);
-  virtual ~Operator() { }
+  virtual ~Operator() {}
   void check_override_grad();
 
   void set_children(std::vector<Node*> children);
 
-  Variable* child(int index) { return static_cast<Variable*>(_children[index]); }
+  Variable* child(int index) {
+    return static_cast<Variable*>(_children[index]);
+  }
 
-  Variable* parent(int index) { return static_cast<Variable*>(_parents[index]); }
+  Variable* parent(int index) {
+    return static_cast<Variable*>(_parents[index]);
+  }
 };
-}
+}  // namespace lightseq

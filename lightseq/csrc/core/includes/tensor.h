@@ -18,18 +18,19 @@ class Tensor {
   Context* context_ptr;
 
  public:
-
   Tensor(std::string name, size_t size, bool is_shared);
 
   Tensor(std::string name, Tensor father_tensor, size_t offset, int size);
 
   virtual ~Tensor() {}
 
-  template<class T>
+  template <class T>
   void set_tensor(T* inp);
 
-  template<class T>
-  void set_tensor(const T* inp) { set_tensor(const_cast<T*>(inp)); }
+  template <class T>
+  void set_tensor(const T* inp) {
+    set_tensor(const_cast<T*>(inp));
+  }
 
   char* tensor();
 
@@ -47,4 +48,4 @@ class Tensor {
 
 int Tensor::global_tensor_id_ = 0;
 
-}
+}  // namespace lightseq

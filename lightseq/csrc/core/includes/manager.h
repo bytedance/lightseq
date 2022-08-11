@@ -21,7 +21,7 @@ class TensorUsage {
   size_t size;
   std::string _name;
   TensorUsage(int uid, int fidx, int lidx, size_t s, std::string name)
-  : unique_id(uid), first_idx(fidx), last_idx(lidx), size(s), _name(name) {}
+      : unique_id(uid), first_idx(fidx), last_idx(lidx), size(s), _name(name) {}
 };
 
 class MemoryManager {
@@ -50,4 +50,4 @@ class MemoryManager {
 
   size_t buffer_size() { return buffer_size_; }
 };
-}
+}  // namespace lightseq

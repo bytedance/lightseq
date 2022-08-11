@@ -5,7 +5,7 @@
 #include "layer_example.h"
 #include "context.h"
 
-namespace lightseq{
+namespace lightseq {
 
 void pybind_test_2_layer() {
   // ================= create model =================
@@ -50,12 +50,10 @@ void pybind_test_2_layer() {
   printf("\n----------Step.x----------\n");
 }
 
-}
+}  // namespace lightseq
 
 int main() {
-
   lightseq::pybind_test_2_layer();
 
   lightseq::pybind_test_2_layer();
-
 }
