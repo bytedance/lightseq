@@ -8,7 +8,7 @@ if [ ! -d "/tmp/wmt14" ]; then
     hdfs dfs -get hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/datasets/en-fr/onefile_databin /tmp/wmt14
 fi
 
-CUDA_VISIBLE_DEVICES=0 lightseq-train /tmp/wmt14/ \
+lightseq-train /tmp/wmt14/ \
     --task translation \
     --save-dir quant_scape2 \
     --arch ls_transformer --share-decoder-input-output-embed \

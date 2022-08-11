@@ -153,3 +153,7 @@ quant_d*
 tmp
 norelu*
 checkpoint*
+
+tmp*
+*.smooth
+fp15*
