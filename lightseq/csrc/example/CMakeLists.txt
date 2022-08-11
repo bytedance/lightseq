@@ -1,0 +1,9 @@
+add_executable(lightseq_prototype_bin test_example.cpp)
+
+include_directories(../core/includes)
+
+target_link_libraries(lightseq_prototype_bin PUBLIC node)
+target_link_libraries(lightseq_prototype_bin PUBLIC context)
+target_link_libraries(lightseq_prototype_bin PUBLIC manager)
+target_link_libraries(lightseq_prototype_bin PUBLIC layer)
+target_link_libraries(lightseq_prototype_bin PUBLIC tensor)
