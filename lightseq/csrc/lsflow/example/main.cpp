@@ -23,7 +23,8 @@ void pybind_test_2_layer() {
 
   Layer2APtr<int, int> layer(
       new Layer2A<int, int>(mx_size, {wei1, wei2}, {grad1, grad2}));
-  Variable* input = new Variable("inputA", mx_size, sizeof(int), sizeof(int));
+  Variable* input =
+      new Variable("inputA", mx_size * sizeof(int), mx_size * sizeof(int));
   Variable* output = (*layer)(input);
 
   // ================= before forward =================
@@ -34,13 +35,13 @@ void pybind_test_2_layer() {
   for (int i = 0; i < 10; i++) {
     input_ptr[i] = i;
   }
-  input->set_value(input_ptr);
+  input->set_value((char*)input_ptr);
 
   int* output_ptr = (int*)malloc(size * sizeof(int));
   for (int i = 0; i < size; i++) {
     output_ptr[i] = i;
   }
-  output->set_value(output_ptr);
+  output->set_value((char*)output_ptr);
 
   layer->forward();
 
