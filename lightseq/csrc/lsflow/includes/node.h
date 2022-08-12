@@ -50,29 +50,23 @@ class Node {
 
 class Variable : public Node {
  private:
-  size_t _mx_size;
+  size_t _value_byte_size;
+  size_t _grad_byte_size;
   TensorPtr _value;
   TensorPtr _grad;
 
  public:
-  Variable(std::string name, size_t mx_size, size_t sizeof_value,
-           size_t sizeof_grad);
+  Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
+  Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
   virtual ~Variable() {}
-
-  template <class T1, class T2>
-  explicit Variable(std::string name, size_t mx_size, const T1* para_ptr,
-                    T2* grad_ptr = nullptr);  // for parameter
 
   void fixed_memory();  // Convert VariableNode to IONode
 
-  template <class T>
-  void set_value(T* value_ptr);
+  void set_value(char* value_ptr);
 
-  template <class T>
-  void set_value(const T* value_ptr);
+  void set_value(const char* value_ptr);
 
-  template <class T>
-  void set_grad(T* grad_ptr);
+  void set_grad(char* grad_ptr);
 
   char* value();
 
