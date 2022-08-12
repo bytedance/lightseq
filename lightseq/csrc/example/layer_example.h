@@ -12,7 +12,7 @@ class LayerA : public Layer {
  public:
   LayerA(int mx_size, const T1* para_ptr, T2* grad_ptr) : Layer("layera") {
     _para =
-        new Variable(this->_name + "-parameter", mx_size, para_ptr, grad_ptr);
+        new Variable(this->_name + "-parameter", (char*)para_ptr, (char*)grad_ptr);
     _operator_add = new AddOperator<T1, T2>(mx_size);
     this->_context_ptr->exit_layer();  // necessary
   }

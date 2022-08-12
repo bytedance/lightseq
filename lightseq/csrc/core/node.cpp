@@ -58,80 +58,50 @@ bool Node::is_cover() {  // true means assign, false means accumulate
   return false;
 }
 
-Variable::Variable(std::string name, size_t mx_size, size_t sizeof_value,
-                   size_t sizeof_grad)
-    : Node(name), _mx_size(mx_size) {
-  _value.reset(
-      new Tensor(this->_name + "_value", mx_size * sizeof_value, true));
-  // auto real_context_ptr = _context_ptr.lock();
+Variable::Variable(std::string name, size_t value_byte_size,
+                   size_t grad_byte_size)
+    : Node(name),
+      _value_byte_size(value_byte_size),
+      _grad_byte_size(grad_byte_size) {
+  _value.reset(new Tensor(this->_name + "/value", _value_byte_size));
   if (_context_ptr->is_training())
-    _grad.reset(new Tensor(this->_name + "_grad", mx_size * sizeof_grad, true));
+    _grad.reset(new Tensor(this->_name + "/grad", _grad_byte_size));
 }
 
-template <class T1, class T2>
-Variable::Variable(std::string name, size_t mx_size, const T1* para_ptr,
-                   T2* grad_ptr)  // for parameter
-    : Node(name), _mx_size(mx_size) {
-  // auto real_context_ptr = _context_ptr.lock();
-  _value.reset(new Tensor(this->_name + "_value", mx_size * sizeof(T1), false));
-  if (_context_ptr->is_training())
-    _grad.reset(new Tensor(this->_name + "_grad", mx_size * sizeof(T2), false));
-  if (para_ptr) {
-    _value->set_tensor(para_ptr);
-  }
-  if (grad_ptr && _context_ptr->is_training()) {
+Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
+    : Variable(name, (size_t)0, (size_t)0) {
+  _value->set_tensor(para_ptr);
+  if (_grad) {
     _grad->set_tensor(grad_ptr);
   }
 }
 
-template Variable::Variable<int, int>(std::string name, size_t mx_size,
-                                      const int* para_ptr, int* grad_ptr);
-
-void Variable::fixed_memory() {  // Convert VariableNode to IONode
-  if (this->_value->memory_type() != FixedMemory) {
-    if (parents().size() > 0 && children().size() > 0) {
-      printf("ERROR! this node is not a IONode!\n");
-      exit(-1);
-    }
-    this->_value->reset_fixed();
+void Variable::fixed_memory() {
+  if (parents().size() > 0 && children().size() > 0) {
+    printf("ERROR! this node is not a IONode!\n");
+    exit(-1);
   }
-  // auto real_context_ptr = _context_ptr.lock();
-  if (_context_ptr->is_training() &&
-      this->_grad->memory_type() != FixedMemory) {
-    this->_grad->reset_fixed();
+  _value->reset_fixed();
+  if (_grad) {
+    _grad->reset_fixed();
   }
   return;
 }
 
-template <class T>
-void Variable::set_value(T* value_ptr) {
-  fixed_memory();
-  _value->set_tensor<T>(value_ptr);
+void Variable::set_value(char* value_ptr) {
+  _value->reset_fixed();
+  _value->set_tensor(value_ptr);
 }
 
-template void Variable::set_value<int>(int* value_ptr);
-template void Variable::set_value<char>(char* value_ptr);
-template void Variable::set_value<float>(float* value_ptr);
-
-template <class T>
-void Variable::set_value(const T* value_ptr) {
-  fixed_memory();
-  _value->set_tensor<T>(value_ptr);
+void Variable::set_value(const char* value_ptr) {
+  _value->reset_fixed();
+  _value->set_tensor(value_ptr);
 }
 
-template void Variable::set_value<int>(const int* value_ptr);
-template void Variable::set_value<char>(const char* value_ptr);
-template void Variable::set_value<float>(const float* value_ptr);
-
-template <class T>
-void Variable::set_grad(T* grad_ptr) {
-  fixed_memory();
-  _grad->set_tensor<T>(grad_ptr);
+void Variable::set_grad(char* grad_ptr) {
+  _grad->reset_fixed();
+  _grad->set_tensor(grad_ptr);
 }
-
-template void Variable::set_grad<int>(int* grad_ptr);
-template void Variable::set_grad<char>(char* grad_ptr);
-template void Variable::set_grad<float>(float* grad_ptr);
 
 char* Variable::value() { return _value->tensor(); }
 

@@ -29,7 +29,7 @@ void pybind_test_2_layer() {
 
   Layer2APtr<int, int> layer(
       new Layer2A<int, int>(mx_size, {wei1, wei2}, {grad1, grad2}));
-  Variable* input = new Variable("inputA", mx_size, sizeof(int), sizeof(int));
+  Variable* input = new Variable("inputA", mx_size * sizeof(int), mx_size * sizeof(int));
   Variable* output = (*layer)(input);
 
   // ================= before forward =================
@@ -47,10 +47,10 @@ void pybind_test_2_layer() {
 
   //   print_vec(input_ptr, "input_ptr", mx_size);
 
-  input->set_value(input_ptr);
+  input->set_value((char*)input_ptr);
 
   int* output_ptr = (int*)cuda_malloc<char>(mx_size * sizeof(int));
-  output->set_value(output_ptr);
+  output->set_value((char*)output_ptr);
 
   layer->forward();
 

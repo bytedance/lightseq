@@ -15,7 +15,7 @@ class AddOperator : public Operator {
 
   Variable* operator()(Variable* inp_1, Variable* inp_2) {
     Variable* result =
-        new Variable(this->_name + "-out", _mx_size, sizeof(T1), sizeof(T2));
+        new Variable(this->_name + "-out", _mx_size * sizeof(T1), _mx_size * sizeof(T2));
     this->set_parents({inp_1, inp_2});
     this->set_children({result});
     return result;

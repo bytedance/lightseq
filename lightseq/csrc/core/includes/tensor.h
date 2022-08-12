@@ -7,37 +7,31 @@ namespace lightseq {
 
 class Tensor {
  private:
-  LSMemoryType memory_type_;
-  char* tensor_ = nullptr;
-  int unique_id_ = -1;
+  LSMemoryType _mtype;
+  char* _ptr = nullptr;
+  int _id = -1;
   std::string _name;
-  size_t tensor_size_;
+  size_t _size;
+  MemoryManagerPtr _mm_ptr = nullptr;
+  Context* _ctx_ptr;
 
-  static int global_tensor_id_;
-  MemoryManagerPtr memory_manager_ptr = nullptr;
-  Context* context_ptr;
+  static int global_tensor_id;
 
  public:
-  Tensor(std::string name, size_t size, bool is_shared);
-
-  Tensor(std::string name, Tensor father_tensor, size_t offset, int size);
+  Tensor(std::string name, size_t size);
 
   virtual ~Tensor() {}
 
-  template <class T>
-  void set_tensor(T* inp);
+  void set_tensor(char* inp);
 
-  template <class T>
-  void set_tensor(const T* inp) {
-    set_tensor(const_cast<T*>(inp));
-  }
+  void set_tensor(const char* inp);
 
   char* tensor();
 
-  LSMemoryType memory_type() { return memory_type_; }
+  LSMemoryType memory_type() { return _mtype; }
 
-  size_t size() { return tensor_size_; }
-  int unique_id() { return unique_id_; }
+  size_t size() { return _size; }
+  int unique_id() { return _id; }
 
   void update_life_idx(int node_idx);
 
@@ -45,5 +39,6 @@ class Tensor {
 
   void reset_fixed();
 };
+
 
 }  // namespace lightseq

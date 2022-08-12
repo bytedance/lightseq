@@ -2,75 +2,69 @@
 
 namespace lightseq {
 
-Tensor::Tensor(std::string name, size_t size, bool is_shared)
-    : unique_id_(global_tensor_id_++) {  // fixed memory
-  tensor_size_ = size;
+Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
   _name = name;
-  memory_type_ = is_shared ? SharedMemory : FixedMemory;
-  context_ptr = thread_context_ptr.get();
-  memory_manager_ptr = thread_context_ptr->memory_manager_ptr();
-  if (is_shared) {
-    thread_context_ptr->mx_tensor_size =
-        std::max(thread_context_ptr->mx_tensor_size, tensor_size_);
+  _size = size;
+  _mtype = size > 0 ? SharedMemory : FixedMemory;
+  if (_mtype == SharedMemory) {
+    _ctx_ptr = thread_context_ptr.get();
+    _mm_ptr = _ctx_ptr->memory_manager_ptr();
+    _ctx_ptr->mx_tensor_size =
+        std::max(thread_context_ptr->mx_tensor_size, _size);
   }
 }
 
-Tensor::Tensor(std::string name, Tensor father_tensor, size_t offset, int size)
-    : unique_id_(father_tensor.unique_id()) {
-  memory_type_ = father_tensor.memory_type();
-  tensor_ = father_tensor.tensor() + offset;
-  _name = name;
-  tensor_size_ = size;
-  context_ptr = thread_context_ptr.get();
-  memory_manager_ptr = thread_context_ptr->memory_manager_ptr();
-}
-
-template <class T>
-void Tensor::set_tensor(T* inp) {
-  if (inp == nullptr) {
-    return;
-  }
-  if (memory_type_ == SharedMemory) {
-    printf("set_tensor(T* inp) Error occuried!\n");
-    printf("this tensor name is: %s\n", _name.c_str());
+void Tensor::set_tensor(char* inp) {
+  if (_mtype == SharedMemory) {
+    printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
     exit(-1);
   }
-  tensor_ = (char*)inp;
+  if (!inp) {
+    printf("set_tensor for %s with nullptr!\n", _name.c_str());
+    exit(-1);
+  }
+  _ptr = inp;
 }
 
-template void Tensor::set_tensor<int>(int* inp);
-template void Tensor::set_tensor<char>(char* inp);
-template void Tensor::set_tensor<float>(float* inp);
+void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
 char* Tensor::tensor() {
-  if (tensor_ == nullptr) {
-    if (!context_ptr->built()) {
-      update_life_idx(context_ptr->node_idx());
-      return context_ptr->temporary_buffer_;
+  if (_mtype == FixedMemory) {
+    if (!_ptr) {
+      printf("%s is null when use, plz set first!\n", _name.c_str());
+      exit(-1);
     }
-    tensor_ = memory_manager_ptr->get_memory(unique_id_);
+    return _ptr;
   }
-  return tensor_;
+  if (_ptr == nullptr) {
+    if (!_ctx_ptr->built()) {
+      update_life_idx(_ctx_ptr->node_idx());
+      return _ctx_ptr->temporary_buffer_;
+    }
+    _ptr = _mm_ptr->get_memory(_id);
+  }
+  return _ptr;
 }
 
 void Tensor::update_life_idx(int node_idx) {
-  if (memory_type_ == FixedMemory) {
+  if (_mtype == FixedMemory) {
     return;
   }
-  memory_manager_ptr->update_tensor_life_idx(unique_id_, node_idx, tensor_size_,
-                                             _name);
+  _mm_ptr->update_tensor_life_idx(_id, node_idx, _size, _name);
 }
 
 void Tensor::remove_life_cycle() {
-  if (memory_manager_ptr != nullptr)
-    memory_manager_ptr->remove_life_cycle(unique_id_);
+  if (_mm_ptr) _mm_ptr->remove_life_cycle(_id);
 }
 
 void Tensor::reset_fixed() {
+  if (_mtype == FixedMemory) {
+    //_ptr = nullptr;
+    return;
+  }
   this->remove_life_cycle();
-  *this = Tensor(this->_name, tensor_size_, false);
+  *this = Tensor(this->_name, 0);
 }
 
-int Tensor::global_tensor_id_ = 0;
-
+int Tensor::global_tensor_id = 0;
 }  // namespace lightseq
