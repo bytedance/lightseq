@@ -50,7 +50,7 @@ void Context::build() {
   }
 
   free(temporary_buffer_);
-  memory_manager_->calculate_buffer_();
+  _mm_ptr->calculate_buffer_();
   _built = true;
 
   thread_context_ptr.reset();
@@ -63,5 +63,7 @@ void Context::build() {
 thread_local ContextPtr thread_context_ptr = nullptr;
 
 void Context::draw_all_context() {}
+
+// thread_local ContextPtr thread_context_ptr = nullptr;
 
 }  // namespace lightseq

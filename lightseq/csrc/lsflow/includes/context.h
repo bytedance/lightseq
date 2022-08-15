@@ -21,14 +21,14 @@ class Context {  // model only
   bool _built = false;
   bool _building = false;
   int _node_idx = 0;
-  MemoryManagerPtr memory_manager_;
+  MemoryManagerPtr _mm_ptr;
 
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
 
  public:
   Context(bool training = false)
-      : memory_manager_(new MemoryManager()), _is_training(training) {}
+      : _mm_ptr(new MemoryManager()), _is_training(training) {}
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
@@ -54,7 +54,7 @@ class Context {  // model only
     _node_idx++;
   }
   bool built() { return _built; }
-  MemoryManagerPtr memory_manager_ptr() { return memory_manager_; }
+  MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }
 
   void add_op(Operator* op);
   void add_node(Node* node);

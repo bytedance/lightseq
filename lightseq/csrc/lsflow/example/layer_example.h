@@ -1,6 +1,6 @@
 #pragma once
-#include "layer.h"
 #include "operator_example.h"
+#include "layer.h"
 
 namespace lightseq {
 template <class T1, class T2>
@@ -46,11 +46,11 @@ class Layer2A : public Layer {
   LayerAPtr<T1, T2> layer_b;
 
  public:
-  Layer2A(int mx_size, std::vector<const T1*> para_vec,
+  Layer2A(int max_size, std::vector<const T1*> para_vec,
           std::vector<T2*> grad_vec)
       : Layer("layer2a") {
-    layer_a.reset(new LayerA<T1, T2>(mx_size, para_vec[0], grad_vec[0]));
-    layer_b.reset(new LayerA<T1, T2>(mx_size, para_vec[1], grad_vec[1]));
+    layer_a.reset(new LayerA<T1, T2>(max_size, para_vec[0], grad_vec[0]));
+    layer_b.reset(new LayerA<T1, T2>(max_size, para_vec[1], grad_vec[1]));
     this->_context_ptr->exit_layer();  // necessary
   }
 

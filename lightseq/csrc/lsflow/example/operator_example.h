@@ -8,10 +8,10 @@ template <class T1, class T2>
 class AddOperator : public Operator {
  private:
   size_t _size;
-  size_t _mx_size;
+  size_t _max_size;
 
  public:
-  AddOperator(size_t mx_size) : Operator("add_op"), _mx_size(mx_size) {}
+  AddOperator(size_t max_size) : Operator("add_op"), _max_size(max_size) {}
 
   Variable* operator()(Variable* inp_1, Variable* inp_2) {
     Variable* result =
