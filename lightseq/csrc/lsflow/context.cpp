@@ -9,7 +9,7 @@ Context::Context(bool training): _mm_ptr(new MemoryManager()), _is_training(trai
 }
 
 Context::~Context() {
-  // printf("~Context()\n");
+  printf("~Context()\n");
   _root_layers.clear();
   _layer_context.clear();
   for (auto& iter : _all_node_vec) {

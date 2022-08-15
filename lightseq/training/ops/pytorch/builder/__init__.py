@@ -7,7 +7,7 @@ from .adam_builder import AdamBuilder
 # List of all available ops
 __op_builders__ = [
     KernelBuilder(),
-    TransformerBuilder(),
+    # TransformerBuilder(),
     AdamBuilder(),
 ]
 ALL_OPS = {op.name: op for op in __op_builders__}

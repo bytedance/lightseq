@@ -9,18 +9,18 @@ NormalizeLayerOp<T1, T2>::NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t h
     Operator("NormalizeLayerOp") {
 #ifdef ONLY_OP
 
-    printf("Running Step.2.1\n");
+    //printf("Running Step.2.1\n");
     static_vars_ = cuda_malloc<T1>(max_batch_tokens);
     if (use_mean) {
         static_means_ = cuda_malloc<T1>(max_batch_tokens);
     }
-    printf("Running Step.2.2\n");
+    //printf("Running Step.2.2\n");
 #else
-    printf("Running Step.2.3\n");
+    //printf("Running Step.2.3\n");
     vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
     if (use_mean) 
         means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-    printf("Running Step.2.4\n");
+    //printf("Running Step.2.4\n");
 #endif
 
 }
@@ -66,7 +66,7 @@ void NormalizeLayerOp<T1, T2>::forward() {
     T1* vars_val = vars_->tensor();
     T1* means_val = means_->tensor();
 #endif
-    printf("Running Step.3.3\n");
+    //printf("Running Step.3.3\n");
     std::cout << ln_res_val << std::endl;
     std::cout << vars_val << std::endl;
     std::cout << means_val << std::endl;
