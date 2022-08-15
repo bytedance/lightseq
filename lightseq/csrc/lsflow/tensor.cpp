@@ -1,7 +1,7 @@
 #include "tensor.h"
 
 namespace lightseq {
-
+int Tensor::global_tensor_id = 0;
 Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
   _name = name;
   _size = size;
