@@ -29,7 +29,8 @@ void pybind_test_2_layer() {
 
   Layer2APtr<int, int> layer(
       new Layer2A<int, int>(mx_size, {wei1, wei2}, {grad1, grad2}));
-  Variable* input = new Variable("inputA", mx_size * sizeof(int), mx_size * sizeof(int));
+  Variable* input =
+      new Variable("inputA", mx_size * sizeof(int), mx_size * sizeof(int));
   Variable* output = (*layer)(input);
 
   // ================= before forward =================

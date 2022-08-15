@@ -66,5 +66,4 @@ void Tensor::reset_fixed() {
   *this = Tensor(this->_name, 0);
 }
 
-
 }  // namespace lightseq

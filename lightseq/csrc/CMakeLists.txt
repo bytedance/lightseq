@@ -38,8 +38,8 @@ set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include lsflow/includes
-                       kernels/includes)
+set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include
+                       lsflow/includes kernels/includes)
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
 include_directories(${COMMON_HEADER_DIRS})

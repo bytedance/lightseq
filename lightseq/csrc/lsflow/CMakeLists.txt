@@ -16,6 +16,6 @@ add_library(lsflow STATIC context.cpp node.cpp manager.cpp layer.cpp tensor.cpp)
 
 target_link_libraries(lsflow PUBLIC cuda_kernels)
 
-if(DEBUG) 
-    add_subdirectory(example)
+if(DEBUG)
+  add_subdirectory(example)
 endif()

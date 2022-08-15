@@ -14,7 +14,6 @@ class Node {
   Context* _context_ptr;
   std::string _name;
 
-
   bool _fw_flag;
   bool _bw_flag;
   bool _bw_first_flag;
