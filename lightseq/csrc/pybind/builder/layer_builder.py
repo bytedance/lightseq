@@ -50,7 +50,7 @@ class TransformerBuilder(CUDAOpBuilder):
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
-            paths.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"))
+            paths.append(str(pathlib.Path(__file__).parents[4] / "3rdparty" / "cub"))
         return paths
 
     def nvcc_args(self):
