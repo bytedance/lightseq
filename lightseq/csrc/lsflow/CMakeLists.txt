@@ -1,26 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
-project(LightseqProtoType LANGUAGES CXX)
+
+project(LightseqProtoType LANGUAGES CXX CUDA)
+
 find_package(Threads REQUIRED)
+
 set(CMAKE_CXX_STANDARD 14)
+
+find_package(CUDAToolkit)
 
 include_directories(includes)
 
 add_definitions(-DDEBUG)
 
-add_executable(lsflow_bin example/main.cpp)
+add_library(lsflow STATIC context.cpp node.cpp manager.cpp layer.cpp tensor.cpp)
 
-add_library(node SHARED node.cpp)
+target_link_libraries(lsflow PUBLIC cuda_kernels)
 
-add_library(context SHARED context.cpp)
-
-add_library(manager SHARED manager.cpp)
-
-add_library(layer SHARED layer.cpp)
-
-add_library(tensor SHARED tensor.cpp)
-
-target_link_libraries(lsflow_bin PUBLIC node)
-target_link_libraries(lsflow_bin PUBLIC context)
-target_link_libraries(lsflow_bin PUBLIC manager)
-target_link_libraries(lsflow_bin PUBLIC layer)
-target_link_libraries(lsflow_bin PUBLIC tensor)
+if(DEBUG) 
+    add_subdirectory(example)
+endif()

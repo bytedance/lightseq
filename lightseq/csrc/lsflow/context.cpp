@@ -36,7 +36,7 @@ void Context::build() {
   }
   _building = true;
 
-  temporary_buffer_ = (char*)malloc(mx_tensor_size);
+  temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
