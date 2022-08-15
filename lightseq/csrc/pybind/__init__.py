@@ -1,4 +1,3 @@
-
 from .builder import TransformerBuilder
 
-transformer_cuda_module = TransformerBuilder().load()
+# transformer_cuda_module = TransformerBuilder().load()

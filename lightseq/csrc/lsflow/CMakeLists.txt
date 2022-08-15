@@ -10,8 +10,6 @@ find_package(CUDAToolkit)
 
 include_directories(includes)
 
-add_definitions(-DDEBUG)
-
 add_library(lsflow STATIC context.cpp node.cpp manager.cpp layer.cpp tensor.cpp)
 
 target_link_libraries(lsflow PUBLIC cuda_kernels)

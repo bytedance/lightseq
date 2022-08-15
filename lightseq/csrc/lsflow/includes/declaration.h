@@ -1,6 +1,9 @@
 #pragma once
 #include "memory"
 #include "thread"
+#include <stdio.h>
+#include <fstream>
+
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>

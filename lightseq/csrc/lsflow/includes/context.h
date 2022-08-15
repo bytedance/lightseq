@@ -27,15 +27,21 @@ class Context {  // model only
   cublasHandle_t _cublasHandle;
 
  public:
-  Context(bool training = false)
-      : _mm_ptr(new MemoryManager()), _is_training(training) {}
+  Context(bool training = false);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
 
   cublasHandle_t get_cublashandle() { return _cublasHandle; }
 
+  void set_stream(cudaStream_t stream) {
+    _stream = stream;
+    CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
+  }
+
   static void new_thread_context(bool training = false);
+
+  static void remove_thread_context(); 
 
   static void set_thread_context(ContextPtr context_ptr);
 
