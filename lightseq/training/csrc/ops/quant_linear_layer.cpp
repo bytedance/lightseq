@@ -32,18 +32,17 @@ void QuantLinearLayer<T>::Forward(const T *inputs_ptr, const T *weight_ptr,
 
   if (_enable_quant) {
     launch_quantize<T>(_quant_input_ptr, nullptr, _igemm_alpha_ptr, inputs_ptr,
-                       cmax_ptr, batch_tokens, _in_features, 2, stream, kCol32);
+                       cmax_ptr, _in_features * batch_tokens, 2, stream);
 
     launch_quantize<T>(_quant_weight_ptr, nullptr, nullptr, weight_ptr,
-                       cmax_ptr + 1, _out_features, _in_features, 4, stream,
-                       kCOL32_2R_4R4);
+                       cmax_ptr + 1, _in_features * _out_features, 4, stream);
 
     _linear.Forward(batch_tokens, _quant_input_ptr, _quant_weight_ptr,
                     _igemm_alpha_ptr, _igemm_beta_ptr, _quant_output_ptr,
-                    _cublasLtHandle, stream, true);
+                    _cublasLtHandle, stream);
 
     launch_dequantize(outputs_ptr, _quant_output_ptr, cmax_ptr + 2,
-                      batch_tokens, tweaked_out_features, 6, stream, true);
+                      batch_tokens * tweaked_out_features, 6, stream);
   } else {
     _linear.Forward(batch_tokens, inputs_ptr, weight_ptr, outputs_ptr,
                     _cublasHandle);
