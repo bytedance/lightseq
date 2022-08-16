@@ -41,7 +41,7 @@ class Context {  // model only
 
   static void new_thread_context(bool training = false);
 
-  static void remove_thread_context(); 
+  static void remove_thread_context();
 
   static void set_thread_context(ContextPtr context_ptr);
 

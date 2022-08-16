@@ -8,6 +8,7 @@ import torch.nn as nn
 
 
 from tests.util import TestDecorator
+
 # from lightseq.training.ops.pytorch import util
 
 from lightseq.csrc.pybind.builder import OperatorBuilder
@@ -18,11 +19,13 @@ op_module = OperatorBuilder().load()
 # def copy_para(x):
 #     return torch.nn.Parameter(torch.empty_like(x).copy_(x))
 
+
 def copy_para(x, fp16):
     y = torch.nn.Parameter(torch.empty_like(x).copy_(x)).to(x.device)
     return y.half() if fp16 else y.float()
 
-@kt.case(dtypes=[torch.float], rtol=1e-3, atol=1e-2, ntest=10)
+
+@kt.case(dtypes=[torch.float], rtol=1e-3, atol=1e-2, ntest=1)
 def test_layer_normalize_fw():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = 512
@@ -33,11 +36,11 @@ def test_layer_normalize_fw():
     betta = kt.rand((hidden_dim))
 
     torch.cuda.set_stream(torch.cuda.Stream())
-    print('--------->', torch.cuda.current_stream())
+    print("--------->", torch.cuda.current_stream())
 
     def custom():
         res = hidden_states.clone()
-        
+
         if kt.dtype == torch.float:
             func = op_module.layer_normalize_fw_fp32
         else:
@@ -60,8 +63,6 @@ def test_layer_normalize_fw():
         ]
 
     return custom, baseline
-
-
 
 
 if __name__ == "__main__":

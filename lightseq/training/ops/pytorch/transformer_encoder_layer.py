@@ -5,12 +5,14 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
-from lightseq.csrc.pybind import transformer_cuda_module
+from lightseq.csrc.pybind import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,
 )
+
+transformer_cuda_module = TransformerBuilder().load()
 
 
 _all_layer_grads = dict()

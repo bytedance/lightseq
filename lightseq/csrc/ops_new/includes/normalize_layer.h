@@ -22,9 +22,10 @@ class NormalizeLayerOp : public Operator {
 #endif
 
  public:
-  NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t hidden_dim, bool use_mean = false);
+  NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t hidden_dim,
+                   bool use_mean = false);
 
-  Variable* operator()(Variable* inp, Variable* gamma, Variable* betta); 
+  Variable* operator()(Variable* inp, Variable* gamma, Variable* betta);
 
   virtual ~NormalizeLayerOp();
 

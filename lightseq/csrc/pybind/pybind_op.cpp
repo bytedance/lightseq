@@ -4,7 +4,7 @@
 
 #include "declaration.h"
 #include "context.h"
-#include "normalize_layer_new.h"
+#include "normalize_layer.h"
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
@@ -20,12 +20,8 @@ template <typename T1, typename T2>
 void layer_normalize_fw(const torch::Tensor& ln_res, const torch::Tensor& inp,
                         const torch::Tensor& gamma, const torch::Tensor& betta,
                         int hidden_dim, int batch_tokens) {
-  Context::new_thread_context();  
-  // cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  // thread_context_ptr->set_stream(stream);
+  Context::new_thread_context();
 
-  std::cout << "!!!!!!!!!!!!!!! cuda stream: " << thread_context_ptr->get_stream() << std::endl;
-  //printf("Running Step.1\n");
   T1* ln_res_ptr = (T1*)ln_res.data_ptr();
   T1* inp_ptr = (T1*)inp.data_ptr();
   T1* gamma_ptr = (T1*)gamma.data_ptr();
@@ -33,27 +29,21 @@ void layer_normalize_fw(const torch::Tensor& ln_res, const torch::Tensor& inp,
 
   size_t batch_dim = batch_tokens * hidden_dim;
 
-
   Variable* inp_var = new Variable("inp", (char*)inp_ptr);
   Variable* gamma_var = new Variable("gamma", (char*)gamma_ptr);
   Variable* betta_var = new Variable("betta", (char*)betta_ptr);
-  //printf("Running Step.2\n");
 
   NormalizeLayerOp<T1, T2>* op =
       new NormalizeLayerOp<T1, T2>(batch_tokens, hidden_dim);
-  //printf("Running Step.3\n");
 
   Variable* out = (*op)(inp_var, gamma_var, betta_var);
 
   out->set_value((char*)ln_res_ptr);
 
-  //printf("Running Step.3.1\n");
   op->before_forward(batch_tokens);
-  //printf("Running Step.3.2\n");
 
   op->forward();
 
-  //printf("Running Step.4\n");
   Context::remove_thread_context();
 }
 

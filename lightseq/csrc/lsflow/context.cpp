@@ -2,14 +2,14 @@
 
 namespace lightseq {
 
-Context::Context(bool training): _mm_ptr(new MemoryManager()), _is_training(training) {
+Context::Context(bool training)
+    : _mm_ptr(new MemoryManager()), _is_training(training) {
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
 }
 
 Context::~Context() {
-  printf("~Context()\n");
   _root_layers.clear();
   _layer_context.clear();
   for (auto& iter : _all_node_vec) {
@@ -26,13 +26,10 @@ void Context::set_thread_context(ContextPtr context_ptr) {
   thread_context_ptr = context_ptr;
 }
 
-void Context::remove_thread_context() {
-  thread_context_ptr.reset();
-}
+void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
-void Context::add_op(Operator* op) { 
-  if(_layer_context.size())
-    _layer_context[0]->_op_vec.push_back(op); 
+void Context::add_op(Operator* op) {
+  if (_layer_context.size()) _layer_context[0]->_op_vec.push_back(op);
 }
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 

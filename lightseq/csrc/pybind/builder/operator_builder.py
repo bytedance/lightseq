@@ -39,7 +39,11 @@ class OperatorBuilder(CUDAOpBuilder):
         ]
 
     def include_paths(self):
-        paths = ["csrc/kernels/includes", "csrc/ops/includes", "csrc/lsflow/includes"]
+        paths = [
+            "csrc/kernels/includes",
+            "csrc/ops_new/includes",
+            "csrc/lsflow/includes",
+        ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
             paths.append(str(pathlib.Path(__file__).parents[4] / "3rdparty" / "cub"))
