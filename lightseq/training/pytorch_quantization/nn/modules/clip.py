@@ -55,7 +55,8 @@ class Clip(nn.Module):
                     " learnable range."
                 )
             self.clip_value_max = Parameter(
-                torch.tensor(clip_value_max)
+                torch.tensor(clip_value_max),
+                requires_grad=False
             )  # pylint: disable=not-callable
         else:
             self.clip_value_max = Parameter(

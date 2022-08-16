@@ -10,7 +10,7 @@ fi
 
 lightseq-train /tmp/wmt14/ \
     --task translation \
-    --save-dir checkpoint_fp16 \
+    --save-dir fp16 \
     --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \

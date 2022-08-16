@@ -1,5 +1,8 @@
+from typing_extensions import IntVar
 import torch
+from torch._C import device
 import torch.nn as nn
+import torch.distributed as dist
 from fairseq import utils
 from fairseq.models import (
     FairseqEncoder,
@@ -20,10 +23,13 @@ from lightseq.training.ops.pytorch.quantization import (
     ptq_mode,
     TensorQuantizer,
 )
+import random
+import logging
 
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
 MAX_SEQ_LENGTH = 300
+logger = logging.getLogger(__name__)
 
 
 @register_model("ls_transformer")
@@ -31,6 +37,11 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     def __init__(self, args, encoder, decoder):
         super().__init__(encoder, decoder)
         self.args = args
+        self.params_clip = None
+        self.device = None
+        self.train_step = 0
+        self.last_model = True
+        self.buffer = None
 
     @staticmethod
     def add_args(parser):
@@ -128,6 +139,10 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--f-b', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--f-b', type=float, metavar='D', default=0,
+                            help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
+                            help='smooth avg')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
             '--min-params-to-wrap', type=int, metavar='D', default=DEFAULT_MIN_PARAMS_TO_WRAP,
@@ -174,10 +189,12 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
+        smooth_avg_update = 1.0 / args.smooth_avg_update
         def f_ab(m):
             if isinstance(m, TensorQuantizer):
-                m.f_a = args.f_a
-                m.f_b = args.f_b
+                m.smooth_avg = smooth_avg_update
+                # m.f_a = args.f_a
+                # m.f_b = args.f_b
         if args.enable_quant:
             encoder.apply(f_ab)
             decoder.apply(f_ab)
@@ -247,12 +264,90 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     def build_decoder(cls, args, tgt_dict, embed_tokens):
         return LSTransformerDecoder(args, tgt_dict, embed_tokens)
 
+    # def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
+    #     if self.training:
+    #         if self.params_clip is None:
+    #             self.params_clip = self.set_params()
+    #         self.last_model = True
+    #     else:
+    #         if self.last_model is True:
+    #             logger.info("avg_clip_max")
+    #             self.avg_clip_max()
+    #         self.last_model = False
+    #         self.params_clip = None
+        
+    #     # if self.params_clip is None:
+    #     #     self.params_clip = self.get_params()
+    #     encoder_out = self.encoder(src_tokens)
+    #     decoder_out = self.decoder(
+    #         prev_output_tokens, encoder_out, features_only=features_only
+    #     )
+    #     # if self.train_step % 10 == 0:
+    #     #     for n, v in self.params_clip:
+    #     #         print(self.device, n, v.item(), self.train_step, flush=True)
+    #     # self.train_step += 1
+    #     return decoder_out
+
+    # def avg_clip_max(self):
+    #     for n, v in self.params_clip:
+    #         v.data = torch.tensor(16.).to(v.data)
+
+    def avg_clip_max(self, params):
+        with torch.no_grad():
+            for i, value in enumerate(params):
+                self.buffer[i].copy_(value.data)
+            dist.all_reduce(self.buffer, op=dist.ReduceOp.AVG)
+            for i, value in enumerate(params):
+                value.data.copy_(self.buffer[i])
+            # total_gpus = float(dist.get_world_size())
+            # for value in self.params_clip:
+            #     value.data /= total_gpus
+            #     dist.all_reduce(value.data, op=dist.ReduceOp.SUM)
+
     def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
+        if self.params_clip is None:
+            self.params_clip, self.buffer = self.get_params()
+        if self.training:
+            self.last_model = True
+        else:
+            if self.last_model is True:
+                logger.info("avg_clip_max")
+                self.avg_clip_max(self.params_clip)
+            self.last_model = False
+
         encoder_out = self.encoder(src_tokens)
         decoder_out = self.decoder(
             prev_output_tokens, encoder_out, features_only=features_only
         )
+        # if self.train_step % 10 == 0:
+        #     for n, v in self.params_clip:
+        #         print(self.device, n, v.item(), self.train_step, flush=True)
+        # self.train_step += 1
         return decoder_out
+
+    # def set_params(self):
+    #     params = []
+    #     for n, v in self.named_parameters():
+    #         if n.endswith("clip_value_max") and "weight_quant" not in n:
+    #             v.data += (random.random() - 0.5) * 0.1
+    #             params.append([n, v])
+    #     return params
+
+    # def get_params(self):
+    #     params = []
+    #     for n, v in self.named_parameters():
+    #         if n.endswith("clip_value_max") and "weight_quant" not in n:
+    #             params.append([n, v])
+    #     return params 
+
+    def get_params(self):
+        params = []
+        for n, v in self.named_parameters():
+            if n.endswith("clip_value_max"):
+                params.append(v)
+        len_params = len(params)
+        buffer = torch.zeros(len_params).to(params[0].data)
+        return params, buffer
 
 
 class LSTransformerEncoder(FairseqEncoder):

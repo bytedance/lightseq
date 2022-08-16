@@ -10,7 +10,7 @@ fi
 
 lightseq-train /tmp/wmt14/ \
     --task translation \
-    --save-dir quant_scape2 \
+    --save-dir quant_notvalid_input00_sysv \
     --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
@@ -28,6 +28,6 @@ lightseq-train /tmp/wmt14/ \
     --use-torch-layer \
     --enable-quant \
     --finetune-from-model fp16/checkpoint_best.pt \
-    --quant-mode qat --max-epoch 30
+    --quant-mode qat --max-epoch 30 --keep-last-epochs 1
 
 # hdfs dfs -put quant_scape_2/* hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/pretrain_model/wmt14en-fr/int8_torch/

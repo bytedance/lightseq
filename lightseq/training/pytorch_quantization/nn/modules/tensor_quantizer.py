@@ -99,7 +99,6 @@ class TensorQuantizer(nn.Module):
         self._if_clip = False
         self._if_calib = if_calib
 
-        self.f_a, self.f_b = 1, 0
         if quant_desc.amax is not None:
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
 
@@ -109,7 +108,7 @@ class TensorQuantizer(nn.Module):
         # It makes more sense to enable clip stage (which learns amax) if learn_amax is true
         self.enable_clip()
 
-
+        self.smooth_avg = 1
         if quant_desc.calib_method == "histogram":
             self._calibrator = calib.HistogramCalibrator(
                 num_bits=self._num_bits, axis=self._axis, unsigned=self._unsigned
@@ -344,7 +343,13 @@ class TensorQuantizer(nn.Module):
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
                 outputs = fake_tensor_quant(
-                    inputs, amax, self._num_bits, self._unsigned, self._narrow_range
+                    inputs, 
+                    amax, 
+                    self._num_bits, 
+                    self._unsigned, 
+                    self._narrow_range, 
+                    self.training,
+                    self.smooth_avg,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
