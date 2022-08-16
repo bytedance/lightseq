@@ -11,7 +11,7 @@ namespace cuda {
 
 int getSMVersion();
 
-bool use_ORDER_COL32_2R_4R4 = (getSMVersion() >= 80 ? true : false);
+static bool use_ORDER_COL32_2R_4R4 = (getSMVersion() >= 80 ? true : false);
 
 enum Layout {
   kRowMajor,
