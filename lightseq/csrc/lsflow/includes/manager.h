@@ -35,7 +35,7 @@ class MemoryManager {
   MemoryManager() {}
   virtual ~MemoryManager() {
     if (buffer_ != nullptr) {
-      delete buffer_;
+      cudaFree(buffer_);
     }
   }
 

@@ -3,6 +3,7 @@
 namespace lightseq {
 
 Node::Node(std::string name) : _context_ptr(thread_context_ptr.get()) {
+  // printf("Running Step.2.6\n");
   int idx = _context_ptr->node_name_cnt[name];
   _context_ptr->node_name_cnt[name] += 1;
   _name = name + "_" + std::to_string(idx);
@@ -116,7 +117,6 @@ bool Variable::enable_override_grad() {
 }
 
 Operator::Operator(std::string name) : Node(name) {
-  // auto real_context_ptr = _context_ptr.lock();
   _context_ptr->add_op(this);
 }
 

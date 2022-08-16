@@ -12,7 +12,7 @@ class Layer {
  protected:
   ContextPtr _context_ptr;
   std::string _name;
-  // static std::map<std::string, int> _name_cnt;
+
   std::vector<Variable*> _root_var_vec = {};
   std::vector<Variable*> _leaf_var_vec = {};
 

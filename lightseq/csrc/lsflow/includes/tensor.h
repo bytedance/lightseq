@@ -40,6 +40,4 @@ class Tensor {
   void reset_fixed();
 };
 
-int Tensor::global_tensor_id = 0;
-
 }  // namespace lightseq

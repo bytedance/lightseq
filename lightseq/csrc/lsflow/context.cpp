@@ -2,8 +2,14 @@
 
 namespace lightseq {
 
+Context::Context(bool training)
+    : _mm_ptr(new MemoryManager()), _is_training(training) {
+  CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
+  CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
+  CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
+}
+
 Context::~Context() {
-  // printf("~Context()\n");
   _root_layers.clear();
   _layer_context.clear();
   for (auto& iter : _all_node_vec) {
@@ -20,7 +26,11 @@ void Context::set_thread_context(ContextPtr context_ptr) {
   thread_context_ptr = context_ptr;
 }
 
-void Context::add_op(Operator* op) { _layer_context[0]->_op_vec.push_back(op); }
+void Context::remove_thread_context() { thread_context_ptr.reset(); }
+
+void Context::add_op(Operator* op) {
+  if (_layer_context.size()) _layer_context[0]->_op_vec.push_back(op);
+}
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer) {
@@ -36,7 +46,7 @@ void Context::build() {
   }
   _building = true;
 
-  temporary_buffer_ = (char*)malloc(mx_tensor_size);
+  temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
@@ -49,14 +59,18 @@ void Context::build() {
     }
   }
 
-  free(temporary_buffer_);
+  cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
+
+  thread_context_ptr.reset();
 
 #ifdef DEBUG
   draw_all_context();
 #endif
 }
+
+thread_local ContextPtr thread_context_ptr = nullptr;
 
 void Context::draw_all_context() {}
 

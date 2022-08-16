@@ -10,10 +10,10 @@ class LayerA : public Layer {
   AddOperator<T1, T2>* _operator_add = nullptr;
 
  public:
-  LayerA(int max_size, const T1* para_ptr, T2* grad_ptr) : Layer("layera") {
-    _para = new Variable(this->_name + "-parameter", (const char*)para_ptr,
+  LayerA(int mx_size, const T1* para_ptr, T2* grad_ptr) : Layer("layera") {
+    _para = new Variable(this->_name + "-parameter", (char*)para_ptr,
                          (char*)grad_ptr);
-    _operator_add = new AddOperator<T1, T2>(max_size);
+    _operator_add = new AddOperator<T1, T2>(mx_size);
     this->_context_ptr->exit_layer();  // necessary
   }
   virtual ~LayerA() {

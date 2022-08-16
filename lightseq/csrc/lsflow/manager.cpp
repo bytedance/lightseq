@@ -26,7 +26,7 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 
 void MemoryManager::calculate_buffer_() {
   if (buffer_ != nullptr) {
-    free(buffer_);
+    cudaFree(buffer_);
   }
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
@@ -86,7 +86,7 @@ void MemoryManager::calculate_buffer_() {
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
 
-  buffer_ = (char *)malloc(total_consumption);
+  buffer_ = cuda_malloc<char>(total_consumption);
   buffer_size_ = total_consumption;
 
 #ifdef DEBUG

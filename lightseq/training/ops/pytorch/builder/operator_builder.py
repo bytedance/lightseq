@@ -8,8 +8,8 @@ from .builder import CUDAOpBuilder
 from .builder import installed_cuda_version
 
 
-class TransformerBuilder(CUDAOpBuilder):
-    NAME = "lightseq_layers"
+class OperatorBuilder(CUDAOpBuilder):
+    NAME = "lightseq_operator"
 
     def __init__(self, name=None):
         name = self.NAME if name is None else name
@@ -29,28 +29,24 @@ class TransformerBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/cross_entropy.cu",
-            "csrc/ops/context.cpp",
-            "csrc/ops/dropout.cpp",
-            "csrc/ops/feed_forward.cpp",
-            "csrc/ops/normalize_layer.cpp",
-            "csrc/ops/softmax.cpp",
-            "csrc/ops/strided_batch_gemm.cpp",
-            "csrc/layers/cross_entropy_layer.cpp",
-            "csrc/layers/transformer_encoder_layer.cpp",
-            "csrc/layers/transformer_decoder_layer.cpp",
-            "csrc/layers/transformer_embedding_layer.cpp",
-            "csrc/pybind/pybind_layer.cpp",
+            "csrc/lsflow/context.cpp",
+            "csrc/lsflow/layer.cpp",
+            "csrc/lsflow/manager.cpp",
+            "csrc/lsflow/node.cpp",
+            "csrc/lsflow/tensor.cpp",
+            "csrc/ops_new/normalize_layer.cpp",
+            "csrc/pybind/pybind_op.cpp",
         ]
 
     def include_paths(self):
         paths = [
             "csrc/kernels/includes",
-            "csrc/ops/includes",
-            "csrc/layers/includes",
+            "csrc/ops_new/includes",
+            "csrc/lsflow/includes",
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
-            paths.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"))
+            paths.append(str(pathlib.Path(__file__).parents[4] / "3rdparty" / "cub"))
         return paths
 
     def nvcc_args(self):
@@ -67,4 +63,4 @@ class TransformerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]
+        return ["-O3", "-std=c++14", "-g", "-Wno-reorder", "-DDEBUG=ON", "-DONLY_OP=ON"]

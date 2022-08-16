@@ -1,6 +1,14 @@
 #pragma once
 #include "memory"
 #include "thread"
+#include <stdio.h>
+#include <fstream>
+
+#include <cuda.h>
+#include <cuda_fp16.h>
+#include <cuda_runtime_api.h>
+#include <type_traits>
+#include "cuda_util.h"
 
 namespace lightseq {
 
@@ -24,6 +32,6 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
 
-thread_local ContextPtr thread_context_ptr;
+extern thread_local ContextPtr thread_context_ptr;
 
 }  // namespace lightseq

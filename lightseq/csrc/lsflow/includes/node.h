@@ -13,7 +13,6 @@ class Node {
  protected:
   Context* _context_ptr;
   std::string _name;
-  // static std::map<std::string, int> _name_cnt;
 
   bool _fw_flag;
   bool _bw_flag;

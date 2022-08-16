@@ -11,12 +11,18 @@ void pybind_test_2_layer() {
   // ================= create model =================
   int mx_size = 10;
   Context::new_thread_context();
-
-  int* arr = (int*)malloc(mx_size * 4 * sizeof(int));
+  std::vector<int> host_input;
   for (int i = 0; i < mx_size * 4; i++) {
-    arr[i] = i * 100;
+    host_input.push_back(i * 100);
   }
-  int* wei1 = arr;
+
+  int* arr = (int*)cuda_malloc<char>(mx_size * 4 * sizeof(int));
+  cudaMemcpy((void*)arr, host_input.data(), sizeof(int) * mx_size * 4,
+             cudaMemcpyHostToDevice);
+
+  //   print_vec(arr, "input_arr", mx_size * 4);
+
+  int* wei1 = (int*)arr;
   int* wei2 = wei1 + mx_size;
   int* grad1 = wei2 + mx_size;
   int* grad2 = grad1 + mx_size;
@@ -31,24 +37,26 @@ void pybind_test_2_layer() {
   int size = 5;
   layer->before_forward(size);
 
-  int* input_ptr = (int*)malloc(mx_size * sizeof(int));
+  int* input_ptr = (int*)cuda_malloc<char>(mx_size * sizeof(int));
+
+  std::vector<int> temp_inp{};
   for (int i = 0; i < 10; i++) {
-    input_ptr[i] = i;
+    temp_inp.push_back(i);
   }
+  cudaMemcpy((void*)input_ptr, temp_inp.data(), sizeof(int) * 10,
+             cudaMemcpyHostToDevice);
+
+  //   print_vec(input_ptr, "input_ptr", mx_size);
+
   input->set_value((char*)input_ptr);
 
-  int* output_ptr = (int*)malloc(size * sizeof(int));
-  for (int i = 0; i < size; i++) {
-    output_ptr[i] = i;
-  }
+  int* output_ptr = (int*)cuda_malloc<char>(mx_size * sizeof(int));
   output->set_value((char*)output_ptr);
 
   layer->forward();
 
-  for (int i = 0; i < mx_size; i++) {
-    printf("%d ", output_ptr[i]);
-  }
-  printf("\n----------Step.x----------\n");
+  print_vec(output_ptr, "output_ptr", mx_size);
+  printf("----------Step.x----------\n");
 }
 
 }  // namespace lightseq
