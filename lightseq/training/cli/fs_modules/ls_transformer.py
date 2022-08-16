@@ -139,8 +139,6 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--f-b', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
-        parser.add_argument('--f-b', type=float, metavar='D', default=0,
-                            help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
                             help='smooth avg')
         # args for Fully Sharded Data Parallel (FSDP) training
