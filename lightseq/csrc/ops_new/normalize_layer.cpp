@@ -7,26 +7,15 @@ NormalizeLayerOp<T1, T2>::NormalizeLayerOp(uint32_t max_batch_tokens,
                                            uint32_t hidden_dim, bool use_mean)
     : _max_batch_tokens(max_batch_tokens),
       _hidden_dim(hidden_dim),
+      _use_mean(use_mean),
       Operator("NormalizeLayerOp") {
-#ifdef ONLY_OP
-  static_vars_ = cuda_malloc<T1>(max_batch_tokens);
-  if (use_mean) {
-    static_means_ = cuda_malloc<T1>(max_batch_tokens);
-  }
-#else
   vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
   if (use_mean)
     means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-#endif
 }
 
 template <typename T1, typename T2>
-NormalizeLayerOp<T1, T2>::~NormalizeLayerOp() {
-#ifdef ONLY_OP
-  cuda_free(static_means_);
-  cuda_free(static_vars_);
-#endif
-}
+NormalizeLayerOp<T1, T2>::~NormalizeLayerOp() {}
 
 template <typename T1, typename T2>
 Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
@@ -54,13 +43,8 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   cudaStream_t stream = _context_ptr->get_stream();
 
-#ifdef ONLY_OP
-  T1* vars_val = static_vars_;
-  T1* means_val = static_means_;
-#else
-  T1* vars_val = vars_->tensor();
-  T1* means_val = means_->tensor();
-#endif
+  T1* vars_val = (T1*)vars_->tensor();
+  T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
@@ -87,13 +71,8 @@ void NormalizeLayerOp<T1, T2>::backward() {
   cudaStream_t streams[2] = {_context_ptr->get_stream(),
                              _context_ptr->get_stream()};
 
-#ifdef ONLY_OP
-  T1* vars_val = static_vars_;
-  T1* means_val = static_means_;
-#else
-  T1* vars_val = (T1*)vars_->value();
-  T1* means_val = (T1*)means_->value();
-#endif
+  T1* vars_val = (T1*)vars_->tensor();
+  T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
 
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                out_val, gamma_val, betta_val, vars_val, means_val,

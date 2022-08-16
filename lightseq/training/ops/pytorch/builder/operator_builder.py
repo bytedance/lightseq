@@ -35,6 +35,7 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/lsflow/node.cpp",
             "csrc/lsflow/tensor.cpp",
             "csrc/ops_new/normalize_layer.cpp",
+            "csrc/ops_new/feed_forward.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 
@@ -63,4 +64,4 @@ class OperatorBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder", "-DDEBUG=ON", "-DONLY_OP=ON"]
+        return ["-O3", "-std=c++14", "-g", "-Wno-reorder", "-DONLY_OP=ON"]

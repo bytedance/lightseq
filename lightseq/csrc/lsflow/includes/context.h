@@ -14,6 +14,7 @@ namespace lightseq {
 class Context {  // model only
  private:
   std::vector<Node*> _all_node_vec{};
+  std::vector<Operator*> _all_op_vec{};
   std::vector<Layer*> _root_layers{};
   std::deque<Layer*> _layer_context;
   bool _is_training = false;
@@ -23,11 +24,13 @@ class Context {  // model only
   int _node_idx = 0;
   MemoryManagerPtr _mm_ptr;
 
+  int _device_id;
+
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
 
  public:
-  Context(bool training = false);
+  Context(bool training = false, int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }

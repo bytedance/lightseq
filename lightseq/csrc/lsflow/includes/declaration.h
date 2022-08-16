@@ -9,6 +9,7 @@
 #include <cuda_runtime_api.h>
 #include <type_traits>
 #include "cuda_util.h"
+#include "cublas_wrappers.h"
 
 namespace lightseq {
 
