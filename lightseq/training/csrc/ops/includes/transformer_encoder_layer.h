@@ -13,6 +13,7 @@
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "cublas_algo_map.h"
 
 template <typename T>
 class TransformerEncoderLayer {
@@ -242,6 +243,7 @@ class TransformerEncoderLayer {
   cublasHandle_t _cublasHandle;
   cublasLtHandle_t _cublasLtHandle;
   cudaStream_t _stream;
+  cublasAlgoMap _algo_map;
 
   // layers
   FeedForward<T> _qkv_linear;

@@ -13,6 +13,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublasLt.h>
+#include "kernels.h"
 
 #define STRIDE 32
 #define BORDER 512
@@ -31,10 +32,11 @@ class cublasAlgoMap {
 
  public:
   explicit cublasAlgoMap(const std::string filename);
+  cublasAlgoMap();
   cublasAlgoMap(const cublasAlgoMap& map);
   ~cublasAlgoMap();
 
   void loadGemmConfig();
-  bool isExist(const int m, const int n, const int k);
-  cublasLtMatmulAlgo_info getAlgo(const int m, const int n, const int k);
+  bool isExist(int m, int n, int k);
+  cublasLtMatmulAlgo_info getAlgo(int m, int n, int k);
 };

@@ -9,6 +9,10 @@ cublasAlgoMap::cublasAlgoMap(const std::string filename)
   loadGemmConfig();
 }
 
+cublasAlgoMap::cublasAlgoMap() : _config_filename(IGEMM_SM80_CONFIG) {
+  loadGemmConfig();
+}
+
 cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map)
     : _config_filename(algo_map._config_filename),
       _algo_map(algo_map._algo_map) {}

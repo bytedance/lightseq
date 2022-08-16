@@ -503,3 +503,14 @@ __inline__ __global__ void zero_grad<__half>(__half *grad) {
 }
 
 std::string launch_gemm_test(int m, int n, int k);
+
+__inline__ std::vector<LSLayout> getLSLayout(std::string layout) {
+  if (layout == "CUBLASLT_ORDER_COL")
+    return {kColMajor, kColMajor, kColMajor};
+  else if (layout == "CUBLASLT_ORDER_COL4_4R2_8C")
+    return {kCol32, kCOL4_4R2_8C, kCol32};
+  else if (layout == "CUBLASLT_ORDER_COL32_2R_4R4")
+    return {kCol32, kCOL32_2R_4R4, kCol32};
+  else
+    return {kRowMajor, kRowMajor, kRowMajor};
+}
