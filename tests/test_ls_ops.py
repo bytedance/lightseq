@@ -11,7 +11,7 @@ from tests.util import TestDecorator
 
 # from lightseq.training.ops.pytorch import util
 
-from lightseq.csrc.pybind.builder import OperatorBuilder
+from lightseq.training.ops.pytorch import OperatorBuilder
 
 kt = TestDecorator()
 op_module = OperatorBuilder().load()
@@ -36,7 +36,6 @@ def test_layer_normalize_fw():
     betta = kt.rand((hidden_dim))
 
     torch.cuda.set_stream(torch.cuda.Stream())
-    print("--------->", torch.cuda.current_stream())
 
     def custom():
         res = hidden_states.clone()
@@ -46,7 +45,7 @@ def test_layer_normalize_fw():
         else:
             func = op_module.layer_normalize_fw_fp16
 
-        func(ln_res, hidden_states, gamma, betta, hidden_dim, batch_size * seq_len)
+        func(ln_res, res, gamma, betta, hidden_dim, batch_size * seq_len)
 
         return [
             ln_res.contiguous().detach(),

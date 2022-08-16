@@ -5,7 +5,7 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
-from lightseq.csrc.pybind import TransformerBuilder
+from lightseq.training.ops.pytorch import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
