@@ -523,7 +523,7 @@ bool QuantDecoder<OpType_>::run_step() {
                            _output_ln_clip_max * _trg_emb_clip_max /
                                (_logits_clip_max * _quant_range),
                            _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
-                           _cublas_lt_handle, _stream, false);
+                           _cublas_lt_handle, _stream, use_ORDER_COL32_2R_4R4);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -628,7 +628,7 @@ void QuantDecoder<OpType_>::self_attention() {
       _dec_clip_max[_layer_id * 19] * _dec_clip_max[_layer_id * 19 + 6] /
           (_dec_clip_max[_layer_id * 19 + 12] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "self qkv(head): ", 5);
@@ -725,7 +725,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       _dec_clip_max[_layer_id * 19 + 2] * _dec_clip_max[_layer_id * 19 + 8] /
           (_dec_clip_max[_layer_id * 19 + 14] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 2], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "encdec q(head): ", 5);
@@ -833,7 +833,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
       _dec_clip_max[_layer_id * 19 + 4] * _dec_clip_max[_layer_id * 19 + 10] /
           (_dec_clip_max[_layer_id * 19 + 16] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 4], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(

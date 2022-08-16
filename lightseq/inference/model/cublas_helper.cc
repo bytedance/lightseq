@@ -437,5 +437,13 @@ template void quantize_weight<half>(const half* origin_weight,
                                     cudaStream_t stream,
                                     cublasLtHandle_t handle, Layout layout);
 
+int getSMVersion() {
+  int device{-1};
+  CHECK_GPU_ERROR(cudaGetDevice(&device));
+  cudaDeviceProp props;
+  CHECK_GPU_ERROR(cudaGetDeviceProperties(&props, device));
+  return props.major * 10 + props.minor;
+}
+
 }  // namespace cuda
 }  // namespace lightseq
