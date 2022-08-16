@@ -64,22 +64,14 @@ void Context::build() {
   }
 
 #ifdef ONLY_OP
-
-  // printf("Running Step.0.1\n");
   for (int idx = 0; idx < _all_op_vec.size(); idx++) {
-    // printf("Running Step.0.1.1: operator name: %s\n",
-    // _all_op_vec[idx]->name().c_str());
     _all_op_vec[idx]->forward();
   }
-  // printf("Running Step.0.2\n");
   if (is_training()) {
     for (int idx = _all_op_vec.size() - 1; idx >= 0; idx--) {
-      // printf("Running Step.0.2.1: operator name: %s\n",
-      // _all_op_vec[idx]->name().c_str());
       _all_op_vec[idx]->backward();
     }
   }
-  // printf("Running Step.0.3\n");
 #endif
 
   cuda_free(temporary_buffer_);
