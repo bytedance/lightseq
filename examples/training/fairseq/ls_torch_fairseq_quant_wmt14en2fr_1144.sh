@@ -28,6 +28,7 @@ lightseq-train /tmp/wmt14/ \
     --use-torch-layer \
     --enable-quant \
     --finetune-from-model fp16/checkpoint_best.pt \
-    --quant-mode qat --max-epoch 30 --keep-last-epochs 1
+    --quant-mode qat --max-epoch 30 --keep-last-epochs 1 \
+    --smooth-avg-update $1
 
 # hdfs dfs -put quant_scape_2/* hdfs://haruna/home/byte_arnold_lq_mlnlc/user/duanrenchong/pretrain_model/wmt14en-fr/int8_torch/
