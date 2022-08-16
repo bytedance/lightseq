@@ -21,8 +21,6 @@ class NormalizeLayerOp : public Operator {
   TensorPtr vars_;
 #endif
 
-
-
  public:
   NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t hidden_dim, bool use_mean = false);
 

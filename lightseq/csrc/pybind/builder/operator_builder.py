@@ -34,7 +34,7 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/lsflow/manager.cpp",
             "csrc/lsflow/node.cpp",
             "csrc/lsflow/tensor.cpp",
-            "csrc/ops/normalize_layer_new.cpp",
+            "csrc/ops_new/normalize_layer.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 

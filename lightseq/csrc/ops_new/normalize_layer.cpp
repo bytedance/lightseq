@@ -1,4 +1,4 @@
-#include "normalize_layer_new.h"
+#include "normalize_layer.h"
 
 namespace lightseq {
   
@@ -8,19 +8,14 @@ NormalizeLayerOp<T1, T2>::NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t h
     _hidden_dim(hidden_dim),
     Operator("NormalizeLayerOp") {
 #ifdef ONLY_OP
-
-    //printf("Running Step.2.1\n");
     static_vars_ = cuda_malloc<T1>(max_batch_tokens);
     if (use_mean) {
         static_means_ = cuda_malloc<T1>(max_batch_tokens);
     }
-    //printf("Running Step.2.2\n");
 #else
-    //printf("Running Step.2.3\n");
     vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
     if (use_mean) 
         means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-    //printf("Running Step.2.4\n");
 #endif
 
 }
@@ -38,7 +33,7 @@ template <typename T1, typename T2>
 Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma, Variable* betta) {
     size_t max_size = _max_batch_tokens * _hidden_dim;
     Variable* result = new Variable(
-        this->_name + "-out", max_size * sizeof(T1), max_size * sizeof(T2));
+        this->_name + "/out", max_size * sizeof(T1), max_size * sizeof(T2));
     this->set_parents({inp, gamma, betta});
     this->set_children({result});
     return result;
@@ -66,13 +61,6 @@ void NormalizeLayerOp<T1, T2>::forward() {
     T1* vars_val = vars_->tensor();
     T1* means_val = means_->tensor();
 #endif
-    //printf("Running Step.3.3\n");
-    std::cout << ln_res_val << std::endl;
-    std::cout << vars_val << std::endl;
-    std::cout << means_val << std::endl;
-    std::cout << inp_val << std::endl;
-    std::cout << gamma_val << std::endl;
-    std::cout << betta_val << std::endl;
 
     launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val, betta_val, _batch_tokens,
                     _hidden_dim, stream);

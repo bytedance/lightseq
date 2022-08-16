@@ -16,7 +16,7 @@ class TransformerBuilder(CUDAOpBuilder):
         super().__init__(name=name)
 
     def absolute_name(self):
-        return f"op_builder.{self.NAME}_op"
+        return f"layer_builder.{self.NAME}"
 
     def sources(self):
         return [
