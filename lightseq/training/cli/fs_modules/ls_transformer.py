@@ -294,7 +294,9 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         with torch.no_grad():
             for i, value in enumerate(params):
                 self.buffer[i].copy_(value.data)
-            dist.all_reduce(self.buffer, op=dist.ReduceOp.AVG)
+            total_gpus = float(dist.get_world_size())
+            self.buffer.div_(total_gpus)
+            dist.all_reduce(self.buffer)
             for i, value in enumerate(params):
                 value.data.copy_(self.buffer[i])
             # total_gpus = float(dist.get_world_size())
