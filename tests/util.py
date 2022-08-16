@@ -150,7 +150,7 @@ class TestDecorator(object):
 
         def core(func):
             res = func()  # warmup for GPU
-            # self.assert_allclose(res, res, rtol, atol)
+            self.assert_allclose(res, res, rtol, atol)
             timing = list()
             for i in range(nrepeat):
                 torch.cuda.synchronize(device=self.device)
