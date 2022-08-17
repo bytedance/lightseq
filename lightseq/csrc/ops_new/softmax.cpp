@@ -19,7 +19,7 @@ void SoftmaxOp<T1, T2>::forward() {
   // need to modify launch_attn_softmax
 
   launch_attn_softmax<T1>(vals, attn_mask, batch_size, config_.nhead, from_len,
-                         to_len, config_.mask_future | mask_future, stream);
+                          to_len, config_.mask_future | mask_future, stream);
 }
 
 template <typename T1, typename T2>

@@ -48,7 +48,6 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
                                 cublasOperation_t op_A, cublasOperation_t op_B,
                                 int stride_A, int stride_B, int stride_C,
                                 int batch, cublasGemmAlgo_t algo) {
-                                  
   cublasStatus_t status = cublasGemmStridedBatchedEx(
       handle, op_A, op_B, m, n, k, alpha, A, CUDA_R_32F,
       (op_A == CUBLAS_OP_N) ? m : k, stride_A, B, CUDA_R_32F,
