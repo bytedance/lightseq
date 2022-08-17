@@ -38,12 +38,15 @@ class AddOperator : public Operator {
     cudaMemcpy(temp_inpB, inpB_ptr, sizeof(T1) * _max_size,
                cudaMemcpyDeviceToHost);
 
+    cudaStreamSynchronize(0);
+
     for (int i = 0; i < this->_size; i++) {
       temp_out[i] = temp_inpA[i] + temp_inpB[i];
     }
 
     cudaMemcpy(out_ptr, temp_out, sizeof(T1) * _max_size,
                cudaMemcpyHostToDevice);
+    cudaStreamSynchronize(0);
   }
 
   void before_backward(size_t size) { _size = size; }

@@ -2,8 +2,11 @@
 
 namespace lightseq {
 
-Context::Context(bool training)
-    : _mm_ptr(new MemoryManager()), _is_training(training) {
+Context::Context(bool training, int device_id)
+    : _mm_ptr(new MemoryManager()),
+      _is_training(training),
+      _device_id(device_id) {
+  CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -30,6 +33,7 @@ void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
   if (_layer_context.size()) _layer_context[0]->_op_vec.push_back(op);
+  _all_op_vec.push_back(op);
 }
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
@@ -59,11 +63,24 @@ void Context::build() {
     }
   }
 
+#ifdef ONLY_OP
+  for (int idx = 0; idx < _all_op_vec.size(); idx++) {
+    _all_op_vec[idx]->forward();
+  }
+  if (is_training()) {
+    for (int idx = _all_op_vec.size() - 1; idx >= 0; idx--) {
+      _all_op_vec[idx]->backward();
+    }
+  }
+#endif
+
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
 
+#ifndef ONLY_OP
   thread_context_ptr.reset();
+#endif
 
 #ifdef DEBUG
   draw_all_context();

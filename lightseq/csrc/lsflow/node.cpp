@@ -53,9 +53,6 @@ bool Node::is_cover() {  // true means assign, false means accumulate
     this->_bw_first_flag = false;
     return true;
   }
-  if (this->_children.size() > 1) {
-    return true;
-  }
   return false;
 }
 

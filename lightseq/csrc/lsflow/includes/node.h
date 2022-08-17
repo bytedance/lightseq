@@ -40,7 +40,7 @@ class Node {
   void recursive_backward();
 
   void clear_fw_flag() { _fw_flag = false; }
-  void clear_bw_flag() { _bw_flag = false; }
+  void clear_bw_flag() { _bw_flag = false, _bw_first_flag = true; }
 
   bool is_cover();  // true means assign, false means accumulate
 };

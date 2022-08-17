@@ -13,13 +13,10 @@ class NormalizeLayerOp : public Operator {
   size_t _max_batch_dim;
   size_t _batch_tokens;
 
-#ifdef ONLY_OP
-  T1* static_means_;
-  T1* static_vars_;
-#else
+  bool _use_mean;
+
   TensorPtr means_;
   TensorPtr vars_;
-#endif
 
  public:
   NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t hidden_dim,
