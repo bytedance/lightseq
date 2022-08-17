@@ -76,7 +76,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                                      _hidden_size / _heads, _stream);
 
   // attention scores, q*k
-  // [b, nh, s, ad] * [b, nh, s, ad]^T -> [b, nh, s, s]
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
                        _cublasHandle);
 
@@ -92,7 +91,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   _attn_context.Forward(_batch_heads, buffer, v_tf_ptr, _ctx_bufB_ptr,
                         _cublasHandle);
 
-  // [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
                              _hidden_size, _heads, 1, _stream);
 
