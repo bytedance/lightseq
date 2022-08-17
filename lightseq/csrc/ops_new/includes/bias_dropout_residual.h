@@ -8,32 +8,33 @@ namespace lightseq {
 // transformer layer's postprocessing dropout, after attn or ffn module,
 // before residual add.
 template <typename T1, typename T2>
-class BiasDropoutResidualOp : public Node {
+class BiasDropoutResOp : public Operator {
  private:
   float ratio;
-  bool training;
+
+  size_t _max_ele_num;
+  int _rows, _cols;
+
+  TensorPtr _mask;
 
  public:
-  float RATIO() const { return training ? ratio : 0.0; }
+  float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
-  BiasDropoutResidualOp(float r, size_t max_ele_num)
-      : ratio(r), training(true) {}
+  BiasDropoutResOp(float r, size_t max_ele_num)
+      : Operator("Dropout"), ratio(r), _max_ele_num(max_ele_num) {
+    _mask.reset(new Tensor("_mask", max_ele_num * sizeof(uint8_t)));
+  }
 
-  virtual ~BiasDropoutResidualOp();
+  virtual ~BiasDropoutResOp() {}
 
-  void bias_dropout_residual(T *output, const T *input, const T *residual,
-                             const T *bias, int rows, int cols,
-                             cudaStream_t stream);
+  Variable* operator()(Variable* inp, Variable* bias, Variable* residual);
 
-  void d_bias_dropout_residual(T *d_input, T *d_bias, const T *d_output,
-                               int rows, int cols, cudaStream_t stream);
+  void before_forward(int rows, int cols) { _rows = rows, _cols = cols; }
 
-  bool HasDropout() const;
+  void forward() override;
 
-  void SetTrainingMode(bool training);
+  void before_backward(int rows, int cols) { _rows = rows, _cols = cols; }
 
- private:
-  uint8_t *_mask;
-  Config _config;
+  void backward() override;
 };
 }  // namespace lightseq

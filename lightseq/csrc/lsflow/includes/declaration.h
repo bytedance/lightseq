@@ -11,6 +11,12 @@
 #include "cuda_util.h"
 #include "cublas_wrappers.h"
 
+#include <cublas_v2.h>
+#include <thrust/copy.h>
+#include <thrust/device_vector.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/random.h>
+
 namespace lightseq {
 
 enum NodeType { VariableNode, IONode, ParametersNode, OperatorNode };

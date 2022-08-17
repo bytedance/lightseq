@@ -70,11 +70,13 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
                       _cublasHandle);
 
+  // [b, s, 3, h] -> [3, b, nh, s, ad]
   launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
                                      _batch_size, _seq_len, 3, _heads,
                                      _hidden_size / _heads, _stream);
 
   // attention scores, q*k
+  // [b, nh, s, ad] * [b, nh, s, ad]^T -> [b, nh, s, s]
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
                        _cublasHandle);
 

@@ -36,18 +36,12 @@ void Layer::clear_fw_flag() {
     for (Node* var : op->children()) {
       var->clear_fw_flag();
     }
-    for (Node* var : op->parents()) {
-      var->clear_fw_flag();
-    }
   }
 }
 
 void Layer::clear_bw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_bw_flag();
-    for (Node* var : op->children()) {
-      var->clear_bw_flag();
-    }
     for (Node* var : op->parents()) {
       var->clear_bw_flag();
     }

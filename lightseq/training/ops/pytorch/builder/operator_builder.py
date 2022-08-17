@@ -34,8 +34,12 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/lsflow/manager.cpp",
             "csrc/lsflow/node.cpp",
             "csrc/lsflow/tensor.cpp",
-            "csrc/ops_new/normalize_layer.cpp",
+            "csrc/ops_new/bias_act_dropout.cpp",
+            "csrc/ops_new/bias_dropout_residual.cpp",
+            "csrc/ops_new/dropout.cpp",
             "csrc/ops_new/feed_forward.cpp",
+            "csrc/ops_new/normalize_layer.cpp",
+            "csrc/ops_new/strided_batch_gemm.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 
