@@ -349,7 +349,11 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
   cublasLtMatrixTransformDesc_t transform_desc = NULL;
   cublasLtMatrixLayout_t input_desc = NULL, output_desc = NULL;
   cublasLtOrder_t order_col = CUBLASLT_ORDER_COL;
-  cublasLtOrder_t order_COL4_4R2_8C = CUBLASLT_ORDER_COL4_4R2_8C;
+  cublasLtOrder_t order_col32;
+  if (use_ORDER_COL32_2R_4R4)
+    order_col32 = CUBLASLT_ORDER_COL32_2R_4R4;
+  else
+    order_col32 = CUBLASLT_ORDER_COL4_4R2_8C;
   cublasOperation_t transpose = CUBLAS_OP_T;
 
   CHECK_GPU_ERROR(
@@ -358,12 +362,16 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
       cublasLtMatrixTransformDescCreate(&transform_desc, CUDA_R_32F));
 
   if (layout == kColMajor32) {
-    int ldtransform = 32 * round_up(col, 8);
+    int ldtransform;
+    if (use_ORDER_COL32_2R_4R4)
+      ldtransform = 32 * round_up(col, 32);
+    else
+      ldtransform = 32 * round_up(col, 8);
     CHECK_GPU_ERROR(cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, col,
                                                row, ldtransform));
     CHECK_GPU_ERROR(cublasLtMatrixLayoutSetAttribute(
-        output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
-        sizeof(order_COL4_4R2_8C)));
+        output_desc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_col32,
+        sizeof(order_col32)));
   } else if (layout == kColMajor) {
     CHECK_GPU_ERROR(
         cublasLtMatrixLayoutCreate(&output_desc, CUDA_R_8I, row, col, row));
