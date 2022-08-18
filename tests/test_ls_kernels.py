@@ -718,23 +718,38 @@ def test_launch_dropout_gelu_bias_bwd():
     return custom, baseline
 
 
+from torch_crf import CRF
+
+
+@kt.case(dtypes=[torch.half])
+def test_crf():
+    batch_size = 128
+    seq_len = 32
+    num_tags = 41
+
+    emissions = kt.rand((batch_size, seq_len, num_tags))
+    mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
+    crf = CRF(num_tags, batch_first=True)
+    crf.to(kt.device, kt.dtype)
+
+    def custom():
+        res = crf.decode(emissions, mask)
+        return [
+            res,
+        ]
+
+    def baseline():
+        res = crf.decode(emissions, mask)
+        return [
+            res,
+        ]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_bw",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
+        "test_crf",
     ]
     kt.run(kernel_list)
