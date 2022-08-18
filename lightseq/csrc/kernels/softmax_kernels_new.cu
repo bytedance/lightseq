@@ -32,8 +32,8 @@ attn_mask: [batch_size, to_len], padding tokens are -inf,
   attn_mask=nullptr and mask_future=false for dec-self-attn infer
 */
 template <typename T, int block_dim, int ele_per_thread>
-__global__ void ker_attn_softmax(T* out, T *inp, const T *attn_mask, int from_len,
-                                 int to_len, bool mask_future) {
+__global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
+                                 int from_len, int to_len, bool mask_future) {
   int batch_id = blockIdx.y;
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
@@ -127,8 +127,9 @@ __global__ void ker_attn_softmax(T* out, T *inp, const T *attn_mask, int from_le
 }
 
 template <typename T, int block_dim, int ele_per_thread>
-__global__ void ker_attn_softmax_lt32(T* out, T *inp, const T *attn_mask, int from_len,
-                                      int to_len, bool mask_future) {
+__global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
+                                      int from_len, int to_len,
+                                      bool mask_future) {
   int batch_id = blockIdx.y;
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
@@ -199,7 +200,7 @@ __global__ void ker_attn_softmax_lt32(T* out, T *inp, const T *attn_mask, int fr
       l_sum[i] = __fdividef(1.0f, l_sum[i] + EPSILON);
       for (int j = 0; j < ele_per_thread; j++) {
         inp_val[i][j] = (T)(val[i][j] * l_sum[i]);
-      } 
+      }
       BlockStore(ts_store).Store(out + (token_id + i) * to_len, inp_val[i],
                                  to_len);
     }
@@ -212,7 +213,7 @@ __global__ void ker_attn_softmax_lt32(T* out, T *inp, const T *attn_mask, int fr
   attn_mask=nullptr and mask_future=false for dec-self-attn infer
 */
 template <>
-void launch_attn_softmax<float>(float* out, float *inp, const float *attn_mask,
+void launch_attn_softmax<float>(float *out, float *inp, const float *attn_mask,
                                 int batch_size, int nhead, int from_len,
                                 int to_len, bool mask_future,
                                 cudaStream_t stream) {
@@ -246,10 +247,10 @@ void launch_attn_softmax<float>(float* out, float *inp, const float *attn_mask,
 }
 
 template <>
-void launch_attn_softmax<__half>(__half* out, __half *inp, const __half *attn_mask,
-                                 int batch_size, int nhead, int from_len,
-                                 int to_len, bool mask_future,
-                                 cudaStream_t stream) {
+void launch_attn_softmax<__half>(__half *out, __half *inp,
+                                 const __half *attn_mask, int batch_size,
+                                 int nhead, int from_len, int to_len,
+                                 bool mask_future, cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<__half, 32, 1><<<grid_dim, 32, 0, stream>>>(

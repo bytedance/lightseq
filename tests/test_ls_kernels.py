@@ -200,7 +200,6 @@ def test_launch_attn_softmax():
     return custom, baseline
 
 
-
 @kt.case(atol=1e-3, rtol=1e-3, ntest=2)
 def test_launch_attn_softmax_new():
     batch_size, from_len = kt.bs_sl()

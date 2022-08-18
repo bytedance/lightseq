@@ -10,7 +10,7 @@ template <typename T1, typename T2>
 class SoftmaxOp : public Operator {
  private:
   int _nhead;
-  
+
   int _max_batchs;
   int _max_from_len;
   int _max_to_len;
@@ -22,13 +22,14 @@ class SoftmaxOp : public Operator {
   bool _mask_future;
 
  public:
-  SoftmaxOp(int max_batchs, int max_from_len, int max_to_len, int nhead, bool mask_future)
-      : Operator("Softmax"), 
-      _max_batchs(max_batchs),
-      _max_from_len(max_from_len),
-      _max_to_len(max_to_len),
-      _nhead(nhead), 
-      _config_mask_future(mask_future) {}
+  SoftmaxOp(int max_batchs, int max_from_len, int max_to_len, int nhead,
+            bool mask_future)
+      : Operator("Softmax"),
+        _max_batchs(max_batchs),
+        _max_from_len(max_from_len),
+        _max_to_len(max_to_len),
+        _nhead(nhead),
+        _config_mask_future(mask_future) {}
 
   virtual ~SoftmaxOp() {}
 
@@ -36,7 +37,8 @@ class SoftmaxOp : public Operator {
 
   void forward() override;
 
-  void before_forward(int batchs, int from_len, int to_len, bool mask_future = false) {
+  void before_forward(int batchs, int from_len, int to_len,
+                      bool mask_future = false) {
     _batchs = batchs;
     _from_len = from_len;
     _to_len = to_len;
