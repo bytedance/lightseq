@@ -200,6 +200,89 @@ def test_launch_attn_softmax():
     return custom, baseline
 
 
+
+@kt.case(atol=1e-3, rtol=1e-3, ntest=2)
+def test_launch_attn_softmax_new():
+    batch_size, from_len = kt.bs_sl()
+    is_dec_self_attn = random.choice([True, False])
+    if is_dec_self_attn:
+        to_len = from_len
+        is_dec_self_attn_infer = random.choice([True, False])
+    else:
+        _, to_len = kt.bs_sl(batch_size)
+        is_dec_self_attn_infer = False
+
+    if is_dec_self_attn_infer:
+        to_len = from_len
+        from_len = 1
+        beam_size = random.choice([3, 4, 5])
+        batch_size *= beam_size
+
+    nhead = kt.nhead
+    print(
+        "(batch_size, nhead, from_len, to_len, is_dec_self_attn,"
+        f" is_dec_self_attn_infer): ({batch_size}, {nhead}, {from_len}, {to_len},"
+        f" {is_dec_self_attn}, {is_dec_self_attn_infer})"
+    )
+
+    inp = kt.rand((batch_size, nhead, from_len, to_len))
+    if is_dec_self_attn:
+        mask = kt.dec_self_attn_mask(to_len) * -1e8
+        mask = mask.unsqueeze(0).unsqueeze(0)  # [1, 1, to_len, to_len]
+    else:
+        mask = kt.attn_mask(batch_size, to_len) * -1e8
+        mask = mask.unsqueeze(1).unsqueeze(1)  # [batch_size, 1, 1, to_len]
+    inp_list = [inp.clone() for _ in range(8)]
+    tt = {"repeat_idx": 0}
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_attn_softmax_new_fp32
+    else:
+        func = cuda_module.torch_launch_attn_softmax_new_fp16
+
+    if kt.dtype == torch.float:
+        func2 = cuda_module.torch_launch_attn_softmax_fp32
+    else:
+        func2 = cuda_module.torch_launch_attn_softmax_fp16
+
+    cust_out = torch.empty_like(inp)
+
+    def custom():
+        cus_inp = inp_list[tt["repeat_idx"]].clone()
+        func(
+            cust_out,
+            cus_inp,
+            mask,
+            batch_size,
+            nhead,
+            from_len,
+            to_len,
+            is_dec_self_attn,
+            is_dec_self_attn and (not is_dec_self_attn_infer),
+        )
+        return [
+            cust_out,
+        ]
+
+    def baseline():
+        base_inp = inp_list[tt["repeat_idx"]].clone()
+        func2(
+            base_inp,
+            mask,
+            batch_size,
+            nhead,
+            from_len,
+            to_len,
+            is_dec_self_attn,
+            is_dec_self_attn and (not is_dec_self_attn_infer),
+        )
+        return [
+            base_inp,
+        ]
+
+    return custom, baseline
+
+
 @kt.case(atol=1e-2, rtol=1e-3)
 def test_launch_attn_softmax_bw():
     nhead = kt.nhead
@@ -727,6 +810,7 @@ if __name__ == "__main__":
         "test_launch_fused_add2",
         "test_launch_ffn_bias_bwd",
         "test_launch_attn_softmax",
+        "test_launch_attn_softmax_new",
         "test_launch_attn_softmax_bw",
         "test_launch_layer_norm",
         "test_launch_ln_bw",

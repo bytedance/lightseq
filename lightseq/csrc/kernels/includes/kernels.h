@@ -34,6 +34,11 @@ template <typename T>
 void launch_attn_softmax_bw(T *out_grad, const T *soft_inp, int rows,
                             int softmax_len, cudaStream_t stream);
 
+template <typename T>
+void launch_attn_softmax(T *out, T *inp, const T *attn_mask, int batch_size, int heads,
+                         int from_len, int to_len, bool mask_future,
+                         cudaStream_t stream);
+
 // [b, s, h] -> [b, nh, s, ad]
 template <typename T>
 void launch_transform_0213(T *output, const T *vals, int batch_size,

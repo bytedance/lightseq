@@ -22,6 +22,7 @@ class KernelBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/transform_kernels.cu",
             "csrc/kernels/softmax_kernels.cu",
+            "csrc/kernels/softmax_kernels_new.cu",
             "csrc/kernels/general_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",

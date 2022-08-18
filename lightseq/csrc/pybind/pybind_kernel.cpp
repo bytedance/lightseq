@@ -69,7 +69,23 @@ void torch_launch_attn_softmax(torch::Tensor &vals,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_attn_softmax(rptr<T>(vals), attn_mask_ptr, batch_size, nhead, from_len,
                       to_len, mask_future, stream);
-  //   cudaStreamSynchronize(stream);
+//     cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
+                               const torch::Tensor &attn_mask, int batch_size,
+                               int nhead, int from_len, int to_len,
+                               bool is_dec_self_attn, bool mask_future) {
+  const T *attn_mask_ptr = rptr<T>(attn_mask);
+  if (is_dec_self_attn) {
+    attn_mask_ptr = nullptr;
+  }
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_attn_softmax(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size, nhead, from_len,
+                      to_len, mask_future, stream);
+//     cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -221,6 +237,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_attn_softmax_fp32", &torch_launch_attn_softmax<float>,
         "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_fp16", &torch_launch_attn_softmax<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_attn_softmax_new_fp32", &torch_launch_attn_softmax_new<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_attn_softmax_new_fp16", &torch_launch_attn_softmax_new<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_fp32",
         &torch_launch_attn_softmax_bw<float>, "Test kernel wrapper");

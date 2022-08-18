@@ -29,6 +29,7 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/cross_entropy.cu",
+            "csrc/kernels/softmax_kernels_new.cu",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
             "csrc/lsflow/manager.cpp",
@@ -39,6 +40,7 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/ops_new/dropout.cpp",
             "csrc/ops_new/feed_forward.cpp",
             "csrc/ops_new/normalize_layer.cpp",
+            "csrc/ops_new/softmax.cpp",
             "csrc/ops_new/strided_batch_gemm.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
