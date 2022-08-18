@@ -26,7 +26,7 @@ class KernelBuilder(CUDAOpBuilder):
             "csrc/kernels/normalize_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/embedding_kernels.cu",
-            "csrc/torch/pybind_kernel.cpp",
+            "csrc/pybind/pybind_kernel.cpp",
         ]
 
     def include_paths(self):

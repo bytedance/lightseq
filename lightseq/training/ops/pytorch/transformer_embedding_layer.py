@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch import transformer_cuda_module
+from lightseq.training.ops.pytorch import TransformerBuilder
 from lightseq.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -10,6 +10,8 @@ from lightseq.training.ops.pytorch.util import (
     calc_offset,
     get_pos_embedding,
 )
+
+transformer_cuda_module = TransformerBuilder().load()
 
 _all_layer_grads = dict()
 
