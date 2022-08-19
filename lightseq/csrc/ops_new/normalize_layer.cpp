@@ -74,6 +74,11 @@ void NormalizeLayerOp<T1, T2>::backward() {
   T1* vars_val = (T1*)vars_->tensor();
   T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
 
+  bool is_res_cover = parent(0)->is_cover();
+  if (!is_res_cover) {
+    residual_grad = inp_grad;
+  }
+
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                out_val, gamma_val, betta_val, vars_val, means_val,
                _batch_tokens, _hidden_dim, streams);
