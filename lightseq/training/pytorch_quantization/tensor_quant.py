@@ -352,10 +352,47 @@ class FakeTensorQuantFunction(Function):
 
     @staticmethod
     def backward(ctx, grad_outputs):
-        # inputs, amax = ctx.saved_tensors
-        # zero = grad_outputs.new_zeros(1)
-        # grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_outputs, None, None, None, None, None, None
+
+
+class FakeTensorQuantFunctionX(Function):
+    """Fake version of TensorQuantFunction
+    See comments of TensorQuantFunction, arguments are the same.
+    """
+
+    @staticmethod
+    def forward(
+        ctx, 
+        inputs, 
+        amax, 
+        num_bits=8, 
+        unsigned=False, 
+        narrow_range=True, 
+        training=False,
+        smooth_avg=1,    
+    ):
+        # ctx.save_for_backward(inputs, amax)
+        outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
+        if unsigned:
+            outputs += (2.0 ** (num_bits - 1)) - 1.0
+        outputs = (outputs * scale).to(inputs.dtype)
+        if training:
+            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
+        ctx.unsigned = unsigned
+        if not unsigned:
+            diff = torch.abs(inputs-outputs) / scale
+            ctx.save_for_backward(diff)
+        return outputs
+
+    @staticmethod
+    def backward(ctx, grad_outputs):
+        if not ctx.unsigned:
+            x = ctx.saved_tensors[0]
+            x = torch.clamp_max(x, 0.5)
+            scale = 1.3 - 1.2 * (0.5 - x)
+            grad_outputs = grad_outputs * scale
+        return grad_outputs, None, None, None, None, None, None
+
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):
     """Shared function body between TensorQuantFunction and FakeTensorQuantFunction"""
@@ -486,4 +523,5 @@ class FakeAffineTensorQuantFunction(Function):
 
 tensor_quant = TensorQuantFunction.apply
 fake_tensor_quant = FakeTensorQuantFunction.apply
+fake_tensor_quantx = FakeTensorQuantFunctionX.apply
 fake_affine_tensor_quant = FakeAffineTensorQuantFunction.apply
