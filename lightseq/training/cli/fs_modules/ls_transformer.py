@@ -139,6 +139,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--f-b', type=float, metavar='D', default=0,
                             help='scalar quantization noise and scalar quantization at training time')
+        parser.add_argument('--quant-bits', type=float, metavar='D', default=8,
+                            help='quantization noise and scalar quantization at training time')
         parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
                             help='smooth avg')
         # args for Fully Sharded Data Parallel (FSDP) training
@@ -188,14 +190,15 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
         smooth_avg_update = 1.0 / args.smooth_avg_update
-        def f_ab(m):
+        def enable_tensorQuantizer(m):
             if isinstance(m, TensorQuantizer):
                 m.smooth_avg = smooth_avg_update
-                # m.f_a = args.f_a
-                # m.f_b = args.f_b
+                if args.quant_bits != 8:
+                    m.num_bits = args.quant_bits
+
         if args.enable_quant:
-            encoder.apply(f_ab)
-            decoder.apply(f_ab)
+            encoder.apply(enable_tensorQuantizer)
+            decoder.apply(enable_tensorQuantizer)
             if args.use_torch_layer:
                 if args.quant_mode == "qat":
                     encoder.apply(qat_mode)
@@ -319,10 +322,6 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         decoder_out = self.decoder(
             prev_output_tokens, encoder_out, features_only=features_only
         )
-        # if self.train_step % 10 == 0:
-        #     for n, v in self.params_clip:
-        #         print(self.device, n, v.item(), self.train_step, flush=True)
-        # self.train_step += 1
         return decoder_out
 
     # def set_params(self):
