@@ -29,6 +29,7 @@ weight_quant_config = QuantDescriptor(
 
 class QuantLinear(Linear):
     def __init__(self, in_features, out_features, pre_activation=None, *args, **kwargs):
+        self.skip_weight_quant = kwargs.pop("skip_weight_quant", False)
         super(QuantLinear, self).__init__(in_features, out_features, *args, **kwargs)
         self.dropout_module_i = None
         self.dropout_module_w = None
@@ -44,7 +45,6 @@ class QuantLinear(Linear):
         # if pre_activation is None:
         self.output_quant = TensorQuantizer(out_quant_config)
         self.weight_quant = TensorQuantizer(weight_quant_config)
-        self.skip_weight_quant = kwargs.pop("skip_weight_quant", False)
 
     def forward(self, input):
         qinput = input
