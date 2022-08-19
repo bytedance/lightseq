@@ -369,7 +369,8 @@ class FakeTensorQuantFunctionX(Function):
         unsigned=False, 
         narrow_range=True, 
         training=False,
-        smooth_avg=1,    
+        smooth_avg=1,
+        fab=(1.3, 1.2)
     ):
         # ctx.save_for_backward(inputs, amax)
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
@@ -379,6 +380,7 @@ class FakeTensorQuantFunctionX(Function):
         if training:
             amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
         ctx.unsigned = unsigned
+        ctx.fab = fab
         if not unsigned:
             diff = torch.abs(inputs-outputs) / scale
             ctx.save_for_backward(diff)
@@ -387,11 +389,12 @@ class FakeTensorQuantFunctionX(Function):
     @staticmethod
     def backward(ctx, grad_outputs):
         if not ctx.unsigned:
+            a, b = ctx.fab
             x = ctx.saved_tensors[0]
             x = torch.clamp_max(x, 0.5)
-            scale = 1.3 - 1.2 * (0.5 - x)
+            scale = a - b * (0.5 - x)
             grad_outputs = grad_outputs * scale
-        return grad_outputs, None, None, None, None, None, None
+        return grad_outputs, None, None, None, None, None, None, None
 
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):

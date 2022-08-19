@@ -99,6 +99,7 @@ class TensorQuantizer(nn.Module):
         self._if_quant = if_quant
         self._if_clip = False
         self._if_calib = if_calib
+        self.fab = (1.3, 1.2)
 
         if quant_desc.amax is not None:
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
@@ -351,6 +352,7 @@ class TensorQuantizer(nn.Module):
                     self._narrow_range, 
                     self.training,
                     self.smooth_avg,
+                    self.fab,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:

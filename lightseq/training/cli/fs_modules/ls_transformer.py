@@ -135,9 +135,9 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='enable quantization')
         parser.add_argument('--quant-mode', type=str,  default="qat", choices=["qat", "ptq"],
                             help='quantization mode')
-        parser.add_argument('--f-a', type=float, metavar='D', default=1,
+        parser.add_argument('--fa', type=float, metavar='D', default=1.3,
                             help='scalar quantization noise and scalar quantization at training time')
-        parser.add_argument('--f-b', type=float, metavar='D', default=0,
+        parser.add_argument('--fb', type=float, metavar='D', default=1.2,
                             help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--quant-bits', type=float, metavar='D', default=8,
                             help='quantization noise and scalar quantization at training time')
@@ -193,6 +193,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         def enable_tensorQuantizer(m):
             if isinstance(m, TensorQuantizer):
                 m.smooth_avg = smooth_avg_update
+                m.fab = (args.fa, args.fb)
                 if args.quant_bits != 8:
                     m.num_bits = args.quant_bits
 
@@ -492,7 +493,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 self.embed_tokens.embeddings.shape[1],
                 self.embed_tokens.embeddings.shape[0],
                 bias=False,
-                skip_weight_quant=True,
+                # skip_weight_quant=True,
             )
             self.output_projection.weight_quant = self.embed_tokens.emb_quant
         else:

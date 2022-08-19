@@ -1021,7 +1021,7 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
 
     def forward(self, input, step=0):
         x = self.emb_lookup(input)
-        # x = self.emb_quant(x)
+        x = self.emb_quant(x)
         x = self.embed_scale * x
         x += self.embed_positions(input, step)
         if self.layernorm_embedding is not None:
