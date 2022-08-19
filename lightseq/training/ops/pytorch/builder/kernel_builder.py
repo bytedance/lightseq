@@ -26,6 +26,7 @@ class KernelBuilder(CUDAOpBuilder):
             "csrc/kernels/normalize_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/embedding_kernels.cu",
+            "csrc/kernels/crf.cu",
             "csrc/pybind/pybind_kernel.cpp",
         ]
 
