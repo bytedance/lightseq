@@ -46,6 +46,19 @@ void torch_launch_bias_add_transform_20314(torch::Tensor &output,
 }
 
 template <typename T>
+void torch_launch_bias_add_transform_20314_new(
+    torch::Tensor &q_out, torch::Tensor &k_out, torch::Tensor &v_out,
+    const torch::Tensor &input, const torch::Tensor &bias, int dim_0, int dim_1,
+    int dim_2, int dim_3, int dim_4) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_bias_add_transform_20314_new(
+      rptr<T>(q_out), rptr<T>(k_out), rptr<T>(v_out), rptr<T>(input),
+      rptr<T>(bias), dim_0, dim_1, dim_2, dim_3, dim_4, stream);
+  //   cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
 void torch_launch_transform4d_0213(torch::Tensor &output,
                                    const torch::Tensor &vals, int batch_size,
                                    int seq_len, int hidden_dim, int nhead,
@@ -54,6 +67,19 @@ void torch_launch_transform4d_0213(torch::Tensor &output,
   launch_transform4d_0213(rptr<T>(output), rptr<T>(vals), batch_size, seq_len,
                           hidden_dim, nhead, trans_count, stream);
   //   cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_launch_transform_20314_bwd_new(
+    torch::Tensor &out, const torch::Tensor &q_inp, const torch::Tensor &k_inp,
+    const torch::Tensor &v_inp, int batch_size, int seq_len, int hidden_dim,
+    int nhead) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_transform_20314_bwd_new(rptr<T>(out), rptr<T>(q_inp), rptr<T>(k_inp),
+                                 rptr<T>(v_inp), batch_size, seq_len,
+                                 hidden_dim, nhead, stream);
+//   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -84,8 +110,8 @@ void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
     attn_mask_ptr = nullptr;
   }
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_attn_softmax(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size,
-                      nhead, from_len, to_len, mask_future, stream);
+  launch_attn_softmax_new(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size,
+                          nhead, from_len, to_len, mask_future, stream);
   //     cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
@@ -97,6 +123,18 @@ void torch_launch_attn_softmax_bw(torch::Tensor &out_grad,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_attn_softmax_bw(rptr<T>(out_grad), rptr<T>(soft_inp), rows,
                          softmax_len, stream);
+  //   cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_launch_attn_softmax_bw_new(torch::Tensor &inp_grad,
+                                      const torch::Tensor &out_grad,
+                                      const torch::Tensor &soft_inp, int rows,
+                                      int softmax_len) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_attn_softmax_bw_new(rptr<T>(inp_grad), rptr<T>(out_grad),
+                             rptr<T>(soft_inp), rows, softmax_len, stream);
   //   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
@@ -223,10 +261,23 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &torch_launch_bias_add_transform_20314<float>, "Test kernel wrapper");
   m.def("torch_launch_bias_add_transform_20314_fp16",
         &torch_launch_bias_add_transform_20314<__half>, "Test kernel wrapper");
+
   m.def("torch_launch_transform4d_0213_fp32",
         &torch_launch_transform4d_0213<float>, "Test kernel wrapper");
   m.def("torch_launch_transform4d_0213_fp16",
         &torch_launch_transform4d_0213<__half>, "Test kernel wrapper");
+
+  m.def("torch_launch_bias_add_transform_20314_new_fp32",
+        &torch_launch_bias_add_transform_20314_new<float>,
+        "Test kernel wrapper");
+  m.def("torch_launch_bias_add_transform_20314_new_fp16",
+        &torch_launch_bias_add_transform_20314_new<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_transform_20314_bwd_new_fp32",
+        &torch_launch_transform_20314_bwd_new<float>, "Test kernel wrapper");
+  m.def("torch_launch_transform_20314_bwd_new_fp16",
+        &torch_launch_transform_20314_bwd_new<__half>, "Test kernel wrapper");
+
   m.def("torch_launch_fused_add2_fp32", &torch_launch_fused_add2<float>,
         "Test kernel wrapper");
   m.def("torch_launch_fused_add2_fp16", &torch_launch_fused_add2<__half>,
@@ -247,6 +298,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &torch_launch_attn_softmax_bw<float>, "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_fp16",
         &torch_launch_attn_softmax_bw<__half>, "Test kernel wrapper");
+
+  m.def("torch_launch_attn_softmax_bw_new_fp32",
+        &torch_launch_attn_softmax_bw_new<float>, "Test kernel wrapper");
+  m.def("torch_launch_attn_softmax_bw_new_fp16",
+        &torch_launch_attn_softmax_bw_new<__half>, "Test kernel wrapper");
+
   m.def("torch_launch_layer_norm_fp32", &torch_launch_layer_norm<float>,
         "Test kernel wrapper");
   m.def("torch_launch_layer_norm_fp16", &torch_launch_layer_norm<__half>,

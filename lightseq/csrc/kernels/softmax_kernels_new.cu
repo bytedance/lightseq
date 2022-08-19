@@ -213,10 +213,10 @@ __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
   attn_mask=nullptr and mask_future=false for dec-self-attn infer
 */
 template <>
-void launch_attn_softmax<float>(float *out, float *inp, const float *attn_mask,
-                                int batch_size, int nhead, int from_len,
-                                int to_len, bool mask_future,
-                                cudaStream_t stream) {
+void launch_attn_softmax_new<float>(float *out, float *inp,
+                                    const float *attn_mask, int batch_size,
+                                    int nhead, int from_len, int to_len,
+                                    bool mask_future, cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<float, 32, 1><<<grid_dim, 32, 0, stream>>>(
@@ -247,10 +247,10 @@ void launch_attn_softmax<float>(float *out, float *inp, const float *attn_mask,
 }
 
 template <>
-void launch_attn_softmax<__half>(__half *out, __half *inp,
-                                 const __half *attn_mask, int batch_size,
-                                 int nhead, int from_len, int to_len,
-                                 bool mask_future, cudaStream_t stream) {
+void launch_attn_softmax_new<__half>(__half *out, __half *inp,
+                                     const __half *attn_mask, int batch_size,
+                                     int nhead, int from_len, int to_len,
+                                     bool mask_future, cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<__half, 32, 1><<<grid_dim, 32, 0, stream>>>(
@@ -279,3 +279,108 @@ void launch_attn_softmax<__half>(__half *out, __half *inp,
         "Sequence length greater than 512 is currently not supported");
   }
 }
+
+/**
+@brief: ker_attn_softmax_bw
+Softmax backward in self attention.
+
+@thread
+gridDim.x = batch_size * nhead * seq_len / warps_per_block
+blockDim.x = WARP_SIZE
+blockDim.y = warps_per_block
+
+@param
+grad: [batch_size, nhead, seq_len, seq_len], output grad.
+output: [batch_size, nhead, seq_len, seq_len], output of softmax forward.
+*/
+template <typename T, int ITERATIONS>
+__global__ void ker_attn_softmax_bw(T *inp_grad, const T *out_grad,
+                                    const T *inp, int softmax_length) {
+  int batch_idx = blockIdx.x * blockDim.y + threadIdx.y;
+  int offset = batch_idx * softmax_length + threadIdx.x;
+
+  inp_grad += offset;
+  out_grad += offset;
+  inp += offset;
+
+  T grad_reg[ITERATIONS];
+  T inp_reg[ITERATIONS];
+  float sum = 0.0;
+
+#pragma unroll
+  for (int i = 0; i < ITERATIONS; ++i) {
+    int curr_idx = threadIdx.x + i * WARP_SIZE;
+    if (curr_idx < softmax_length) {
+      grad_reg[i] = out_grad[i * WARP_SIZE];
+      inp_reg[i] = inp[i * WARP_SIZE];
+      sum += (float)grad_reg[i] * (float)inp_reg[i];
+    }
+  }
+
+  cg::thread_block b = cg::this_thread_block();
+  cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
+
+  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_xor(sum, i);
+
+#pragma unroll
+  for (int i = 0; i < ITERATIONS; ++i) {
+    int curr_idx = threadIdx.x + i * WARP_SIZE;
+    if (curr_idx < softmax_length)
+      inp_grad[i * WARP_SIZE] =
+          (T)((float)inp_reg[i] * ((float)grad_reg[i] - sum));
+  }
+}
+
+template <typename T>
+void launch_attn_softmax_bw_new(T *inp_grad, const T *out_grad,
+                                const T *soft_inp, int rows, int softmax_len,
+                                cudaStream_t stream) {
+  const int warps_per_block = 4;
+  // rows = batch_size * nhead * from_len
+  dim3 grid_dim(rows / warps_per_block);
+  dim3 block_dim(WARP_SIZE, warps_per_block);
+
+  if (softmax_len <= 32)
+    ker_attn_softmax_bw<T, 1><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 64)
+    ker_attn_softmax_bw<T, 2><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 128)
+    ker_attn_softmax_bw<T, 4><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 256)
+    ker_attn_softmax_bw<T, 8><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 384)
+    ker_attn_softmax_bw<T, 12><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 512)
+    ker_attn_softmax_bw<T, 16><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 768)
+    ker_attn_softmax_bw<T, 24><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 1024)
+    ker_attn_softmax_bw<T, 32><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else if (softmax_len <= 2048)
+    ker_attn_softmax_bw<T, 64><<<grid_dim, block_dim, 0, stream>>>(
+        inp_grad, out_grad, soft_inp, softmax_len);
+  else
+    throw std::runtime_error(
+        std::string(
+            "Special sequence length found in softmax backward, seq_len: ") +
+        std::to_string(softmax_len));
+}
+
+template void launch_attn_softmax_bw_new<__half>(__half *inp_grad,
+                                                 const __half *out_grad,
+                                                 const __half *soft_inp,
+                                                 int rows, int softmax_len,
+                                                 cudaStream_t stream);
+template void launch_attn_softmax_bw_new<float>(float *inp_grad,
+                                                const float *out_grad,
+                                                const float *soft_inp, int rows,
+                                                int softmax_len,
+                                                cudaStream_t stream);

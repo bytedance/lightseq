@@ -21,6 +21,7 @@ class KernelBuilder(CUDAOpBuilder):
         return [
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/transform_kernels.cu",
+            "csrc/kernels/transform_kernels_new.cu",
             "csrc/kernels/softmax_kernels.cu",
             "csrc/kernels/softmax_kernels_new.cu",
             "csrc/kernels/general_kernels.cu",

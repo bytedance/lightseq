@@ -35,9 +35,14 @@ void launch_attn_softmax_bw(T *out_grad, const T *soft_inp, int rows,
                             int softmax_len, cudaStream_t stream);
 
 template <typename T>
-void launch_attn_softmax(T *out, T *inp, const T *attn_mask, int batch_size,
-                         int heads, int from_len, int to_len, bool mask_future,
-                         cudaStream_t stream);
+void launch_attn_softmax_new(T *out, T *inp, const T *attn_mask, int batch_size,
+                             int heads, int from_len, int to_len,
+                             bool mask_future, cudaStream_t stream);
+
+template <typename T>
+void launch_attn_softmax_bw_new(T *inp_grad, const T *out_grad,
+                                const T *soft_inp, int rows, int softmax_len,
+                                cudaStream_t stream);
 
 // [b, s, h] -> [b, nh, s, ad]
 template <typename T>
@@ -51,11 +56,25 @@ void launch_bias_add_transform_20314(T *output, const T *input, const T *bias,
                                      int dim_0, int dim_1, int dim_2, int dim_3,
                                      int dim_4, cudaStream_t stream);
 
+// [b, s, 3, h] -> 3 * [b, nh, s, ad]
+template <typename T>
+void launch_bias_add_transform_20314_new(T *q_out, T *k_out, T *v_out,
+                                         const T *input, const T *bias,
+                                         int dim_0, int dim_1, int dim_2,
+                                         int dim_3, int dim_4,
+                                         cudaStream_t stream);
+
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <typename T>
 void launch_transform4d_0213(T *output, const T *vals, int batch_size,
                              int seq_len, int hidden_dim, int nhead,
                              int trans_count, cudaStream_t stream);
+
+template <typename T>
+void launch_transform_20314_bwd_new(T *output, const T *q_inp, const T *k_inp,
+                                    const T *v_inp, int batch_size, int seq_len,
+                                    int hidden_dim, int nhead,
+                                    cudaStream_t stream);
 
 template <typename T>
 void launch_ls_dropout(T *out, const T *vals, uint8_t *mask, int total_count,
