@@ -2,6 +2,7 @@
 Export Hugging Face GPT2 models to hdf5 format.
 """
 import os
+import json
 import h5py
 import numpy as np
 from collections import OrderedDict
@@ -37,7 +38,6 @@ src_emb_mapping_dict = OrderedDict(
 def extract_gpt_weights(
     output_file,
     model_dir,
-    head_num,
     generation_method,
     topk=1,
     topp=0.75,
@@ -47,6 +47,9 @@ def extract_gpt_weights(
     max_step=50,
 ):
     # load var names
+    with open(os.path.join(os.path.dirname(model_dir), "config.json")) as f:
+        config = json.load(f)
+    head_num = config["n_head"]
     state_dict = torch.load(model_dir, "cpu")
     var_name_list = list(state_dict.keys())
 
@@ -141,7 +144,6 @@ if __name__ == "__main__":
     if args.generation_method not in ["topk", "topp", "ppl"]:
         args.generation_method = "topk"
 
-    head_number = 12  # 20 for "gpt2-large"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
@@ -151,7 +153,6 @@ if __name__ == "__main__":
     extract_gpt_weights(
         hdf5_path,
         args.model,
-        head_num=head_number,  # layer number
         generation_method=args.generation_method,
         topk=topk,
         topp=topp,

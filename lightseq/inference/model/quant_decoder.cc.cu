@@ -57,7 +57,8 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
       _h_alive_seq_probs(max_batch_size * tw._beam_size,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
-      _h_unfinished(1) {
+      _h_unfinished(1),
+      _is_benchmark(false) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
   }
@@ -398,6 +399,11 @@ std::string QuantDecoder<OpType_>::check() {
   return "";
 }
 
+template <OperationType OpType_>
+void QuantDecoder<OpType_>::benchmark_mode(bool is_benchmark) {
+  _is_benchmark = is_benchmark;
+}
+
 /**
 QuantDecoder inference
 */
@@ -436,7 +442,8 @@ void QuantDecoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 #ifdef DEBUG_RESULT
     std::cout << "*** run step " << _cur_step << " ***" << std::endl;
 #endif
-    if (run_step()) {  // one step
+    bool early_stop = run_step();
+    if (!_is_benchmark && early_stop) {  // one step
       break;
     }
   }

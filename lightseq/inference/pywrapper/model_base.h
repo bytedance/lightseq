@@ -87,6 +87,8 @@ class LSModel {
   virtual std::vector<int> get_output_max_shape(int index) = 0;
   virtual DataType get_output_dtype(int index) = 0;
 
+  virtual void benchmark_mode(bool is_benchmark) = 0;
+
  protected:
   void set_output_shape(int index, std::vector<int> shape) {
     output_shapes_.at(index) = std::move(shape);

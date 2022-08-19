@@ -45,7 +45,8 @@ QuantGptEncoder<OpType_>::QuantGptEncoder(
       _h_real_seq_len(max_batch_size, 0),
       _h_ppl(max_batch_size, 0.f),
       _h_sample_id(max_batch_size * tw._max_step, 0),
-      _h_unfinished(1) {
+      _h_unfinished(1),
+      _is_benchmark(false) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
 
@@ -288,6 +289,11 @@ void QuantGptEncoder<OpType_>::run_one_infer(int batch_size,
 }
 
 template <OperationType OpType_>
+void QuantGptEncoder<OpType_>::benchmark_mode(bool is_benchmark) {
+  _is_benchmark = is_benchmark;
+}
+
+template <OperationType OpType_>
 int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
                                              int batch_seq_len) {
   if (batch_size > _max_batch_size) {
@@ -346,7 +352,7 @@ int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
     return _batch_seq_len;
   }
 
-  while (1) {
+  while (_batch_seq_len < _tw._max_step) {
 #ifdef DEBUG_RESULT
     std::cout << "before sample:batch_size-" << _batch_size << " batch_seq_len-"
               << _batch_seq_len << std::endl;
@@ -372,8 +378,8 @@ int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
     _p_d_self_v_cache2 = _p_d_self_v_cache1;
     _p_d_self_v_cache1 = ftmp;
 
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
-      break;
+    bool unfinish = sample_one_token_with_cache();
+    if (!unfinish && !_is_benchmark) break;
   }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
