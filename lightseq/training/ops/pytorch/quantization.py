@@ -49,13 +49,13 @@ class QuantLinear(Linear):
     def forward(self, input):
         qinput = input
         if self.input_quant is not None:
-            # if self.dropout_module_i is not None:
-            #     input = self.dropout_module_i(input)
             qinput = self.input_quant(input)
-        if not self.skip_weight_quant:
+
+        if self.skip_weight_quant:
+            qweight = self.weight
+        else:
             qweight = self.weight_quant(self.weight)
-        # if self.dropout_module_w is not None:
-        #     qweight = self.dropout_module_w(qweight)
+
         output = F.linear(qinput, qweight)
         if self.output_quant is not None:
             output = self.output_quant(output)
