@@ -140,14 +140,7 @@ def test_launch_transform_20314_bwd_new():
 
     def custom():
         cust_func(
-            custom_res,
-            q_inp,
-            k_inp,
-            v_inp,
-            batch_size,
-            seq_len,
-            hidden_dim,
-            nhead
+            custom_res, q_inp, k_inp, v_inp, batch_size, seq_len, hidden_dim, nhead
         )
         return [
             custom_res.contiguous(),

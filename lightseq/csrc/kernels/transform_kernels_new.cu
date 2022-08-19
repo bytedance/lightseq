@@ -24,14 +24,15 @@ bias: [dim_2, dim_3, dim_4]
 output: [dim_2, dim_0, dim_3, dim_1, dim_4]
 */
 template <typename T>
-__global__ void bias_add_transform_20314_new(T *q_out, T* k_out, T* v_out, const T *input,
-                                         const T *bias, int dim_3, int dim_4, int batch_ele);
+__global__ void bias_add_transform_20314_new(T *q_out, T *k_out, T *v_out,
+                                             const T *input, const T *bias,
+                                             int dim_3, int dim_4,
+                                             int batch_ele);
 
 template <>
-__global__ void bias_add_transform_20314_new<float>(float *q_out, float* k_out, float* v_out,
-                                                const float *input,
-                                                const float *bias, int dim_3,
-                                                int dim_4, int batch_ele) {
+__global__ void bias_add_transform_20314_new<float>(
+    float *q_out, float *k_out, float *v_out, const float *input,
+    const float *bias, int dim_3, int dim_4, int batch_ele) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -49,7 +50,7 @@ __global__ void bias_add_transform_20314_new<float>(float *q_out, float* k_out, 
   float4 *qres_4 = reinterpret_cast<float4 *>(q_out);
   float4 *kres_4 = reinterpret_cast<float4 *>(k_out);
   float4 *vres_4 = reinterpret_cast<float4 *>(v_out);
-  
+
   float4 vqkv4;
   float4 vbias4;
   float4 vres4;
@@ -66,23 +67,20 @@ __global__ void bias_add_transform_20314_new<float>(float *q_out, float* k_out, 
     int id4 = i % dim_4;
     int cur_trg_offset = flat_3dim(id3, 0, id4, dim_1, dim_4);
     int temp_offset = trg_offset + cur_trg_offset;
-    if(temp_offset >= batch_ele * 2) {
-        vres_4[temp_offset - batch_ele * 2] = vres4;
-    }
-    else if (temp_offset >= batch_ele) {
-        kres_4[temp_offset - batch_ele] = vres4;    
-    }
-    else {
-        qres_4[temp_offset] = vres4;    
+    if (temp_offset >= batch_ele * 2) {
+      vres_4[temp_offset - batch_ele * 2] = vres4;
+    } else if (temp_offset >= batch_ele) {
+      kres_4[temp_offset - batch_ele] = vres4;
+    } else {
+      qres_4[temp_offset] = vres4;
     }
   }
 }
 
 template <>
-__global__ void bias_add_transform_20314_new<__half>(__half *q_out, __half* k_out, __half* v_out,
-                                                 const __half *input,
-                                                 const __half *bias, int dim_3,
-                                                 int dim_4, int batch_ele) {
+__global__ void bias_add_transform_20314_new<__half>(
+    __half *q_out, __half *k_out, __half *v_out, const __half *input,
+    const __half *bias, int dim_3, int dim_4, int batch_ele) {
   int id0 = blockIdx.x;
   int id1 = blockIdx.y;
   int id2 = blockIdx.z;
@@ -100,7 +98,7 @@ __global__ void bias_add_transform_20314_new<__half>(__half *q_out, __half* k_ou
   float4 *qres_4 = reinterpret_cast<float4 *>(q_out);
   float4 *kres_4 = reinterpret_cast<float4 *>(k_out);
   float4 *vres_4 = reinterpret_cast<float4 *>(v_out);
-  
+
   float4 vqkv4;
   float4 vbias4;
   float4 vres4;
@@ -120,43 +118,40 @@ __global__ void bias_add_transform_20314_new<__half>(__half *q_out, __half* k_ou
     int id4 = i % dim_4;
     int cur_trg_offset = flat_3dim(id3, 0, id4, dim_1, dim_4);
     int temp_offset = trg_offset + cur_trg_offset;
-    if(temp_offset >= batch_ele * 2) {
-        vres_4[temp_offset - batch_ele * 2] = vres4;
-    }
-    else if (temp_offset >= batch_ele) {
-        kres_4[temp_offset - batch_ele] = vres4;    
-    }
-    else {
-        qres_4[temp_offset] = vres4;    
+    if (temp_offset >= batch_ele * 2) {
+      vres_4[temp_offset - batch_ele * 2] = vres4;
+    } else if (temp_offset >= batch_ele) {
+      kres_4[temp_offset - batch_ele] = vres4;
+    } else {
+      qres_4[temp_offset] = vres4;
     }
   }
 }
 
 // [b, s, 3, h] -> [3, b, nh, s, ad]
 template <>
-void launch_bias_add_transform_20314_new<float>(float *q_out, float* k_out, float* v_out, const float *input,
-                                            const float *bias, int dim_0,
-                                            int dim_1, int dim_2, int dim_3,
-                                            int dim_4, cudaStream_t stream) {
+void launch_bias_add_transform_20314_new<float>(
+    float *q_out, float *k_out, float *v_out, const float *input,
+    const float *bias, int dim_0, int dim_1, int dim_2, int dim_3, int dim_4,
+    cudaStream_t stream) {
   dim_4 >>= 2;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
   dim3 block_dim(min(dim_3 * dim_4, MAX_THREADS));
   int batch_ele = dim_0 * dim_1 * dim_3 * dim_4;
 
-  bias_add_transform_20314_new<float>
-      <<<grid_dim, block_dim, 0, stream>>>(q_out, k_out, v_out, input, bias, dim_3, dim_4, batch_ele);
+  bias_add_transform_20314_new<float><<<grid_dim, block_dim, 0, stream>>>(
+      q_out, k_out, v_out, input, bias, dim_3, dim_4, batch_ele);
 }
 
 template <>
-void launch_bias_add_transform_20314_new<__half>(__half *q_out, __half* k_out, __half* v_out,
-                                             const __half *input,
-                                             const __half *bias, int dim_0,
-                                             int dim_1, int dim_2, int dim_3,
-                                             int dim_4, cudaStream_t stream) {
+void launch_bias_add_transform_20314_new<__half>(
+    __half *q_out, __half *k_out, __half *v_out, const __half *input,
+    const __half *bias, int dim_0, int dim_1, int dim_2, int dim_3, int dim_4,
+    cudaStream_t stream) {
   if (dim_2 != 3) {
-      printf("launch_bias_add_transform_20314_new error!\n");
-      exit(0);
+    printf("launch_bias_add_transform_20314_new error!\n");
+    exit(0);
   }
   dim_4 >>= 3;
 
@@ -165,11 +160,9 @@ void launch_bias_add_transform_20314_new<__half>(__half *q_out, __half* k_out, _
 
   int batch_ele = dim_0 * dim_1 * dim_3 * dim_4;
 
-  bias_add_transform_20314_new<__half>
-      <<<grid_dim, block_dim, 0, stream>>>(q_out, k_out, v_out, input, bias, dim_3, dim_4, batch_ele);
+  bias_add_transform_20314_new<__half><<<grid_dim, block_dim, 0, stream>>>(
+      q_out, k_out, v_out, input, bias, dim_3, dim_4, batch_ele);
 }
-
-
 
 /**
 @brief: transform_20314_bwd_new
@@ -188,9 +181,10 @@ hidden_dim: dim of the hidden tensor
 nhead: number of attention heads
 */
 template <typename T>
-__global__ void transform_20314_bwd_new(T *output, const T *q_inp, const T* k_inp, const T* v_inp, int batch_size,
-                                 int seq_len, int nhead,
-                                 int head_dim, int batch_ele_num) {
+__global__ void transform_20314_bwd_new(T *output, const T *q_inp,
+                                        const T *k_inp, const T *v_inp,
+                                        int batch_size, int seq_len, int nhead,
+                                        int head_dim, int batch_ele_num) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= batch_ele_num * 3) {
     return;
@@ -207,20 +201,21 @@ __global__ void transform_20314_bwd_new(T *output, const T *q_inp, const T* k_in
   const float4 *v_inp4 = reinterpret_cast<const float4 *>(v_inp);
 
   float4 *res4 = reinterpret_cast<float4 *>(output);
-  if (offset >= batch_ele_num * 2) 
+  if (offset >= batch_ele_num * 2)
     res4[trg_offset] = v_inp4[offset - batch_ele_num * 2];
-  else if (offset >= batch_ele_num) 
+  else if (offset >= batch_ele_num)
     res4[trg_offset] = k_inp4[offset - batch_ele_num];
-  else 
+  else
     res4[trg_offset] = q_inp4[offset];
 }
 
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <>
-void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp, const float *k_inp, const float *v_inp,
-                                    int batch_size, int seq_len, int hidden_dim,
-                                    int nhead,
-                                    cudaStream_t stream) {
+void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp,
+                                           const float *k_inp,
+                                           const float *v_inp, int batch_size,
+                                           int seq_len, int hidden_dim,
+                                           int nhead, cudaStream_t stream) {
   hidden_dim >>= 2;
   int head_dim = hidden_dim / nhead;
   int batch_ele_num = batch_size * seq_len * hidden_dim;
@@ -232,10 +227,11 @@ void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp, co
 }
 
 template <>
-void launch_transform_20314_bwd_new<__half>(__half *output, const __half *q_inp, const __half *k_inp, const __half *v_inp,
-                                     int batch_size, int seq_len,
-                                     int hidden_dim, int nhead,
-                                     cudaStream_t stream) {
+void launch_transform_20314_bwd_new<__half>(__half *output, const __half *q_inp,
+                                            const __half *k_inp,
+                                            const __half *v_inp, int batch_size,
+                                            int seq_len, int hidden_dim,
+                                            int nhead, cudaStream_t stream) {
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
   int batch_ele_num = batch_size * seq_len * hidden_dim;
