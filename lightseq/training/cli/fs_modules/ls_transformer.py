@@ -488,17 +488,13 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
             self.layer_norm = None
 
         if args.use_torch_layer:
-            # self.output_projection = QuantLinear(
-            #     self.embed_tokens.embeddings.shape[1],
-            #     self.embed_tokens.embeddings.shape[0],
-            #     bias=False,
-            # )
-            # self.output_projection.weight_quant = self.embed_tokens.emb_quant
-            self.output_projection = nn.Linear(
+            self.output_projection = QuantLinear(
                 self.embed_tokens.embeddings.shape[1],
                 self.embed_tokens.embeddings.shape[0],
                 bias=False,
+                skip_weight_quant=True,
             )
+            self.output_projection.weight_quant = self.embed_tokens.emb_quant
         else:
             if args.enable_quant:
                 raise NotImplementedError

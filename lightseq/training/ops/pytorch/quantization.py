@@ -34,11 +34,9 @@ class QuantLinear(Linear):
         self.dropout_module_w = None
         if pre_activation == "relu":
             input_quant_config = relu_quant_config
-            # self.dropout_module_w = Dropout(0.1)
         else:
             input_quant_config = act_quant_config
 
-        # self.dropout_module_i = Dropout(0.1)
         self.input_quant = None
         if pre_activation != "encoder_out":
             self.input_quant = TensorQuantizer(input_quant_config)
@@ -46,6 +44,7 @@ class QuantLinear(Linear):
         # if pre_activation is None:
         self.output_quant = TensorQuantizer(out_quant_config)
         self.weight_quant = TensorQuantizer(weight_quant_config)
+        self.skip_weight_quant = kwargs.pop("skip_weight_quant", False)
 
     def forward(self, input):
         qinput = input
@@ -53,7 +52,8 @@ class QuantLinear(Linear):
             # if self.dropout_module_i is not None:
             #     input = self.dropout_module_i(input)
             qinput = self.input_quant(input)
-        qweight = self.weight_quant(self.weight)
+        if not self.skip_weight_quant:
+            qweight = self.weight_quant(self.weight)
         # if self.dropout_module_w is not None:
         #     qweight = self.dropout_module_w(qweight)
         output = F.linear(qinput, qweight)
