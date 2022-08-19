@@ -954,7 +954,7 @@ if __name__ == "__main__":
         "test_launch_bias_add_transform_20314",
         "test_launch_transform4d_0213",
         "test_launch_bias_add_transform_20314_new",
-        "test_launch_transform_20314_bwd_new"
+        "test_launch_transform_20314_bwd_new",
         "test_launch_fused_add2",
         "test_launch_ffn_bias_bwd",
         "test_launch_attn_softmax",
