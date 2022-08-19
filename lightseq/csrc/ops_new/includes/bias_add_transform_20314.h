@@ -2,6 +2,7 @@
 #include "declaration.h"
 #include "node.h"
 #include "kernels.h"
+#include "tuple"
 
 namespace lightseq {
 
@@ -24,7 +25,8 @@ class BiasAddTrans20314 : public Operator {
 
   virtual ~BiasAddTrans20314() {}
 
-  Variable* operator()(Variable* inp, Variable* bias);
+  std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp,
+                                                         Variable* bias);
 
   void before_forward(int batch, int seq_len) {
     _batch = batch, _seq_len = seq_len;

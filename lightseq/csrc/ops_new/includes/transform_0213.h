@@ -22,7 +22,7 @@ class Transform0213 : public Operator {
         _heads(heads),
         _hidden_size(hidden_size) {}
 
-  virtual ~BiasAddTrans20314() {}
+  virtual ~Transform0213() {}
 
   Variable* operator()(Variable* inp);
 

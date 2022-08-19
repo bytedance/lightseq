@@ -3,17 +3,17 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
+Variable* Transform0213<T1, T2>::operator()(Variable* inp) {
   size_t trans_size = _max_batch * _max_seq * _hidden_size;
   Variable* res = new Variable(this->_name + "/res", trans_size * sizeof(T1),
                                trans_size * sizeof(T2));
   this->set_parents({inp});
   this->set_children({res});
-  return result;
+  return res;
 }
 
 template <typename T1, typename T2>
-void BiasAddTrans20314<T1, T2>::forward() {
+void Transform0213<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
   T1* inp_ptr = (T1*)parent(0)->value();
@@ -25,7 +25,8 @@ void BiasAddTrans20314<T1, T2>::forward() {
 }
 
 template <typename T1, typename T2>
-void BiasAddTrans20314<T1, T2>::backward() {
+void Transform0213<T1, T2>::backward() {
+  cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* out_grad = (T1*)child(0)->grad();
 
