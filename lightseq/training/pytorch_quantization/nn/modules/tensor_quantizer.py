@@ -93,13 +93,14 @@ class TensorQuantizer(nn.Module):
         self._learn_amax = quant_desc.learn_amax
         self._unsigned = quant_desc.unsigned
         self._narrow_range = quant_desc.narrow_range
-
+        self.train_step = 0
         self._scale = None if not quant_desc.fake_quant else 1.0
         self._disabled = disabled
         self._if_quant = if_quant
         self._if_clip = False
         self._if_calib = if_calib
         self.fab = (1.3, 1.2)
+        self.fa_t = 0.3
 
         if quant_desc.amax is not None:
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
@@ -341,6 +342,11 @@ class TensorQuantizer(nn.Module):
 
         amax = self.clip.clip_value_max
 
+        factor = 0.9999**(self.train_step/0.9999)
+        a = self.fa_t * factor
+        fa, fb = 1 + a, a * 4
+        
+        self.train_step += 1
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
@@ -352,7 +358,8 @@ class TensorQuantizer(nn.Module):
                     self._narrow_range, 
                     self.training,
                     self.smooth_avg,
-                    self.fab,
+                    # self.fab,
+                    (fa, fb),
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
