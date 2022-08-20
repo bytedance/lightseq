@@ -190,10 +190,11 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
 
         smooth_avg_update = 1.0 / args.smooth_avg_update
+        fb = (args.fa - 1) * 4
         def enable_tensorQuantizer(m):
             if isinstance(m, TensorQuantizer):
                 m.smooth_avg = smooth_avg_update
-                m.fab = (args.fa, args.fb)
+                m.fab = (args.fa, fb)
                 if args.quant_bits != 8:
                     m.num_bits = args.quant_bits
 
