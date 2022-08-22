@@ -89,7 +89,6 @@ void T5Weight<OpType_>::proto_get_model_config(const T5 &t5,
   _multilg_type = t5.model_conf().multilg_type();
 }
 
-
 /**
 Load the weights of embedding layer into GPU memory.
 Compared with the encoder, the decoder has more
@@ -114,7 +113,8 @@ std::string T5Weight<OpType_>::proto_parse_emb_wei(
   idx += vocab_size * _hidden_size;
 
   offset.push_back(idx);
-  if (layer.position_embedding_size() != _relative_attention_num_buckets * _head_num)
+  if (layer.position_embedding_size() !=
+      _relative_attention_num_buckets * _head_num)
     return "Wrong position_embedding_size !";
   for (float ele : layer.position_embedding()) value.push_back(ele);
   idx += _relative_attention_num_buckets * _head_num;
