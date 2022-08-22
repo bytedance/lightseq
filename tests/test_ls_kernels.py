@@ -772,11 +772,14 @@ def test_crf():
             seq_len,
             batch_size,
         )
-        # print(f'ls step0 score: {score[0, -10:]}') #debug
-        # print(f'ls end score: {next_score[0, :]}') #debug
-        # print(f'ls best score: {score[0, 0]}, last tag: {score[0, 1]}') #debug
-        # print(f'ls  emissions: {emissions[0, 0, -3:]}') #debug
-        # print(f'ls start_transition: {start_transition[-3:]}') #debug
+        if seq_len % 2 == 0:
+            print(f"ls end score: {next_score[0, :]}")  # debug
+            print(f"ls best score: {score[0, 0]}, last tag: {score[0, 1]}")  # debug
+        else:
+            print(f"ls end score: {score[0, :]}")  # debug
+            print(
+                f"ls best score: {next_score[0, 0]}, last tag: {next_score[0, 1]}"
+            )  # debug
         return [
             best_tags,
         ]

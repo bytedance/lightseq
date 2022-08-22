@@ -121,8 +121,8 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   if (threadIdx.x != 0) {
     return;
   }
-  next_score[0] = max_score;
-  next_score[1] = last_tag;
+  next_score[0] = max_score;  // for debug
+  next_score[1] = last_tag;   // for debug
   seq_idx--;
   best_tags[flat_2dim(blockIdx.x, seq_idx, seq_len)] = last_tag;
   for (int i = seq_idx - 1; i >= 0; i--) {

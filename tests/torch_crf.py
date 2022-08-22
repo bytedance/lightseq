@@ -48,9 +48,9 @@ class CRF(nn.Module):
         The parameters will be initialized randomly from a uniform distribution
         between -0.1 and 0.1.
         """
-        nn.init.normal_(self.start_transitions)
-        nn.init.normal_(self.end_transitions)
-        nn.init.normal_(self.transitions)
+        nn.init.normal_(self.start_transitions, std=10.0)
+        nn.init.normal_(self.end_transitions, std=10.0)
+        nn.init.normal_(self.transitions, std=10.0)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(num_tags={self.num_tags})"
@@ -332,8 +332,10 @@ class CRF(nn.Module):
         end_score = score + self.end_transitions
         _, end_tag = end_score.max(dim=1)
         # print(f'history_idx: {history_idx[0, :, :]}')
-        # print(f'pt end score: {end_score[0, :]}') #debug
-        # print(f'pt best score: {end_score[0, end_tag[0]]}, last tag: {end_tag[0]}') #debug
+        print(f"pt end score: {end_score[0, :]}")  # debug
+        print(
+            f"pt best score: {end_score[0, end_tag[0]]}, last tag: {end_tag[0]}"
+        )  # debug
 
         # shape: (batch_size,)
         seq_ends = mask.long().sum(dim=0) - 1
