@@ -56,12 +56,22 @@ int main(int argc, char* argv[]) {
   lightseq::cuda::CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   std::cout << "infer preprocessing finished" << std::endl;
 
+  std::chrono::duration<double> elapsed;
+  int iter = 0;
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 20; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    lightseq::cuda::print_time_duration(start, "one infer time", 0);
+    auto finish = std::chrono::high_resolution_clock::now();
+
+    if (i >= 5) {
+      iter++;
+      elapsed += finish - start;
+    }
   }
+
+  std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
+            << " ms" << std::endl;
 
   for (int i = 0; i < model->get_output_size(); i++) {
     const float* d_output;

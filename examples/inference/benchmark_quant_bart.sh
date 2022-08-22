@@ -17,8 +17,8 @@ echo "batch_size input_seq_len output_seq_len beam_size latency" >>$res_log
 
 for batch_size in 1 8 32; do
     for beam_size in 1 4 32; do
-        for input_seq_len in 32 64 128; do
-            output_seq_len=$(($input_seq_len + 50))
+        for input_seq_len in 16 32 64; do
+            output_seq_len=$input_seq_len
             cd $CUR_DIR/python
 
             python3 generate_model.py --model_name $model_full_name --sampling_method beam_search \
