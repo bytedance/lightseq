@@ -16,6 +16,11 @@ void assign_zero_bias(Type *ptr, int size) {
   for (int i = 0; i < size; i++) ptr[i] = 0;
 }
 
+template <typename Type>
+void push_back_zero(std::vector<Type> &vec, int size) {
+  for (int i = 0; i < size; ++i) vec.push_back(0);
+}
+
 /**
 Cast weights into required datatype.
 The datatype of weights in custom proto file will always be in fp32.
@@ -40,7 +45,7 @@ template <OperationType OpType_>
 void T5Weight<OpType_>::proto_get_model_config(const T5 &t5,
                                                bool only_decoder) {
   _hidden_size = t5.trg_embedding().norm_scale_size();
-  _max_step = t5.trg_embedding().position_embedding_size() / _hidden_size;
+  _max_step = t5.model_conf().max_step();
 
   _inner_size = t5.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   if (!only_decoder) {
@@ -53,6 +58,7 @@ void T5Weight<OpType_>::proto_get_model_config(const T5 &t5,
   }
   _n_dec_layer = t5.decoder_stack_size();
   _head_num = t5.model_conf().head_num();
+  _relative_attention_num_buckets = 32;
   if (_hidden_size % _head_num != 0) {
     throw std::runtime_error("Wrong head_num: hidden_size " +
                              std::to_string(_hidden_size) + " % head_num " +
@@ -83,6 +89,7 @@ void T5Weight<OpType_>::proto_get_model_config(const T5 &t5,
   _multilg_type = t5.model_conf().multilg_type();
 }
 
+
 /**
 Load the weights of embedding layer into GPU memory.
 Compared with the encoder, the decoder has more
@@ -107,10 +114,10 @@ std::string T5Weight<OpType_>::proto_parse_emb_wei(
   idx += vocab_size * _hidden_size;
 
   offset.push_back(idx);
-  if (layer.position_embedding_size() != _max_step * _hidden_size)
+  if (layer.position_embedding_size() != _relative_attention_num_buckets * _head_num)
     return "Wrong position_embedding_size !";
   for (float ele : layer.position_embedding()) value.push_back(ele);
-  idx += _max_step * _hidden_size;
+  idx += _relative_attention_num_buckets * _head_num;
 
   offset.push_back(idx);
   if (layer.norm_scale_size() != _hidden_size) return "Wrong norm_scale_size !";
@@ -118,8 +125,8 @@ std::string T5Weight<OpType_>::proto_parse_emb_wei(
   idx += _hidden_size;
 
   offset.push_back(idx);
-  if (layer.norm_bias_size() != _hidden_size) return "Wrong norm_bias_size !";
-  for (float ele : layer.norm_bias()) value.push_back(ele);
+  // norm_bias
+  push_back_zero(value, _hidden_size);
   idx += _hidden_size;
 
   if (source == "src") {
@@ -143,17 +150,13 @@ std::string T5Weight<OpType_>::proto_parse_emb_wei(
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-    if (layer.encode_output_project_bias_kv_size() !=
-        _hidden_size * 2 * _n_dec_layer)
-      return "Wrong encode_output_project_bias_kv_size !";
-    for (float ele : layer.encode_output_project_bias_kv())
-      value.push_back(ele);
+    // encode_output_project_bias_kv
+    push_back_zero(value, _hidden_size * 2 * _n_dec_layer);
     idx += _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
-    if (layer.shared_bias_size() != vocab_size)
-      return "Wrong shared_bias_size !";
-    for (float ele : layer.shared_bias()) value.push_back(ele);
+    // shared_bias
+    push_back_zero(value, vocab_size);
     idx += vocab_size;
 
     std::vector<_DataType> raw_value;
@@ -208,9 +211,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_norm_bias_size() != _hidden_size)
-      return "Wrong multihead_norm_bias_size !";
-    for (float ele : enc_layer.multihead_norm_bias()) value.push_back(ele);
+    // multihead_norm_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -224,10 +226,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_bias_qkv_size() != _hidden_size * 3)
-      return "Wrong multihead_project_bias_qkv_size !";
-    for (float ele : enc_layer.multihead_project_bias_qkv())
-      value.push_back(ele);
+    // multihead_project_bias_qkv
+    push_back_zero(value, _hidden_size * 3);
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -241,10 +241,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.multihead_project_bias_output_size() != _hidden_size)
-      return "Wrong multihead_project_bias_output_size !";
-    for (float ele : enc_layer.multihead_project_bias_output())
-      value.push_back(ele);
+    // multihead_project_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -254,9 +252,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_norm_bias_size() != _hidden_size)
-      return "Wrong ffn_norm_bias_size !";
-    for (float ele : enc_layer.ffn_norm_bias()) value.push_back(ele);
+    // ffn_norm_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -268,9 +265,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_first_bias_size() != _inner_size)
-      return "Wrong ffn_first_bias_size !";
-    for (float ele : enc_layer.ffn_first_bias()) value.push_back(ele);
+    // ffn_first_bias
+    push_back_zero(value, _inner_size);
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -282,9 +278,8 @@ std::string T5Weight<OpType_>::proto_parse_enc_wei(const T5 &t5) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (enc_layer.ffn_second_bias_size() != _hidden_size)
-      return "Wrong ffn_second_bias_size !";
-    for (float ele : enc_layer.ffn_second_bias()) value.push_back(ele);
+    // ffn_second_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
   }  // for
@@ -316,9 +311,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.self_norm_bias_size() != _hidden_size)
-      return "Wrong self_norm_bias_size !";
-    for (float ele : dec_layer.self_norm_bias()) value.push_back(ele);
+    // self_norm_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -331,9 +325,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_bias_qkv_size() != _hidden_size * 3)
-      return "Wrong self_project_bias_qkv size !";
-    for (float ele : dec_layer.self_project_bias_qkv()) value.push_back(ele);
+    // self_project_bias_qkv
+    push_back_zero(value, _hidden_size * 3);
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
@@ -347,9 +340,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.self_project_bias_output_size() != _hidden_size)
-      return "Wrong self_project_bias_output size !";
-    for (float ele : dec_layer.self_project_bias_output()) value.push_back(ele);
+    // self_project_bias_output
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -359,9 +351,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_norm_bias_size() != _hidden_size)
-      return "Wrong encdec_norm_bias_size !";
-    for (float ele : dec_layer.encdec_norm_bias()) value.push_back(ele);
+    // encdec_norm_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -373,9 +364,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_bias_q_size() != _hidden_size)
-      return "Wrong encdec_project_bias_q size !";
-    for (float ele : dec_layer.encdec_project_bias_q()) value.push_back(ele);
+    // encdec_project_bias_q
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -389,10 +379,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.encdec_project_bias_output_size() != _hidden_size)
-      return "Wrong encdec_project_bias_output size !";
-    for (float ele : dec_layer.encdec_project_bias_output())
-      value.push_back(ele);
+    // encdec_project_bias_output
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -402,9 +390,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_norm_bias_size() != _hidden_size)
-      return "Wrong ffn_norm_bias_size !";
-    for (float ele : dec_layer.ffn_norm_bias()) value.push_back(ele);
+    // ffn_norm_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
     offset.push_back(idx);
@@ -416,9 +403,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_first_bias_size() != _inner_size)
-      return "Wrong ffn_first_bias_size !";
-    for (float ele : dec_layer.ffn_first_bias()) value.push_back(ele);
+    // ffn_first_bias
+    push_back_zero(value, _inner_size);
     idx += _inner_size;
 
     offset.push_back(idx);
@@ -430,9 +416,8 @@ std::string T5Weight<OpType_>::proto_parse_dec_wei(const T5 &t5) {
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
-    if (dec_layer.ffn_second_bias_size() != _hidden_size)
-      return "Wrong ffn_second_bias_size !";
-    for (float ele : dec_layer.ffn_second_bias()) value.push_back(ele);
+    // ffn_second_bias
+    push_back_zero(value, _hidden_size);
     idx += _hidden_size;
 
   }  // for
