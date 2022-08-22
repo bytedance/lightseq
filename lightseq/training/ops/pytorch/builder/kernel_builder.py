@@ -21,12 +21,14 @@ class KernelBuilder(CUDAOpBuilder):
         return [
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/transform_kernels.cu",
+            "csrc/kernels/transform_kernels_new.cu",
             "csrc/kernels/softmax_kernels.cu",
+            "csrc/kernels/softmax_kernels_new.cu",
             "csrc/kernels/general_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/embedding_kernels.cu",
-            "csrc/torch/pybind_kernel.cpp",
+            "csrc/pybind/pybind_kernel.cpp",
         ]
 
     def include_paths(self):
