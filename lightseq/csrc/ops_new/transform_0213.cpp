@@ -34,4 +34,7 @@ void Transform0213<T1, T2>::backward() {
                             _heads, _stream);
 }
 
+template class Transform0213<float, float>;
+template class Transform0213<__half, __half>;
+
 }  // namespace lightseq
