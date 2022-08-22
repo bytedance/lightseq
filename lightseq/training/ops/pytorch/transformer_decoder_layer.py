@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch import transformer_cuda_module
+from lightseq.training.ops.pytorch import TransformerBuilder
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
@@ -16,6 +16,7 @@ from lightseq.training.ops.pytorch.util import (
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
 
+transformer_cuda_module = TransformerBuilder().load()
 
 _all_layer_grads = dict()
 _shared_encdec_attn_kv_params = dict()
