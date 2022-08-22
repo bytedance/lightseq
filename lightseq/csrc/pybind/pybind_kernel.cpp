@@ -212,7 +212,7 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
                  rptr<float>(score), rptr<float>(next_score),
                  rptr<int>(history), rptr<int>(best_tags), num_tags, seq_len,
                  batch_size, stream);
-  //   cudaStreamSynchronize(stream);
+  cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -283,5 +283,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_viterbi_fp16", &torch_launch_viterbi<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_viterbi_fp32", &torch_launch_viterbi<float>,
         "Test kernel wrapper");
 }
