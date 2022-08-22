@@ -31,7 +31,6 @@ Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 template <typename T1, typename T2>
 void NormalizeLayerOp<T1, T2>::before_forward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
-  _batch_dim = _batch_tokens * _hidden_dim;
 }
 
 template <typename T1, typename T2>

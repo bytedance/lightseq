@@ -1,35 +1,27 @@
 #pragma once
-#include "bias_act_dropout.h"
-#include "bias_add_transform_20314.h"
-#include "bias_dropout_residual.h"
-#include "dropout.h"
-#include "feed_forward.h"
-#include "normalize_layer.h"
-#include "softmax.h"
-#include "strided_batch_gemm.h"
-#include "transform_0213.h"
 #include "layer.h"
+#include "feed_forward_layer.h"
+#include "self_attention_layer.h"
 
 namespace lightseq {
 
 template <class T1, class T2>
 class TransformerEncoderLayer : public Layer {
-private:
-  // operators 
+ private:
+  SelfAttentionLayerPtr<T1, T2> _attn_layer;
+  FeedForwardLayerPtr<T1, T2> _ffn_layer;
 
-  // parameters
+ public:
+  TransformerEncoderLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+                          int hidden_size, int num_heads, int intermediate_size,
+                          float attn_prob_dropout_ratio,
+                          float activation_dropout_ratio,
+                          float hidden_output_dropout_ratio,
+                          bool pre_or_postLayerNorm, std::string activation_fn,
+                          bool mask_future_tokens);
+  virtual ~TransformerEncoderLayer() {}
 
-public:
-  TransformerEncoderLayer() : Layer("TransformerEncoderLayer") {
-      
-    this->_context_ptr->exit_layer();  // necessary
-  }
-  virtual ~LayerA() {}
-
-  Variable* operator()(Variable* inp) {
-      
-    return output;
-  }
+  Variable* operator()(Variable* inp, Variable* inp_mask) { return output; }
 
   void before_forward(int size) {
     // op before forward
@@ -40,10 +32,11 @@ public:
   void before_backward() { return; }
 };
 
-template class LayerA<int, int>;
+template class TransformerEncoderLayer<float, float>;
+template class TransformerEncoderLayer<__half, __half>;
 
 template <class T1, class T2>
-using LayerAPtr = std::shared_ptr<LayerA<T1, T2>>;
-
+using TransformerEncoderLayerPtr =
+    std::shared_ptr<TransformerEncoderLayer<T1, T2>>;
 
 }  // namespace lightseq

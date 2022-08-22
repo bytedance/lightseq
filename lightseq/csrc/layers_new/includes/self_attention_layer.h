@@ -12,21 +12,20 @@
 
 namespace lightseq {
 
-
 template <class T1, class T2>
 class SelfAttentionLayer : public Layer {
-private:
-  // operators 
-  NormalizeLayerOp<T1, T2>*     _attn_ln = nullptr;
-  FeedForwardOp<T1, T2>*        _qkv_linear = nullptr;
-  BiasAddTrans20314<T1, T2>*    _bias_add_transform_20314 = nullptr;
-  StridedBatchGemmOp<T1, T2>*   _attn_scores = nullptr;
-  SoftmaxOp<T1, T2>*            _softmax = nullptr;
-  DropoutOp<T1, T2>*            _attn_prob_dropout = nullptr;
-  StridedBatchGemmOp<T1, T2>*   _attn_context = nullptr;
-  Transform0213<T1, T2>*        _transform_0213 = nullptr;
-  FeedForwardOp<T1, T2>*        _attn_out_linear = nullptr;
-  BiasDropoutResOp<T1, T2>*     _attn_dropout = nullptr;
+ private:
+  // operators
+  NormalizeLayerOp<T1, T2>* _attn_ln = nullptr;
+  FeedForwardOp<T1, T2>* _qkv_linear = nullptr;
+  BiasAddTrans20314<T1, T2>* _bias_add_transform_20314 = nullptr;
+  StridedBatchGemmOp<T1, T2>* _attn_scores = nullptr;
+  SoftmaxOp<T1, T2>* _softmax = nullptr;
+  DropoutOp<T1, T2>* _attn_prob_dropout = nullptr;
+  StridedBatchGemmOp<T1, T2>* _attn_context = nullptr;
+  Transform0213<T1, T2>* _transform_0213 = nullptr;
+  FeedForwardOp<T1, T2>* _attn_out_linear = nullptr;
+  BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
 
   // parameters
   Variable* _attn_qkvw;
@@ -40,8 +39,8 @@ private:
   int _batch_dim;
   int _batch_heads;
   int _batch_tokens;
-  
-public:
+
+ public:
   SelfAttentionLayer();
 
   virtual ~SelfAttentionLayer() {}
@@ -57,6 +56,6 @@ template class SelfAttentionLayer<__half, __half>;
 template class SelfAttentionLayer<float, float>;
 
 template <class T1, class T2>
-using SelfAttentionLayer = std::shared_ptr<SelfAttentionLayer<T1, T2>>;
+using SelfAttentionLayerPtr = std::shared_ptr<SelfAttentionLayer<T1, T2>>;
 
-} // namespace lightseq 
+}  // namespace lightseq
