@@ -131,9 +131,9 @@ class MT5Decoder {
 
  public:
   MT5Decoder(int max_batch_size, const int* p_d_padding_mask,
-            const _DataType* p_d_encoder_output, int* p_d_result,
-            MT5Weight<OpType_>& tw, cudaStream_t stream, cublasHandle_t hd,
-            bool output_topk = false, const int* p_d_lang_id = nullptr);
+             const _DataType* p_d_encoder_output, int* p_d_result,
+             MT5Weight<OpType_>& tw, cudaStream_t stream, cublasHandle_t hd,
+             bool output_topk = false, const int* p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();

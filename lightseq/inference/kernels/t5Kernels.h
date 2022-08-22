@@ -26,7 +26,7 @@ void t5_ker_correlation_softmax_decself_launcher(
 
 template <typename T>
 void ker_gelu_first_elementmul_launcher(int batch_token_num, int block_dim,
-                            cudaStream_t stream, T* input, const T* input2,
-                            int feature_dim);
+                                        cudaStream_t stream, T* input,
+                                        const T* input2, int feature_dim);
 }  // namespace cuda
 }  // namespace lightseq

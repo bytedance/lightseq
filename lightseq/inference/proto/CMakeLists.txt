@@ -87,9 +87,9 @@ target_link_libraries(t5_weight PUBLIC utils ${Protobuf_LIBRARIES}
 target_include_directories(t5_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(t5_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-
-add_library(mt5_weight STATIC mt5_weight.cc ${MT5_PROTO_SRC} ${MT5_PROTO_HEADER})
+add_library(mt5_weight STATIC mt5_weight.cc ${MT5_PROTO_SRC}
+                              ${MT5_PROTO_HEADER})
 target_link_libraries(mt5_weight PUBLIC utils ${Protobuf_LIBRARIES}
-                                       ${HDF5_LIBRARIES})
+                                        ${HDF5_LIBRARIES})
 target_include_directories(mt5_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(mt5_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

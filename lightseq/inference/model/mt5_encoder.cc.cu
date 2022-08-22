@@ -16,9 +16,10 @@ namespace cuda {
 
 template <OperationType OpType_>
 MT5Encoder<OpType_>::MT5Encoder(int max_batch_size, int *p_d_token_id,
-                              int *p_d_padding_mask, _DataType *p_d_output,
-                              const MT5Weight<OpType_> &tw, cudaStream_t stream,
-                              cublasHandle_t hd, const int *p_d_lang_id)
+                                int *p_d_padding_mask, _DataType *p_d_output,
+                                const MT5Weight<OpType_> &tw,
+                                cudaStream_t stream, cublasHandle_t hd,
+                                const int *p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _p_d_token_id(p_d_token_id),
       _p_d_padding_mask(p_d_padding_mask),
@@ -44,7 +45,8 @@ template <OperationType OpType_>
 long MT5Encoder<OpType_>::compute_buffer_bytesize() {
   long sz1 = _max_batch_dim * 6 +
              _max_batch_size * _tw._head_num * _tw._max_step * _tw._max_step;
-  long sz2 = _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size * 2;
+  long sz2 =
+      _max_batch_dim + _max_batch_size * _tw._max_step * _tw._inner_size * 2;
   return max(sz1, sz2) * sizeof(_DataType);
 }
 
@@ -64,7 +66,8 @@ void MT5Encoder<OpType_>::init_buffer(void *pbuf) {
   _p_d_c = _p_d_v + _max_batch_dim;
   _p_d_ffn_buf1 = p_d_buf;
   _p_d_ffn_buf2 = _p_d_ffn_buf1 + _max_batch_dim;
-  _p_d_ffn_buf3 = _p_d_ffn_buf2 + _max_batch_size * _tw._max_step * _tw._inner_size;
+  _p_d_ffn_buf3 =
+      _p_d_ffn_buf2 + _max_batch_size * _tw._max_step * _tw._inner_size;
   // encoder and decoder use the same buffer to save gpu memory useage
   return;
 }
@@ -301,11 +304,10 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
-  #ifdef DEBUG_RESULT
-      std::cout << "result of first gemm" << std::endl;
-      print_vec(_p_d_ffn_buf2, "result: ", 10);
-  #endif
+#ifdef DEBUG_RESULT
+  std::cout << "result of first gemm" << std::endl;
+  print_vec(_p_d_ffn_buf2, "result: ", 10);
+#endif
 
   // if (_tw._use_gelu) {
   //   ker_bias_gelu_launcher<_DataType>(
@@ -316,12 +318,11 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
   //       _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
   //       _p_d_enc_wei[_weight_offset + 9], _tw._inner_size);
   // }
-  
+
   // #ifdef DEBUG_RESULT
   //     std::cout << "result of first gemm(after gelu)" << std::endl;
   //     print_vec(_p_d_ffn_buf2, "result: ", 10);
   // #endif
-
 
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -330,25 +331,25 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
       _p_d_ffn_buf3, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  
-  #ifdef DEBUG_RESULT
-      std::cout << "result of second gemm" << std::endl;
-      print_vec(_p_d_ffn_buf3, "result: ", 10);
-  #endif
+
+#ifdef DEBUG_RESULT
+  std::cout << "result of second gemm" << std::endl;
+  print_vec(_p_d_ffn_buf3, "result: ", 10);
+#endif
 
   ker_gelu_first_elementmul_launcher<_DataType>(
-    _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-    _p_d_ffn_buf3, _tw._inner_size);
+      _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
+      _p_d_ffn_buf3, _tw._inner_size);
 
-  #ifdef DEBUG_RESULT
-      std::cout << "result of gelu first and element wise multiply" << std::endl;
-      print_vec(_p_d_ffn_buf2, "result: ", 10);
-  #endif
+#ifdef DEBUG_RESULT
+  std::cout << "result of gelu first and element wise multiply" << std::endl;
+  print_vec(_p_d_ffn_buf2, "result: ", 10);
+#endif
 
-  #ifdef DEBUG_RESULT
-      std::cout << "weight of wo" << std::endl;
-      print_vec(_p_d_enc_wei[_weight_offset + 12], "result: ", 10);
-  #endif
+#ifdef DEBUG_RESULT
+  std::cout << "weight of wo" << std::endl;
+  print_vec(_p_d_enc_wei[_weight_offset + 12], "result: ", 10);
+#endif
 
   /* ---step 3. third ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
@@ -357,7 +358,6 @@ void MT5Encoder<OpType_>::ffn_add_norm() {
       _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
       _p_d_output, _CType, _tw._hidden_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id

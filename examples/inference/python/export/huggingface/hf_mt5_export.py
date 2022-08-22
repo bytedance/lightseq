@@ -110,7 +110,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "shared_bias",
         "lang_emb",
         "trg_vocab_mask",
-        "lm_head"
+        "lm_head",
     ]
 
     ENCODER_LAYER_KEYS = [
@@ -127,7 +127,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
-        "ffn_third_kernel"
+        "ffn_third_kernel",
     ]
 
     DECODER_LAYER_KEYS = [
@@ -150,7 +150,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "ffn_first_bias",
         "ffn_second_kernel",
         "ffn_second_bias",
-        "ffn_third_kernel"
+        "ffn_third_kernel",
     ]
     base_attr_to_keys = {
         "src_embedding": EMBEDDING_KEYS,
@@ -220,13 +220,13 @@ def replace_second_digit(s):
     pos_digit = -1
     cnt = 0
     for i in range(1, len(s)):
-        if s[i].isdigit() and not s[i-1].isdigit():
+        if s[i].isdigit() and not s[i - 1].isdigit():
             cnt += 1
             if cnt == 2:
                 pos_digit = i
     if pos_digit != -1:
         s[pos_digit] = table[s[pos_digit]]
-    return ''.join(s)
+    return "".join(s)
 
 
 def extract_transformer_weights(
@@ -371,21 +371,14 @@ def extract_transformer_weights(
         )
     )
 
-
     lm_head_weight_list = (
-        reloaded['lm_head.weight']
-        .transpose(0,1)
-        .numpy()
-        .reshape([-1])
-        .tolist()
+        reloaded["lm_head.weight"].transpose(0, 1).numpy().reshape([-1]).tolist()
     )
 
-    transformer.trg_embedding.lm_head[
-        :
-    ] = lm_head_weight_list
+    transformer.trg_embedding.lm_head[:] = lm_head_weight_list
     print(
         "lm_head.weight -> trg_embedding.lm_head, shape: {}, conversion finished!".format(
-            reloaded['lm_head.weight'].shape
+            reloaded["lm_head.weight"].shape
         )
     )
 
@@ -460,7 +453,9 @@ if __name__ == "__main__":
     output_lightseq_model_name = (
         "lightseq_mt5_base"  # you can rename it to "lightseq_mt5_large" for large model
     )
-    input_huggingface_t5_model = "google/mt5-base"  # Example: you can try "google/mt5-large" as well
+    input_huggingface_t5_model = (
+        "google/mt5-base"  # Example: you can try "google/mt5-large" as well
+    )
     head_number = 12  # change this to 16 for "mt5-large" model
     beam_size = 1
     max_step = 80  # max step for generation, it decides GPU memory occupancy

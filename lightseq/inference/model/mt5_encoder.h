@@ -61,7 +61,7 @@ class MT5Encoder {
   _DataType *_p_d_ffn_buf1;
   _DataType *_p_d_ffn_buf2;
   _DataType *_p_d_ffn_buf3;
-  
+
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
@@ -79,9 +79,9 @@ class MT5Encoder {
 
  public:
   MT5Encoder(int max_batch_size, int *p_d_token_id, int *p_d_padding_mask,
-            _DataType *p_d_output, const MT5Weight<OpType_> &tw,
-            cudaStream_t stream, cublasHandle_t hd,
-            const int *p_d_lang_id = nullptr);
+             _DataType *p_d_output, const MT5Weight<OpType_> &tw,
+             cudaStream_t stream, cublasHandle_t hd,
+             const int *p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
   void init_buffer(void *pbuf);
   std::string check();

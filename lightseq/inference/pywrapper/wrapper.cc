@@ -748,7 +748,6 @@ class PyMT5 {
   }
 };
 
-
 class PyVit {
  private:
   lightseq::cuda::LSModel *model_;

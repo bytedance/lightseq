@@ -38,7 +38,7 @@ Read model config stored in custom proto file.
 */
 template <OperationType OpType_>
 void MT5Weight<OpType_>::proto_get_model_config(const MT5 &mt5,
-                                               bool only_decoder) {
+                                                bool only_decoder) {
   _hidden_size = mt5.trg_embedding().norm_scale_size();
   _max_step = mt5.trg_embedding().position_embedding_size() / _hidden_size;
 
@@ -452,7 +452,7 @@ Read model config stored in custom hdf5 file.
 */
 template <OperationType OpType_>
 void MT5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
-                                              bool only_decoder) {
+                                               bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
 
   _inner_size =
@@ -561,7 +561,7 @@ Compared with the encoder, the decoder has more
 */
 template <OperationType OpType_>
 void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                           std::string source) {
+                                            std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::string dataset_prefix =
@@ -571,7 +571,8 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
                       2 * _hidden_size;
   if (source != "src") {
     value_size += _hidden_size * _hidden_size * 2 * _n_dec_layer +
-                  _hidden_size * 2 * _n_dec_layer + vocab_size + vocab_size * _hidden_size;
+                  _hidden_size * 2 * _n_dec_layer + vocab_size +
+                  vocab_size * _hidden_size;
   }
 
   std::vector<int> offset;
@@ -647,11 +648,9 @@ void MT5Weight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file,
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/lm_head",
-        H5T_NATIVE_FLOAT, value.data() + idx,
-        [=](int size) {
-          return size != vocab_size * _hidden_size;
-        },
+        hdf5_file, dataset_prefix + "/lm_head", H5T_NATIVE_FLOAT,
+        value.data() + idx,
+        [=](int size) { return size != vocab_size * _hidden_size; },
         "Wrong lm_head_size !");
     idx += vocab_size * _hidden_size;
 
@@ -984,7 +983,7 @@ Load the proto file into CPU memory and parse it.
 */
 template <OperationType OpType_>
 std::string MT5Weight<OpType_>::initializing(std::string weight_path,
-                                            bool only_decoder) {
+                                             bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;

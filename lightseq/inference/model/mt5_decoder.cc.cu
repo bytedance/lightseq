@@ -16,10 +16,10 @@ namespace cuda {
 
 template <OperationType OpType_>
 MT5Decoder<OpType_>::MT5Decoder(int max_batch_size, const int* p_d_padding_mask,
-                              const _DataType* p_d_encoder_output,
-                              int* p_d_result, MT5Weight<OpType_>& tw,
-                              cudaStream_t stream, cublasHandle_t hd,
-                              bool output_topk, const int* p_d_lang_id)
+                                const _DataType* p_d_encoder_output,
+                                int* p_d_result, MT5Weight<OpType_>& tw,
+                                cudaStream_t stream, cublasHandle_t hd,
+                                bool output_topk, const int* p_d_lang_id)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -382,9 +382,9 @@ bool MT5Decoder<OpType_>::run_step() {
   decoder_stack();
   /* --- Project hidden states to vocab logits--- */
 
-  #ifdef DEBUG_RESULT
-    print_vec(_p_d_trg_emb_wei[7], "lm_head confirm", 10);
-  #endif
+#ifdef DEBUG_RESULT
+  print_vec(_p_d_trg_emb_wei[7], "lm_head confirm", 10);
+#endif
 
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._trg_vocab_size, _step_token_num,
@@ -704,7 +704,6 @@ void MT5Decoder<OpType_>::ffn_add_norm() {
       _p_d_query_buf2, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-
   /* ---step 2. second ffn layer--- */
   CHECK_GPU_ERROR(cublasGemmEx(
       _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _step_token_num,
@@ -712,7 +711,6 @@ void MT5Decoder<OpType_>::ffn_add_norm() {
       _tw._inner_size, _p_d_query_buf1, _BType, _tw._hidden_size, &_type_zero,
       _p_d_query_buf3, _CType, _tw._inner_size, _computeType,
       CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-
 
   ker_gelu_first_elementmul_launcher<_DataType>(
       _step_token_num, _max_thread_per_block, _stream, _p_d_query_buf2,
