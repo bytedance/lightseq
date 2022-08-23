@@ -107,6 +107,7 @@ class TensorQuantizer(nn.Module):
 
         # Clip module consumes a lot of memory, so only create it if learn_amax is True
         init_amax = quant_desc.amax if quant_desc.amax is not None else 1.0
+        self.is_weight = True if init_amax == 1.0 else False
         self.clip = Clip(-init_amax, init_amax, learn_min=quant_desc.learn_amax, learn_max=quant_desc.learn_amax)
         # It makes more sense to enable clip stage (which learns amax) if learn_amax is true
         self.enable_clip()
@@ -361,6 +362,7 @@ class TensorQuantizer(nn.Module):
                     self.smooth_avg,
                     # self.fab,
                     (fa, fb),
+                    self.is_weight,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
