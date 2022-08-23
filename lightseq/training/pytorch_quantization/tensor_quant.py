@@ -380,16 +380,16 @@ class FakeTensorQuantFunctionX(Function):
         outputs = (outputs * scale).to(inputs.dtype)
         if training:
             amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
-        ctx.unsigned = unsigned
+        ctx.can_scale = (not unsigned and not is_weight)
         ctx.fab = fab
-        if not unsigned and not is_weight:
+        if ctx.can_scale:
             diff = torch.abs(inputs-outputs) / scale
             ctx.save_for_backward(diff)
         return outputs
 
     @staticmethod
     def backward(ctx, grad_outputs):
-        if not ctx.unsigned:
+        if ctx.can_scale:
             a, b = ctx.fab
             x = ctx.saved_tensors[0]
             x = torch.clamp_max(x, 0.5)
