@@ -1,6 +1,7 @@
 import random
 
 import torch
+from torch._C import ScriptModule, dtype
 from torch.nn import functional
 
 from lightseq.training.ops.pytorch.builder import KernelBuilder, AdamBuilder
@@ -942,6 +943,75 @@ def test_launch_dropout_gelu_bias_bwd():
         return [
             test_input.grad.contiguous().detach(),
             test_bias.grad.contiguous().detach(),
+        ]
+
+    return custom, baseline
+
+
+from torch_crf import CRF
+
+
+@kt.case(dtypes=[torch.half], atol=5.0)
+def test_crf():
+    batch_size = 129
+    seq_len = 33
+    num_tags = 41
+    torch_mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
+    # torch_mask = kt.ones((batch_size, seq_len)).to(torch.bool)
+    ls_mask = torch_mask.clone()
+    ls_mask = (~ls_mask).to(dtype=torch.uint8)
+
+    emissions = kt.rand((batch_size, seq_len, num_tags))
+    crf = CRF(num_tags, batch_first=True)
+    crf.to(kt.device, torch.float)
+    crf.start_transitions.data.to(torch.half).to(torch.float)
+    crf.end_transitions.data.to(torch.half).to(torch.float)
+    crf.transitions.data.to(torch.half).to(torch.float)
+
+    """
+    torch_launch_viterbi(const torch::Tensor &start_transition,
+                          const torch::Tensor &end_transition,
+                          const torch::Tensor &transition,
+                          const torch::Tensor &emission,
+                          const torch::Tensor &mask, torch::Tensor &score,
+                          torch::Tensor &next_score, torch::Tensor &history,
+                          torch::Tensor &best_tags, int num_tags, int seq_len,
+                          int batch_size)
+    """
+    start_transition = (
+        crf.start_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    )
+    end_transition = crf.end_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    transitions = (
+        crf.transitions.data.clone().detach().transpose(0, 1).to(kt.dtype).contiguous()
+    )
+
+    best_score = kt.zeros((batch_size)).to(dtype=torch.float)
+    history = kt.ones((batch_size, seq_len, num_tags)).to(dtype=torch.int32)
+    best_tags = kt.zeros((batch_size, seq_len)).to(dtype=torch.int32)
+
+    cus_func = cuda_module.torch_launch_viterbi_fp16
+
+    def custom():
+        cus_func(
+            start_transition,
+            end_transition,
+            transitions,
+            emissions,
+            ls_mask,
+            best_score,
+            history,
+            best_tags,
+            num_tags,
+            seq_len,
+            batch_size,
+        )
+        return [best_score]
+
+    def baseline():
+        res, best_score = crf.decode(emissions, torch_mask, pad_tag=-1)
+        return [
+            best_score.detach().to(torch.float),
         ]
 
     return custom, baseline

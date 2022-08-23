@@ -254,6 +254,23 @@ void torch_launch_ls_dropout_act_bias_bwd(
       stream);
 }
 
+template <typename T>
+void torch_launch_viterbi(const torch::Tensor &start_transition,
+                          const torch::Tensor &end_transition,
+                          const torch::Tensor &transition,
+                          const torch::Tensor &emission,
+                          const torch::Tensor &mask, torch::Tensor &best_score,
+                          torch::Tensor &history, torch::Tensor &best_tags,
+                          int num_tags, int seq_len, int batch_size) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_viterbi(rptr<T>(start_transition), rptr<T>(end_transition),
+                 rptr<T>(transition), rptr<T>(emission), rptr<uint8_t>(mask),
+                 rptr<float>(best_score), rptr<int>(history),
+                 rptr<int>(best_tags), num_tags, seq_len, batch_size, stream);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -342,5 +359,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp16",
         &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_viterbi_fp16", &torch_launch_viterbi<__half>,
+        "Test kernel wrapper");
+  m.def("torch_launch_viterbi_fp32", &torch_launch_viterbi<float>,
         "Test kernel wrapper");
 }
