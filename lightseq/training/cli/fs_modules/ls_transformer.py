@@ -416,7 +416,7 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 self.embed_tokens.config.embedding_dim,
             )
             if self.quant_mode:
-                self.output_projection.clip_max[1] = self.embed_tokens.embeddings[-1]
+                self.output_projection.clip_max[1] = self.embed_tokens.embeddings[-1].data
 
         # x: [batch_size, seq_len, hidden_size]
         for _, layer in enumerate(self.layers):
