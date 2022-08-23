@@ -57,8 +57,8 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
   // step 1. compute first step's score
-  for (int cur_tag = threadIdx.y; cur_tag < num_tags; cur_tag += blockDim.y) {
-    if (threadIdx.x == 0) {
+  if (threadIdx.y == 0) {
+    for (int cur_tag = threadIdx.x; cur_tag < num_tags; cur_tag += blockDim.x) {
       score[cur_tag] =
           emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)] +
           start_transition[cur_tag];
@@ -121,8 +121,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   if (threadIdx.x != 0) {
     return;
   }
-  next_score[0] = max_score;  // for debug
-  next_score[1] = last_tag;   // for debug
+  next_score[blockIdx.x] = max_score;  // for debug
   seq_idx--;
   best_tags[flat_2dim(blockIdx.x, seq_idx, seq_len)] = last_tag;
   for (int i = seq_idx - 1; i >= 0; i--) {
@@ -145,9 +144,10 @@ void launch_viterbi<__half>(const __half* start_transition,
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
-  ker_viterbi<__half><<<grid_dim, block_dim, 0, stream>>>(
-      start_transition, end_transition, transition, emission, mask, score,
-      next_score, history, best_tags, num_tags, seq_len);
+  ker_viterbi<__half>
+      <<<grid_dim, block_dim, 2 * num_tags * sizeof(float), stream>>>(
+          start_transition, end_transition, transition, emission, mask, score,
+          next_score, history, best_tags, num_tags, seq_len);
 }
 
 template <>
@@ -160,7 +160,8 @@ void launch_viterbi<float>(const float* start_transition,
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
-  ker_viterbi<float><<<grid_dim, block_dim, 0, stream>>>(
-      start_transition, end_transition, transition, emission, mask, score,
-      next_score, history, best_tags, num_tags, seq_len);
+  ker_viterbi<float>
+      <<<grid_dim, block_dim, 2 * num_tags * sizeof(float), stream>>>(
+          start_transition, end_transition, transition, emission, mask, score,
+          next_score, history, best_tags, num_tags, seq_len);
 }

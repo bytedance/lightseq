@@ -145,7 +145,8 @@ class CRF(nn.Module):
             mask = mask.transpose(0, 1)
 
         if nbest == 1:
-            return self._viterbi_decode(emissions, mask, pad_tag).unsqueeze(0)
+            best_tags, best_score = self._viterbi_decode(emissions, mask, pad_tag)
+            return best_tags.unsqueeze(0), best_score
         return self._viterbi_decode_nbest(emissions, mask, nbest, pad_tag)
 
     def _validate(
@@ -330,12 +331,14 @@ class CRF(nn.Module):
         # End transition score
         # shape: (batch_size, num_tags)
         end_score = score + self.end_transitions
-        _, end_tag = end_score.max(dim=1)
-        # print(f'history_idx: {history_idx[0, :, :]}')
+        best_score, end_tag = end_score.max(dim=1)
+        """
+        print(f'history_idx: {history_idx[0, :, :]}')
         print(f"pt end score: {end_score[0, :]}")  # debug
         print(
             f"pt best score: {end_score[0, end_tag[0]]}, last tag: {end_tag[0]}"
         )  # debug
+        """
 
         # shape: (batch_size,)
         seq_ends = mask.long().sum(dim=0) - 1
@@ -358,7 +361,7 @@ class CRF(nn.Module):
             best_tags = torch.gather(history_idx[idx], 1, best_tags)
             best_tags_arr[idx] = best_tags.data.view(batch_size)
 
-        return torch.where(mask, best_tags_arr, oor_tag).transpose(0, 1)
+        return torch.where(mask, best_tags_arr, oor_tag).transpose(0, 1), best_score
 
     def _viterbi_decode_nbest(
         self,

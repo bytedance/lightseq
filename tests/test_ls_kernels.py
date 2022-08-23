@@ -722,17 +722,17 @@ def test_launch_dropout_gelu_bias_bwd():
 from torch_crf import CRF
 
 
-@kt.case(dtypes=[torch.half], ntest=100, nrepeat=1)
+@kt.case(dtypes=[torch.half], ntest=100, nrepeat=1, atol=10.0)
 def test_crf():
-    batch_size = 1
-    seq_len = 33
-    num_tags = 65
+    batch_size = 128
+    seq_len = 32
+    num_tags = 41
     # torch_mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
     torch_mask = kt.ones((batch_size, seq_len)).to(torch.bool)
     ls_mask = torch_mask.clone()
     ls_mask = (~ls_mask).to(dtype=torch.uint8)
 
-    emissions = kt.rand((batch_size, seq_len, num_tags)) * 10
+    emissions = kt.rand((batch_size, seq_len, num_tags))
     crf = CRF(num_tags, batch_first=True)
     crf.to(kt.device, kt.dtype)
 
@@ -772,22 +772,19 @@ def test_crf():
             seq_len,
             batch_size,
         )
+        best_score = None  # [batch_size]
         if seq_len % 2 == 0:
-            print(f"ls end score: {next_score[0, :]}")  # debug
-            print(f"ls best score: {score[0, 0]}, last tag: {score[0, 1]}")  # debug
+            best_score = score
         else:
-            print(f"ls end score: {score[0, :]}")  # debug
-            print(
-                f"ls best score: {next_score[0, 0]}, last tag: {next_score[0, 1]}"
-            )  # debug
+            best_score = next_score
         return [
-            best_tags,
+            best_score.reshape(-1).contiguous()[:batch_size],
         ]
 
     def baseline():
-        res = crf.decode(emissions, torch_mask, pad_tag=-1).to(dtype=torch.int32)
+        res, best_score = crf.decode(emissions, torch_mask, pad_tag=-1)
         return [
-            res,
+            best_score.detach().to(torch.float),
         ]
 
     return custom, baseline
@@ -795,9 +792,9 @@ def test_crf():
 
 @kt.case(dtypes=[torch.half], ntest=10, nrepeat=1)
 def test_crf_debug():
-    batch_size = 1
-    seq_len = 3
-    num_tags = 2
+    batch_size = 128
+    seq_len = 32
+    num_tags = 41
     torch_mask = kt.ones((batch_size, seq_len)).to(torch.bool)
     ls_mask = torch_mask.clone()
     ls_mask = (~ls_mask).to(dtype=torch.uint8)
