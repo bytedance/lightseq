@@ -5,6 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
                                                  Variable* inpB) {
+  printf("StridedBatchGemmOp: %zu\n", _max_ele_num);
   Variable* result =
       new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
@@ -24,6 +25,8 @@ void StridedBatchGemmOp<T1, T2>::forward() {
   T1* _buffer_a = (T1*)parent(0)->value();
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
+
+  printf("StridedBatchGemmOp forward(): %d %d %d\n", _m, _n, _k);
 
   cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
                               _buffer_b, output, _op_A, _op_B, stride_a,

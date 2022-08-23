@@ -39,9 +39,21 @@ class SelfAttentionLayer : public Layer {
   int _batch_dim;
   int _batch_heads;
   int _batch_tokens;
+  int _layer_id;
+  int _max_batch_tokens;
+  int _max_seq_len;
+  int _hidden_size;
+  int _heads;
+  int _training;
+  bool _pre_or_postLayerNorm;
 
  public:
-  SelfAttentionLayer();
+  SelfAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+                     int hidden_size, int num_heads,
+                     float attn_prob_dropout_ratio,
+                     float hidden_output_dropout_ratio,
+                     bool pre_or_postLayerNorm, bool mask_future_tokens,
+                     const T1* para_ptr, T2* grad_ptr, int& offset);
 
   virtual ~SelfAttentionLayer() {}
 

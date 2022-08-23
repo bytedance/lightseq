@@ -10,15 +10,21 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, const T1* para_ptr, T2* grad_ptr, int& offset)
     : Layer("TransformerEncoderLayer") {
-  _attn_layer = new SelfAttentionLayer<T1, T2>(
+  printf("Running! Step.0.0 TransformerEncoderLayer\n");
+
+  _attn_layer.reset(new SelfAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, para_ptr, grad_ptr, offset);
+      pre_or_postLayerNorm, mask_future_tokens, para_ptr, grad_ptr, offset));
 
-  _ffn_layer = new FeedForwardLayer<T1, T2>(
+  printf("Running! Step.0.1 TransformerEncoderLayer\n");
+
+  _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      intermediate_size, activation_dropout_ratio, pre_or_postLayerNorm,
-      activation_fn, para_ptr, grad_ptr, offset);
+      intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
+      pre_or_postLayerNorm, activation_fn, para_ptr, grad_ptr, offset));
+
+  printf("Running! Step.0.2 TransformerEncoderLayer\n");
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -26,11 +32,16 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
 template <typename T1, typename T2>
 Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
+  this->set_inputs({inp, inp_mask});
   Variable* attn_out = (*_attn_layer)(inp, inp_mask);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
+  this->set_outputs({ffn_out});
   return ffn_out;
 }
+
+// template class TransformerEncoderLayer<float, float>;
+// template class TransformerEncoderLayer<__half, __half>;
 
 }  // namespace lightseq

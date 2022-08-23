@@ -86,6 +86,7 @@ void MemoryManager::calculate_buffer_() {
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
 
+  printf("Running DEBUG.2! %zu\n", total_consumption);
   buffer_ = cuda_malloc<char>(total_consumption);
   buffer_size_ = total_consumption;
 

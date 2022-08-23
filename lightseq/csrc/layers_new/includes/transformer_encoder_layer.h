@@ -18,15 +18,15 @@ class TransformerEncoderLayer : public Layer {
                           float activation_dropout_ratio,
                           float hidden_output_dropout_ratio,
                           bool pre_or_postLayerNorm, std::string activation_fn,
-                          bool mask_future_tokens);
+                          bool mask_future_tokens, const T1* para_ptr,
+                          T2* grad_ptr, int& offset);
   virtual ~TransformerEncoderLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* inp_mask) { return output; }
+  Variable* operator()(Variable* inp, Variable* inp_mask);
 
-  void before_forward(int size) {
-    // op before forward
-    _operator_add->before_forward(size);
-    _operator_add2->before_forward(size);
+  void before_forward(int batch_size, int seq_len) {
+    _attn_layer->before_forward(batch_size, seq_len);
+    _ffn_layer->before_forward(batch_size, seq_len);
   }
 
   void before_backward() { return; }

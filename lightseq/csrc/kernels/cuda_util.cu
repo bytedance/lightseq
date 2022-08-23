@@ -100,6 +100,7 @@ template <typename T>
 T *cuda_malloc(size_t ele_num) {
   size_t byte_size = ele_num * sizeof(T);
   T *pdata = nullptr;
+  printf("Running DEBUG! %zu\n", ele_num);
   CHECK_GPU_ERROR(cudaMalloc((void **)&pdata, byte_size));
   return pdata;
 }

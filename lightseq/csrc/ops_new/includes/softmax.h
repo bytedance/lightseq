@@ -11,9 +11,8 @@ class SoftmaxOp : public Operator {
  private:
   int _nhead;
 
-  int _max_batchs;
-  int _max_from_len;
-  int _max_to_len;
+  int _max_batch_tokens;
+  int _max_seq_len;
 
   int _batchs;
   int _from_len;
@@ -22,12 +21,11 @@ class SoftmaxOp : public Operator {
   bool _mask_future;
 
  public:
-  SoftmaxOp(int max_batchs, int max_from_len, int max_to_len, int nhead,
+  SoftmaxOp(int max_batch_tokens, int max_seq_len, int nhead,
             bool mask_future)
       : Operator("Softmax"),
-        _max_batchs(max_batchs),
-        _max_from_len(max_from_len),
-        _max_to_len(max_to_len),
+        _max_batch_tokens(max_batch_tokens),
+        _max_seq_len(max_seq_len),
         _nhead(nhead),
         _config_mask_future(mask_future) {}
 

@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 std::tuple<Variable*, Variable*, Variable*>
 BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
-  size_t trans_size = _max_batch * _max_seq * _hidden_size;
+  size_t trans_size = _max_batch_tokens * _hidden_size;
   Variable* res_q = new Variable(
       this->_name + "/res_q", trans_size * sizeof(T1), trans_size * sizeof(T2));
   Variable* res_k = new Variable(

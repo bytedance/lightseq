@@ -21,7 +21,7 @@ class StridedBatchGemmOp : public Operator {
   std::array<int, 3> _gemm_algos;
 
  public:
-  StridedBatchGemmOp(int max_ele_num, float param_alpha, float param_beta,
+  StridedBatchGemmOp(size_t max_ele_num, float param_alpha, float param_beta,
                      cublasOperation_t opA, cublasOperation_t opB)
       : Operator("StridedBatchGemmOp"),
         _max_ele_num(max_ele_num),
@@ -29,7 +29,9 @@ class StridedBatchGemmOp : public Operator {
         _beta(param_beta),
         _op_A(opA),
         _op_B(opB),
-        _gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+        _gemm_algos(std::array<int, 3>({99, 99, 99})) {
+          printf("initial StridedBatchGemmOp: %zu\n", _max_ele_num);
+        }
 
   virtual ~StridedBatchGemmOp() {}
 

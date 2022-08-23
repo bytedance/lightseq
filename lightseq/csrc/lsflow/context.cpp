@@ -50,12 +50,15 @@ void Context::build() {
   }
   _building = true;
 
+  printf("Running DEBUG.1! %zu\n", mx_tensor_size);
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
+  printf("before fake_forward!\n");
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
     rl->forward();
   }
+  printf("after fake_forward!\n");
 
   if (_is_training) {
     for (Layer* rl : _root_layers) {

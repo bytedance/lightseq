@@ -21,7 +21,9 @@ class FeedForwardOp : public Operator {
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),
         _input_size(input_size),
-        _gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+        _gemm_algos(std::array<int, 3>({99, 99, 99})) {
+    printf("Running! Step.0.0.1 FeedForwardOp\n");
+  }
 
   ~FeedForwardOp() {}
 
