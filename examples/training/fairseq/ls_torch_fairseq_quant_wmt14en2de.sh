@@ -16,7 +16,7 @@ lightseq-train /tmp/wmt14_en_de/ \
     --arch ls_transformer --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
-    --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
+    --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
     --max-tokens 8192 \
     --eval-bleu \
@@ -31,5 +31,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --enable-quant \
     --quant-mode qat  \
     --keep-last-epochs 1 --max-epoch 150 \
-    --smooth-avg-update 1000 --quant-bits 4 $@ 
+    --smooth-avg-update 1000 --quant-bits 4 --fa 0.4 $@ 
 
