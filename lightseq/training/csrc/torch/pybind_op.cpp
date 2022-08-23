@@ -463,6 +463,9 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
                      .dtype(dtype)
                      .layout(torch::kStrided)
                      .device(torch::kCUDA, inputs.device().index());
+  if (!quant_mode) {
+    tweaked_out_features = out_features;
+  }
   auto outputs =
       torch::empty({batch_size, seq_len, tweaked_out_features}, options);
   T *outputs_ptr = static_cast<T *>(outputs.data_ptr());
