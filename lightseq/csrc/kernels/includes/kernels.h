@@ -126,8 +126,8 @@ void launch_d_lookup_scale_pos_dropout(
 template <typename T>
 void launch_viterbi(const T *start_transition, const T *end_transition,
                     const T *transition, const T *emission, const uint8_t *mask,
-                    float *score, float *next_score, int *history,
-                    int *best_tags, int num_tags, int seq_len, int batch_size,
+                    float *best_score, int *history, int *best_tags,
+                    int num_tags, int seq_len, int batch_size,
                     cudaStream_t stream);
 
 /* Convert 2-dim tensor index into vector index */

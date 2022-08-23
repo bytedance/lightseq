@@ -202,16 +202,14 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
                           const torch::Tensor &end_transition,
                           const torch::Tensor &transition,
                           const torch::Tensor &emission,
-                          const torch::Tensor &mask, torch::Tensor &score,
-                          torch::Tensor &next_score, torch::Tensor &history,
-                          torch::Tensor &best_tags, int num_tags, int seq_len,
-                          int batch_size) {
+                          const torch::Tensor &mask, torch::Tensor &best_score,
+                          torch::Tensor &history, torch::Tensor &best_tags,
+                          int num_tags, int seq_len, int batch_size) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_viterbi(rptr<T>(start_transition), rptr<T>(end_transition),
                  rptr<T>(transition), rptr<T>(emission), rptr<uint8_t>(mask),
-                 rptr<float>(score), rptr<float>(next_score),
-                 rptr<int>(history), rptr<int>(best_tags), num_tags, seq_len,
-                 batch_size, stream);
+                 rptr<float>(best_score), rptr<int>(history),
+                 rptr<int>(best_tags), num_tags, seq_len, batch_size, stream);
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
