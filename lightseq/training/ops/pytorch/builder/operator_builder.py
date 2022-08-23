@@ -22,8 +22,10 @@ class OperatorBuilder(CUDAOpBuilder):
         return [
             "csrc/kernels/cublas_wrappers.cu",
             "csrc/kernels/transform_kernels.cu",
+            "csrc/kernels/transform_kernels_new.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",
+            "csrc/kernels/softmax_kernels_new.cu",
             "csrc/kernels/softmax_kernels.cu",
             "csrc/kernels/general_kernels.cu",
             "csrc/kernels/cuda_util.cu",
@@ -35,11 +37,14 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/lsflow/node.cpp",
             "csrc/lsflow/tensor.cpp",
             "csrc/ops_new/bias_act_dropout.cpp",
+            "csrc/ops_new/bias_add_transform_20314.cpp",
             "csrc/ops_new/bias_dropout_residual.cpp",
             "csrc/ops_new/dropout.cpp",
             "csrc/ops_new/feed_forward.cpp",
             "csrc/ops_new/normalize_layer.cpp",
+            "csrc/ops_new/softmax.cpp",
             "csrc/ops_new/strided_batch_gemm.cpp",
+            "csrc/ops_new/transform_0213.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 
