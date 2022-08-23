@@ -724,7 +724,7 @@ from torch_crf import CRF
 
 @kt.case(dtypes=[torch.half], ntest=100, nrepeat=1, atol=10.0)
 def test_crf():
-    batch_size = 128
+    batch_size = 1
     seq_len = 32
     num_tags = 41
     # torch_mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
@@ -734,7 +734,10 @@ def test_crf():
 
     emissions = kt.rand((batch_size, seq_len, num_tags))
     crf = CRF(num_tags, batch_first=True)
-    crf.to(kt.device, kt.dtype)
+    crf.to(kt.device, torch.float)
+    crf.start_transitions.data.to(torch.half).to(torch.float)
+    crf.end_transitions.data.to(torch.half).to(torch.float)
+    crf.transitions.data.to(torch.half).to(torch.float)
 
     """
     torch_launch_viterbi(const torch::Tensor &start_transition,
@@ -746,9 +749,13 @@ def test_crf():
                           torch::Tensor &best_tags, int num_tags, int seq_len,
                           int batch_size)
     """
-    start_transition = crf.start_transitions.data.clone().detach().contiguous()
-    end_transition = crf.end_transitions.data.clone().detach().contiguous()
-    transitions = crf.transitions.data.clone().detach().transpose(0, 1).contiguous()
+    start_transition = (
+        crf.start_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    )
+    end_transition = crf.end_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    transitions = (
+        crf.transitions.data.clone().detach().transpose(0, 1).to(kt.dtype).contiguous()
+    )
 
     score = kt.zeros((batch_size, num_tags)).to(dtype=torch.float)
     next_score = kt.zeros((batch_size, num_tags)).to(dtype=torch.float)

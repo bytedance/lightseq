@@ -45,7 +45,10 @@ score: [batch_size, num_tags]
   best score end with every tag for current step
 next_score: [batch_size, num_tags]
   best score end with every tag for next step
-test_tag: [batch_size, seq_len]
+history: [batch_size, seq_len, num_tags]:
+  i, j, k store the tag of i-th batch, j-th step when
+  the tag of i-th batch, (j+1)-th step is k
+best_tag: [batch_size, seq_len]
 */
 template <typename T>
 __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
@@ -56,10 +59,13 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
+  float* s_score = score + blockIdx.x * num_tags;
+  float* s_next_score = score + blockIdx.x * num_tags;
+
   // step 1. compute first step's score
   if (threadIdx.y == 0) {
     for (int cur_tag = threadIdx.x; cur_tag < num_tags; cur_tag += blockDim.x) {
-      score[cur_tag] =
+      s_score[cur_tag] =
           emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)] +
           start_transition[cur_tag];
     }
@@ -78,7 +84,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
       const T* cur_transition = transition + cur_tag * num_tags;
       for (int pre_tag = threadIdx.x; pre_tag < num_tags;
            pre_tag += blockDim.x) {
-        float s = (float)score[pre_tag] + (float)cur_transition[pre_tag];
+        float s = (float)s_score[pre_tag] + (float)cur_transition[pre_tag];
         if (s > max_score) {
           max_score = s;
           idx = pre_tag;
@@ -95,8 +101,8 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
       }
     }  // row
     float* tmp = next_score;
-    next_score = score;
-    score = tmp;
+    next_score = s_score;
+    s_score = tmp;
     b.sync();
   }  // seq_len
 
@@ -107,8 +113,7 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   float max_score = REDUCE_FLOAT_INF_NEG;
   int last_tag = 0;
   for (int cur_tag = threadIdx.x; cur_tag < num_tags; cur_tag += blockDim.x) {
-    float s = (float)score[cur_tag] + (float)end_transition[cur_tag];
-    score[cur_tag] = s;  // for debug
+    float s = (float)s_score[cur_tag] + (float)end_transition[cur_tag];
     if (s > max_score) {
       max_score = s;
       last_tag = cur_tag;
