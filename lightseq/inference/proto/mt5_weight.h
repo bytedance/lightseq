@@ -29,13 +29,6 @@ class MT5Weight {
   typedef typename _optraits::DataType _DataType;
   _DataType float2required(float value);
 
-  // parsing function for protobuffer
-  void proto_get_model_config(const MT5 &mt5, bool only_decoder = false);
-  std::string proto_parse_emb_wei(const MT5EmbeddingLayer &layer,
-                                  std::string source);
-  std::string proto_parse_enc_wei(const MT5 &mt5);
-  std::string proto_parse_dec_wei(const MT5 &mt5);
-
   // parsing function for hdf5
   void hdf5_get_model_config(hid_t hdf5_file, bool only_decoder = false);
   void hdf5_parse_emb_wei(hid_t hdf5_file, std::string source);
