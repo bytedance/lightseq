@@ -1,7 +1,7 @@
 import pathlib
 import sys
 
-from fairseq_cli.train import cli_main
+from gradient_comm_quantization.train import cli_main
 
 
 def ls_cli_main(*args, **kwargs):
