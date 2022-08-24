@@ -11,10 +11,10 @@ fi
 
 lightseq-train /tmp/wmt14_en_de/ \
     --task translation \
-    --save-dir int4_from_int5 \
+    --save-dir int4_with_2int5 \
     --finetune-from-model fp16_ende/checkpoint_best.pt \
     --arch ls_transformer --share-decoder-input-output-embed \
-    --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
+    --lr 5e-4 --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
     --lr-scheduler inverse_sqrt --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
@@ -31,5 +31,5 @@ lightseq-train /tmp/wmt14_en_de/ \
     --enable-quant \
     --quant-mode qat  \
     --keep-last-epochs 1 --max-epoch 150 \
-    --smooth-avg-update 1000 --quant-bits 4 --fa 0.4 $@ 
+    --smooth-avg-update 1000 --quant-bits 4 --fa 0.3 $@
 

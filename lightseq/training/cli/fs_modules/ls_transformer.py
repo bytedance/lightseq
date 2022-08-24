@@ -32,6 +32,16 @@ MAX_SEQ_LENGTH = 300
 logger = logging.getLogger(__name__)
 
 
+def enable_int5(m):
+    if isinstance(m, TensorQuantizer):
+        m.num_bits = 5.0
+
+
+def enable_int4(m):
+    if isinstance(m, TensorQuantizer):
+        m.num_bits = 4.0
+
+
 @register_model("ls_transformer")
 class LSTransformerModel(FairseqEncoderDecoderModel):
     def __init__(self, args, encoder, decoder):
@@ -40,7 +50,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         self.params_clip = None
         self.device = None
         self.train_step = 0
-        self.last_model = True
+        self.last_model = False
         self.buffer = None
 
     @staticmethod
@@ -143,6 +153,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='quantization noise and scalar quantization at training time')
         parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
                             help='smooth avg')
+        parser.add_argument('--n-gpus-int5', type=float, metavar='D', default=-1,
+                            help='-1')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
             '--min-params-to-wrap', type=int, metavar='D', default=DEFAULT_MIN_PARAMS_TO_WRAP,
@@ -268,34 +280,6 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     def build_decoder(cls, args, tgt_dict, embed_tokens):
         return LSTransformerDecoder(args, tgt_dict, embed_tokens)
 
-    # def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
-    #     if self.training:
-    #         if self.params_clip is None:
-    #             self.params_clip = self.set_params()
-    #         self.last_model = True
-    #     else:
-    #         if self.last_model is True:
-    #             logger.info("avg_clip_max")
-    #             self.avg_clip_max()
-    #         self.last_model = False
-    #         self.params_clip = None
-        
-    #     # if self.params_clip is None:
-    #     #     self.params_clip = self.get_params()
-    #     encoder_out = self.encoder(src_tokens)
-    #     decoder_out = self.decoder(
-    #         prev_output_tokens, encoder_out, features_only=features_only
-    #     )
-    #     # if self.train_step % 10 == 0:
-    #     #     for n, v in self.params_clip:
-    #     #         print(self.device, n, v.item(), self.train_step, flush=True)
-    #     # self.train_step += 1
-    #     return decoder_out
-
-    # def avg_clip_max(self):
-    #     for n, v in self.params_clip:
-    #         v.data = torch.tensor(16.).to(v.data)
-
     def avg_clip_max(self, params):
         with torch.no_grad():
             for i, value in enumerate(params):
@@ -313,10 +297,16 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
     def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
         if self.params_clip is None:
             self.params_clip, self.buffer = self.get_params()
+
         if self.training:
+            if self.last_model is False:
+                rank = int(dist.get_rank())
+                if rank < self.args.n_gpus_int5:
+                    self.apply(enable_int5)
             self.last_model = True
         else:
             if self.last_model is True:
+                self.apply(enable_int4)
                 logger.info("avg_clip_max")
                 self.avg_clip_max(self.params_clip)
             self.last_model = False
