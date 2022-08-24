@@ -1552,10 +1552,11 @@ def test_quant_linear_layer_forward():
     weight = custom_layer.weight
     bias = custom_layer.bias
     cmax = custom_layer.clip_max
-    print(bias)
+    custom_layer.apply(enable_quant)
 
     def custom():
         res = custom_layer(inputs)
+
         return [
             res.contiguous().detach(),
             # bias.contiguous().detach(),

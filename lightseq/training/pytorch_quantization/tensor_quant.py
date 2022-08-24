@@ -344,7 +344,6 @@ class FakeTensorQuantFunction(Function):
         zero = grad_outputs.new_zeros(1)
         grad_inputs = torch.where(inputs.abs() <= amax, grad_outputs, zero)
         return grad_inputs, None, None, None, None
-        # return grad_outputs, None, None, None, None
 
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):

@@ -82,22 +82,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     const T *gemmQKV_inp_ptr =
         _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-    // cublasLtMatmulAlgo_info qkv_algo_info =
-    //     _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
-    // std::vector<LSLayout> qkv_layout = getLSLayout(qkv_algo_info.dataOrder);
-    // launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(),
-    // _igemm_alpha_ptr,
-    //                    gemmQKV_inp_ptr, _attn_qkv_cmax_ptr, _batch_tokens,
-    //                    _hidden_size, 2, _stream, qkv_layout[0]);
-    // launch_quantize<T>(qweight_ptr, _attn_prob_dropout.get_mask(), nullptr,
-    //                    _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1, 3 *
-    //                    _hidden_size, _hidden_size, 4, _stream,
-    //                    qkv_layout[1]);
 
-    // _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-    // _igemm_alpha_ptr,
-    //                     _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream,
-    //                     qkv_algo_info);
 
     launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(), _igemm_alpha_ptr,
                        gemmQKV_inp_ptr, _attn_qkv_cmax_ptr,
@@ -113,11 +98,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     const T *attn_qkv_cache_cmax =
         _mask_future_tokens ? _attn_qkv_cache_cmax_ptr : nullptr;
 
-    // launch_quant_bias_add_transform_20314<T>(
-    //     q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
-    //     _attn_qkv_cmax_ptr + 2, _batch_size, _seq_len, 3, _heads,
-    //     _hidden_size / _heads, _stream, attn_qkv_cache_cmax,
-    //     qkv_layout[2] == kCol32);
+
 
     launch_quant_bias_add_transform_20314<T>(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
