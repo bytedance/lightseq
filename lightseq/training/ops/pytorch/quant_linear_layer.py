@@ -148,11 +148,19 @@ class LSQuantLinearLayer(nn.Module):
         self.config.quant_mode = self.quant_mode
 
         bs, sl = inputs.size()[:2]
+        new_bs = None
+        if self.quant_mode and (self.config.out_features * bs * sl) % 8 != 0:
+            new_bs = (bs // 8 + 1) * 8
+            inputs = inputs.pad(
+                (0, new_bs - bs) + tuple(0 for _ in range((inputs.dim() - 1) * 2))
+            )
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
                 f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
             )
         out = LSQuantLinearFunc.apply(self.config, inputs, self.weight, self.clip_max)
+        if new_bs is not None:
+            out = out[:bs, :, :]
         if self.bias is not None:
             out = out + self.bias
         return out

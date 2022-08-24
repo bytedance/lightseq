@@ -28,13 +28,10 @@ class QuantLinearLayer {
 
  private:
   void allocate_mem_buffer() {
-    int tweaked_out_features = static_cast<int>((_out_features + 7) / 8) * 8;
-
     // allocate local gpu memory
     _quant_input_ptr = cuda_malloc<T>(_max_batch_tokens * _in_features);
     _quant_weight_ptr = cuda_malloc<T>(_in_features * _out_features);
-    _quant_output_ptr =
-        cuda_malloc<T>(_max_batch_tokens * tweaked_out_features);
+    _quant_output_ptr = cuda_malloc<T>(_max_batch_tokens * _out_features);
     _igemm_alpha_ptr = cuda_malloc<float>(_max_batch_tokens);
     _igemm_beta_ptr = cuda_malloc<float>(1);
     cuda_set<float>(_igemm_beta_ptr, 0, 1);
