@@ -14,6 +14,32 @@ endif()
 
 target_include_directories(transformer_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+set(t5_files t5_decoder.cc.cu t5_encoder.cc.cu)
+add_library(t5_model STATIC ${t5_files})
+target_link_libraries(t5_model PUBLIC cuda_kernels)
+target_link_libraries(t5_model PUBLIC t5_weight)
+if(DYNAMIC_API)
+  target_link_libraries(t5_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(t5_model PRIVATE CUDA::cublas_static
+                                         CUDA::cublasLt_static)
+endif()
+
+target_include_directories(t5_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+set(mt5_files mt5_decoder.cc.cu mt5_encoder.cc.cu)
+add_library(mt5_model STATIC ${mt5_files})
+target_link_libraries(mt5_model PUBLIC cuda_kernels)
+target_link_libraries(mt5_model PUBLIC mt5_weight)
+if(DYNAMIC_API)
+  target_link_libraries(mt5_model PRIVATE CUDA::cublas CUDA::cublasLt)
+else()
+  target_link_libraries(mt5_model PRIVATE CUDA::cublas_static
+                                          CUDA::cublasLt_static)
+endif()
+
+target_include_directories(mt5_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 set(quant_transformer_files quant_decoder.cc.cu quant_encoder.cc.cu
                             cublas_helper.cc)
 add_library(quant_transformer_model STATIC ${quant_transformer_files})
