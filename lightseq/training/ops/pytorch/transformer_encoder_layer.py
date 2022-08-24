@@ -276,7 +276,6 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         grad = torch.empty_like(param)
         func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
-        print(param)
 
     def state_dict(self, destination=None, prefix="", keep_vars=False):
         destination = state_dict(

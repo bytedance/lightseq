@@ -24,8 +24,6 @@ void SoftmaxOp<T1, T2>::forward() {
                               _from_len, _to_len,
                               _config_mask_future | _mask_future, stream);
 
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 }
 
 template <typename T1, typename T2>

@@ -27,15 +27,6 @@ void FeedForwardOp<T1, T2>::forward() {
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
 
-
-#ifdef DEBUG
-  // if(this->_name == "FeedForwardOp_0"){
-  //   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  //   printf("FeedForwardOp: %s\n", this->_name.c_str());
-  //   print_vec(weights, "??? new feed_forward weights", 10);
-  //   print_vec(out_ptr, "??? new feed_forward outs", 10);
-  // }
-#endif
 }
 
 template <typename T1, typename T2>

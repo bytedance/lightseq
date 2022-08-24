@@ -31,11 +31,6 @@ void BiasAddTrans20314<T1, T2>::forward() {
   launch_bias_add_transform_20314_new<T1>(q_ptr, k_ptr, v_ptr, inp_ptr,
                                           bias_ptr, _batch, _seq_len, 3, _heads,
                                           _hidden_size / _heads, _stream);
-
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  // print_vec(q_ptr, "??? new after transform20314 q_tf_ptr", 10);
-  // print_vec(k_ptr, "??? new after transform20314 k_tf_ptr", 10);
-  // print_vec(v_ptr, "??? new after transform20314 v_tf_ptr", 10);
 }
 
 template <typename T1, typename T2>

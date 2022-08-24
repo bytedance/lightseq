@@ -23,7 +23,7 @@ class SoftmaxOp : public Operator {
  public:
   SoftmaxOp(int max_batch_tokens, int max_seq_len, int nhead,
             bool mask_future)
-      : Operator("Softmax"),
+      : Operator("SoftmaxOp"),
         _max_batch_tokens(max_batch_tokens),
         _max_seq_len(max_seq_len),
         _nhead(nhead),

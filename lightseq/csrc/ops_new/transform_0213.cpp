@@ -23,7 +23,6 @@ void Transform0213<T1, T2>::forward() {
   launch_transform4d_0213<T1>(res_ptr, inp_ptr, _batch, _seq_len, _hidden_size,
                               _heads, 1, _stream);
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 }
 
 template <typename T1, typename T2>

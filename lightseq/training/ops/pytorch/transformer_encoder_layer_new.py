@@ -181,8 +181,6 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
             else cuda_module.create_transformer_encoder_layer_new_fp32
         )
 
-        print(param)
-
         create_layer_func(
             self.config.layer_id,
             self.config.max_batch_tokens,

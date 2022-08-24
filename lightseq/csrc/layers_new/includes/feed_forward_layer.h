@@ -52,7 +52,6 @@ class FeedForwardLayer : public Layer {
   Variable* operator()(Variable* inp);
 
   void before_forward(int batch_size, int seq_len);
-  void before_forward() override { before_forward(1, 32); }
 
   void before_backward();
 };

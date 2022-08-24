@@ -22,16 +22,13 @@ class Layer {
  public:
   Layer(std::string name);
   virtual ~Layer();
+  std::string name(){ return _name; }
 
-  virtual void before_forward() {}
   virtual void forward();
-
-  virtual void before_backward() {}
   virtual void backward();
 
   void set_inputs(std::vector<Variable*> inps) { _inp_var_vec = inps; }
   void set_outputs(std::vector<Variable*> outs) { _out_var_vec = outs; }
-  std::string name(){ return _name; }
 
   Variable* input(int idx) { return _inp_var_vec[idx]; }
   Variable* output(int idx) { return _out_var_vec[idx]; }
