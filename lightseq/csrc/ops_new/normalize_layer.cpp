@@ -35,7 +35,6 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
-
 }
 
 template <typename T1, typename T2>

@@ -10,12 +10,10 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, const T1* para_ptr, T2* grad_ptr, int& offset)
     : Layer("TransformerEncoderLayer") {
-
   _attn_layer.reset(new SelfAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, mask_future_tokens, para_ptr, grad_ptr, offset));
-
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,

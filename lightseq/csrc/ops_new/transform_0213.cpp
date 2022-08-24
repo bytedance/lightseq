@@ -22,7 +22,6 @@ void Transform0213<T1, T2>::forward() {
   //   [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213<T1>(res_ptr, inp_ptr, _batch, _seq_len, _hidden_size,
                               _heads, 1, _stream);
-
 }
 
 template <typename T1, typename T2>

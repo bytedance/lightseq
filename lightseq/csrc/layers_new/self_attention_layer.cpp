@@ -27,14 +27,15 @@ SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
-      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len,
-                                     num_heads, mask_future_tokens)),
+      _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads,
+                                     mask_future_tokens)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(
           attn_prob_dropout_ratio, max_batch_tokens * num_heads * max_seq_len)),
       _attn_context(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * hidden_size, T1(1.0), T1(0.0), CUBLAS_OP_N,
           CUBLAS_OP_N)),
-      _transform_0213(new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
+      _transform_0213(
+          new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
       _attn_out_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, hidden_size,
                                                  hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
@@ -110,7 +111,6 @@ Variable* SelfAttentionLayer<T1, T2>::operator()(Variable* inp,
 
 template <typename T1, typename T2>
 void SelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
-
   _batch_tokens = batch_size * seq_len;
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;

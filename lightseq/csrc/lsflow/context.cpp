@@ -90,7 +90,7 @@ void Context::build() {
 
 thread_local ContextPtr thread_context_ptr = nullptr;
 
-void Context::draw_all_context() { }
+void Context::draw_all_context() {}
 
 // thread_local ContextPtr thread_context_ptr = nullptr;
 

@@ -22,11 +22,9 @@ void FeedForwardOp<T1, T2>::forward() {
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
-
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, _output_size,
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
-
 }
 
 template <typename T1, typename T2>

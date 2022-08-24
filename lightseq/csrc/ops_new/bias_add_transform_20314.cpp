@@ -49,7 +49,6 @@ void BiasAddTrans20314<T1, T2>::backward() {
 
   launch_fuse_transpose_bias_kernel<T2>(
       inp_grad, qkv_bias_grad, _batch * _seq_len, 3 * _hidden_size, _stream);
-
 }
 
 template class BiasAddTrans20314<float, float>;

@@ -28,7 +28,7 @@ class TransformerEncoderLayer : public Layer {
     _attn_layer->before_forward(batch_size, seq_len);
     _ffn_layer->before_forward(batch_size, seq_len);
   }
-  
+
   void before_backward() { return; }
 };
 

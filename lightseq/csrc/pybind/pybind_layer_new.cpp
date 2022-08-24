@@ -30,22 +30,18 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 
-static ContextPtr global_context_ptr(new Context());
-
 template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, torch::Tensor &para_ptr,
-    torch::Tensor &grad_ptr) {
+    bool mask_future_tokens, torch::Tensor &para_ptr, torch::Tensor &grad_ptr) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  global_context_ptr->set_stream(stream);
-  Context::set_thread_context(global_context_ptr);
+  Context::new_thread_context();
+  thread_context_ptr->set_stream(stream);
 
   int layer_offset = 0;
-
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
@@ -54,10 +50,12 @@ int create_transformer_encoder_layer_new(
       mask_future_tokens, rptr<T1>(para_ptr), rptr<T2>(grad_ptr), layer_offset);
 
   Variable *inp(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",(size_t)0, (size_t)0));
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",
+      (size_t)0, (size_t)0));
 
   Variable *inp_mask(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask", (size_t)0, (size_t)0));
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask",
+      (size_t)0, (size_t)0));
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 
@@ -68,8 +66,6 @@ int create_transformer_encoder_layer_new(
 
   std::cout << "Encoder layer #" << layer_id << " is created with date type ["
             << T1_dtype << ", " << T2_dtype << "]." << std::endl;
-
-  printf("======================\n");
 
   return 0;
 }
@@ -99,12 +95,9 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
 
-
   layer->before_forward(input.size(0), input.size(1));
 
   layer->forward();
-
-
 
   return;
 }

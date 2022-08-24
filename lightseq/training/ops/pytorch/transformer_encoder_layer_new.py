@@ -16,6 +16,7 @@ layer_cuda_module = LayerBuilder().load()
 
 _all_layer_grads = dict()
 
+
 class LSTransformerEncoderFuncNew(Function):
     @staticmethod
     def forward(
@@ -37,9 +38,7 @@ class LSTransformerEncoderFuncNew(Function):
             input_mask = input_mask.to(torch.half)
             res = res.to(torch.half)
 
-        forward_func(
-            config.layer_id, res, input, input_mask, config.training
-        )
+        forward_func(config.layer_id, res, input, input_mask, config.training)
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(res, input, input_mask)
@@ -93,7 +92,9 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
 
         self.config = config
         self.config.layer_id = LSTransformerEncoderLayerNew.layer_id
-        LSTransformerEncoderLayerNew.layer_id = LSTransformerEncoderLayerNew.layer_id + 1
+        LSTransformerEncoderLayerNew.layer_id = (
+            LSTransformerEncoderLayerNew.layer_id + 1
+        )
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
@@ -295,7 +296,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
         )
-        
+
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
@@ -321,4 +322,3 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
         )
 
         return output.to(self.para)
-    

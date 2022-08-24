@@ -67,7 +67,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                      _batch_tokens, _stream);
   }
 
-
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,

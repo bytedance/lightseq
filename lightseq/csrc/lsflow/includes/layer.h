@@ -22,7 +22,7 @@ class Layer {
  public:
   Layer(std::string name);
   virtual ~Layer();
-  std::string name(){ return _name; }
+  std::string name() { return _name; }
 
   virtual void forward();
   virtual void backward();

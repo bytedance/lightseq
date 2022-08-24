@@ -72,7 +72,9 @@ def gen_enc_layer_pair():
     fairseq_enc_layer = fairseq_layers.generate_enc_layer()
     fairseq_enc_layer.train()
     initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
-    custom_enc_layer_new = generate_enc_layer_new(initial_enc_weights, initial_enc_biases)
+    custom_enc_layer_new = generate_enc_layer_new(
+        initial_enc_weights, initial_enc_biases
+    )
     custom_enc_layer_new.train()
     custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
     custom_enc_layer_base.train()
@@ -88,7 +90,6 @@ def test_encoder_layer_forward():
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
-
 
     def custom():
         inp = hidden_states.clone()
@@ -107,6 +108,7 @@ def test_encoder_layer_forward():
 
     return custom, baseline
 
+
 if __name__ == "__main__":
 
     kt.init(device="cuda:0", nhead=16)
@@ -115,4 +117,3 @@ if __name__ == "__main__":
             "test_encoder_layer_forward",
         ]
     )
-

@@ -27,7 +27,6 @@ class NormalizeLayerOp : public Operator {
     vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
     if (use_mean)
       means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-
   }
 
   Variable* operator()(Variable* inp, Variable* gamma, Variable* betta);
