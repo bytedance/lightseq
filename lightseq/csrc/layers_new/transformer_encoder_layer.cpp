@@ -10,21 +10,17 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, const T1* para_ptr, T2* grad_ptr, int& offset)
     : Layer("TransformerEncoderLayer") {
-  printf("Running! Step.0.0 TransformerEncoderLayer\n");
 
   _attn_layer.reset(new SelfAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, mask_future_tokens, para_ptr, grad_ptr, offset));
 
-  printf("Running! Step.0.1 TransformerEncoderLayer\n");
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, activation_fn, para_ptr, grad_ptr, offset));
-
-  printf("Running! Step.0.2 TransformerEncoderLayer\n");
 
   this->_context_ptr->exit_layer();  // necessary
 }

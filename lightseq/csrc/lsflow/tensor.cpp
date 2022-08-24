@@ -11,7 +11,6 @@ Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
     _ctx_ptr->mx_tensor_size =
         std::max(thread_context_ptr->mx_tensor_size, _size);
-    std::cout << "TEST! tensor size: " << _size << ", tensor name: " << _name << std::endl;
   }
 }
 

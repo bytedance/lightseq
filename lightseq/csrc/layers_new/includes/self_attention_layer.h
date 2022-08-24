@@ -60,6 +60,7 @@ class SelfAttentionLayer : public Layer {
   Variable* operator()(Variable* inp, Variable* inp_mask);
 
   void before_forward(int batch_size, int seq_len);
+  void before_forward() override { before_forward(1, 32); }
 
   void before_backward();
 };

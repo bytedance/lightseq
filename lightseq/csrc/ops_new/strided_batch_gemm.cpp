@@ -26,12 +26,18 @@ void StridedBatchGemmOp<T1, T2>::forward() {
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
 
-  printf("StridedBatchGemmOp forward(): %d %d %d\n", _m, _n, _k);
 
   cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
                               _buffer_b, output, _op_A, _op_B, stride_a,
                               stride_b, stride_c, _batch_heads,
                               cublasGemmAlgo_t(_gemm_algos[0]));
+                            
+#ifdef DEBUG
+  if(this->_name == "StridedBatchGemmOp_0") {
+    CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+    // print_vec(output, "??? new attention scores", 10);
+  }
+#endif
 }
 
 template <typename T1, typename T2>

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "context.h"
+#include "cuda_util.h"
 #include "transformer_encoder_layer.h"
 
 // x is torch::Tensor
@@ -32,12 +33,12 @@ static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 static ContextPtr global_context_ptr(new Context());
 
 template <typename T1, typename T2>
-int create_transformer_encoder_layer(
+int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, const torch::Tensor &para_ptr,
+    bool mask_future_tokens, torch::Tensor &para_ptr,
     torch::Tensor &grad_ptr) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   global_context_ptr->set_stream(stream);
@@ -45,7 +46,6 @@ int create_transformer_encoder_layer(
 
   int layer_offset = 0;
 
-  printf("Running! Step.0\n");
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
@@ -53,17 +53,11 @@ int create_transformer_encoder_layer(
       hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
       mask_future_tokens, rptr<T1>(para_ptr), rptr<T2>(grad_ptr), layer_offset);
 
-  printf("Running! Step.1\n");
-
   Variable *inp(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",
-      max_batch_tokens * hidden_dim * sizeof(T1),
-      max_batch_tokens * hidden_dim * sizeof(T2)));
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",(size_t)0, (size_t)0));
 
   Variable *inp_mask(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask",
-      max_batch_tokens * hidden_dim * sizeof(T1),
-      max_batch_tokens * hidden_dim * sizeof(T2)));
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask", (size_t)0, (size_t)0));
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 
@@ -98,6 +92,7 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
           s_transformer_encoder_layers[layer_id]);
 
   printf("encoder fw! Step.0\n");
+  print_vec((T1*)input_ptr, "new input_ptr", 20);
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
@@ -109,6 +104,8 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
 
   printf("encoder fw! Step.1\n");
 
+  layer->before_forward(input.size(0), input.size(1));
+  std::cout << "new shape: " << input.size(0) << ", " << input.size(1) << std::endl;
   layer->forward();
 
 
@@ -120,11 +117,11 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
 }  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("create_transformer_encoder_layer_fp32",
-        &lightseq::create_transformer_encoder_layer<float, float>,
+  m.def("create_transformer_encoder_layer_new_fp32",
+        &lightseq::create_transformer_encoder_layer_new<float, float>,
         "Create LightSeq Transformer Encoder Layer with fp32 (CUDA)");
-  m.def("create_transformer_encoder_layer_fp16",
-        &lightseq::create_transformer_encoder_layer<__half, __half>,
+  m.def("create_transformer_encoder_layer_new_fp16",
+        &lightseq::create_transformer_encoder_layer_new<__half, __half>,
         "Create LightSeq Transformer Encoder Layer with fp16 (CUDA)");
 
   m.def("transformer_encoder_layer_fw_fp32",

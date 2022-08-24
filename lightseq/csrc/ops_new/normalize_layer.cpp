@@ -35,6 +35,14 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
+
+#ifdef DEBUG
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  // printf("NormalizeLayerOp: %s\n", this->_name.c_str());
+  // print_vec(ln_res_val, "new attn_ln", 10);
+  // print_vec(gamma_val, "new gamma_val", 10);
+  // print_vec(betta_val, "new betta_val", 10);
+#endif
 }
 
 template <typename T1, typename T2>

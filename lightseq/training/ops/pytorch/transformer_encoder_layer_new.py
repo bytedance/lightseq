@@ -16,7 +16,7 @@ layer_cuda_module = LayerBuilder().load()
 
 _all_layer_grads = dict()
 
-class LSTransformerEncoderFunc(Function):
+class LSTransformerEncoderFuncNew(Function):
     @staticmethod
     def forward(
         ctx,
@@ -37,14 +37,14 @@ class LSTransformerEncoderFunc(Function):
             input_mask = input_mask.to(torch.half)
             res = res.to(torch.half)
 
-        (output,) = forward_func(
+        forward_func(
             config.layer_id, res, input, input_mask, config.training
         )
 
         if config.is_grad_enabled and config.training:
-            ctx.save_for_backward(output, input, input_mask)
+            ctx.save_for_backward(res, input, input_mask)
             ctx.config = config
-        return output
+        return res
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -72,14 +72,14 @@ class LSTransformerEncoderFunc(Function):
         return (grad_input, None, grad, None)
 
 
-class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
+class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
     """Initialize the Lightseq Transformer Encoder Layer.
 
     Static variable:
         layer_id: The layer-index counter starting from 0 and incrementing by 1 every time a layer object is instantiated,
         e.g. if a model has 24 transformer layers, layer_id goes from 0 to 23.
     Arguments:
-        config: An object of LSTransformerEncoderLayer config, see get_config
+        config: An object of LSTransformerEncoderLayerNew config, see get_config
 
         initial_weights: Optional: Only used for unit test
 
@@ -89,24 +89,23 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
     layer_id = 0
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
-        super(LSTransformerEncoderLayer, self).__init__()
+        super(LSTransformerEncoderLayerNew, self).__init__()
 
         self.config = config
-        self.config.layer_id = LSTransformerEncoderLayer.layer_id
-        LSTransformerEncoderLayer.layer_id = LSTransformerEncoderLayer.layer_id + 1
+        self.config.layer_id = LSTransformerEncoderLayerNew.layer_id
+        LSTransformerEncoderLayerNew.layer_id = LSTransformerEncoderLayerNew.layer_id + 1
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
         if self.config.local_rank is not None and self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
-
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
         self.hs = hs
         self.ims = ims
-        self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
-        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+        self.para_offset = LSTransformerEncoderLayerNew.gen_offset(hs, ims)
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1])).to("cuda:0")
 
         if initial_weights is None or initial_biases is None:
             self.init_transformer_weights()
@@ -144,7 +143,9 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             else self.para
         )
 
-        grad = torch.empty_like(self.para)
+        param.to("cuda:0")
+
+        grad = torch.empty_like(param)
 
         _all_layer_grads[self.config.layer_id] = grad
 
@@ -175,10 +176,12 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         # create the layer in cuda kernels.
         cuda_module = layer_cuda_module
         create_layer_func = (
-            cuda_module.create_transformer_encoder_layer_fp16
+            cuda_module.create_transformer_encoder_layer_new_fp16
             if self.config.fp16
-            else cuda_module.create_transformer_encoder_layer_fp32
+            else cuda_module.create_transformer_encoder_layer_new_fp32
         )
+
+        print(param)
 
         create_layer_func(
             self.config.layer_id,
@@ -311,7 +314,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             assert bs == encoder_padding_mask.size(
                 0
             ) and sl == encoder_padding_mask.size(1)
-        output = LSTransformerEncoderFunc.apply(
+        output = LSTransformerEncoderFuncNew.apply(
             res,
             hidden_states,
             encoder_padding_mask,

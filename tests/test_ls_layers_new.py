@@ -19,10 +19,33 @@ from tests.util import (
 
 from tests import fairseq_layers
 from lightseq.training.ops.pytorch.transformer_encoder_layer_new import (
+    LSTransformerEncoderLayerNew,
+)
+
+from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
 
 kt = TestDecorator()
+
+
+def generate_enc_layer_new(initial_weights=None, initial_biases=None):
+    config = LSTransformerEncoderLayerNew.get_config(
+        max_batch_tokens=max_batch_tokens,
+        max_seq_len=max_seq_len,
+        hidden_size=1024,
+        intermediate_size=4096,
+        nhead=16,
+        attn_prob_dropout_ratio=0.0,
+        activation_dropout_ratio=0.0,
+        hidden_dropout_ratio=0.0,
+        pre_layer_norm=True,
+        fp16=True,
+        local_rank=0,
+        activation_fn="relu",
+    )
+    layer = LSTransformerEncoderLayerNew(config, initial_weights, initial_biases)
+    return layer
 
 
 def generate_enc_layer(initial_weights=None, initial_biases=None):
@@ -49,21 +72,22 @@ def gen_enc_layer_pair():
     fairseq_enc_layer = fairseq_layers.generate_enc_layer()
     fairseq_enc_layer.train()
     initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
-    custom_enc_layer = generate_enc_layer(initial_enc_weights, initial_enc_biases)
-    # custom_enc_layer.train()
-    return fairseq_enc_layer, custom_enc_layer
+    custom_enc_layer_new = generate_enc_layer_new(initial_enc_weights, initial_enc_biases)
+    custom_enc_layer_new.train()
+    custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
+    custom_enc_layer_base.train()
+    return custom_enc_layer_base, custom_enc_layer_new
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
-    fairseq_enc, custom_enc = gen_enc_layer_pair()
+    base_enc, custom_enc = gen_enc_layer_pair()
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
-
 
 
     def custom():
@@ -75,8 +99,8 @@ def test_encoder_layer_forward():
         ]
 
     def baseline():
-        res = hidden_states.contiguous().clone()
-        res = fairseq_enc(res, self_attn_padding_mask)
+        res = hidden_states.clone()
+        res = base_enc(res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
         ]

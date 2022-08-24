@@ -29,7 +29,6 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
                                      intermediate_size)),
       _ffn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
-  printf("Running! Step.0.1\n");
 
   // parameters node
   _inter_w = new Variable(this->_name + "_inter_w", (char*)(para_ptr + offset),
@@ -54,7 +53,6 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
   _ffn_nb = new Variable(this->_name + "_ffn_nb", (char*)(para_ptr + offset),
                          (char*)(grad_ptr + offset));
   offset += _hidden_size;
-  printf("Running! Step.0.2\n");
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -88,6 +86,7 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
 
 template <typename T1, typename T2>
 void FeedForwardLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
+
   int batch_tokens = batch_size * seq_len;
 
   _ffn_ln->before_forward(batch_tokens);

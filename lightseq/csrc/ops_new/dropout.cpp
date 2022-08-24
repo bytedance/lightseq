@@ -22,6 +22,8 @@ void DropoutOp<T1, T2>::forward() {
 
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 }
 
 template <typename T1, typename T2>

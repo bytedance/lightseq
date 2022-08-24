@@ -17,14 +17,25 @@ void FeedForwardOp<T1, T2>::forward() {
   float alpha = float(1.);
   float beta = float(0.);
 
-  T1* weights = (T1*)parent(1)->value();
   T1* input_ptr = (T1*)parent(0)->value();
+  T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
+
 
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, _output_size,
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
+
+
+#ifdef DEBUG
+  // if(this->_name == "FeedForwardOp_0"){
+  //   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  //   printf("FeedForwardOp: %s\n", this->_name.c_str());
+  //   print_vec(weights, "??? new feed_forward weights", 10);
+  //   print_vec(out_ptr, "??? new feed_forward outs", 10);
+  // }
+#endif
 }
 
 template <typename T1, typename T2>

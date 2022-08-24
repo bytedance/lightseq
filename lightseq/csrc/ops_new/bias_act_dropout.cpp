@@ -31,6 +31,12 @@ void BiasActDropoutOp<T1, T2>::forward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  print_vec(input, "??? new BiasActDropoutOp inp", 10);
+  print_vec(bias, "??? new BiasActDropoutOp bias", 10);
+  print_vec(output, "??? new BiasActDropoutOp output", 10);
+
 }
 
 template <typename T1, typename T2>

@@ -2,6 +2,7 @@
 
 #include "context.h"
 #include "kernels.h"
+#include "cuda_util.h"
 
 template <typename T>
 TransformerEncoderLayer<T>::TransformerEncoderLayer(
@@ -64,19 +65,39 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   if (_pre_or_postLayerNorm) {
     _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
+
+    CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+    // print_vec(_gemmQKV_inp_ptr, "base attn_ln", 10);
+    // print_vec(_attn_nw_ptr, "base gamma_val", 10);
+    // print_vec(_attn_nb_ptr, "base betta_val", 10);
   }
+
+
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
                       _cublasHandle);
 
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  // print_vec(_attn_qkvw_ptr, "!!! base feed_forward weights", 10);
+  // print_vec(buffer, "!!! base feed_forward outs", 10);
+
   launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
                                      _batch_size, _seq_len, 3, _heads,
                                      _hidden_size / _heads, _stream);
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  // print_vec(q_tf_ptr, "!!! base after transform20314 q_tf_ptr", 10);
+  // print_vec(q_tf_ptr + _batch_size * _seq_len * _hidden_size, "!!! base after transform20314 k_tf_ptr", 10);
+  // print_vec(q_tf_ptr + 2 * _batch_size * _seq_len * _hidden_size, "!!! base after transform20314 v_tf_ptr", 10);
+
   // attention scores, q*k
   _attn_scores.Forward(_batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
                        _cublasHandle);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_soft_out_ptr, "!!! base attention scores", 10);
 
   // Softmax + Mask
   _softmax.Forward(_soft_out_ptr, input_mask_ptr, _batch_size, _seq_len,
@@ -97,9 +118,18 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   _attn_out_linear.Forward(_batch_tokens, _attn_o_inp_ptr, _attn_ow_ptr,
                            output_ptr, _cublasHandle);
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(output_ptr, "!!! base bias add res inp", 10);
+
   _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
                                       _attn_ob_ptr, _batch_tokens, _hidden_size,
                                       _stream);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  // print_vec(_attn_ob_ptr, "!!! base bias add res bias", 10);
+  // print_vec(input_ptr, "!!! base bias add res residual", 10);
+  // print_vec(output_ptr, "!!! base bias add res outs", 10);
+
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
@@ -121,11 +151,25 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _ff2_inp_ptr, _relu_inp_ptr, _inter_b_ptr, _batch_tokens,
       _intermediate_size, _activation_fn, _stream);
 
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  // print_vec(_relu_inp_ptr, "!!! base BiasActDropoutOp inp", 10);
+  // print_vec(_inter_b_ptr, "!!! base BiasActDropoutOp bias", 10);
+  // print_vec(_ff2_inp_ptr, "!!! base BiasActDropoutOp output", 10);
+
   _ff2.Forward(_batch_tokens, _ff2_inp_ptr, _output_w_ptr, out_ptr,
                _cublasHandle);
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(out_ptr, "!!! base BiasDropoutRes inp", 10);
+
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
+  print_vec(_output_b_ptr, "!!! base BiasDropoutRes bias", 10);
+  print_vec(inp_ptr, "!!! base BiasDropoutRes residual", 10);
+  print_vec(out_ptr, "!!! base BiasDropoutRes outs", 10);
 
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode

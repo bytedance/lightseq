@@ -22,7 +22,6 @@ class FeedForwardOp : public Operator {
         _output_size(output_size),
         _input_size(input_size),
         _gemm_algos(std::array<int, 3>({99, 99, 99})) {
-    printf("Running! Step.0.0.1 FeedForwardOp\n");
   }
 
   ~FeedForwardOp() {}
