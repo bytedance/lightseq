@@ -91,9 +91,6 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
       std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
           s_transformer_encoder_layers[layer_id]);
 
-  printf("encoder fw! Step.0\n");
-  print_vec((T1*)input_ptr, "new input_ptr", 20);
-
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
   Variable *inp_mask_node = layer->input(1);
@@ -102,14 +99,12 @@ void transformer_encoder_layer_fw(int layer_id, torch::Tensor &output,
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
 
-  printf("encoder fw! Step.1\n");
 
   layer->before_forward(input.size(0), input.size(1));
-  std::cout << "new shape: " << input.size(0) << ", " << input.size(1) << std::endl;
+
   layer->forward();
 
 
-  printf("encoder fw! Step.2\n");
 
   return;
 }

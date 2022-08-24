@@ -118,7 +118,7 @@ void MemoryManager::calculate_buffer_() {
   for (auto iter: tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
-    #ifdef DEBUG
+    #if DEBUG == true
     printf("idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
            unique_id, iter.first.first_idx, iter.first.last_idx,
            iter.first._name.c_str(), size, iter.second);

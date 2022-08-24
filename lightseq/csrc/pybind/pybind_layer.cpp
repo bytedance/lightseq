@@ -55,9 +55,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
   const T *input_ptr = (const T *)input.data_ptr();
   const T *input_mask_ptr = (const T *)input_mask.data_ptr();
 
-  print_vec((T*)input_ptr, "base input_ptr", 20);
-
-
   auto output = torch::empty_like(input);
   T *out_ptr = (T *)output.data_ptr();
 
@@ -65,7 +62,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
       std::static_pointer_cast<TransformerEncoderLayer<T>>(
           s_transformer_encoder_layers[layer_id]);
   layer->set_cur_batch_shape(input.size(0), input.size(1));
-  std::cout << "base shape: " << input.size(0) << ", " << input.size(1) << std::endl;
   layer->SetTrainingMode(training_mode);
   layer->Forward(input_ptr, input_mask_ptr, out_ptr);
 

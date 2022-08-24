@@ -5,7 +5,6 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
                                                  Variable* inpB) {
-  printf("StridedBatchGemmOp: %zu\n", _max_ele_num);
   Variable* result =
       new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
