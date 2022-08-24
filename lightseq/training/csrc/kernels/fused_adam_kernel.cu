@@ -2,7 +2,6 @@
    Copyright NVIDIA/apex
    This apex_adam_cuda_kernel is adapted from NVIDIA/apex
 */
-#include <THC/THCGeneral.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <stdio.h>
@@ -14,6 +13,7 @@
 #include "ATen/TensorUtils.h"
 #include "ATen/cuda/CUDAContext.h"
 #include "ATen/cuda/detail/IndexUtils.cuh"
+#include "ATen/cuda/Exceptions.h"
 #include "fused_adam_kernel.h"
 #include "multi_tensor_apply.cuh"
 
@@ -197,7 +197,7 @@ void fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
             g.DATA_PTR<scalar_t_0>(), beta1, beta2, eps, grad_scale, step_size,
             total_size, (adamMode_t)mode, decay););
   }
-  THCudaCheck(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 
 void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
@@ -250,5 +250,5 @@ void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
             g.DATA_PTR<scalar_t_0>(), beta1, beta2, eps, grad_scale, step_size,
             tsize, (adamMode_t)mode, decay););
   }
-  THCudaCheck(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }

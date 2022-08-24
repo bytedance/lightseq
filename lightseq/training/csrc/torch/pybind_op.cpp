@@ -453,7 +453,6 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
   int seq_len = inputs.size(1);
   int in_features = inputs.size(2);
   int out_features = weight.size(0);
-  int tweaked_out_features = static_cast<int>((out_features + 7) / 8) * 8;
 
   std::shared_ptr<QuantLinearLayer<T>> layer =
       std::static_pointer_cast<QuantLinearLayer<T>>(
@@ -463,18 +462,16 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
                      .dtype(dtype)
                      .layout(torch::kStrided)
                      .device(torch::kCUDA, inputs.device().index());
-  if (!quant_mode) {
-    tweaked_out_features = out_features;
-  }
+
   auto outputs =
-      torch::empty({batch_size, seq_len, tweaked_out_features}, options);
+      torch::empty({batch_size, seq_len, out_features}, options);
   T *outputs_ptr = static_cast<T *>(outputs.data_ptr());
 
   layer->set_cur_batch_shape(batch_size, seq_len);
   layer->SetQuantMode(quant_mode);
   layer->Forward(inputs_ptr, weight_ptr, clip_max_ptr, outputs_ptr);
 
-  return outputs.index({Slice(), Slice(), Slice(None, out_features)});
+  return outputs;
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

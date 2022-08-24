@@ -153,7 +153,7 @@ class LSQuantLinearLayer(nn.Module):
             new_bs = (bs // 8 + 1) * 8
             inputs = torch.nn.functional.pad(
                 inputs,
-                (0, new_bs - bs) + tuple(0 for _ in range((inputs.dim() - 1) * 2)),
+                tuple(0 for _ in range((inputs.dim() - 1) * 2)) + (0, new_bs - bs),
             )
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
