@@ -147,6 +147,13 @@ void launch_d_lookup_scale_pos_dropout(
     int max_seq_len, int padding_idx, float dropout_ratio, bool trainable_pos,
     cudaStream_t &stream);
 
+template <typename T>
+void launch_viterbi(const T *start_transition, const T *end_transition,
+                    const T *transition, const T *emission, const uint8_t *mask,
+                    float *best_score, int *history, int *best_tags,
+                    int num_tags, int seq_len, int batch_size,
+                    cudaStream_t stream);
+
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
   return id1 * dim2 + id2;

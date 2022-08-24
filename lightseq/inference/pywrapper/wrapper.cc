@@ -602,6 +602,152 @@ class PyMoe {
   }
 };
 
+class PyT5 {
+ private:
+  lightseq::cuda::LSModel *model_;
+  int *d_input_;
+  std::vector<void *> d_outputs_;
+
+ public:
+  PyT5(std::string weight_path, int max_batch_size) {
+    model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+        "T5", weight_path, max_batch_size);
+    std::vector<int> max_input_shape = model_->get_input_max_shape(0);
+    int max_size =
+        std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
+                        std::multiplies<int>());
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc(&d_input_, sizeof(int) * max_size));
+
+    for (int i = 0; i < model_->get_output_size(); i++) {
+      void *d_output;
+      std::vector<int> shape = model_->get_output_max_shape(i);
+      int output_size = std::accumulate(shape.begin(), shape.end(), 1,
+                                        std::multiplies<int>());
+      lightseq::cuda::CHECK_GPU_ERROR(
+          cudaMalloc(&d_output, output_size * sizeof(int)));
+      model_->set_output_ptr(i, d_output);
+      d_outputs_.push_back(d_output);
+    }
+  }
+  ~PyT5() {
+    delete model_;
+    lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_input_));
+    for (auto d_output : d_outputs_) {
+      lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_output));
+    }
+  }
+
+  std::tuple<py::array_t<int>, py::array_t<float>> infer(
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+    auto input_seq_out = input_seq.mutable_unchecked<2>();
+    const int *input_seq_data = input_seq_out.data(0, 0);
+    int batch_size = input_seq_out.shape(0);
+    int batch_seq_len = input_seq_out.shape(1);
+
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
+                   cudaMemcpyHostToDevice));
+
+    model_->set_input_ptr(0, d_input_);
+    model_->set_input_shape(0, {batch_size, batch_seq_len});
+
+    model_->Infer();
+
+    std::vector<int> output_shape = model_->get_output_shape(0);
+    auto tokens = py::array_t<int>(output_shape);
+    int *tokens_data = tokens.mutable_data(0, 0);
+    const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output,
+                                               sizeof(int) * tokens.size(),
+                                               cudaMemcpyDeviceToHost));
+
+    std::vector<int> score_shape = model_->get_output_shape(1);
+    auto scores = py::array_t<float>(score_shape);
+    float *scores_data = scores.mutable_data(0, 0);
+    const float *d_scores =
+        static_cast<const float *>(model_->get_output_ptr(1));
+
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(scores_data, d_scores,
+                                               sizeof(float) * scores.size(),
+                                               cudaMemcpyDeviceToHost));
+    return std::make_tuple(tokens, scores);
+  }
+};
+
+class PyMT5 {
+ private:
+  lightseq::cuda::LSModel *model_;
+  int *d_input_;
+  std::vector<void *> d_outputs_;
+
+ public:
+  PyMT5(std::string weight_path, int max_batch_size) {
+    model_ = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+        "MT5", weight_path, max_batch_size);
+    std::vector<int> max_input_shape = model_->get_input_max_shape(0);
+    int max_size =
+        std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
+                        std::multiplies<int>());
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMalloc(&d_input_, sizeof(int) * max_size));
+
+    for (int i = 0; i < model_->get_output_size(); i++) {
+      void *d_output;
+      std::vector<int> shape = model_->get_output_max_shape(i);
+      int output_size = std::accumulate(shape.begin(), shape.end(), 1,
+                                        std::multiplies<int>());
+      lightseq::cuda::CHECK_GPU_ERROR(
+          cudaMalloc(&d_output, output_size * sizeof(int)));
+      model_->set_output_ptr(i, d_output);
+      d_outputs_.push_back(d_output);
+    }
+  }
+  ~PyMT5() {
+    delete model_;
+    lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_input_));
+    for (auto d_output : d_outputs_) {
+      lightseq::cuda::CHECK_GPU_ERROR(cudaFree(d_output));
+    }
+  }
+
+  std::tuple<py::array_t<int>, py::array_t<float>> infer(
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+    auto input_seq_out = input_seq.mutable_unchecked<2>();
+    const int *input_seq_data = input_seq_out.data(0, 0);
+    int batch_size = input_seq_out.shape(0);
+    int batch_seq_len = input_seq_out.shape(1);
+
+    lightseq::cuda::CHECK_GPU_ERROR(
+        cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
+                   cudaMemcpyHostToDevice));
+
+    model_->set_input_ptr(0, d_input_);
+    model_->set_input_shape(0, {batch_size, batch_seq_len});
+
+    model_->Infer();
+
+    std::vector<int> output_shape = model_->get_output_shape(0);
+    auto tokens = py::array_t<int>(output_shape);
+    int *tokens_data = tokens.mutable_data(0, 0);
+    const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(tokens_data, d_output,
+                                               sizeof(int) * tokens.size(),
+                                               cudaMemcpyDeviceToHost));
+
+    std::vector<int> score_shape = model_->get_output_shape(1);
+    auto scores = py::array_t<float>(score_shape);
+    float *scores_data = scores.mutable_data(0, 0);
+    const float *d_scores =
+        static_cast<const float *>(model_->get_output_ptr(1));
+
+    lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(scores_data, d_scores,
+                                               sizeof(float) * scores.size(),
+                                               cudaMemcpyDeviceToHost));
+    return std::make_tuple(tokens, scores);
+  }
+};
+
 class PyVit {
  private:
   lightseq::cuda::LSModel *model_;
@@ -698,6 +844,18 @@ PYBIND11_MODULE(inference, m) {
            py::arg("max_batch_size"))
       .def("infer", &PyTransformer::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
+
+  py::class_<PyT5>(m, "T5")
+      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+           py::arg("max_batch_size"))
+      .def("infer", &PyT5::infer, py::return_value_policy::reference_internal,
+           py::arg("input_seq"));
+
+  py::class_<PyMT5>(m, "MT5")
+      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+           py::arg("max_batch_size"))
+      .def("infer", &PyMT5::infer, py::return_value_policy::reference_internal,
+           py::arg("input_seq"));
 
   py::class_<PyQuantTransformer>(m, "QuantTransformer")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
