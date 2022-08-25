@@ -51,8 +51,8 @@ class Variable : public Node {
  private:
   size_t _value_byte_size;
   size_t _grad_byte_size;
-  TensorPtr _value;
-  TensorPtr _grad;
+  TensorPtr _value = nullptr;
+  TensorPtr _grad = nullptr;
 
  public:
   Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);

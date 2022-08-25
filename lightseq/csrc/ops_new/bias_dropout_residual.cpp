@@ -49,6 +49,8 @@ void BiasDropoutResOp<T1, T2>::backward() {
                _max_ele_num * sizeof(T2), cudaMemcpyDeviceToDevice);
   } else {  // accumulate
             // launch_fused_add2 ...
+    launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
+                      _cols, stream);
   }
 }
 

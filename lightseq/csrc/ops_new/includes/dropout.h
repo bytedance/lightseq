@@ -20,7 +20,7 @@ class DropoutOp : public Operator {
 
   DropoutOp(float r, size_t max_ele_num)
       : Operator("Dropout"), ratio(r), _max_ele_num(max_ele_num) {
-    _mask.reset(new Tensor("_mask", max_ele_num * sizeof(uint8_t)));
+    _mask.reset(new Tensor("DropoutOp/_mask", max_ele_num * sizeof(uint8_t)));
   }
 
   virtual ~DropoutOp() {}

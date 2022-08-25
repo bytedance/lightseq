@@ -2,6 +2,7 @@
 
 #include "context.h"
 #include "kernels.h"
+#include "cuda_util.h"
 
 template <typename T>
 TransformerEncoderLayer<T>::TransformerEncoderLayer(
@@ -65,6 +66,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
   }
+
   const T *gemmQKV_inp_ptr =
       _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
@@ -100,6 +102,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
   _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
                                       _attn_ob_ptr, _batch_tokens, _hidden_size,
                                       _stream);
+
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
