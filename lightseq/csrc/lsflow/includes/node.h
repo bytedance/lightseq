@@ -55,6 +55,7 @@ class Variable : public Node {
   TensorPtr _grad = nullptr;
 
  public:
+  Variable(std::string name);
   Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
   Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
   virtual ~Variable() {}

@@ -1,14 +1,67 @@
-#include "self_attention_layer.h"
+#include "multihead_attention_layer.h"
 
 namespace lightseq {
 
+
+template<class T1, class T2>
+int MultiheadAttentionLayerWeight::load_para_and_grad(const T1* para_ptr, T2* grad_ptr)  { // for training
+  int offset = 0;
+  _attn_qkvw_ptr = (char*)(para_ptr + offset);
+  _grad_attn_qkvw_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size * _hidden_size * 3;
+
+  _attn_qkvb_ptr = (char*)(para_ptr + offset);
+  _grad_attn_qkvb_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size * 3;
+
+  _attn_ow_ptr = (char*)(para_ptr + offset);
+  _grad_attn_ow_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size * _hidden_size;
+
+  _attn_ob_ptr = (char*)(para_ptr + offset);
+  _grad_attn_ob_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size;
+
+  _attn_nw_ptr = (char*)(para_ptr + offset);
+  _grad_attn_nw_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size;
+
+  _attn_nb_ptr = (char*)(para_ptr + offset);
+  _grad_attn_nb_ptr = (char*)(grad_ptr + offset);
+  offset += _hidden_size;
+
+  return offset;
+}
+
+template int MultiheadAttentionLayerWeight::load_para_and_grad(const float* para_ptr, float* grad_ptr);
+template int MultiheadAttentionLayerWeight::load_para_and_grad(const __half* para_ptr, __half* grad_ptr);
+
+template<typename T>
+int MultiheadAttentionLayerWeight::load_params(const std::vector<const T*> & para_vec) { // for inference
+  int offset = 0;
+  _attn_nw_ptr = (char*)para_vec[offset ++];
+  _attn_nb_ptr = (char*)para_vec[offset ++];
+
+  _attn_qkvw_ptr = (char*)para_vec[offset ++];
+  _attn_qkvb_ptr = (char*)para_vec[offset ++];
+
+  _attn_ow_ptr = (char*)para_vec[offset ++];
+  _attn_ob_ptr = (char*)para_vec[offset ++];
+
+  return offset;
+}
+
+template int MultiheadAttentionLayerWeight::load_params<float>(const std::vector<const float*> & para_vec);
+template int MultiheadAttentionLayerWeight::load_params<__half>(const std::vector<const __half*> & para_vec);
+
 template <typename T1, typename T2>
-SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
+MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, const T1* para_ptr, T2* grad_ptr, int& offset)
-    : Layer("SelfAttentionLayer"),
+    bool mask_future_tokens, 
+    MultiheadAttentionLayerWeightPtr _attn_wt)
+    : Layer("MultiheadAttentionLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -42,33 +95,33 @@ SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters
   _attn_qkvw =
-      new Variable(this->_name + "_attn_qkvw", (char*)(para_ptr + offset),
-                   (char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size * 3;
+      new Variable(this->_name + "_attn_qkvw", _attn_wt->_attn_qkvw_ptr,
+                   _attn_wt->_grad_attn_qkvw_ptr);
+
   _attn_qkvb =
-      new Variable(this->_name + "_attn_qkvb", (char*)(para_ptr + offset),
-                   (char*)(grad_ptr + offset));
-  offset += _hidden_size * 3;
+      new Variable(this->_name + "_attn_qkvb", _attn_wt->_attn_qkvb_ptr,
+                   _attn_wt->_grad_attn_qkvb_ptr);
 
-  _attn_ow = new Variable(this->_name + "_attn_ow", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size;
-  _attn_ob = new Variable(this->_name + "_attn_ob", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
 
-  _attn_nw = new Variable(this->_name + "_attn_nw", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
-  _attn_nb = new Variable(this->_name + "_attn_nb", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
+  _attn_ow = new Variable(this->_name + "_attn_ow", _attn_wt->_attn_ow_ptr,
+                           _attn_wt->_grad_attn_ow_ptr);
+
+  _attn_ob = new Variable(this->_name + "_attn_ob",  _attn_wt->_attn_ob_ptr,
+                          _attn_wt->_grad_attn_ob_ptr);
+
+
+  _attn_nw = new Variable(this->_name + "_attn_nw", _attn_wt->_attn_nw_ptr,
+                          _attn_wt->_grad_attn_nw_ptr);
+
+  _attn_nb = new Variable(this->_name + "_attn_nb", _attn_wt->_attn_nb_ptr,
+                          _attn_wt->_grad_attn_nb_ptr);
+
 
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
-Variable* SelfAttentionLayer<T1, T2>::operator()(Variable* inp,
+Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                  Variable* inp_mask) {
   Variable* qkv_out = nullptr;
   this->set_inputs({inp, inp_mask});
@@ -110,7 +163,7 @@ Variable* SelfAttentionLayer<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-void SelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
+void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   _batch_tokens = batch_size * seq_len;
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
@@ -139,9 +192,9 @@ void SelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
 }
 
 template <typename T1, typename T2>
-void SelfAttentionLayer<T1, T2>::before_backward() {}
+void MultiheadAttentionLayer<T1, T2>::before_backward() {}
 
-// template class SelfAttentionLayer<float, float>;
-// template class SelfAttentionLayer<__half, __half>;
+// template class MultiheadAttentionLayer<float, float>;
+// template class MultiheadAttentionLayer<__half, __half>;
 
 }  // namespace lightseq

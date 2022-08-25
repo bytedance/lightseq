@@ -46,7 +46,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/softmax.cpp",
             "csrc/ops_new/transform_0213.cpp",
             "csrc/layers_new/feed_forward_layer.cpp",
-            "csrc/layers_new/self_attention_layer.cpp",
+            "csrc/layers_new/multihead_attention_layer.cpp",
             "csrc/layers_new/transformer_encoder_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]

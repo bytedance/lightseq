@@ -30,6 +30,21 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 
+void layer_context_initial(ContextPtr context_ptr) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream(); 
+  if (context_ptr == nullptr) {
+    context_ptr.reset(new Context());
+    Context::set_thread_context(context_ptr);
+  }
+  else if (context_ptr->built()) {
+    context_ptr.reset(new Context());
+    Context::set_thread_context(context_ptr);
+  }
+  context_ptr->set_stream(stream);
+}
+
+#define ContextInitial(context_ptr) layer_context_initial(context_ptr);
+
 template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
@@ -37,17 +52,19 @@ int create_transformer_encoder_layer_new(
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, torch::Tensor &para_ptr, torch::Tensor &grad_ptr) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  Context::new_thread_context();
-  thread_context_ptr->set_stream(stream);
 
-  int layer_offset = 0;
+  // necessary
+  static ContextPtr layer_context_ptr;
+  ContextInitial(layer_context_ptr);
+
+  TransformerEncoderLayerWeightPtr enc_layer_wt(new TransformerEncoderLayerWeight(hidden_dim, intermediate_size));
+  enc_layer_wt->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
       hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
-      mask_future_tokens, rptr<T1>(para_ptr), rptr<T2>(grad_ptr), layer_offset);
+      mask_future_tokens, enc_layer_wt);
 
   Variable *inp(new Variable(
       "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",
