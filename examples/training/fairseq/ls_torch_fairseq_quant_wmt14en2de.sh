@@ -30,6 +30,6 @@ lightseq-train /tmp/wmt14_en_de/ \
     --use-torch-layer \
     --enable-quant \
     --quant-mode qat  \
-    --keep-last-epochs 1 --max-epoch 150 \
+    --keep-last-epochs 1 --max-epoch 300 \
     --smooth-avg-update 1000 --quant-bits 4 --fa 0.3 $@
 
