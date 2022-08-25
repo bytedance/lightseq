@@ -1,7 +1,7 @@
 import pathlib
 import sys
 
-from gradient_comm_quantization.train import cli_main
+from lightseq.training.gradient_comm_quantization.train import cli_main
 
 
 def ls_cli_main(*args, **kwargs):

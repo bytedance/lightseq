@@ -135,7 +135,13 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 '--offload-activations are passed.'
             )
         )
+        # args for Gradient Communication Quantization (GCQ) in multi-machine distributed training
+        parser.add_argument('--enable_GCQ', default=False, action='store_true',
+                            help='enable gradient communication quantization')
+        parser.add_argument('--GCQ_quantile', type=float, default=0.99,
+                            help='quantile value of gradient communication quantization, between 0.0-1.0')
         # fmt: on
+        
 
     @classmethod
     def build_model(cls, args, task):

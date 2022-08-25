@@ -27,7 +27,7 @@ from fairseq import (
 from fairseq.data import iterators
 from fairseq.logging import meters, metrics, progress_bar
 from fairseq.model_parallel.megatron_trainer import MegatronTrainer
-from gradient_comm_quantization.trainer import Trainer
+from .trainer import Trainer
 
 
 logging.basicConfig(
