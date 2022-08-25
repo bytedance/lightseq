@@ -24,7 +24,7 @@ public:
       : Operator("LaunchEncEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _pad_id(pad_id),
-        _hidden_dim(hidden_dim):
+        _hidden_dim(hidden_dim),
         _multilg_type(multilg_type) {}
 
   virtual ~LaunchEncEmbOp() {}

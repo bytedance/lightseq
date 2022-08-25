@@ -23,7 +23,6 @@ Util functions
 */
 
 namespace lightseq {
-namespace cuda {
 
 /* GPU function guard */
 static std::string _cudaGetErrorString(cudaError_t error) {
@@ -78,35 +77,8 @@ void check_gpu_error(T result, char const* const func, const char* const file,
 
 #define CHECK_GPU_ERROR(val) check_gpu_error((val), #val, __FILE__, __LINE__)
 
-enum class OperationType { FP32, FP16 };
 
-/* Precision descriptor */
-template <OperationType OpType_>
-class OperationTypeTraits;
 
-/* Type when fp32 */
-template <>
-class OperationTypeTraits<OperationType::FP32> {
- public:
-  typedef float DataType;
-  // cuda gemm computeType type
-  static cudaDataType_t const computeType = CUDA_R_32F;
-  static cudaDataType_t const AType = CUDA_R_32F;
-  static cudaDataType_t const BType = CUDA_R_32F;
-  static cudaDataType_t const CType = CUDA_R_32F;
-};
-
-/* Type when fp16 */
-template <>
-class OperationTypeTraits<OperationType::FP16> {
- public:
-  typedef __half DataType;
-  // cuda gemm computeType type
-  static cudaDataType_t const computeType = CUDA_R_16F;
-  static cudaDataType_t const AType = CUDA_R_16F;
-  static cudaDataType_t const BType = CUDA_R_16F;
-  static cudaDataType_t const CType = CUDA_R_16F;
-};
 
 /* Print vector stored in GPU memory, for debug */
 template <typename T>
@@ -230,5 +202,4 @@ float dequantize(unsigned char i, float scale, float clip_max);
 void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
                       float clip_max, float quant_range, int start, int num);
 
-}  // namespace cuda
 }  // namespace lightseq

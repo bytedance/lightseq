@@ -1,7 +1,6 @@
 #include "util.h"
 
 namespace lightseq {
-namespace cuda {
 
 template <typename T>
 void print_vec(const thrust::device_vector<T>& outv, std::string outn,
@@ -354,5 +353,4 @@ void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

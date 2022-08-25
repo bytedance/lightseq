@@ -48,6 +48,7 @@ set(COMMON_HEADER_DIRS
     # models/includes
     ops_new/includes
     proto/includes
+    tools/includes
 )
 
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)

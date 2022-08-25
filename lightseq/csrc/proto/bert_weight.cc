@@ -32,8 +32,8 @@ __half BertWeight<__half>::float2required(float value) {
 /**
 Read model config stored in custom proto file.
 */
-template <typename OpType_>
-void BertWeight<OpType_>::proto_get_model_config(const Bert &bert) {
+template <typename T>
+void BertWeight<T>::proto_get_model_config(const Bert &bert) {
   _hidden_size = bert.src_embedding().norm_scale_size();
   _inner_size = bert.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
   _max_step = bert.src_embedding().position_embedding_size() / _hidden_size;
@@ -51,8 +51,8 @@ void BertWeight<OpType_>::proto_get_model_config(const Bert &bert) {
 /**
 Load the weights of embedding layer into GPU memory.
 */
-template <typename OpType_>
-std::string BertWeight<OpType_>::proto_parse_emb_wei(
+template <typename T>
+std::string BertWeight<T>::proto_parse_emb_wei(
     const BertEmbeddingLayer &layer) {
   std::vector<int> offset;
   std::vector<float> value;
@@ -80,7 +80,7 @@ std::string BertWeight<OpType_>::proto_parse_emb_wei(
   for (float ele : layer.norm_bias()) value.push_back(ele);
   idx += _hidden_size;
 
-  std::vector<_DataType> raw_value;
+  std::vector<T> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
   for (int e : offset)
@@ -94,8 +94,8 @@ std::string BertWeight<OpType_>::proto_parse_emb_wei(
 /**
 Load the weights of encoder into GPU memory.
 */
-template <typename OpType_>
-std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
+template <typename T>
+std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -181,7 +181,7 @@ std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
 
   }  // for
 
-  std::vector<_DataType> raw_value;
+  std::vector<T> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
 
@@ -194,8 +194,8 @@ std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
 /**
 Read model config stored in custom hdf5 file.
 */
-template <typename OpType_>
-void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
+template <typename T>
+void BertWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
 
   _inner_size =
@@ -240,8 +240,8 @@ void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 /**
 Load the weights of embedding layer into GPU memory.
 */
-template <typename OpType_>
-void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
+template <typename T>
+void BertWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
 
   size_t value_size = _src_vocab_size * _hidden_size +
@@ -249,7 +249,7 @@ void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
 
   std::vector<int> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
-  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+  std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
   int idx = 0;
 
@@ -283,7 +283,7 @@ void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
       "Wrong norm_bias_size !");
   idx += _hidden_size;
 
-  std::vector<_DataType> raw_value;
+  std::vector<T> raw_value;
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_src_emb_wei = raw_value;
@@ -297,8 +297,8 @@ void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
 /**
 Load the weights of encoder into GPU memory.
 */
-template <typename OpType_>
-void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
+template <typename T>
+void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
        _hidden_size * _hidden_size + _hidden_size * 3 +
@@ -307,7 +307,7 @@ void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
       _n_enc_layer;
   std::vector<int> offset;
   std::vector<float> value(value_size);
-  std::cout << "loading " << value_size * sizeof(OpType_) / (1024 * 1024)
+  std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
 
   int idx = 0;
@@ -406,7 +406,7 @@ void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
   }  // for
 
-  std::vector<_DataType> raw_value;
+  std::vector<T> raw_value;
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
   _d_enc_wei = raw_value;
@@ -419,8 +419,8 @@ void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 /**
 Load the proto file into CPU memory and parse it.
 */
-template <typename OpType_>
-std::string BertWeight<OpType_>::initializing(std::string weight_path) {
+template <typename T>
+std::string BertWeight<T>::initializing(std::string weight_path) {
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
     Bert bert;
