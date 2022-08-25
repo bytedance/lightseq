@@ -57,9 +57,7 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name),
-      _value_byte_size(0),
-      _grad_byte_size(0) {
+    : Node(name), _value_byte_size(0), _grad_byte_size(0) {
   _value.reset(new Tensor(this->_name + "/value", 0));
   if (_context_ptr->is_training())
     _grad.reset(new Tensor(this->_name + "/grad", 0));

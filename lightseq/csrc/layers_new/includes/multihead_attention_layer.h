@@ -13,8 +13,8 @@
 namespace lightseq {
 
 class MultiheadAttentionLayerWeight {
-public:
-  MultiheadAttentionLayerWeight(int hidden_size): _hidden_size(hidden_size) {}
+ public:
+  MultiheadAttentionLayerWeight(int hidden_size) : _hidden_size(hidden_size) {}
   char* _attn_qkvw_ptr;
   char* _attn_qkvb_ptr;
   char* _attn_ow_ptr;
@@ -32,12 +32,15 @@ public:
   int _hidden_size;
   int _intermediate_size;
 
-  template<class T1, class T2> int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  template <class T1, class T2>
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
-  template<typename T> int load_params(const std::vector<const T*> & para_vec);
+  template <typename T>
+  int load_params(const std::vector<const T*>& para_vec);
 };
 
-using MultiheadAttentionLayerWeightPtr = std::shared_ptr<MultiheadAttentionLayerWeight>;
+using MultiheadAttentionLayerWeightPtr =
+    std::shared_ptr<MultiheadAttentionLayerWeight>;
 
 template <class T1, class T2>
 class MultiheadAttentionLayer : public Layer {
@@ -76,11 +79,11 @@ class MultiheadAttentionLayer : public Layer {
 
  public:
   MultiheadAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
-                     int hidden_size, int num_heads,
-                     float attn_prob_dropout_ratio,
-                     float hidden_output_dropout_ratio,
-                     bool pre_or_postLayerNorm, bool mask_future_tokens,
-                     MultiheadAttentionLayerWeightPtr _attn_wt);
+                          int hidden_size, int num_heads,
+                          float attn_prob_dropout_ratio,
+                          float hidden_output_dropout_ratio,
+                          bool pre_or_postLayerNorm, bool mask_future_tokens,
+                          MultiheadAttentionLayerWeightPtr _attn_wt);
 
   virtual ~MultiheadAttentionLayer() {}
 
@@ -95,6 +98,7 @@ template class MultiheadAttentionLayer<__half, __half>;
 template class MultiheadAttentionLayer<float, float>;
 
 template <class T1, class T2>
-using MultiheadAttentionLayerPtr = std::shared_ptr<MultiheadAttentionLayer<T1, T2>>;
+using MultiheadAttentionLayerPtr =
+    std::shared_ptr<MultiheadAttentionLayer<T1, T2>>;
 
 }  // namespace lightseq

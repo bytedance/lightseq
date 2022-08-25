@@ -24,7 +24,6 @@ Load the model weights which stored in custom proto file into GPU memory.
 template <typename T>
 class BertWeight {
  private:
-
   T float2required(float value);
   void proto_get_model_config(const Bert &bert);
   std::string proto_parse_emb_wei(const BertEmbeddingLayer &layer);

@@ -15,4 +15,3 @@ add_library(bert_weight STATIC bert_weight.cc ${BERT_PROTO_SRC}
 target_link_libraries(bert_weight PUBLIC utils ${Protobuf_LIBRARIES})
 target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-

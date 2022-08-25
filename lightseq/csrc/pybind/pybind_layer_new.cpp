@@ -31,12 +31,11 @@ static std::unordered_map<int, std::shared_ptr<void>>
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 
 void layer_context_initial(ContextPtr context_ptr) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream(); 
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (context_ptr == nullptr) {
     context_ptr.reset(new Context());
     Context::set_thread_context(context_ptr);
-  }
-  else if (context_ptr->built()) {
+  } else if (context_ptr->built()) {
     context_ptr.reset(new Context());
     Context::set_thread_context(context_ptr);
   }
@@ -52,12 +51,12 @@ int create_transformer_encoder_layer_new(
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, torch::Tensor &para_ptr, torch::Tensor &grad_ptr) {
-
   // necessary
   static ContextPtr layer_context_ptr;
   ContextInitial(layer_context_ptr);
 
-  TransformerEncoderLayerWeightPtr enc_layer_wt(new TransformerEncoderLayerWeight(hidden_dim, intermediate_size));
+  TransformerEncoderLayerWeightPtr enc_layer_wt(
+      new TransformerEncoderLayerWeight(hidden_dim, intermediate_size));
   enc_layer_wt->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(

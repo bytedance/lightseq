@@ -14,9 +14,6 @@ const lightseq::cuda::OperationType bert_optype =
 namespace lightseq {
 class Bert : public LSModel {
  private:
-
-
-
  public:
   Bert(const std::string weight_path, const int max_batch_size);
 

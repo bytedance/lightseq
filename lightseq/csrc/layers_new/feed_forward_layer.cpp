@@ -2,8 +2,9 @@
 
 namespace lightseq {
 
-template<class T1, class T2>
-int FeedForwardLayerWeight::load_para_and_grad(const T1* para_ptr, T2* grad_ptr)  { // for training
+template <class T1, class T2>
+int FeedForwardLayerWeight::load_para_and_grad(const T1* para_ptr,
+                                               T2* grad_ptr) {  // for training
   int offset = 0;
   _inter_w_ptr = (char*)(para_ptr + offset);
   _grad_inter_w_ptr = (char*)(grad_ptr + offset);
@@ -32,26 +33,31 @@ int FeedForwardLayerWeight::load_para_and_grad(const T1* para_ptr, T2* grad_ptr)
   return offset;
 }
 
-template int FeedForwardLayerWeight::load_para_and_grad(const float* para_ptr, float* grad_ptr);
-template int FeedForwardLayerWeight::load_para_and_grad(const __half* para_ptr, __half* grad_ptr);
+template int FeedForwardLayerWeight::load_para_and_grad(const float* para_ptr,
+                                                        float* grad_ptr);
+template int FeedForwardLayerWeight::load_para_and_grad(const __half* para_ptr,
+                                                        __half* grad_ptr);
 
-template<typename T>
-int FeedForwardLayerWeight::load_params(const std::vector<const T*> & para_vec) { // for inference
+template <typename T>
+int FeedForwardLayerWeight::load_params(
+    const std::vector<const T*>& para_vec) {  // for inference
   int offset = 0;
-  _ffn_nw_ptr = (char*)para_vec[offset ++];
-  _ffn_nb_ptr = (char*)para_vec[offset ++];
+  _ffn_nw_ptr = (char*)para_vec[offset++];
+  _ffn_nb_ptr = (char*)para_vec[offset++];
 
-  _inter_w_ptr = (char*)para_vec[offset ++];
-  _inter_b_ptr = (char*)para_vec[offset ++];
+  _inter_w_ptr = (char*)para_vec[offset++];
+  _inter_b_ptr = (char*)para_vec[offset++];
 
-  _output_w_ptr = (char*)para_vec[offset ++];
-  _output_b_ptr = (char*)para_vec[offset ++];
+  _output_w_ptr = (char*)para_vec[offset++];
+  _output_b_ptr = (char*)para_vec[offset++];
 
   return offset;
 }
 
-template int FeedForwardLayerWeight::load_params<float>(const std::vector<const float*> & para_vec);
-template int FeedForwardLayerWeight::load_params<__half>(const std::vector<const __half*> & para_vec);
+template int FeedForwardLayerWeight::load_params<float>(
+    const std::vector<const float*>& para_vec);
+template int FeedForwardLayerWeight::load_params<__half>(
+    const std::vector<const __half*>& para_vec);
 
 template <typename T1, typename T2>
 FeedForwardLayer<T1, T2>::FeedForwardLayer(
@@ -86,12 +92,10 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
   _inter_b = new Variable(this->_name + "_inter_b", ffn_wt->_inter_b_ptr,
                           ffn_wt->_grad_inter_b_ptr);
 
-  _output_w =
-      new Variable(this->_name + "_output_w", ffn_wt->_output_w_ptr,
-                   ffn_wt->_grad_output_w_ptr);
-  _output_b =
-      new Variable(this->_name + "_output_b", ffn_wt->_output_b_ptr,
-                   ffn_wt->_grad_output_b_ptr);
+  _output_w = new Variable(this->_name + "_output_w", ffn_wt->_output_w_ptr,
+                           ffn_wt->_grad_output_w_ptr);
+  _output_b = new Variable(this->_name + "_output_b", ffn_wt->_output_b_ptr,
+                           ffn_wt->_grad_output_b_ptr);
 
   _ffn_nw = new Variable(this->_name + "_ffn_nw", ffn_wt->_ffn_nw_ptr,
                          ffn_wt->_grad_ffn_nw_ptr);

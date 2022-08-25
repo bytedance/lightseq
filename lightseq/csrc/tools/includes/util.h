@@ -77,9 +77,6 @@ void check_gpu_error(T result, char const* const func, const char* const file,
 
 #define CHECK_GPU_ERROR(val) check_gpu_error((val), #val, __FILE__, __LINE__)
 
-
-
-
 /* Print vector stored in GPU memory, for debug */
 template <typename T>
 void print_vec(const thrust::device_vector<T>& outv, std::string outn,

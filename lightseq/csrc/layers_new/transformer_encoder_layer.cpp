@@ -2,34 +2,43 @@
 
 namespace lightseq {
 
-
-template<class T1, class T2>
-int TransformerEncoderLayerWeight::load_para_and_grad(const T1* para_ptr, T2* grad_ptr)  { // for training
+template <class T1, class T2>
+int TransformerEncoderLayerWeight::load_para_and_grad(
+    const T1* para_ptr, T2* grad_ptr) {  // for training
   int offset = 0;
-  
-  offset += _attn_layer_wt->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
 
-  offset += _ffn_layer_wt->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
+  offset +=
+      _attn_layer_wt->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
+
+  offset +=
+      _ffn_layer_wt->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
 
   return offset;
 }
 
-template int TransformerEncoderLayerWeight::load_para_and_grad(const float* para_ptr, float* grad_ptr);
-template int TransformerEncoderLayerWeight::load_para_and_grad(const __half* para_ptr, __half* grad_ptr);
+template int TransformerEncoderLayerWeight::load_para_and_grad(
+    const float* para_ptr, float* grad_ptr);
+template int TransformerEncoderLayerWeight::load_para_and_grad(
+    const __half* para_ptr, __half* grad_ptr);
 
-template<typename T>
-int TransformerEncoderLayerWeight::load_params(const std::vector<const T*> & para_vec) { // for inference
+template <typename T>
+int TransformerEncoderLayerWeight::load_params(
+    const std::vector<const T*>& para_vec) {  // for inference
   int offset = 0;
-  
-  offset += _attn_layer_wt->load_params(std::vector<const T*>(para_vec.begin() + offset, para_vec.end()));
 
-  offset += _ffn_layer_wt->load_params(std::vector<const T*>(para_vec.begin() + offset, para_vec.end()));
+  offset += _attn_layer_wt->load_params(
+      std::vector<const T*>(para_vec.begin() + offset, para_vec.end()));
+
+  offset += _ffn_layer_wt->load_params(
+      std::vector<const T*>(para_vec.begin() + offset, para_vec.end()));
 
   return offset;
 }
 
-template int TransformerEncoderLayerWeight::load_params<float>(const std::vector<const float*> & para_vec);
-template int TransformerEncoderLayerWeight::load_params<__half>(const std::vector<const __half*> & para_vec);
+template int TransformerEncoderLayerWeight::load_params<float>(
+    const std::vector<const float*>& para_vec);
+template int TransformerEncoderLayerWeight::load_params<__half>(
+    const std::vector<const __half*>& para_vec);
 
 template <typename T1, typename T2>
 TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
@@ -39,7 +48,6 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, TransformerEncoderLayerWeightPtr enc_layer_wt)
     : Layer("TransformerEncoderLayer") {
-
   _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
