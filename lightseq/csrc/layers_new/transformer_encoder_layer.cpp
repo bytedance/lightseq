@@ -65,7 +65,6 @@ template <typename T1, typename T2>
 Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
   this->set_inputs({inp, inp_mask});
-
   Variable* attn_out = (*_attn_layer)(inp, inp_mask);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);

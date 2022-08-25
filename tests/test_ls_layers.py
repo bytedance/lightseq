@@ -1062,17 +1062,5 @@ if __name__ == "__main__":
     kt.run(
         [
             "test_encoder_layer_forward",
-            "test_encoder_layer_backward",
-            "test_bert_encoder_layer_forward",
-            "test_bert_encoder_layer_backward",
-            "test_decoder_layer_forward",
-            "test_decoder_layer_backward",
-            "test_decoder_layer_forward_inference",
-            "test_embedding_layer_forward",
-            "test_embedding_layer_backward",
-            "test_tra_pos_embedding_layer_forward",
-            "test_tra_pos_embedding_layer_backward",
-            "test_cross_entropy_layer_forward",
-            "test_cross_entropy_layer_backward",
         ]
     )
