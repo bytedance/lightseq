@@ -37,9 +37,32 @@ def enable_int5(m):
         m.num_bits = 5.0
 
 
+def enable_fp16(m):
+    if isinstance(m, TensorQuantizer):
+        m.disable()
+        m.disable_quant()
+        m.disable_calib()
+
+
+def enable_int6(m):
+    if isinstance(m, TensorQuantizer):
+        m.num_bits = 6.0
+
+
 def enable_int4(m):
     if isinstance(m, TensorQuantizer):
+        m.enable()
+        m.enable_quant()
+        m.disable_calib()
         m.num_bits = 4.0
+
+
+enable_bits = {
+    4: enable_int4,
+    5: enable_int5,
+    6: enable_int6,
+    16: enable_fp16,
+}
 
 
 @register_model("ls_transformer")
@@ -153,8 +176,10 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='quantization noise and scalar quantization at training time')
         parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
                             help='smooth avg')
-        parser.add_argument('--n-gpus-int5', type=float, metavar='D', default=-1,
-                            help='-1')
+        parser.add_argument('--n-gpus-intk', type=float, metavar='D', default=-1,
+                            help='number gpus')
+        parser.add_argument('--n-gpus-intwhat', type=float, metavar='D', default=5,
+                            help='num_bits')
         # args for Fully Sharded Data Parallel (FSDP) training
         parser.add_argument(
             '--min-params-to-wrap', type=int, metavar='D', default=DEFAULT_MIN_PARAMS_TO_WRAP,
@@ -301,8 +326,8 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         if self.training:
             if self.last_model is False:
                 rank = int(dist.get_rank())
-                if rank < self.args.n_gpus_int5:
-                    self.apply(enable_int5)
+                if rank < self.args.n_gpus_intk:
+                    self.apply(enable_bits[self.args.n_gpus_intwhat])
             self.last_model = True
         else:
             if self.last_model is True:
