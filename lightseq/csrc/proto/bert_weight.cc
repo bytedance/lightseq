@@ -11,14 +11,13 @@ Weights in proto file will always be in fp32. For fp16, the weights
 */
 
 namespace lightseq {
-namespace cuda {
 
 /**
 Cast weights into required datatype.
 The datatype of weights in custom proto file will always be in fp32.
 */
 template <>
-float BertWeight<OperationType::FP32>::float2required(float value) {
+float BertWeight<float>::float2required(float value) {
   return value;
 }
 
@@ -26,14 +25,14 @@ float BertWeight<OperationType::FP32>::float2required(float value) {
 fp16 version, cast fp32 into fp16
 */
 template <>
-__half BertWeight<OperationType::FP16>::float2required(float value) {
+__half BertWeight<__half>::float2required(float value) {
   return __float2half_rn(value);
 }
 
 /**
 Read model config stored in custom proto file.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 void BertWeight<OpType_>::proto_get_model_config(const Bert &bert) {
   _hidden_size = bert.src_embedding().norm_scale_size();
   _inner_size = bert.encoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
@@ -52,7 +51,7 @@ void BertWeight<OpType_>::proto_get_model_config(const Bert &bert) {
 /**
 Load the weights of embedding layer into GPU memory.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 std::string BertWeight<OpType_>::proto_parse_emb_wei(
     const BertEmbeddingLayer &layer) {
   std::vector<int> offset;
@@ -95,7 +94,7 @@ std::string BertWeight<OpType_>::proto_parse_emb_wei(
 /**
 Load the weights of encoder into GPU memory.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
   std::vector<int> offset;
   std::vector<float> value;
@@ -195,7 +194,7 @@ std::string BertWeight<OpType_>::proto_parse_enc_wei(const Bert &bert) {
 /**
 Read model config stored in custom hdf5 file.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
 
@@ -241,7 +240,7 @@ void BertWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
 /**
 Load the weights of embedding layer into GPU memory.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
 
@@ -298,7 +297,7 @@ void BertWeight<OpType_>::hdf5_parse_emb_wei(hid_t hdf5_file) {
 /**
 Load the weights of encoder into GPU memory.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
@@ -420,7 +419,7 @@ void BertWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 /**
 Load the proto file into CPU memory and parse it.
 */
-template <OperationType OpType_>
+template <typename OpType_>
 std::string BertWeight<OpType_>::initializing(std::string weight_path) {
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
@@ -476,8 +475,7 @@ std::string BertWeight<OpType_>::initializing(std::string weight_path) {
   }
 }
 
-template class BertWeight<OperationType::FP16>;
-template class BertWeight<OperationType::FP32>;
+template class BertWeight<__half>;
+template class BertWeight<float>;
 
-}  // namespace cuda
 }  // namespace lightseq

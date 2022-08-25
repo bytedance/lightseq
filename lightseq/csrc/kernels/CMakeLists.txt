@@ -6,6 +6,7 @@ set(cuda_kernel_files
     cuda_util.cu 
     dropout_kernels.cu
     embedding_kernels.cu
+    embKernels.cc.cu
     # fused_adam_kernel.cu
     general_kernels.cu
     normalize_kernels.cu
