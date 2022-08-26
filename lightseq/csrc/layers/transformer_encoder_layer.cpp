@@ -2,6 +2,7 @@
 
 #include "context.h"
 #include "kernels.h"
+#include "cuda_util.h"
 
 template <typename T>
 TransformerEncoderLayer<T>::TransformerEncoderLayer(

@@ -16,13 +16,22 @@ class Layer {
   std::vector<Variable*> _root_var_vec = {};
   std::vector<Variable*> _leaf_var_vec = {};
 
+  std::vector<Variable*> _inp_var_vec = {};
+  std::vector<Variable*> _out_var_vec = {};
+
  public:
   Layer(std::string name);
   virtual ~Layer();
+  std::string name() { return _name; }
 
   virtual void forward();
-
   virtual void backward();
+
+  void set_inputs(std::vector<Variable*> inps) { _inp_var_vec = inps; }
+  void set_outputs(std::vector<Variable*> outs) { _out_var_vec = outs; }
+
+  Variable* input(int idx) { return _inp_var_vec[idx]; }
+  Variable* output(int idx) { return _out_var_vec[idx]; }
 
   void clear_fw_flag();
 

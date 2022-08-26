@@ -3,18 +3,6 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-NormalizeLayerOp<T1, T2>::NormalizeLayerOp(uint32_t max_batch_tokens,
-                                           uint32_t hidden_dim, bool use_mean)
-    : _max_batch_tokens(max_batch_tokens),
-      _hidden_dim(hidden_dim),
-      _use_mean(use_mean),
-      Operator("NormalizeLayerOp") {
-  vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
-  if (use_mean)
-    means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-}
-
-template <typename T1, typename T2>
 NormalizeLayerOp<T1, T2>::~NormalizeLayerOp() {}
 
 template <typename T1, typename T2>
@@ -31,7 +19,6 @@ Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 template <typename T1, typename T2>
 void NormalizeLayerOp<T1, T2>::before_forward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
-  _max_batch_dim = _batch_tokens * _hidden_dim;
 }
 
 template <typename T1, typename T2>
@@ -53,7 +40,6 @@ void NormalizeLayerOp<T1, T2>::forward() {
 template <typename T1, typename T2>
 void NormalizeLayerOp<T1, T2>::before_backward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
-  _max_batch_dim = _batch_tokens * _hidden_dim;
 }
 
 template <typename T1, typename T2>

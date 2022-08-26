@@ -75,6 +75,7 @@ void Context::build() {
 #endif
 
   cuda_free(temporary_buffer_);
+
   _mm_ptr->calculate_buffer_();
   _built = true;
 
