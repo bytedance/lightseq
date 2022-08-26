@@ -23,6 +23,7 @@ import yaml
 import logging
 
 import torch
+import random
 from torch.autograd import Function
 
 logger = logging.getLogger(__name__)
@@ -374,6 +375,9 @@ class FakeTensorQuantFunctionX(Function):
         is_weight=False,
     ):
         # ctx.save_for_backward(inputs, amax)
+        if not is_weight and training:
+            if random.random() < 0.3:
+                num_bits = 5
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
