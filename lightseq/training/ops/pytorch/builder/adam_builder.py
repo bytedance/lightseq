@@ -19,11 +19,11 @@ class AdamBuilder(CUDAOpBuilder):
     def sources(self):
         return [
             "csrc/kernels/fused_adam_kernel.cu",
-            "csrc/torch/pybind_adam.cpp",
+            "csrc/pybind/pybind_adam.cpp",
         ]
 
     def include_paths(self):
-        return ["csrc/kernels/includes", "csrc/ops/includes"]
+        return ["csrc/kernels/includes", "csrc/ops/includes", "csrc/layers/includes"]
 
     def nvcc_args(self):
         args = [

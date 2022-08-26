@@ -1,6 +1,6 @@
 import torch
 
-from lightseq.training.ops.pytorch import transformer_cuda_module
+from lightseq.training.ops.pytorch import TransformerBuilder
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
@@ -8,6 +8,8 @@ from lightseq.training.ops.pytorch.quantization import (
     weight_quant_config,
     act_quant_config,
 )
+
+transformer_cuda_module = TransformerBuilder().load()
 
 
 class LSGptEncoderLayer(LSTransformerEncoderLayer):

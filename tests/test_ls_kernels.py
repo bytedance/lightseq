@@ -1,6 +1,7 @@
 import random
 
 import torch
+from torch._C import ScriptModule, dtype
 from torch.nn import functional
 
 from lightseq.training.ops.pytorch.builder import KernelBuilder, AdamBuilder
@@ -48,6 +49,108 @@ def test_launch_bias_add_transform_20314():
         )
         return [
             base.contiguous(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case()
+def test_launch_bias_add_transform_20314_new():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    count = 3
+    print(
+        "(batch_size, seq_len, count, nhead, head_dim): "
+        f"({batch_size}, {seq_len}, {count}, {nhead}, {head_dim})"
+    )
+
+    qkv = kt.rand((batch_size, seq_len, count, hidden_dim))
+    bias = kt.zeros((1, 1, count, hidden_dim))
+    custom_q = kt.rand((batch_size, nhead, seq_len, head_dim))
+    custom_k = kt.rand((batch_size, nhead, seq_len, head_dim))
+    custom_v = kt.rand((batch_size, nhead, seq_len, head_dim))
+    base_res = kt.rand((count, batch_size, nhead, seq_len, head_dim))
+
+    if kt.dtype == torch.float:
+        cust_func = cuda_module.torch_launch_bias_add_transform_20314_new_fp32
+    else:
+        cust_func = cuda_module.torch_launch_bias_add_transform_20314_new_fp16
+
+    if kt.dtype == torch.float:
+        base_func = cuda_module.torch_launch_bias_add_transform_20314_fp32
+    else:
+        base_func = cuda_module.torch_launch_bias_add_transform_20314_fp16
+
+    def custom():
+        cust_func(
+            custom_q,
+            custom_k,
+            custom_v,
+            qkv,
+            bias,
+            batch_size,
+            seq_len,
+            count,
+            nhead,
+            head_dim,
+        )
+        return [torch.cat((custom_q, custom_k, custom_v), dim=0)]
+
+    def baseline():
+        base_func(base_res, qkv, bias, batch_size, seq_len, count, nhead, head_dim)
+        return [
+            base_res,
+        ]
+
+    return custom, baseline
+
+
+@kt.case(ntest=5, dtypes=[torch.float32])
+def test_launch_transform_20314_bwd_new():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    trans_count = 3
+    print(
+        "(batch_size, seq_len, hidden_dim, nhead, trans_count): "
+        f"({batch_size}, {seq_len}, {hidden_dim}, {nhead}, {trans_count})"
+    )
+
+    q_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
+    k_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
+    v_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
+    vals = torch.cat((q_inp.clone(), k_inp.clone(), v_inp.clone()), dim=0)
+    custom_res = kt.rand((batch_size, seq_len, trans_count, nhead, head_dim))
+    base_res = kt.rand((batch_size, seq_len, trans_count, nhead, head_dim))
+
+    if kt.dtype == torch.float:
+        base_func = cuda_module.torch_launch_transform4d_0213_fp32
+    else:
+        base_func = cuda_module.torch_launch_transform4d_0213_fp16
+
+    if kt.dtype == torch.float:
+        cust_func = cuda_module.torch_launch_transform_20314_bwd_new_fp32
+    else:
+        cust_func = cuda_module.torch_launch_transform_20314_bwd_new_fp16
+
+    # [trans_count, batch_size, nhead, seq_len, head_dim] ->
+    # [batch_size, seq_len, trans_count, nhead, head_dim]
+
+    def custom():
+        cust_func(
+            custom_res, q_inp, k_inp, v_inp, batch_size, seq_len, hidden_dim, nhead
+        )
+        return [
+            custom_res.contiguous(),
+        ]
+
+    def baseline():
+        base_func(base_res, vals, batch_size, seq_len, hidden_dim, nhead, trans_count)
+        return [
+            base_res.contiguous(),
         ]
 
     return custom, baseline
@@ -200,6 +303,88 @@ def test_launch_attn_softmax():
     return custom, baseline
 
 
+@kt.case(atol=1e-3, rtol=1e-3, ntest=2)
+def test_launch_attn_softmax_new():
+    batch_size, from_len = kt.bs_sl()
+    is_dec_self_attn = random.choice([True, False])
+    if is_dec_self_attn:
+        to_len = from_len
+        is_dec_self_attn_infer = random.choice([True, False])
+    else:
+        _, to_len = kt.bs_sl(batch_size)
+        is_dec_self_attn_infer = False
+
+    if is_dec_self_attn_infer:
+        to_len = from_len
+        from_len = 1
+        beam_size = random.choice([3, 4, 5])
+        batch_size *= beam_size
+
+    nhead = kt.nhead
+    print(
+        "(batch_size, nhead, from_len, to_len, is_dec_self_attn,"
+        f" is_dec_self_attn_infer): ({batch_size}, {nhead}, {from_len}, {to_len},"
+        f" {is_dec_self_attn}, {is_dec_self_attn_infer})"
+    )
+
+    inp = kt.rand((batch_size, nhead, from_len, to_len))
+    if is_dec_self_attn:
+        mask = kt.dec_self_attn_mask(to_len) * -1e8
+        mask = mask.unsqueeze(0).unsqueeze(0)  # [1, 1, to_len, to_len]
+    else:
+        mask = kt.attn_mask(batch_size, to_len) * -1e8
+        mask = mask.unsqueeze(1).unsqueeze(1)  # [batch_size, 1, 1, to_len]
+    inp_list = [inp.clone() for _ in range(8)]
+    tt = {"repeat_idx": 0}
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_attn_softmax_new_fp32
+    else:
+        func = cuda_module.torch_launch_attn_softmax_new_fp16
+
+    if kt.dtype == torch.float:
+        func2 = cuda_module.torch_launch_attn_softmax_fp32
+    else:
+        func2 = cuda_module.torch_launch_attn_softmax_fp16
+
+    cust_out = torch.empty_like(inp)
+
+    def custom():
+        cus_inp = inp_list[tt["repeat_idx"]].clone()
+        func(
+            cust_out,
+            cus_inp,
+            mask,
+            batch_size,
+            nhead,
+            from_len,
+            to_len,
+            is_dec_self_attn,
+            is_dec_self_attn and (not is_dec_self_attn_infer),
+        )
+        return [
+            cust_out,
+        ]
+
+    def baseline():
+        base_inp = inp_list[tt["repeat_idx"]].clone()
+        func2(
+            base_inp,
+            mask,
+            batch_size,
+            nhead,
+            from_len,
+            to_len,
+            is_dec_self_attn,
+            is_dec_self_attn and (not is_dec_self_attn_infer),
+        )
+        return [
+            base_inp,
+        ]
+
+    return custom, baseline
+
+
 @kt.case(atol=1e-2, rtol=1e-3)
 def test_launch_attn_softmax_bw():
     nhead = kt.nhead
@@ -237,6 +422,51 @@ def test_launch_attn_softmax_bw():
                 res,
             ]
         )
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-2, rtol=1e-3)
+def test_launch_attn_softmax_bw_new():
+    nhead = kt.nhead
+    batch_size, from_len = kt.bs_sl()
+    _, to_len = kt.bs_sl(batch_size)
+    print(
+        "(batch_size, nhead, from_len, to_len): "
+        f"({batch_size}, {nhead}, {from_len}, {to_len})"
+    )
+
+    out_grad = kt.rand((batch_size, nhead, from_len, to_len))
+    soft_inp = kt.rand((batch_size, nhead, from_len, to_len))
+    inp_grad = kt.rand((batch_size, nhead, from_len, to_len))
+
+    if kt.dtype == torch.float:
+        base_func = cuda_module.torch_launch_attn_softmax_bw_fp32
+    else:
+        base_func = cuda_module.torch_launch_attn_softmax_bw_fp16
+
+    if kt.dtype == torch.float:
+        cust_func = cuda_module.torch_launch_attn_softmax_bw_new_fp32
+    else:
+        cust_func = cuda_module.torch_launch_attn_softmax_bw_new_fp16
+
+    inp_grad_dup = inp_grad.clone()
+
+    def custom():
+        out_grad_dup = out_grad.clone()
+        cust_func(
+            inp_grad_dup, out_grad_dup, soft_inp, batch_size * nhead * from_len, to_len
+        )
+        return [
+            inp_grad_dup,
+        ]
+
+    def baseline():
+        base_out_grad = out_grad.clone()
+        base_func(base_out_grad, soft_inp, batch_size * nhead * from_len, to_len)
+        return [
+            base_out_grad,
+        ]
 
     return custom, baseline
 
@@ -878,6 +1108,75 @@ def test_launch_dropout_gelu_bias_bwd():
     return custom, baseline
 
 
+from torch_crf import CRF
+
+
+@kt.case(dtypes=[torch.half], atol=5.0)
+def test_crf():
+    batch_size = 129
+    seq_len = 33
+    num_tags = 41
+    torch_mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
+    # torch_mask = kt.ones((batch_size, seq_len)).to(torch.bool)
+    ls_mask = torch_mask.clone()
+    ls_mask = (~ls_mask).to(dtype=torch.uint8)
+
+    emissions = kt.rand((batch_size, seq_len, num_tags))
+    crf = CRF(num_tags, batch_first=True)
+    crf.to(kt.device, torch.float)
+    crf.start_transitions.data.to(torch.half).to(torch.float)
+    crf.end_transitions.data.to(torch.half).to(torch.float)
+    crf.transitions.data.to(torch.half).to(torch.float)
+
+    """
+    torch_launch_viterbi(const torch::Tensor &start_transition,
+                          const torch::Tensor &end_transition,
+                          const torch::Tensor &transition,
+                          const torch::Tensor &emission,
+                          const torch::Tensor &mask, torch::Tensor &score,
+                          torch::Tensor &next_score, torch::Tensor &history,
+                          torch::Tensor &best_tags, int num_tags, int seq_len,
+                          int batch_size)
+    """
+    start_transition = (
+        crf.start_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    )
+    end_transition = crf.end_transitions.data.clone().detach().to(kt.dtype).contiguous()
+    transitions = (
+        crf.transitions.data.clone().detach().transpose(0, 1).to(kt.dtype).contiguous()
+    )
+
+    best_score = kt.zeros((batch_size)).to(dtype=torch.float)
+    history = kt.ones((batch_size, seq_len, num_tags)).to(dtype=torch.int32)
+    best_tags = kt.zeros((batch_size, seq_len)).to(dtype=torch.int32)
+
+    cus_func = cuda_module.torch_launch_viterbi_fp16
+
+    def custom():
+        cus_func(
+            start_transition,
+            end_transition,
+            transitions,
+            emissions,
+            ls_mask,
+            best_score,
+            history,
+            best_tags,
+            num_tags,
+            seq_len,
+            batch_size,
+        )
+        return [best_score]
+
+    def baseline():
+        res, best_score = crf.decode(emissions, torch_mask, pad_tag=-1)
+        return [
+            best_score.detach().to(torch.float),
+        ]
+
+    return custom, baseline
+
+
 @kt.case(atol=4, rtol=1e-2)
 def test_launch_dropout_relu_bias_i8I_i8O():
     batch_size, seq_len = kt.bs_sl()
@@ -1396,10 +1695,14 @@ if __name__ == "__main__":
         # "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
+        # "test_launch_bias_add_transform_20314_new",
+        # "test_launch_transform_20314_bwd_new",
         # "test_launch_fused_add2",
         # "test_launch_ffn_bias_bwd",
         # "test_launch_attn_softmax",
+        # "test_launch_attn_softmax_new",
         # "test_launch_attn_softmax_bw",
+        # "test_launch_attn_softmax_bw_new",
         # "test_launch_layer_norm",
         # "test_launch_ln_bw",
         # "test_launch_concat3_dim1",

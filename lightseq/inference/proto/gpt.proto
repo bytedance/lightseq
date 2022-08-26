@@ -57,6 +57,7 @@ message GptModelConf {
   float topp = 4;
   int32 topk = 5;
   int32 eos_id = 6;
+  int32 extra_decode_length = 7;
 }
 
 message Gpt {

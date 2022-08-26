@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 max_batch_tokens = 9216
-max_seq_len = 256
+max_seq_len = 1024
 
 
 class TestDecorator(object):

@@ -23,19 +23,23 @@ class KernelBuilder(CUDAOpBuilder):
             "csrc/kernels/gemm_test.cpp",
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/transform_kernels.cu",
+            "csrc/kernels/transform_kernels_new.cu",
             "csrc/kernels/softmax_kernels.cu",
+            "csrc/kernels/softmax_kernels_new.cu",
             "csrc/kernels/general_kernels.cu",
             "csrc/kernels/normalize_kernels.cu",
             "csrc/kernels/dropout_kernels.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/quantize_kernels.cu",
-            "csrc/torch/pybind_kernel.cpp",
+            "csrc/kernels/crf.cu",
+            "csrc/pybind/pybind_kernel.cpp",
         ]
 
     def include_paths(self):
         paths = [
             "csrc/kernels/includes",
             "csrc/ops/includes",
+            "csrc/layers/includes",
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:

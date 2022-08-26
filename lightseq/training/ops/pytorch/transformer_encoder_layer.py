@@ -6,7 +6,6 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
-from lightseq.training.ops.pytorch import transformer_cuda_module
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.quantization import (
     weight_quant_config,
@@ -18,6 +17,8 @@ from lightseq.training.ops.pytorch.util import (
     state_dict,
     calc_offset,
 )
+
+transformer_cuda_module = TransformerBuilder().load()
 
 
 _all_layer_grads = dict()
@@ -116,6 +117,8 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
         self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
@@ -233,6 +236,49 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         wei_cmax = weight_quant_config.amax.tolist()
         init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
         self._get_weights(12).copy_(init_clip_max)
+
+    def params_dict(self):
+        """
+        Returns:
+            weight: dict
+            bias: dict
+        """
+
+        def copy_and_view(m, shape=None):
+            if shape is None:
+                shape = (-1,)
+            return m.data.clone().view(*shape)
+
+        self_attn_qkvw = self._get_weights(0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
+            self.hs * self.hs, 0
+        )
+        self_attn_qkvb = self._get_weights(1)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+
+        weight = {
+            "self_attn.q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn.k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn.v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn.out_proj": copy_and_view(
+                self._get_weights(2), (self.hs, self.hs)
+            ),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
+            "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
+            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
+        }
+        bias = {
+            "self_attn.q_proj": copy_and_view(self_attn_qb),
+            "self_attn.k_proj": copy_and_view(self_attn_kb),
+            "self_attn.v_proj": copy_and_view(self_attn_vb),
+            "self_attn.out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
+            "fc1": copy_and_view(self._get_weights(7)),
+            "fc2": copy_and_view(self._get_weights(9)),
+            "final_layer_norm": copy_and_view(self._get_weights(11)),
+        }
+        return weight, bias
 
     def __assign_layer_weight_grad(self):
         param = (

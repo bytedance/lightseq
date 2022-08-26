@@ -31,18 +31,25 @@ class TransformerBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/cross_entropy.cu",
-            "csrc/ops/cross_entropy_layer.cpp",
-            "csrc/ops/quant_linear_layer.cpp",
-            "csrc/ops/transformer_encoder_layer.cpp",
-            "csrc/ops/transformer_decoder_layer.cpp",
-            "csrc/ops/transformer_embedding_layer.cpp",
-            "csrc/torch/pybind_op.cpp",
+            # "csrc/ops/context.cpp",
+            # "csrc/ops/dropout.cpp",
+            # "csrc/ops/feed_forward.cpp",
+            # "csrc/ops/normalize_layer.cpp",
+            # "csrc/ops/softmax.cpp",
+            # "csrc/ops/strided_batch_gemm.cpp",
+            "csrc/layers/cross_entropy_layer.cpp",
+            "csrc/layers/quant_linear_layer.cpp",
+            "csrc/layers/transformer_encoder_layer.cpp",
+            "csrc/layers/transformer_decoder_layer.cpp",
+            "csrc/layers/transformer_embedding_layer.cpp",
+            "csrc/pybind/pybind_layer.cpp",
         ]
 
     def include_paths(self):
         paths = [
             "csrc/kernels/includes",
             "csrc/ops/includes",
+            "csrc/layers/includes",
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:

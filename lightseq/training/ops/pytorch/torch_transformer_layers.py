@@ -969,12 +969,15 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
 
 class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
-    def __init__(self, config, initial_embeddings=None):
+    def __init__(self, config, initial_embeddings=None, emb_lookup=None):
         super().__init__()
 
-        self.emb_lookup = nn.Embedding(
-            config.vocab_size, config.embedding_dim, padding_idx=config.padding_idx
-        )
+        if emb_lookup is not None:
+            self.emb_lookup = emb_lookup
+        else:
+            self.emb_lookup = nn.Embedding(
+                config.vocab_size, config.embedding_dim, padding_idx=config.padding_idx
+            )
         self.emb_lookup.to(dtype=(torch.half if config.fp16 else torch.float))
         self.embeddings = self.emb_lookup.weight
         nn.init.normal_(self.embeddings, mean=0, std=config.embedding_dim**-0.5)
@@ -986,22 +989,79 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
                 copy_para(initial_embeddings, config.fp16)
             )
 
-        self.embed_positions = SinusoidalPositionalEmbedding(
-            config.embedding_dim, config.padding_idx, config.max_seq_len, config.fp16
-        )
+        if config.trainable_pos:
+            if config.need_offset:
+                num_embeddings = config.max_seq_len + config.padding_idx + 1
+            else:
+                num_embeddings = config.max_seq_len
+            self.embed_positions = TrainablePositionalEmbedding(
+                num_embeddings,
+                config.embedding_dim,
+                config.padding_idx,
+                config.need_offset,
+            )
+            nn.init.normal_(
+                self.embed_positions.weight, mean=0, std=config.embedding_dim**-0.5
+            )
+            if config.need_offset is not None:
+                nn.init.constant_(self.embed_positions.weight[config.padding_idx], 0)
+        else:
+            self.embed_positions = SinusoidalPositionalEmbedding(
+                config.embedding_dim,
+                config.padding_idx,
+                config.max_seq_len,
+                config.fp16,
+            )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
         self.emb_quant = TensorQuantizer(emb_quant_config)
+        if config.layernorm_embedding:
+            self.layernorm_embedding = LayerNorm(config.embedding_dim)
+        else:
+            self.layernorm_embedding = None
+        self.embed_scale = (
+            1.0 if config.no_scale_embedding else math.sqrt(config.embedding_dim)
+        )
         self.config = config
 
     def forward(self, input, step=0):
         x = self.emb_lookup(input)
         x = self.emb_quant(x)
-        x = math.sqrt(self.embedding_dim) * x
+        x = self.embed_scale * x
         x += self.embed_positions(input, step)
+        if self.layernorm_embedding is not None:
+            x = self.layernorm_embedding(x)
         x = self.dropout(x)
 
         return x
+
+
+class TrainablePositionalEmbedding(nn.Embedding):
+    """
+    This module learns positional embeddings up to a fixed maximum size.
+    """
+
+    def __init__(self, num_embeddings, embedding_dim, padding_idx, need_offset):
+        super().__init__(num_embeddings, embedding_dim)
+        self.embedding_dim = embedding_dim
+        self.padding_id = padding_idx
+        self.offset = padding_idx + 1 if need_offset else 0
+
+    def make_positions(self, tensor, step):
+        mask = tensor.ne(self.padding_id).int()
+        positions = torch.cumsum(mask, dim=1).type_as(mask) - 1 + step + self.offset
+        return (positions * mask).long()
+
+    def forward(self, input, step: int = 0):
+        """`input.shape` is expected to be [bsz x seqlen]."""
+        bsz, seq_len = input.size(0), input.size(1)
+        positions = self.make_positions(input, step)
+        mask = (
+            torch.ne(input, self.padding_id)
+            .unsqueeze(2)
+            .expand(bsz, seq_len, self.embedding_dim)
+        )
+        return super().forward(positions) * mask
 
 
 class SinusoidalPositionalEmbedding(nn.Module):

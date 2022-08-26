@@ -1,14 +1,18 @@
 from itertools import zip_longest
 import math
+from dataclasses import dataclass
 
 import torch
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch import transformer_cuda_module
+from lightseq.training.ops.pytorch import TransformerBuilder
+from lightseq.training.ops.pytorch.builder import TransformerBuilder
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
+    MODEL_ARCH,
+    check_config,
     calc_offset,
 )
 from lightseq.training.ops.pytorch.quantization import (
@@ -18,6 +22,7 @@ from lightseq.training.ops.pytorch.quantization import (
 )
 from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
 
+transformer_cuda_module = TransformerBuilder().load()
 
 _all_layer_grads = dict()
 _shared_encdec_attn_kv_params = dict()
@@ -157,6 +162,8 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
         hs = self.config.hidden_size
         ims = self.config.intermediate_size
+        self.hs = hs
+        self.ims = ims
 
         self.para_offset = LSTransformerDecoderLayer.gen_offset(
             hs, ims, self.config.nlayer
@@ -199,6 +206,9 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
     @staticmethod
     def gen_offset(hidden_size, intermediate_size, nlayer):
+        """Returns the offset of each module's parameters among all
+        parameters of a layer
+        """
         hs, ims = hidden_size, intermediate_size
         sizes = [
             hs * hs * 3,  # attn_qkvw
@@ -226,12 +236,86 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         offsets = calc_offset(sizes)
         return offsets
 
+    def params_dict(self):
+        """
+        Returns:
+            weight: dict
+            bias: dict
+        """
+
+        def copy_and_view(m, shape=None):
+            if shape is None:
+                shape = (-1,)
+            return m.data.clone().view(*shape)
+
+        def _copy(m):
+            return copy_and_view(m, (self.hs, self.hs))
+
+        self_attn_qkvw = self._get_weights(0)
+        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
+            self.hs * self.hs, 0
+        )
+        self_attn_qkvb = self._get_weights(1)
+        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
+
+        all_enc_attn_kw, all_enc_attn_vw = None, None
+        all_enc_attn_kb, all_enc_attn_vb = None, None
+        if self.config.layer_id == 0:
+            all_enc_attn_kvw = self._get_weights(18)
+            all_enc_attn_kvw = all_enc_attn_kvw.split(self.hs * self.hs, 0)
+            all_enc_attn_kw = list(map(_copy, all_enc_attn_kvw[::2]))
+            all_enc_attn_vw = list(map(_copy, all_enc_attn_kvw[1::2]))
+
+            all_enc_attn_kvb = self._get_weights(19)
+            all_enc_attn_kvb = all_enc_attn_kvb.split(self.hs, 0)
+            all_enc_attn_kb = list(map(copy_and_view, all_enc_attn_kvb[::2]))
+            all_enc_attn_vb = list(map(copy_and_view, all_enc_attn_kvb[1::2]))
+
+        weight = {
+            "self_attn.q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
+            "self_attn.k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
+            "self_attn.v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
+            "self_attn.out_proj": copy_and_view(
+                self._get_weights(2), (self.hs, self.hs)
+            ),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
+            "encoder_attn.q_proj": copy_and_view(
+                self._get_weights(6), (self.hs, self.hs)
+            ),
+            "encoder_attn.out_proj": copy_and_view(
+                self._get_weights(8), (self.hs, self.hs)
+            ),
+            "encoder_attn_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(12), (self.ims, self.hs)),
+            "fc2": copy_and_view(self._get_weights(14), (self.hs, self.ims)),
+            "final_layer_norm": copy_and_view(self._get_weights(16), (self.hs,)),
+            "encoder_attn.k_proj": all_enc_attn_kw,
+            "encoder_attn.v_proj": all_enc_attn_vw,
+        }
+        bias = {
+            "self_attn.q_proj": copy_and_view(self_attn_qb),
+            "self_attn.k_proj": copy_and_view(self_attn_kb),
+            "self_attn.v_proj": copy_and_view(self_attn_vb),
+            "self_attn.out_proj": copy_and_view(self._get_weights(3)),
+            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
+            "encoder_attn.q_proj": copy_and_view(self._get_weights(7), (self.hs,)),
+            "encoder_attn.out_proj": copy_and_view(self._get_weights(9), (self.hs,)),
+            "encoder_attn_layer_norm": copy_and_view(self._get_weights(11), (self.hs,)),
+            "fc1": copy_and_view(self._get_weights(13)),
+            "fc2": copy_and_view(self._get_weights(15)),
+            "final_layer_norm": copy_and_view(self._get_weights(17)),
+            "encoder_attn.k_proj": all_enc_attn_kb,
+            "encoder_attn.v_proj": all_enc_attn_vb,
+        }
+        return weight, bias
+
     def _get_weights(self, i):
         return self.para.data.narrow(
             0, self.para_offset[i], self.para_offset[i + 1] - self.para_offset[i]
         )
 
     def calc_bound(self, w):
+        """Used to initialize parameters"""
         fan_in, _ = nn.init._calculate_fan_in_and_fan_out(w)
         bound = 1.0 / math.sqrt(fan_in)
         return bound
@@ -289,6 +373,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             nn.init.uniform_(self._get_weights(20), -bound, bound)
 
     def __assign_layer_weight_grad(self):
+        """fp16 or fp32"""
         param = (
             self.para_16
             if self.config.fp16 and self.para.dtype != torch.half
@@ -337,7 +422,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         return destination
 
     def forward(
-        self, decoder_states, encoder_out, encoder_padding_mask, cache, **kwargs
+        self, decoder_states, encoder_out, encoder_padding_mask, cache=None, **kwargs
     ):
         """
         decoder_states, [batch_size, trg_len, hidden_size] or [batch_size * beam_size, 1, hidden_size]
