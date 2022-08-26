@@ -377,7 +377,7 @@ class FakeTensorQuantFunctionX(Function):
         # ctx.save_for_backward(inputs, amax)
         if not is_weight and training:
             if random.random() < 0.3:
-                num_bits = 5
+                num_bits = 3
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
