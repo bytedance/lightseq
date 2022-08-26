@@ -174,7 +174,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                             help='scalar quantization noise and scalar quantization at training time')
         parser.add_argument('--quant-bits', type=float, metavar='D', default=8,
                             help='quantization noise and scalar quantization at training time')
-        parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=2000,
+        parser.add_argument('--smooth-avg-update', type=float, metavar='D', default=1000,
                             help='smooth avg')
         parser.add_argument('--n-gpus-intk', type=float, metavar='D', default=-1,
                             help='number gpus')
