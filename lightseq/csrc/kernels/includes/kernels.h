@@ -217,8 +217,8 @@ void launch_lookup_scale_pos_dropout(
 
 template <typename T>
 void launch_d_lookup_scale_pos_dropout(
-    T *grad_embeddings, T *grad_clip_max, T *grad_pos_embeddings,const T *grad_output,
-     const int *input, const uint8_t *dropout_mask,
+    T *grad_embeddings, T *grad_clip_max, T *grad_pos_embeddings,
+    const T *grad_output, const int *input, const uint8_t *dropout_mask,
     const int *tokens_position, int batch_size, int seq_len, int embedding_dim,
     int vocab_size, int max_seq_len, int padding_idx, float dropout_ratio,
     bool trainable_pos, cudaStream_t &stream);

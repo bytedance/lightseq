@@ -83,8 +83,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     const T *gemmQKV_inp_ptr =
         _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-
-
     launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(), _igemm_alpha_ptr,
                        gemmQKV_inp_ptr, _attn_qkv_cmax_ptr,
                        _hidden_size * _batch_tokens, 2, _stream);
@@ -98,8 +96,6 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
 
     const T *attn_qkv_cache_cmax =
         _mask_future_tokens ? _attn_qkv_cache_cmax_ptr : nullptr;
-
-
 
     launch_quant_bias_add_transform_20314<T>(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,

@@ -464,8 +464,7 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
                      .layout(torch::kStrided)
                      .device(torch::kCUDA, inputs.device().index());
 
-  auto outputs =
-      torch::empty({batch_size, seq_len, out_features}, options);
+  auto outputs = torch::empty({batch_size, seq_len, out_features}, options);
   T *outputs_ptr = static_cast<T *>(outputs.data_ptr());
 
   layer->set_cur_batch_shape(batch_size, seq_len);

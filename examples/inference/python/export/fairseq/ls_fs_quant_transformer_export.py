@@ -31,9 +31,7 @@ def export_fs_weights(transformer, state_dict, args):
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    output_ln_clip_max = state_dict[
-        "decoder.output_projection.clip_max"
-    ][0]
+    output_ln_clip_max = state_dict["decoder.output_projection.clip_max"][0]
     logits_clip_max = state_dict["decoder.output_projection.clip_max"][2]
 
     emb_size = state_dict["decoder.embed_tokens.para"].size(0) - 1
