@@ -32,11 +32,11 @@ def export_fs_weights(transformer, state_dict, args):
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
     output_ln_clip_max = state_dict[
-        "decoder.output_projection.input_quant.clip.clip_value_max"
-    ]
-    logits_clip_max = state_dict["decoder.output_projection.output_quant._amax"]
+        "decoder.output_projection.clip_max"
+    ][0]
+    logits_clip_max = state_dict["decoder.output_projection.clip_max"][2]
 
-    emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
+    emb_size = state_dict["decoder.embed_tokens.para"].size(0) - 1
     assert emb_size % args.decoder_embed_dim == 0
     dec_shared_b = torch.zeros(emb_size // args.decoder_embed_dim).flatten().tolist()
 

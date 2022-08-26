@@ -35,7 +35,7 @@ def export_fs_weights(transformer, state_dict, args):
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
+    emb_size = state_dict["decoder.embed_tokens.para"].size(0) - 1
     assert emb_size % args.decoder_embed_dim == 0
     dec_shared_b = torch.zeros(emb_size // args.decoder_embed_dim).flatten().tolist()
     transformer.src_embedding.norm_scale[:] = enc_norm_w

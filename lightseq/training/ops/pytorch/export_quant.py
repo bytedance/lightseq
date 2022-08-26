@@ -265,7 +265,7 @@ def export_ls_embedding_ptq(
 ):
     var_name_list = list(state_dict.keys())
     emb, clip_max, target_tn = gather_quant_token_embedding(
-        var_name_list, state_dict, "embeddings"
+        var_name_list, state_dict, "embed_tokens"
     )
     emb_size = emb.flatten().shape[0] - 1
     assert emb_size % emb_dim == 0
@@ -473,7 +473,7 @@ def export_ls_quant_embedding(
 ):
     var_name_list = list(state_dict.keys())
     emb, clip_max, target_tn = gather_quant_token_embedding(
-        var_name_list, state_dict, "embeddings", ptq_mode=False
+        var_name_list, state_dict, "embed_tokens", ptq_mode=False
     )
     emb_size = emb.flatten().shape[0] - 1
     assert emb_size % emb_dim == 0

@@ -164,7 +164,7 @@ def export_ls_embedding(
 ):
     var_name_list = list(state_dict.keys())
     emb, target_tn = gather_token_embedding(
-        var_name_list, state_dict, "embeddings", emb_dim=emb_dim
+        var_name_list, state_dict, "embed_tokens", emb_dim=emb_dim
     )
     emb_size = emb.flatten().shape[0] - 1
     assert emb_size % emb_dim == 0

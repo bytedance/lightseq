@@ -55,7 +55,7 @@ from ls_hf_vit_encoder_layer import inject_ls_enc_layer
 logger = logging.getLogger(__name__)
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-check_min_version("4.18.0.dev0")
+check_min_version("4.16.0")
 
 require_version(
     "datasets>=1.8.0",
