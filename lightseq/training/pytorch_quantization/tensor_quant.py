@@ -373,19 +373,39 @@ class FakeTensorQuantFunctionX(Function):
         smooth_avg=1,
         fab=(1.3, 1.2),
         is_weight=False,
+        is_embed=False,
     ):
         # ctx.save_for_backward(inputs, amax)
+        if is_embed:
+            _amax = amax[None,None,:] if inputs.dim() == 3 else amax[None,:]
+        else:
+            _amax = amax
         outputs, scale = _tensor_quant(inputs, amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
         outputs = (outputs * scale).to(inputs.dtype)
         if training:
-            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
+            if is_embed:
+                x = inputs.view(-1, inputs.shape[-1])
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(x, 0)[0]
+            else:
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
+        ctx.can_scale = (not unsigned)
+        ctx.fab = fab
+        if ctx.can_scale:
+            diff = torch.abs(inputs-outputs) / scale
+            ctx.save_for_backward(diff)
         return outputs
 
     @staticmethod
     def backward(ctx, grad_outputs):
-        return grad_outputs, None, None, None, None, None, None, None, None
+        if ctx.can_scale:
+            a, b = ctx.fab
+            x = ctx.saved_tensors[0]
+            x = torch.clamp_max(x, 0.5)
+            scale = a - b * (0.5 - x)
+            grad_outputs = grad_outputs * scale
+        return grad_outputs, None, None, None, None, None, None, None, None, None
 
 
 def _tensor_quant(inputs, amax, num_bits=8, unsigned=False, narrow_range=True):

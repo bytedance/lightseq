@@ -1009,7 +1009,7 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
             )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(weight_quant_config, is_embed=True, hz=512)
         if config.layernorm_embedding:
             self.layernorm_embedding = LayerNorm(config.embedding_dim)
         else:
