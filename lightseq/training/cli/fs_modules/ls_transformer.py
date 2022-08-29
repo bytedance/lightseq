@@ -233,7 +233,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 m.smooth_avg = smooth_avg_update
                 # m.fab = (args.fa, fb)
                 m.fa_t = args.fa
-                if args.quant_bits != 8:
+                if args.quant_bits != 8 and m.special:
                     m.num_bits = args.quant_bits
 
         if args.enable_quant:

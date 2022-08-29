@@ -84,6 +84,7 @@ class TensorQuantizer(nn.Module):
         if_calib=False,
         is_embed=False,
         hz=None,
+        special=False,
     ):
         """Initialize quantizer and set up required variables"""
         super(TensorQuantizer, self).__init__()
@@ -104,6 +105,7 @@ class TensorQuantizer(nn.Module):
         self.fab = (1.3, 1.2)
         self.fa_t = 0.3
         self.is_embed = is_embed
+        self.special = special
 
         if quant_desc.amax is not None:
             self.register_buffer("_amax", torch.tensor(quant_desc.amax))
