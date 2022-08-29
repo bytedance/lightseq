@@ -54,7 +54,7 @@ def enable_int4(m):
         m.enable()
         m.enable_quant()
         m.disable_calib()
-        m.num_bits = 4.0
+        m.num_bits = 4.0 if m.special else 8.0
 
 
 enable_bits = {
