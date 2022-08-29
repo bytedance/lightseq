@@ -387,7 +387,7 @@ class FakeTensorQuantFunctionX(Function):
         if training:
             if is_embed:
                 x = inputs.view(-1, inputs.shape[-1])
-                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(x, 0)[0]
+                amax.data = amax * (1 - 0.999) + 0.001 * torch.max(x, 0)[0]
             else:
                 amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
         #         ctx.can_scale = (not unsigned)
