@@ -8,13 +8,14 @@
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
+#include "cuda_util.h"
 
 namespace lightseq {
 
 class Context {  // model only
  private:
   std::vector<Node*> _all_node_vec{};
-  std::vector<Operator*> _all_op_vec{};
+  std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
   std::deque<Layer*> _layer_context;
   bool _is_training = false;
