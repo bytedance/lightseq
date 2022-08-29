@@ -346,7 +346,8 @@ class TensorQuantizer(nn.Module):
         """Quantized forward pass."""
         inputs = self.clip(inputs)
 
-        amax = self.clip.clip_value_maxs if self.is_embed else self.clip.clip_value_max
+        # amax = self.clip.clip_value_maxs if self.is_embed else self.clip.clip_value_max
+        amax = self.clip.clip_value_max
 
         factor = 0.9999**(self.train_step/0.9999)
         # factor = 0.999**(self.train_step/0.999)
