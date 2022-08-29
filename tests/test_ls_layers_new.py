@@ -81,7 +81,7 @@ def gen_enc_layer_pair():
     return custom_enc_layer_base, custom_enc_layer_new
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=5)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -89,11 +89,11 @@ def test_encoder_layer_forward():
     base_enc, custom_enc = gen_enc_layer_pair()
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
+    res = torch.empty_like(hidden_states)
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
     def custom():
         inp = hidden_states.clone()
-        res = torch.empty_like(inp)
         custom_enc(res, inp, self_attn_padding_mask)
         return [
             res.contiguous().detach(),

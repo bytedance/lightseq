@@ -8,13 +8,14 @@
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
+#include "cuda_util.h"
 
 namespace lightseq {
 
 class Context {  // model only
  private:
   std::vector<Node*> _all_node_vec{};
-  std::vector<Operator*> _all_op_vec{};
+  std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
   std::deque<Layer*> _layer_context;
   bool _is_training = false;
@@ -60,7 +61,7 @@ class Context {  // model only
   int node_idx() { return _node_idx; }
   void update_node_idx() {
     if (_built) return;
-    _node_idx++;
+    _node_idx ++;
   }
   bool built() { return _built; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }

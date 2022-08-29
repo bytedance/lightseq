@@ -2,16 +2,46 @@
 #include "bias_act_dropout.h"
 #include "bias_dropout_residual.h"
 #include "feed_forward.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "layer.h"
 
 namespace lightseq {
+
+class FeedForwardLayerWeight {
+ public:
+  FeedForwardLayerWeight(int hidden_size, int intermediate_size)
+      : _hidden_size(hidden_size), _intermediate_size(intermediate_size) {}
+  char* _inter_w_ptr;
+  char* _inter_b_ptr;
+  char* _output_w_ptr;
+  char* _output_b_ptr;
+  char* _ffn_nw_ptr;
+  char* _ffn_nb_ptr;
+
+  char* _grad_inter_w_ptr;
+  char* _grad_inter_b_ptr;
+  char* _grad_output_w_ptr;
+  char* _grad_output_b_ptr;
+  char* _grad_ffn_nw_ptr;
+  char* _grad_ffn_nb_ptr;
+
+  int _hidden_size;
+  int _intermediate_size;
+
+  template <class T1, class T2>
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+
+  template <typename T>
+  void load_params(const std::vector<const T*>& para_vec, int& offset);
+};
+
+using FeedForwardLayerWeightPtr = std::shared_ptr<FeedForwardLayerWeight>;
 
 template <class T1, class T2>
 class FeedForwardLayer : public Layer {
  private:
   // operators
-  NormalizeLayerOp<T1, T2>* _ffn_ln = nullptr;
+  LayerNormalizeOp<T1, T2>* _ffn_ln = nullptr;
   FeedForwardOp<T1, T2>* _ff1 = nullptr;
   BiasActDropoutOp<T1, T2>* _ffn_activation_dropout = nullptr;
   FeedForwardOp<T1, T2>* _ff2 = nullptr;
@@ -38,14 +68,15 @@ class FeedForwardLayer : public Layer {
   int _intermediate_size;
   bool _pre_or_postLayerNorm;
   std::string _activation_fn;
+  bool _is_post_ln;
 
  public:
-  FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
-                   int hidden_size, int num_heads, int intermediate_size,
+  FeedForwardLayer(FeedForwardLayerWeightPtr ffn_wt, int layer_id,
+                   int max_batch_tokens, int max_seq_len, int hidden_size,
+                   int num_heads, int intermediate_size,
                    float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-                   std::string activation_fn, const T1* para_ptr, T2* grad_ptr,
-                   int& offset);
+                   std::string activation_fn, bool is_post_ln = false);
 
   virtual ~FeedForwardLayer() {}
 

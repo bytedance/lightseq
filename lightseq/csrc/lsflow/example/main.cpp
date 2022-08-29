@@ -46,8 +46,6 @@ void pybind_test_2_layer() {
   cudaMemcpy((void*)input_ptr, temp_inp.data(), sizeof(int) * 10,
              cudaMemcpyHostToDevice);
 
-  //   print_vec(input_ptr, "input_ptr", mx_size);
-
   input->set_value((char*)input_ptr);
 
   int* output_ptr = (int*)cuda_malloc<char>(mx_size * sizeof(int));

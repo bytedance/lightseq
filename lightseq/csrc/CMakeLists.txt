@@ -38,8 +38,17 @@ set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(COMMON_HEADER_DIRS ${PROJECT_SOURCE_DIR} ${CUDA_PATH}/include
-                       lsflow/includes kernels/includes)
+set(COMMON_HEADER_DIRS
+    ${PROJECT_SOURCE_DIR}
+    ${CUDA_PATH}/include
+    kernels/includes
+    layers_new/includes
+    lsflow/includes
+    models/includes
+    ops_new/includes
+    proto/includes
+    tools/includes)
+
 set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
 include_directories(${COMMON_HEADER_DIRS})
@@ -47,5 +56,11 @@ include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/3rdparty/cub)
 
 link_directories(${COMMON_LIB_DIRS})
 
-add_subdirectory(lsflow)
+add_subdirectory(tools)
 add_subdirectory(kernels)
+add_subdirectory(layers_new)
+add_subdirectory(lsflow)
+add_subdirectory(models)
+add_subdirectory(ops_new)
+add_subdirectory(proto)
+add_subdirectory(example)

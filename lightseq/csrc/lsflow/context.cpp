@@ -32,8 +32,17 @@ void Context::set_thread_context(ContextPtr context_ptr) {
 void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
-  if (_layer_context.size()) _layer_context[0]->_op_vec.push_back(op);
-  _all_op_vec.push_back(op);
+  if (_layer_context.size()){
+    _layer_context[0]->_op_vec.push_back(op);
+    return ;
+  }
+#if ONLY_OP == true
+  _model_ops.push_back(op);
+#else
+  printf("ERROR! don't use operator directly!\n");
+  printf("Node name: %s\n", op->name().c_str());
+  exit(-1);
+#endif
 }
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
@@ -52,6 +61,19 @@ void Context::build() {
 
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
+
+#if ONLY_OP == true
+  for (int idx = 0; idx < _model_ops.size(); idx++) {
+    _model_ops[idx]->recursive_forward();
+  }
+  if (is_training()) {
+    for (int idx = _model_ops.size() - 1; idx >= 0; idx--) {
+      _model_ops[idx]->recursive_backward();
+    }
+  }
+#endif
+
+
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
     rl->forward();
@@ -63,17 +85,7 @@ void Context::build() {
     }
   }
 
-#ifdef ONLY_OP
-  for (int idx = 0; idx < _all_op_vec.size(); idx++) {
-    _all_op_vec[idx]->forward();
-  }
-  if (is_training()) {
-    for (int idx = _all_op_vec.size() - 1; idx >= 0; idx--) {
-      _all_op_vec[idx]->backward();
-    }
-  }
-#endif
-
+  // CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   cuda_free(temporary_buffer_);
 
   _mm_ptr->calculate_buffer_();
