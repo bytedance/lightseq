@@ -30,7 +30,8 @@ void LaunchEncEmbOp<T>::forward() {
 
   T* output_ptr = (T*)child(0)->value();
 
-  std::cout << "LaunchEncEmbOp node idx: " <<  _context_ptr->node_idx() << std::endl;
+  std::cout << "LaunchEncEmbOp node idx: " << _context_ptr->node_idx()
+            << std::endl;
 
   cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
                           _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,

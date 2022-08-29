@@ -115,11 +115,13 @@ void MemoryManager::calculate_buffer_() {
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
-    #ifdef DEBUG
-    printf("idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu, end_addr: %zu\n",
-           unique_id, iter.first.first_idx, iter.first.last_idx,
-           iter.first._name.c_str(), size, iter.second, iter.second + size);
-    #endif
+#ifdef DEBUG
+    printf(
+        "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu, "
+        "end_addr: %zu\n",
+        unique_id, iter.first.first_idx, iter.first.last_idx,
+        iter.first._name.c_str(), size, iter.second, iter.second + size);
+#endif
 
     for (auto check_iter : temp_check_vec) {
       if (judge_func(check_iter, iter)) {

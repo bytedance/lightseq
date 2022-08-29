@@ -16,7 +16,8 @@ template <typename T1, typename T2>
 void SoftmaxOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
-  T1* inp_ptr = (T1*)parent(0)->value(true);  // [start, now] -> [start, now - 1]
+  T1* inp_ptr =
+      (T1*)parent(0)->value(true);  // [start, now] -> [start, now - 1]
   T1* mask_ptr = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
 

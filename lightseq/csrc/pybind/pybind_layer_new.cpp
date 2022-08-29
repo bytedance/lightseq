@@ -60,10 +60,10 @@ int create_transformer_encoder_layer_new(
   enc_layer_wt->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
-      enc_layer_wt, layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
-      intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
-      mask_future_tokens);
+      enc_layer_wt, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
+      num_heads, intermediate_size, attn_prob_dropout_ratio,
+      activation_dropout_ratio, hidden_dropout_ratio, pre_or_postLayerNorm,
+      activation_fn, mask_future_tokens);
 
   Variable *inp(new Variable(
       "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",

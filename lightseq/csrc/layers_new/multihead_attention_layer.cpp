@@ -148,8 +148,7 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
   if (_context_ptr->is_training()) {
     Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
     attn_context = (*_attn_context)(v_out, prob_dropout);
-  }
-  else {
+  } else {
     attn_context = (*_attn_context)(v_out, soft_out);
   }
 

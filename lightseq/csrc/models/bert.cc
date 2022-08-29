@@ -22,13 +22,11 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
 
   tw_.print_model_config();
 
-
-
   /* --- step.3 initial input Variable node --- */
 
   inp_tokens = new Variable("inp_tokens");
   pad_mask_ptr = cuda_malloc<int>(_max_batch_size * tw_._max_step);
-  pad_mask = new Variable("pad_mask", (char *)pad_mask_ptr);  
+  pad_mask = new Variable("pad_mask", (char *)pad_mask_ptr);
 
   /* --- step.4 initial layer weight --- */
 
@@ -52,8 +50,9 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
   // initial launch_enc_emb_op
-  launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(enc_emb_wt,
-      max_batch_tokens, tw_._padding_id, tw_._hidden_size, tw_._multilg_type));
+  launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(
+      enc_emb_wt, max_batch_tokens, tw_._padding_id, tw_._hidden_size,
+      tw_._multilg_type));
 
   float attn_prob_dropout_ratio = 0.0;
   float activation_dropout_ratio = 0.0;

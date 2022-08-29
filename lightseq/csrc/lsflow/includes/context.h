@@ -61,7 +61,7 @@ class Context {  // model only
   int node_idx() { return _node_idx; }
   void update_node_idx() {
     if (_built) return;
-    _node_idx ++;
+    _node_idx++;
   }
   bool built() { return _built; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }

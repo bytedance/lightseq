@@ -32,9 +32,9 @@ void Context::set_thread_context(ContextPtr context_ptr) {
 void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
-  if (_layer_context.size()){
+  if (_layer_context.size()) {
     _layer_context[0]->_op_vec.push_back(op);
-    return ;
+    return;
   }
 #if ONLY_OP == true
   _model_ops.push_back(op);
@@ -61,7 +61,6 @@ void Context::build() {
 
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 
-
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
     _model_ops[idx]->recursive_forward();
@@ -72,7 +71,6 @@ void Context::build() {
     }
   }
 #endif
-
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();

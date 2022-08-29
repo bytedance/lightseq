@@ -38,7 +38,8 @@ char* Tensor::tensor(bool is_open_interval) {
   }
   if (_ptr == nullptr) {
     if (!_ctx_ptr->built()) {
-      // printf("tensor_name: %s, node_idx: %zu\n", _name.c_str(), _ctx_ptr->node_idx());
+      // printf("tensor_name: %s, node_idx: %zu\n", _name.c_str(),
+      // _ctx_ptr->node_idx());
       update_life_idx(_ctx_ptr->node_idx() - is_open_interval);
       return _ctx_ptr->temporary_buffer_;
     }

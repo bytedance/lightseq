@@ -83,7 +83,7 @@ class BertWeight {
     std::cout << "use_gelu: " << _use_gelu << std::endl;
     std::cout << "padding_id: " << _padding_id << std::endl;
     std::cout << "max_step: " << _max_step << std::endl;
-    
+
     std::cout << std::endl;
   }
 };

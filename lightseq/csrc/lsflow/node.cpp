@@ -107,7 +107,9 @@ void Variable::set_grad(char* grad_ptr) {
   _grad->set_tensor(grad_ptr);
 }
 
-char* Variable::value(bool is_open_interval) { return _value->tensor(is_open_interval); }
+char* Variable::value(bool is_open_interval) {
+  return _value->tensor(is_open_interval);
+}
 
 char* Variable::grad() { return _grad->tensor(); }
 

@@ -37,12 +37,12 @@ void LayerNormalizeOp<T1, T2>::forward() {
                     betta_val, _batch_tokens, _hidden_dim, stream);
 
 #ifdef DEBUG
-  if(_context_ptr->built()) {
+  if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
     print_vec(ln_res_val, name() + " ans", 10);
     printf("\n");
   }
-#endif 
+#endif
 }
 
 template <typename T1, typename T2>

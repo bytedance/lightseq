@@ -23,8 +23,10 @@ class LaunchEncEmbLayerWeight {
   }
 };
 
-template int LaunchEncEmbLayerWeight::load_params(const std::vector<const float*>& para_vec, int offset);
-template int LaunchEncEmbLayerWeight::load_params(const std::vector<const __half*>& para_vec, int offset);
+template int LaunchEncEmbLayerWeight::load_params(
+    const std::vector<const float*>& para_vec, int offset);
+template int LaunchEncEmbLayerWeight::load_params(
+    const std::vector<const __half*>& para_vec, int offset);
 
 using LaunchEncEmbLayerWeightPtr = std::shared_ptr<LaunchEncEmbLayerWeight>;
 
@@ -41,32 +43,35 @@ class LaunchEncEmbLayer : public Layer {
   Variable* _lang_id;
 
  public:
-  LaunchEncEmbLayer(LaunchEncEmbLayerWeightPtr enc_emb_wt, 
-                  int max_batch_tokens, int pad_id, int hidden_dim, int multilg_type):
-    Layer("LaunchEncEmbLayer"),
-    _launch_enc_op(new LaunchEncEmbOp<T>(max_batch_tokens, pad_id, hidden_dim, multilg_type)) {
-        
-        _token_emb = new Variable("token_emb", enc_emb_wt->_token_emb_ptr);
+  LaunchEncEmbLayer(LaunchEncEmbLayerWeightPtr enc_emb_wt, int max_batch_tokens,
+                    int pad_id, int hidden_dim, int multilg_type)
+      : Layer("LaunchEncEmbLayer"),
+        _launch_enc_op(new LaunchEncEmbOp<T>(max_batch_tokens, pad_id,
+                                             hidden_dim, multilg_type)) {
+    _token_emb = new Variable("token_emb", enc_emb_wt->_token_emb_ptr);
 
-        _pos_emb = new Variable("pos_emb", enc_emb_wt->_pos_emb_ptr);
+    _pos_emb = new Variable("pos_emb", enc_emb_wt->_pos_emb_ptr);
 
-        _lang_emb = new Variable("lang_emb", enc_emb_wt->_lang_emb_ptr);
+    _lang_emb = new Variable("lang_emb", enc_emb_wt->_lang_emb_ptr);
 
-        _lang_id = new Variable("lang_id", enc_emb_wt->_lang_id_ptr);
+    _lang_id = new Variable("lang_id", enc_emb_wt->_lang_id_ptr);
 
-        this->_context_ptr->exit_layer();  // necessary
-    }
+    this->_context_ptr->exit_layer();  // necessary
+  }
 
   virtual ~LaunchEncEmbLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* pad_mask)  {
+  Variable* operator()(Variable* inp, Variable* pad_mask) {
     this->set_inputs({inp, pad_mask});
-    Variable* out = (*_launch_enc_op)(inp, _token_emb, _pos_emb, pad_mask, _lang_emb, _lang_id);
+    Variable* out = (*_launch_enc_op)(inp, _token_emb, _pos_emb, pad_mask,
+                                      _lang_emb, _lang_id);
     this->set_outputs({out});
     return out;
   }
 
-  void before_forward(int batch_size, int seq_len) { _launch_enc_op->before_forward(batch_size, seq_len); }
+  void before_forward(int batch_size, int seq_len) {
+    _launch_enc_op->before_forward(batch_size, seq_len);
+  }
 
   void before_backward() {}
 };
