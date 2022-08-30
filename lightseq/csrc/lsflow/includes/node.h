@@ -55,6 +55,7 @@ class Variable : public Node {
   TensorPtr _grad = nullptr;
 
  public:
+  Variable(std::string name);
   Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
   Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
   virtual ~Variable() {}
@@ -67,20 +68,30 @@ class Variable : public Node {
 
   void set_grad(char* grad_ptr);
 
-  char* value();
+  char* value(bool is_open_interval = false);
 
   char* grad();
 
   bool enable_override_grad();
 };
 
+enum class OperatorType {
+  LaunchEmbOp,
+  NormalOp,
+};
+
 class Operator : public Node {
+ protected:
+  OperatorType _op_type;
+
  public:
-  Operator(std::string name);
+  Operator(std::string name, OperatorType op_type = OperatorType::NormalOp);
   virtual ~Operator() {}
   void check_override_grad();
 
   void set_children(std::vector<Node*> children);
+
+  OperatorType op_type() { return _op_type; }
 
   Variable* child(int index) {
     return static_cast<Variable*>(_children[index]);

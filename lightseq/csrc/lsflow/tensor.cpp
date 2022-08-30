@@ -19,26 +19,28 @@ void Tensor::set_tensor(char* inp) {
     printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
     exit(-1);
   }
-  if (!inp) {
-    printf("set_tensor for %s with nullptr!\n", _name.c_str());
-    exit(-1);
-  }
+  // if (!inp) {
+  //   printf("set_tensor for %s with nullptr!\n", _name.c_str());
+  //   exit(-1);
+  // }
   _ptr = inp;
 }
 
 void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
-char* Tensor::tensor() {
+char* Tensor::tensor(bool is_open_interval) {
   if (_mtype == FixedMemory) {
-    if (!_ptr) {
-      printf("%s is null when use, plz set first!\n", _name.c_str());
-      exit(-1);
-    }
+    // if (!_ptr) {
+    //   printf("%s is null when use, plz set first!\n", _name.c_str());
+    //   exit(-1);
+    // }
     return _ptr;
   }
   if (_ptr == nullptr) {
     if (!_ctx_ptr->built()) {
-      update_life_idx(_ctx_ptr->node_idx());
+      // printf("tensor_name: %s, node_idx: %zu\n", _name.c_str(),
+      // _ctx_ptr->node_idx());
+      update_life_idx(_ctx_ptr->node_idx() - is_open_interval);
       return _ctx_ptr->temporary_buffer_;
     }
     _ptr = _mm_ptr->get_memory(_id);

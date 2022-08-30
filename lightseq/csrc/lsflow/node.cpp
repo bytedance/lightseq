@@ -3,7 +3,6 @@
 namespace lightseq {
 
 Node::Node(std::string name) : _context_ptr(thread_context_ptr.get()) {
-  // printf("Running Step.2.6\n");
   int idx = _context_ptr->node_name_cnt[name];
   _context_ptr->node_name_cnt[name] += 1;
   _name = name + "_" + std::to_string(idx);
@@ -12,7 +11,6 @@ Node::Node(std::string name) : _context_ptr(thread_context_ptr.get()) {
 }
 
 Node::~Node() {
-  // printf("~Node() %s\n", _name.c_str());
   _parents.clear();
   _children.clear();
 }
@@ -31,8 +29,9 @@ void Node::recursive_forward() {
   }
 
   _fw_flag = true;
-  // auto real_context_ptr = _context_ptr.lock();
+
   _context_ptr->update_node_idx();
+
   forward();
 }
 
@@ -43,8 +42,8 @@ void Node::recursive_backward() {
   }
 
   _bw_flag = true;
-  // auto real_context_ptr = _context_ptr.lock();
   _context_ptr->update_node_idx();
+
   backward();
 }
 
@@ -54,6 +53,13 @@ bool Node::is_cover() {  // true means assign, false means accumulate
     return true;
   }
   return false;
+}
+
+Variable::Variable(std::string name)
+    : Node(name), _value_byte_size(0), _grad_byte_size(0) {
+  _value.reset(new Tensor(this->_name + "/value", 0));
+  if (_context_ptr->is_training())
+    _grad.reset(new Tensor(this->_name + "/grad", 0));
 }
 
 Variable::Variable(std::string name, size_t value_byte_size,
@@ -101,7 +107,9 @@ void Variable::set_grad(char* grad_ptr) {
   _grad->set_tensor(grad_ptr);
 }
 
-char* Variable::value() { return _value->tensor(); }
+char* Variable::value(bool is_open_interval) {
+  return _value->tensor(is_open_interval);
+}
 
 char* Variable::grad() { return _grad->tensor(); }
 
@@ -113,7 +121,8 @@ bool Variable::enable_override_grad() {
   }
 }
 
-Operator::Operator(std::string name) : Node(name) {
+Operator::Operator(std::string name, OperatorType op_type)
+    : Node(name), _op_type(op_type) {
   _context_ptr->add_op(this);
 }
 

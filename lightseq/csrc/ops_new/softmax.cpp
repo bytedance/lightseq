@@ -16,13 +16,21 @@ template <typename T1, typename T2>
 void SoftmaxOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
-  T1* inp_ptr = (T1*)parent(0)->value();
+  T1* inp_ptr =
+      (T1*)parent(0)->value(true);  // [start, now] -> [start, now - 1]
   T1* mask_ptr = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
 
   launch_attn_softmax_new<T1>(out_ptr, inp_ptr, mask_ptr, _batchs, _nhead,
                               _from_len, _to_len,
                               _config_mask_future | _mask_future, stream);
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(out_ptr, name() + " ans", 5);
+    printf("\n");
+  }
+#endif
 }
 
 template <typename T1, typename T2>

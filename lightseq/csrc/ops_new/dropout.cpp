@@ -22,6 +22,15 @@ void DropoutOp<T1, T2>::forward() {
 
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(input, this->name() + " inp", 10);
+    print_vec(output, this->name() + " out", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template <typename T1, typename T2>

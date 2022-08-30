@@ -66,8 +66,8 @@ template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<T> hout(num_output_ele, (T)0);
-  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
-             cudaMemcpyDeviceToHost);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
+                             cudaMemcpyDeviceToHost));
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << hout[i] << ", ";
   }
@@ -79,8 +79,8 @@ void print_vec<__half>(const __half *outv, std::string outn,
                        int num_output_ele) {
   std::cout << outn << ": ";
   std::vector<__half> hout(num_output_ele, (__half)0.f);
-  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
-             cudaMemcpyDeviceToHost);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
+                             cudaMemcpyDeviceToHost));
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << __half2float(hout[i]) << ", ";
   }
@@ -119,6 +119,9 @@ template void print_vec<float>(const float *outv, std::string outn,
 template void print_vec<int>(const int *outv, std::string outn,
                              int num_output_ele);
 
+template void print_vec<int8_t>(const int8_t *outv, std::string outn,
+                                int num_output_ele);
+
 template void print_vec<__half>(const __half *outv, std::string outn,
                                 int num_output_ele);
 
@@ -129,12 +132,44 @@ template void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
                                  int num_output_ele);
 
 template <typename T>
+void print_vec(const T *outv, std::string outn, int start, int end) {
+  std::cout << outn << ": ";
+  thrust::copy(thrust::device_pointer_cast(outv + start),
+               thrust::device_pointer_cast(outv + end),
+               std::ostream_iterator<T>(std::cout, ", "));
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<__half>(const __half *outv, std::string outn, int start,
+                       int end) {
+  std::cout << outn << ": ";
+  int num_elements = end - start;
+  std::vector<__half> hout(num_elements, (__half)0.f);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv + start,
+                             num_elements * sizeof(__half),
+                             cudaMemcpyDeviceToHost));
+  for (int i = 0; i < num_elements; i++) {
+    std::cout << __half2float(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
+template void print_vec<float>(const float *outv, std::string outn, int start,
+                               int end);
+
+template void print_vec<int>(const int *outv, std::string outn, int start,
+                             int end);
+
+template <typename T>
 T *cuda_malloc(size_t ele_num) {
   size_t byte_size = ele_num * sizeof(T);
   T *pdata = nullptr;
   CHECK_GPU_ERROR(cudaMalloc((void **)&pdata, byte_size));
   return pdata;
 }
+
+template int *cuda_malloc<int>(size_t ele_num);
 
 template char *cuda_malloc<char>(size_t ele_num);
 
