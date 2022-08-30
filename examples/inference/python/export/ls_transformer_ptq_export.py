@@ -34,15 +34,13 @@ def _extract_weight(state_dict):
     return encoder_state_dict, decoder_state_dict
 
 
-def export_other_weights(ls_infer_model, state_dict):
+def export_other_weights(ls_infer_model, state_dict, vocab_size):
     enc_norm_w = state_dict["encoder.layer_norm.weight"].flatten().tolist()
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    emb_size = state_dict["decoder.embed_tokens.embeddings"].size(0) - 1
-    emb_dim = state_dict["encoder.layer_norm.weight"].size(0)
-    assert emb_size % emb_dim == 0
-    dec_shared_b = torch.zeros(emb_size // emb_dim).flatten().tolist()
+    dec_shared_b = torch.zeros(vocab_size).flatten().tolist()
+
     ls_infer_model.src_embedding.norm_scale[:] = enc_norm_w
     ls_infer_model.src_embedding.norm_bias[:] = enc_norm_b
     ls_infer_model.trg_embedding.norm_scale[:] = dec_norm_w
@@ -83,7 +81,7 @@ def export_pb(state_dict, pb_path, pad_id, start_id, end_id, config):
         config.num_decoder_layer,
         act_clip_max=global_act_clip_max,
     )
-    export_other_weights(ls_infer_model, state_dict)
+    export_other_weights(ls_infer_model, state_dict, config.vocab_size)
     export_ls_config(
         ls_infer_model,
         config.nhead,
