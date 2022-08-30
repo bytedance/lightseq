@@ -267,6 +267,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
             "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
             "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
+            "clip_max": copy_and_view(self._get_weights(12), (12,)),
         }
         bias = {
             "self_attn.q_proj": copy_and_view(self_attn_qb),

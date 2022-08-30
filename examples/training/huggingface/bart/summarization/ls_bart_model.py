@@ -7,6 +7,11 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import (
 from lightseq.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer as TransformerDecoderLayer,
 )
+from lightseq.training.ops.pytorch.quantization import (
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
+)
 from transformers import (
     BartPretrainedModel,
     BartForConditionalGeneration,
@@ -288,6 +293,10 @@ class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
             w, b = get_weight_and_bias(module)
             init_ws.append(w)
             init_bs.append(b)
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+        init_ws.append(init_clip_max)
         return cls(config, init_ws, init_bs)
 
 
@@ -372,6 +381,11 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
             w, b = get_weight_and_bias(module)
             init_ws.append(w)
             init_bs.append(b)
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 8)
+        init_ws.append(init_clip_max)
+        init_bs.append(None)
         if layer_id == 0:
             enc_kvw, enc_kvb = get_hf_bart_dec_enc_atten_kv(
                 layer_list, params_list, config.nlayer

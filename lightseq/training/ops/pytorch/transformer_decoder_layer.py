@@ -261,12 +261,12 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         all_enc_attn_kw, all_enc_attn_vw = None, None
         all_enc_attn_kb, all_enc_attn_vb = None, None
         if self.config.layer_id == 0:
-            all_enc_attn_kvw = self._get_weights(18)
+            all_enc_attn_kvw = self._get_weights(19)
             all_enc_attn_kvw = all_enc_attn_kvw.split(self.hs * self.hs, 0)
             all_enc_attn_kw = list(map(_copy, all_enc_attn_kvw[::2]))
             all_enc_attn_vw = list(map(_copy, all_enc_attn_kvw[1::2]))
 
-            all_enc_attn_kvb = self._get_weights(19)
+            all_enc_attn_kvb = self._get_weights(20)
             all_enc_attn_kvb = all_enc_attn_kvb.split(self.hs, 0)
             all_enc_attn_kb = list(map(copy_and_view, all_enc_attn_kvb[::2]))
             all_enc_attn_vb = list(map(copy_and_view, all_enc_attn_kvb[1::2]))
@@ -289,6 +289,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             "fc1": copy_and_view(self._get_weights(12), (self.ims, self.hs)),
             "fc2": copy_and_view(self._get_weights(14), (self.hs, self.ims)),
             "final_layer_norm": copy_and_view(self._get_weights(16), (self.hs,)),
+            "clip_max": copy_and_view(self._get_weights(18), (24,)),
             "encoder_attn.k_proj": all_enc_attn_kw,
             "encoder_attn.v_proj": all_enc_attn_vw,
         }
