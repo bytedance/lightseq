@@ -82,7 +82,7 @@ void QuantDecoder<OpType_>::init_buffer() {
   std::cout << "decoder buffer init start" << std::endl;
 
   // malloc activations and cache
-  int temp_size = _tw._n_dec_layer * 2 * _layer_size_encdec_k;
+  size_t temp_size = _tw._n_dec_layer * 2 * (size_t)_layer_size_encdec_k;
   _DataType *temp, *sliding_temp;
   CHECK_GPU_ERROR(cudaMalloc(&temp, temp_size * sizeof(_DataType)));
   sliding_temp = temp;
@@ -202,8 +202,9 @@ void QuantDecoder<OpType_>::init_buffer() {
       cudaMalloc(&self_kv_cache_buffer,
                  _layer_size_self_k * _tw._n_dec_layer * 4 * sizeof(int8_t)));
 
-  int encoder_out_size = _tw._hidden_size * 2 * _tw._n_dec_layer *
-                         _max_batch_size * _tw._max_step * sizeof(_DataType);
+  size_t encoder_out_size = _tw._hidden_size * 2 * _tw._n_dec_layer *
+                            (size_t)_max_batch_size * _tw._max_step *
+                            sizeof(_DataType);
   if (encoder_out_size <=
       _layer_size_self_k * _tw._n_dec_layer * 4 * sizeof(int8_t)) {
     _p_d_encoder_out_buf = reinterpret_cast<_DataType*>(self_kv_cache_buffer);
