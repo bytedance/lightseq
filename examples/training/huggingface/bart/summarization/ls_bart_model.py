@@ -83,7 +83,7 @@ def get_dec_layer_config(training_args, config):
         activation_fn=config.activation_function,
         nlayer=config.decoder_layers,
         pre_layer_norm=False,
-        max_batch_tokens=4096,
+        max_batch_tokens=10000,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,
     )
