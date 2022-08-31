@@ -1180,7 +1180,7 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
         assert input_ids is not None
         assert position_ids is None
         assert inputs_embeds is None
-        assert torch.all(token_type_ids == 0)
+        # assert torch.all(token_type_ids == 0)
 
         input_shape = input_ids.size()
         seq_length = input_shape[1]
