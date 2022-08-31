@@ -23,6 +23,8 @@ from .quantization import (
     TensorQuantizer,
     act_quant_config,
     weight_quant_config,
+    out_quant_config,
+    emb_quant_config,
 )
 
 
@@ -91,7 +93,7 @@ class MultiheadAttention(nn.Module):
             self.qkv_proj = QuantLinear(embed_dim, 3 * embed_dim, bias=bias)
 
             self.attention_quant = (
-                TensorQuantizer(act_quant_config) if self.is_decoder else None
+                TensorQuantizer(out_quant_config) if self.is_decoder else None
             )
         elif self.encoder_decoder_attention and self.is_decoder:
             self.k_proj = QuantLinear(
@@ -219,6 +221,7 @@ class MultiheadAttention(nn.Module):
             q = self.q_proj(query)
             k = self.k_proj(key)
             v = self.v_proj(value)
+
         q = q * self.scaling
 
         if self.bias_k is not None:
@@ -371,6 +374,7 @@ class MultiheadAttention(nn.Module):
 
         assert v is not None
         attn = torch.bmm(attn_probs, v)
+
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
         if self.onnx_trace and attn.size(1) == 1:
             # when ONNX tracing a single decoder step (sequence length == 1)
@@ -632,7 +636,7 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
 
 
         Returns:
-            encoded output of shape `(seq_len, batch, embed_dim)`
+            encoded output of shape `(batch, seq_len, embed_dim)`
         """
 
         # anything in original attn_mask = 1, becomes -1e8
@@ -671,6 +675,7 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
             x = self.final_layer_norm(x)
 
         x = x.transpose(0, 1)
+
         return x
 
 
@@ -1009,7 +1014,7 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
             )
         self.embedding_dim = config.embedding_dim
         self.dropout = Dropout(config.dropout)
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
         if config.layernorm_embedding:
             self.layernorm_embedding = LayerNorm(config.embedding_dim)
         else:
@@ -1151,7 +1156,7 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
             persistent=False,
         )
 
-        self.emb_quant = TensorQuantizer(weight_quant_config)
+        self.emb_quant = TensorQuantizer(emb_quant_config)
 
         if initial_weights is None:
             return
@@ -1180,7 +1185,7 @@ class BertEmbeddingLayer(TransformerEmbeddingLayerBase):
         assert input_ids is not None
         assert position_ids is None
         assert inputs_embeds is None
-        assert torch.all(token_type_ids == 0)
+        # assert torch.all(token_type_ids == 0)
 
         input_shape = input_ids.size()
         seq_length = input_shape[1]

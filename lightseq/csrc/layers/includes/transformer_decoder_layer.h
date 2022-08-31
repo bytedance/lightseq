@@ -57,6 +57,8 @@ class TransformerDecoderLayer {
   void ffn_layer_bw(const T *grad_output_ptr, const T *output_ptr,
                     T *grad_inp_ptr, T *buffer);
 
+  void zero_mask_grad();
+
   void set_cur_batch_shape(int batch_size, int trg_seq_len, int src_seq_len,
                            int step = -1) {
     _batch_size = batch_size;
@@ -136,6 +138,23 @@ class TransformerDecoderLayer {
     _ffn_nb_ptr = wptr;
     wptr += _hidden_size;
 
+    _attn_qkv_cmax_ptr = wptr;
+    wptr += 3;
+    _attn_out_cmax_ptr = wptr;
+    wptr += 3;
+    _encdec_qkv_cmax_ptr = wptr;
+    wptr += 3;
+    _encdec_out_cmax_ptr = wptr;
+    wptr += 3;
+    _inter_cmax_ptr = wptr;
+    wptr += 3;
+    _output_cmax_ptr = wptr;
+    wptr += 3;
+    _encdec_kv_cmax_ptr = wptr;
+    wptr += 5;
+    _attn_qkv_cache_cmax_ptr = wptr;
+    wptr += 1;
+
     if (_layer_id == 0) {
       _encdec_attn_kvw_ptr = wptr;
       wptr += _shared_nlayer * _hidden_size * _hidden_size * 2;
@@ -144,6 +163,7 @@ class TransformerDecoderLayer {
     } else {
       _encdec_attn_kvw_ptr = nullptr;
       _encdec_attn_kvb_ptr = nullptr;
+      _encdec_kv_cmax_ptr = nullptr;
     }
   }
 
@@ -189,6 +209,23 @@ class TransformerDecoderLayer {
     _grad_ffn_nb_ptr = gptr;
     gptr += _hidden_size;
 
+    _grad_attn_qkv_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_attn_out_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_encdec_qkv_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_encdec_out_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_inter_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_output_cmax_ptr = gptr;
+    gptr += 3;
+    _grad_encdec_kv_cmax_ptr = gptr;
+    gptr += 5;
+    _grad_attn_qkv_cache_cmax_ptr = gptr;
+    gptr += 1;
+
     if (_layer_id == 0) {
       _grad_encdec_attn_kvw_ptr = gptr;
       gptr += _shared_nlayer * _hidden_size * _hidden_size * 2;
@@ -197,33 +234,25 @@ class TransformerDecoderLayer {
     } else {
       _grad_encdec_attn_kvw_ptr = nullptr;
       _grad_encdec_attn_kvb_ptr = nullptr;
+      _grad_encdec_kv_cmax_ptr = nullptr;
+    }
+  }
+
+  void SetQuantMode(bool enable_quant) {
+    if (_enable_quant != enable_quant) {
+      _enable_quant = enable_quant;
+      if (_enable_quant) {
+        std::cout << "Decoder layer #" << _layer_id << " enable quantization"
+                  << std::endl;
+      }
     }
   }
 
  private:
   void allocate_buffer() {
     // allocate local gpu memory
-    if (_pre_or_postLayerNorm) {
-      _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-    } else {
-      _gemmQKV_inp_ptr = nullptr;
-    }
-    _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
-    _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    _attn_score_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    _attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
 
-    _gemmQ_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-    _encdec_q_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-    _encdec_soft_out_ptr =
-        cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    _encdec_attn_score_ptr =
-        cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
-    _encdec_attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-
-    _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
-    _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
-    _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    allocate_layer_memory();
 
     // buffer size needed by ffn bw
     size_t sz_ffn_bw = 3 * _max_batch_tokens * _hidden_size +
@@ -239,6 +268,19 @@ class TransformerDecoderLayer {
       std::cout << "Decoder layer #" << _layer_id
                 << " allocate shared memory size: " << smem_size << std::endl;
     }
+
+    if (!_shared_quant_mem_ptr) {
+      cuda_free(_shared_quant_mem_ptr);
+      size_t quant_smem_size =
+          std::max(_max_batch_tokens * _hidden_size * 4 +
+                       _hidden_size * _hidden_size * 3,
+                   _max_batch_tokens * (_hidden_size + _intermediate_size) +
+                       _hidden_size * _intermediate_size);
+      _shared_quant_mem_ptr = cuda_malloc<int8_t>(quant_smem_size);
+      std::cout << "Decoder layer #" << _layer_id
+                << " allocate shared quant memory size: " << quant_smem_size
+                << std::endl;
+    }
   }
 
   void allocate_encdec_kv_memory() {
@@ -246,7 +288,9 @@ class TransformerDecoderLayer {
     if (_shared_encdec_kv_ptr) {
       return;
     }
-    size_t smem_size = _shared_nlayer * _max_batch_tokens * _hidden_size * 2;
+    size_t smem_size = _shared_nlayer *
+                       std::max(_hidden_size, _max_batch_tokens) *
+                       _hidden_size * 2;
     _shared_encdec_kv_ptr = cuda_malloc<T>(smem_size);
     _shared_grad_encdec_kv_ptr = cuda_malloc<T>(smem_size);
     _encdec_kv_linear.reset_size(_shared_nlayer * 2 * _hidden_size,
@@ -257,21 +301,8 @@ class TransformerDecoderLayer {
 
   void free_memory() {
     // free local gpu memory
-    cuda_free(_gemmQKV_inp_ptr);
-    cuda_free(_qkv_ptr);
-    cuda_free(_soft_out_ptr);
-    cuda_free(_attn_score_ptr);
-    cuda_free(_attn_output_ptr);
 
-    cuda_free(_gemmQ_inp_ptr);
-    cuda_free(_encdec_q_ptr);
-    cuda_free(_encdec_soft_out_ptr);
-    cuda_free(_encdec_attn_score_ptr);
-    cuda_free(_encdec_attn_output_ptr);
-
-    cuda_free(_ff1_inp_ptr);
-    cuda_free(_relu_inp_ptr);
-    cuda_free(_ff2_inp_ptr);
+    free_layer_memory();
 
     // free shared gpu memory between layers
     cuda_free(_shared_buffer_ptr);
@@ -280,6 +311,56 @@ class TransformerDecoderLayer {
     _shared_encdec_kv_ptr = nullptr;
     cuda_free(_shared_grad_encdec_kv_ptr);
     _shared_grad_encdec_kv_ptr = nullptr;
+  }
+
+  void allocate_layer_memory() {
+    // allocate local gpu memory
+    _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
+    _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    _attn_score_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    _encdec_q_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _encdec_soft_out_ptr =
+        cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+    _encdec_attn_score_ptr =
+        cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
+
+    if (_pre_or_postLayerNorm) {
+      _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    } else {
+      _gemmQKV_inp_ptr = nullptr;
+    }
+    _attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _gemmQ_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _encdec_attn_output_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _ff1_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
+    _relu_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _relu_inp_i8_ptr = reinterpret_cast<int8_t *>(_relu_inp_ptr);
+    _ff2_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _intermediate_size);
+    _igemm_alpha_ptr = cuda_malloc<float>(_max_batch_tokens);
+    _igemm_beta_ptr = cuda_malloc<float>(1);
+    cuda_set<float>(_igemm_beta_ptr, 0, 1);
+  }
+
+  void free_layer_memory() {
+    // free local gpu memory
+    cuda_free(_igemm_alpha_ptr);
+    cuda_free(_igemm_beta_ptr);
+    cuda_free(_gemmQKV_inp_ptr);
+    cuda_free(_attn_output_ptr);
+    cuda_free(_gemmQ_inp_ptr);
+    cuda_free(_encdec_attn_output_ptr);
+
+    cuda_free(_ff1_inp_ptr);
+    cuda_free(_relu_inp_ptr);
+    cuda_free(_ff2_inp_ptr);
+
+    cuda_free(_qkv_ptr);
+    cuda_free(_soft_out_ptr);
+    cuda_free(_attn_score_ptr);
+
+    cuda_free(_encdec_q_ptr);
+    cuda_free(_encdec_soft_out_ptr);
+    cuda_free(_encdec_attn_score_ptr);
   }
 
   // const parameter between batch
@@ -300,9 +381,11 @@ class TransformerDecoderLayer {
   size_t _batch_dim;
   int _step;
   bool _training;
+  bool _enable_quant;
   bool _predict;
 
   cublasHandle_t _cublasHandle;
+  cublasLtHandle_t _cublasLtHandle;
   cudaStream_t _stream;
 
   // layers
@@ -330,7 +413,12 @@ class TransformerDecoderLayer {
 
   T *_ff1_inp_ptr;
   T *_relu_inp_ptr;
+  int8_t *_relu_inp_i8_ptr;
   T *_ff2_inp_ptr;
+
+  // local GPU memory for quantization
+  float *_igemm_alpha_ptr;
+  float *_igemm_beta_ptr;
 
   // shared GPU memory between layer
   static size_t _shared_nlayer;
@@ -338,6 +426,7 @@ class TransformerDecoderLayer {
   static T *_shared_encdec_kv_ptr;
   static T *_shared_grad_encdec_kv_ptr;
   static T *_shared_infer_encdec_kv_ptr;
+  static int8_t *_shared_quant_mem_ptr;
 
   // weights ptr
   const T *_attn_qkvw_ptr;
@@ -363,6 +452,15 @@ class TransformerDecoderLayer {
   const T *_ffn_nw_ptr;
   const T *_ffn_nb_ptr;
 
+  const T *_attn_qkv_cmax_ptr;
+  const T *_attn_out_cmax_ptr;
+  const T *_encdec_qkv_cmax_ptr;
+  const T *_encdec_out_cmax_ptr;
+  const T *_inter_cmax_ptr;
+  const T *_output_cmax_ptr;
+  const T *_encdec_kv_cmax_ptr;
+  const T *_attn_qkv_cache_cmax_ptr;
+
   // grads ptr
   T *_grad_attn_qkvw_ptr;
   T *_grad_attn_qkvb_ptr;
@@ -386,4 +484,13 @@ class TransformerDecoderLayer {
   T *_grad_output_b_ptr;
   T *_grad_ffn_nw_ptr;
   T *_grad_ffn_nb_ptr;
+
+  T *_grad_attn_qkv_cmax_ptr;
+  T *_grad_attn_out_cmax_ptr;
+  T *_grad_encdec_qkv_cmax_ptr;
+  T *_grad_encdec_out_cmax_ptr;
+  T *_grad_inter_cmax_ptr;
+  T *_grad_output_cmax_ptr;
+  T *_grad_encdec_kv_cmax_ptr;
+  T *_grad_attn_qkv_cache_cmax_ptr;
 };

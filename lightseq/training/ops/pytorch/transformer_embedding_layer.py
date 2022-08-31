@@ -26,7 +26,9 @@ class LSTransformerEmbeddingFunc(Function):
             else cuda_module.transformer_embedding_layer_fw_fp32
         )
 
-        (output,) = forward_func(config.layer_id, input, step, config.training)
+        (output,) = forward_func(
+            config.layer_id, input, step, config.training, config.quant_mode
+        )
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(input)
@@ -83,6 +85,8 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
+        self.quant_mode = False
+
         self.para_offset = LSTransformerEmbeddingLayer.gen_offset(
             config.embedding_dim, config.vocab_size, config.max_seq_len
         )
@@ -101,7 +105,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         self.create_cpp_layer()
 
         # declare trainable embedding and position(if needed) parameters
-        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1] + 1))
         if initial_embeddings is None and initial_positions is None:
             self.reset_parameters()
             return
@@ -145,6 +149,8 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         nn.init.normal_(self.para, mean=0, std=self.config.embedding_dim**-0.5)
         embeddings = self._get_weights(0).view(-1, self.config.embedding_dim)
         nn.init.constant_(embeddings[self.config.padding_idx], 0)
+        # clip_max
+        nn.init.constant_(self.para[-1], 1)
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -166,7 +172,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             func = cuda_module.assign_layer_weight_grad_fp32
-        grad = torch.empty_like(param)
+        grad = torch.zeros_like(param)
         func(param, grad, "TransformerEmbeddingLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
@@ -188,6 +194,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
 
     def forward(self, input, step=0, **kwargs):
         self.config.training = self.training
+        self.config.quant_mode = self.quant_mode
         self.config.is_grad_enabled = torch.is_grad_enabled()
 
         if self.config.fp16 and self.para.dtype != torch.half:
@@ -215,3 +222,9 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
             )
         x = LSTransformerEmbeddingFunc.apply(self.config, input, self.para, step)
         return x.to(self.para)
+
+    def disable_quant(self):
+        self.quant_mode = False
+
+    def enable_quant(self):
+        self.quant_mode = True

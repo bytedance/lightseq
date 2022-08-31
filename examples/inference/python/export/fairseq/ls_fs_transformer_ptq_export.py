@@ -30,16 +30,14 @@ def _extract_weight(state_dict):
     return encoder_state_dict, decoder_state_dict
 
 
-def export_fs_weights(transformer, state_dict):
+def export_fs_weights(transformer, state_dict, args):
     enc_norm_w = state_dict["encoder.layer_norm.weight"].flatten().tolist()
     enc_norm_b = state_dict["encoder.layer_norm.bias"].flatten().tolist()
     dec_norm_w = state_dict["decoder.layer_norm.weight"].flatten().tolist()
     dec_norm_b = state_dict["decoder.layer_norm.bias"].flatten().tolist()
-    dec_shared_b = (
-        torch.zeros(state_dict["decoder.embed_tokens.embeddings"].size(0))
-        .flatten()
-        .tolist()
-    )
+    emb_size = state_dict["decoder.embed_tokens.para"].size(0) - 1
+    assert emb_size % args.decoder_embed_dim == 0
+    dec_shared_b = torch.zeros(emb_size // args.decoder_embed_dim).flatten().tolist()
     transformer.src_embedding.norm_scale[:] = enc_norm_w
     transformer.src_embedding.norm_bias[:] = enc_norm_b
     transformer.trg_embedding.norm_scale[:] = dec_norm_w
@@ -59,6 +57,7 @@ def export_ls_fs_transformer_ptq(model_path, pb_path, hdf5_path, hdf5):
         transformer,
         encoder_state_dict,
         300,
+        args.encoder_embed_dim,
         True,
         save_pb=True,
     )
@@ -66,6 +65,7 @@ def export_ls_fs_transformer_ptq(model_path, pb_path, hdf5_path, hdf5):
         transformer,
         decoder_state_dict,
         300,
+        args.decoder_embed_dim,
         False,
         save_pb=True,
     )
@@ -86,7 +86,7 @@ def export_ls_fs_transformer_ptq(model_path, pb_path, hdf5_path, hdf5):
         act_clip_max=global_act_clip_max,
         save_pb=True,
     )
-    export_fs_weights(transformer, state_dict)
+    export_fs_weights(transformer, state_dict, args)
     export_ls_config(
         transformer,
         args.encoder_attention_heads,

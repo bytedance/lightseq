@@ -1,5 +1,14 @@
-import torch.nn as nn
-from lightseq.training.ops.pytorch.quantization import qat_mode, disable_quant
+import torch
+from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
+    enable_quant,
+)
+from lightseq.training.ops.pytorch.quantization import (
+    qat_mode,
+    disable_quant,
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
+)
 from lightseq.training.ops.pytorch.torch_transformer_layers import BertEmbeddingLayer
 from transformers import (
     BertForSequenceClassification,
@@ -35,6 +44,11 @@ def get_hf_bert_enc_layer_params(layer):
     init_bs.append(layer.output.dense.bias.detach().clone())
     init_ws.append(layer.output.LayerNorm.weight.detach().clone())
     init_bs.append(layer.output.LayerNorm.bias.detach().clone())
+
+    act_cmax = act_quant_config.amax.tolist()
+    wei_cmax = weight_quant_config.amax.tolist()
+    init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+    init_ws.append(init_clip_max)
 
     return init_ws, init_bs
 
@@ -79,7 +93,7 @@ def inject_ls_layer(model, training_args, model_args, config):
     else:
         raise NotImplementedError
 
-    if model_args.module_type == 2:
+    if model_args.module_type == 1 or model_args.module_type == 2:
         bert_emb_config = gen_bert_emb_config(training_args, config)
         init_ws = get_hf_bert_emb_layer_params(model.bert.embeddings)
         model.bert.embeddings = BertEmbeddingLayer(bert_emb_config, init_ws)
@@ -121,11 +135,10 @@ def inject_ls_layer(model, training_args, model_args, config):
         model.bert.encoder.layer[i] = LSHFTransformerEncoderLayer(
             bert_enc_config, init_ws, init_bs
         ).cuda()
-        if model_args.module_type == 2:
-            if model_args.enable_quant:
-                model.bert.encoder.layer[i].apply(qat_mode)
-            else:
-                model.bert.encoder.layer[i].apply(disable_quant)
+        if model_args.enable_quant:
+            model.bert.encoder.layer[i].apply(enable_quant)
+        else:
+            model.bert.encoder.layer[i].apply(disable_quant)
 
 
 def hf_state_dict(model):
@@ -173,7 +186,7 @@ def hf_state_dict(model):
         raise ValueError("Must be ligtseq replaced model")
     # reload original modules
     ls_encoder_layer = model_to_save.bert.encoder.layer
-    model_to_save.bert.encoder.layer = nn.ModuleList(
+    model_to_save.bert.encoder.layer = torch.nn.ModuleList(
         [BertLayer(model.config) for _ in range(model.config.num_hidden_layers)]
     )
     inject_hf_layer(
@@ -194,9 +207,9 @@ class LSBertPreTrainedModel(BertPreTrainedModel):
             inject_ls_layer(model, training_args, model_args, self.config)
         return model
 
-    def save_pretrained(self, *args, **kwargs):
-        kwargs["state_dict"] = hf_state_dict(self)
-        super().save_pretrained(*args, **kwargs)
+    # def save_pretrained(self, *args, **kwargs):
+    #     kwargs["state_dict"] = hf_state_dict(self)
+    #     super().save_pretrained(*args, **kwargs)
 
 
 class LSBertForSequenceClassification(

@@ -20,3 +20,9 @@ target_link_libraries(quant_gpt_example PUBLIC liblightseq)
 
 add_executable(transformer_decoder_example decoder_example.cc.cu)
 target_link_libraries(transformer_decoder_example PUBLIC transformer_model)
+
+add_executable(vit_example vit_example.cc)
+target_link_libraries(vit_example PUBLIC liblightseq)
+
+add_executable(quant_vit_example quant_vit_example.cc)
+target_link_libraries(quant_vit_example PUBLIC liblightseq)

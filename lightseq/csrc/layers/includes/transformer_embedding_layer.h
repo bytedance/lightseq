@@ -29,6 +29,7 @@ class TransformerEmbeddingLayer {
   }
 
   void SetTrainingMode(bool training);
+  void SetQuantMode(bool enable_quant);
   inline bool IsTrainingMode() const { return _training; }
   inline float DropoutRatio() const { return _training ? _dropout_ratio : 0.0; }
   inline int EmbeddingDim() const { return _embedding_dim; }
@@ -38,11 +39,13 @@ class TransformerEmbeddingLayer {
     const T *wptr = weights_ptr;
 
     _embeddings_ptr = wptr;
+    wptr += _vocab_size * _embedding_dim;
     // if trainable postional embedding, using a combined large tensor
     if (_trainable_pos) {
-      wptr += _vocab_size * _embedding_dim;
       _pos_embeddings_ptr = wptr;
+      wptr += _max_seq_len * _embedding_dim;
     }
+    _clip_max_ptr = wptr;
   }
 
   void assign_grad_ptr(T *grads_ptr) {
@@ -50,13 +53,15 @@ class TransformerEmbeddingLayer {
     T *gptr = grads_ptr;
 
     _grad_embeddings_ptr = gptr;
+    gptr += _vocab_size * _embedding_dim;
     // if trainable postional embedding, set grad tensor
     if (_trainable_pos) {
-      gptr += _vocab_size * _embedding_dim;
       _grad_pos_embeddings_ptr = gptr;
+      gptr += _max_seq_len * _embedding_dim;
     } else {
       _grad_pos_embeddings_ptr = nullptr;
     }
+    _grad_clip_max_ptr = gptr;
   }
 
  private:
@@ -86,14 +91,17 @@ class TransformerEmbeddingLayer {
   size_t _seq_len;
   bool _training;
   bool _trainable_pos;
+  bool _enable_quant;
   uint8_t *_dropout_mask;
   int *_tokens_position;
 
   // weights ptr
   const T *_pos_embeddings_ptr;
   const T *_embeddings_ptr;
+  const T *_clip_max_ptr;
 
   // grads ptr
   T *_grad_pos_embeddings_ptr;
   T *_grad_embeddings_ptr;
+  T *_grad_clip_max_ptr;
 };

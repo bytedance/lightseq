@@ -957,7 +957,6 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         value.data() + idx, [=](int size) { return size != _hidden_size; },
         "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
-
   }  // for
 
   std::vector<_DataType> raw_value;

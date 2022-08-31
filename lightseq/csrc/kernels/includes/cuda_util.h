@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cublas_v2.h>
+#include <cublasLt.h>
 #include <cuda.h>
 #include <math_constants.h>
 
@@ -30,9 +31,18 @@ T *cuda_malloc(size_t ele_num);
 void cuda_free(void *pdata);
 
 template <typename T>
+void cuda_set(T *pdata, int value, size_t ele_num);
+
+template <typename T>
 void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
                    std::string file, int line, cudaStream_t stream);
 
 #define CHECK_NAN_INF(ptr, size, stream)                            \
   check_nan_inf((ptr), (size), true, __FILE__, __LINE__, (stream)); \
   check_nan_inf((ptr), (size), false, __FILE__, __LINE__, (stream))
+
+template <typename T>
+void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
+                 cudaStream_t stream);
+
+int getSMVersion();

@@ -53,7 +53,6 @@ src_emb_mapping_dict = OrderedDict(
 def extract_gpt_weights(
     output_file,
     model_dir,
-    head_num,
     generation_method,
     topk=1,
     topp=0.75,
@@ -63,8 +62,11 @@ def extract_gpt_weights(
     max_step=50,
     extra_decode_length=0,
 ):
+
     # load var names
-    encoder_state_dict = GPT2LMHeadModel.from_pretrained(model_dir).state_dict()
+    model = GPT2LMHeadModel.from_pretrained(model_dir)
+    head_num = model.config.n_head
+    encoder_state_dict = model.state_dict()
     enc_var_name_list = list(encoder_state_dict.keys())
 
     # initialize output file
@@ -156,7 +158,6 @@ if __name__ == "__main__":
         args.generation_method = "topk"
     output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
-    head_number = 12  # 20 for "gpt2-large"
     topk = 1
     topp = 0.75
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
@@ -167,7 +168,6 @@ if __name__ == "__main__":
     extract_gpt_weights(
         output_lightseq_model_name,
         input_huggingface_gpt_model,
-        head_num=head_number,  # layer number
         generation_method=args.generation_method,
         topk=topk,
         topp=topp,

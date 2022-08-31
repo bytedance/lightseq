@@ -10,7 +10,7 @@ from export.proto.quant_transformer_pb2 import QuantTransformer
 from lightseq.training.ops.pytorch.export import export_ls_config
 from lightseq.training.ops.pytorch.export_quant import (
     gather_quant_token_embedding,
-    fill_quant_pb_layer,
+    fill_ptq_pb_layer,
 )
 from lightseq.training.ops.pytorch.util import get_pos_embedding
 import lightseq.inference as lsi
@@ -157,7 +157,7 @@ def export_ls_torch_fs_transformer_ptq(
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(enc_tensor_names.keys()):
-        fill_quant_pb_layer(
+        fill_ptq_pb_layer(
             enc_tensor_names[layer_id],
             encoder_state_dict,
             transformer.encoder_stack.add(),
@@ -175,7 +175,7 @@ def export_ls_torch_fs_transformer_ptq(
         dec_tensor_names.setdefault(layer_id, []).append(name)
 
     for layer_id in sorted(dec_tensor_names.keys()):
-        fill_quant_pb_layer(
+        fill_ptq_pb_layer(
             dec_tensor_names[layer_id],
             decoder_state_dict,
             transformer.decoder_stack.add(),
@@ -183,7 +183,7 @@ def export_ls_torch_fs_transformer_ptq(
             global_act_clip_max,
         )
 
-    fill_quant_pb_layer(
+    fill_ptq_pb_layer(
         enc_var_name_list,
         encoder_state_dict,
         transformer.src_embedding,
@@ -218,7 +218,7 @@ def export_ls_torch_fs_transformer_ptq(
     # fill trg_embedding
     encode_output_mapping_dict = _get_encode_output_mapping_dict(len(dec_tensor_names))
     trg_emb_mapping_dict.update(encode_output_mapping_dict)
-    fill_quant_pb_layer(
+    fill_ptq_pb_layer(
         dec_var_name_list,
         decoder_state_dict,
         transformer.trg_embedding,

@@ -37,19 +37,19 @@ enc_layer_mapping_dict = OrderedDict(
         "ffn_second_kernel": "fc2 weight&&expression_.transpose(0, 1)",
         "ffn_second_bias": "fc2 bias",
         # weight_clip_max
-        "multihead_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant clip_value_max",
-        "multihead_project_kernel_output_clip_max": "self_attn out_proj weight_quant clip_value_max",
-        "ffn_first_kernel_clip_max": "fc1 weight_quant clip_value_max",
-        "ffn_second_kernel_clip_max": "fc2 weight_quant clip_value_max",
+        "multihead_project_kernel_qkv_clip_max": "self_attn qkv_proj weight_quant _amax",
+        "multihead_project_kernel_output_clip_max": "self_attn out_proj weight_quant _amax",
+        "ffn_first_kernel_clip_max": "fc1 weight_quant _amax",
+        "ffn_second_kernel_clip_max": "fc2 weight_quant _amax",
         # act_clip_max
         "multihead_ln_clip_max": "self_attn qkv_proj input_quant clip_value_max",
         "multihead_project_output_clip_max": "self_attn out_proj input_quant clip_value_max",
         "ffn_ln_clip_max": "fc1 input_quant clip_value_max",
         "ffn_first_act_clip_max": "fc2 input_quant clip_value_max",
-        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant clip_value_max",
-        "multihead_output_dense_clip_max": "self_attn out_proj output_quant clip_value_max",
-        "ffn_first_output_clip_max": "fc1 output_quant clip_value_max",
-        "self_qkv_bias_out_clip_max": "self_attn attention_quant clip_value_max",
+        "multihead_qkv_dense_clip_max": "self_attn qkv_proj output_quant _amax",
+        "multihead_output_dense_clip_max": "self_attn out_proj output_quant _amax",
+        "ffn_first_output_clip_max": "fc1 output_quant _amax",
+        "self_qkv_bias_out_clip_max": "self_attn attention_quant _amax",
     }
 )
 
@@ -58,7 +58,7 @@ src_emb_mapping_dict = OrderedDict(
         "norm_scale": "ln_f weight",
         "norm_bias": "ln_f bias",
         "output_ln_clip_max": "lm_head input_quant clip_value_max",
-        "logits_clip_max": "lm_head output_quant clip_value_max",
+        "logits_clip_max": "lm_head output_quant _amax",
     }
 )
 
@@ -96,9 +96,9 @@ def extract_gpt_weights(
     var_name_list = list(state_dict.keys())
 
     for name in var_name_list:
-        if name.endswith("weight_quant.clip.clip_value_max"):
-            state_dict[name[:-26]] = torch.Tensor(
-                quantize(state_dict[name[:-26]].numpy(), 127, state_dict[name].numpy())
+        if name.endswith("weight_quant._amax"):
+            state_dict[name[:-12]] = torch.Tensor(
+                quantize(state_dict[name[:-12]].numpy(), 127, state_dict[name].numpy())
             ).to(torch.uint8)
 
     # initialize output file

@@ -14,12 +14,11 @@ from fairseq.modules import LayerNorm
 from lightseq.training.ops.pytorch.layer_base import TransformerEmbeddingLayerBase
 from lightseq.training.ops.pytorch.quantization import (
     QuantLinear,
-    enable_quant,
     disable_quant,
-    qat_mode,
+    enable_quant,
     ptq_mode,
+    qat_mode,
 )
-
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
 MAX_SEQ_LENGTH = 300
@@ -178,13 +177,17 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                     encoder.apply(ptq_mode)
                     decoder.apply(ptq_mode)
             else:
-                raise NotImplementedError
+                if args.quant_mode == "qat":
+                    encoder.apply(enable_quant)
+                    decoder.apply(enable_quant)
+                    encoder.apply(qat_mode)
+                    decoder.apply(qat_mode)
+
+                else:
+                    raise NotImplementedError
         else:
-            if args.use_torch_layer:
-                encoder.apply(disable_quant)
-                decoder.apply(disable_quant)
-            else:
-                pass
+            encoder.apply(disable_quant)
+            decoder.apply(disable_quant)
 
         return cls(args, encoder, decoder)
 
@@ -389,16 +392,25 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
                 bias=False,
             )
             self.output_projection.weight_quant = self.embed_tokens.emb_quant
+            self.output_projection.weight = self.embed_tokens.embeddings
         else:
-            if args.enable_quant:
-                raise NotImplementedError
-            else:
-                self.output_projection = nn.Linear(
-                    self.embed_tokens.embeddings.shape[1],
-                    self.embed_tokens.embeddings.shape[0],
-                    bias=False,
-                )
-        self.output_projection.weight = self.embed_tokens.embeddings
+            from lightseq.training.ops.pytorch.quant_linear_layer import (
+                LSQuantLinearLayer,
+            )
+
+            config = LSQuantLinearLayer.get_config(
+                max_batch_tokens=self.args.max_tokens,
+                in_features=self.embed_tokens.config.embedding_dim,
+                out_features=self.embed_tokens.config.vocab_size,
+                bias=False,
+                fp16=self.args.fp16,
+                local_rank=self.args.device_id,
+            )
+            self.output_projection = LSQuantLinearLayer(config)
+            del self.output_projection.weight
+
+        self.quant_mode = args.enable_quant
+        self.use_torch_layer = args.use_torch_layer
 
     def build_decoder_layer(self, args):
         if args.use_torch_layer:
@@ -447,6 +459,17 @@ class LSTransformerDecoder(FairseqIncrementalDecoder):
         x, prev_output_tokens = self.forward_embedding(
             prev_output_tokens, incremental_state
         )
+
+        if not self.use_torch_layer:
+            self.output_projection.weight = self.embed_tokens.para[
+                : self.embed_tokens.config.vocab_size
+                * self.embed_tokens.config.embedding_dim
+            ].reshape(
+                self.embed_tokens.config.vocab_size,
+                self.embed_tokens.config.embedding_dim,
+            )
+            if self.quant_mode:
+                self.output_projection.clip_max[1] = self.embed_tokens.para[-1].data
 
         # x: [batch_size, seq_len, hidden_size]
         for _, layer in enumerate(self.layers):
