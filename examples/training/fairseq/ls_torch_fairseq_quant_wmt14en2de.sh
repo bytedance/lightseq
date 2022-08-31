@@ -14,7 +14,7 @@ lightseq-train /tmp/wmt14_en_de/ \
     --save-dir int4_with_2int5 \
     --finetune-from-model fp16_ende/checkpoint_best.pt \
     --arch ls_transformer --share-decoder-input-output-embed \
-    --lr 5e-4 --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
+    --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
     --warmup-updates 4000 --weight-decay 0.0001 \
     --lr-scheduler polynomial_decay \
