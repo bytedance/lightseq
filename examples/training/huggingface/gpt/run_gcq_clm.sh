@@ -22,4 +22,4 @@ python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
     --module_type 2 \
     --enable_quant false \
     --enable_GCQ true \
-    --GCQ_quantile
+    --GCQ_quantile 0.99
