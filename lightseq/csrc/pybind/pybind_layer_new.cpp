@@ -30,19 +30,16 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 
-void layer_context_initial(ContextPtr context_ptr) {
+void ContextInitial() {
+  static ContextPtr context_ptr;
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (context_ptr == nullptr) {
-    context_ptr.reset(new Context());
-    Context::set_thread_context(context_ptr);
-  } else if (context_ptr->built()) {
     context_ptr.reset(new Context());
     Context::set_thread_context(context_ptr);
   }
   context_ptr->set_stream(stream);
 }
 
-#define ContextInitial(context_ptr) layer_context_initial(context_ptr);
 
 template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
@@ -52,26 +49,20 @@ int create_transformer_encoder_layer_new(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, torch::Tensor &para_ptr, torch::Tensor &grad_ptr) {
   // necessary
-  static ContextPtr layer_context_ptr;
-  ContextInitial(layer_context_ptr);
-
-  TransformerEncoderLayerWeightPtr enc_layer_wt(
-      new TransformerEncoderLayerWeight(hidden_dim, intermediate_size));
-  enc_layer_wt->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
+  ContextInitial();
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
-      enc_layer_wt, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
+      layer_id, max_batch_tokens, max_seq_len, hidden_dim,
       num_heads, intermediate_size, attn_prob_dropout_ratio,
       activation_dropout_ratio, hidden_dropout_ratio, pre_or_postLayerNorm,
       activation_fn, mask_future_tokens);
 
-  Variable *inp(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp",
-      (size_t)0, (size_t)0));
+  layer->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
+  Variable *inp(new Variable(
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp"));
   Variable *inp_mask(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask",
-      (size_t)0, (size_t)0));
+      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask"));
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 

@@ -13,12 +13,9 @@ Context::Context(bool training, int device_id)
 }
 
 Context::~Context() {
-  _root_layers.clear();
-  _layer_context.clear();
   for (auto& iter : _all_node_vec) {
     delete iter;
   }
-  _all_node_vec.clear();
 }
 
 void Context::new_thread_context(bool training) {
@@ -34,6 +31,7 @@ void Context::remove_thread_context() { thread_context_ptr.reset(); }
 void Context::add_op(Operator* op) {
   if (_layer_context.size()) {
     _layer_context[0]->_op_vec.push_back(op);
+    printf("add_op : %s\n", op->name().c_str());
     return;
   }
 #if ONLY_OP == true

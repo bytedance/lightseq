@@ -35,7 +35,7 @@ Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
-  LAYER_POST_OUTPUTS({inp, inp_mask});
+  LAYER_POST_OUTPUTS({ffn_out});
   return ffn_out;
 }
 
