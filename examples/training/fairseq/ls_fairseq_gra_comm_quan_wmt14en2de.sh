@@ -31,6 +31,4 @@ python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
     --maximize-best-checkpoint-metric \
     --fp16 \
     --enable_GCQ \
-    --GCQ_quantile 0.99 \
-
-
+    --GCQ_quantile 0.99 
