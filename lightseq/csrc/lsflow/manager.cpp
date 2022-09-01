@@ -28,6 +28,9 @@ void MemoryManager::calculate_buffer_() {
   if (buffer_ != nullptr) {
     cudaFree(buffer_);
   }
+
+  printf("===== Execute MemoryManager calculate_buffer_ =====\n");
+
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
   size_t tmp_buffer_size_ = 0;

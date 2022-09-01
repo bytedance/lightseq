@@ -7,12 +7,10 @@ Layer::Layer(std::string name) : _op_vec({}) {
   int idx = _context_ptr->layer_name_cnt[name];
   _context_ptr->layer_name_cnt[name] += 1;
   _name = name + "_" + std::to_string(idx);
-  _context_ptr->enter_layer(this);
+  _context_ptr->enter_layer(this, true);
 }
 
-Layer::~Layer() {
-  // printf("~Layer() %s\n", _name.c_str());
-}
+Layer::~Layer() {}
 
 void Layer::forward() {
   _context_ptr->build();

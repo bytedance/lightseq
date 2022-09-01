@@ -7,36 +7,6 @@
 
 namespace lightseq {
 
-class FeedForwardLayerWeight {
- public:
-  FeedForwardLayerWeight(int hidden_size, int intermediate_size)
-      : _hidden_size(hidden_size), _intermediate_size(intermediate_size) {}
-  char* _inter_w_ptr;
-  char* _inter_b_ptr;
-  char* _output_w_ptr;
-  char* _output_b_ptr;
-  char* _ffn_nw_ptr;
-  char* _ffn_nb_ptr;
-
-  char* _grad_inter_w_ptr;
-  char* _grad_inter_b_ptr;
-  char* _grad_output_w_ptr;
-  char* _grad_output_b_ptr;
-  char* _grad_ffn_nw_ptr;
-  char* _grad_ffn_nb_ptr;
-
-  int _hidden_size;
-  int _intermediate_size;
-
-  template <class T1, class T2>
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
-
-  template <typename T>
-  void load_params(const std::vector<const T*>& para_vec, int& offset);
-};
-
-using FeedForwardLayerWeightPtr = std::shared_ptr<FeedForwardLayerWeight>;
-
 template <class T1, class T2>
 class FeedForwardLayer : public Layer {
  private:
@@ -71,9 +41,8 @@ class FeedForwardLayer : public Layer {
   bool _is_post_ln;
 
  public:
-  FeedForwardLayer(FeedForwardLayerWeightPtr ffn_wt, int layer_id,
-                   int max_batch_tokens, int max_seq_len, int hidden_size,
-                   int num_heads, int intermediate_size,
+  FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+                   int hidden_size, int num_heads, int intermediate_size,
                    float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
                    std::string activation_fn, bool is_post_ln = false);
@@ -85,6 +54,10 @@ class FeedForwardLayer : public Layer {
   void before_forward(int batch_size, int seq_len);
 
   void before_backward();
+
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+
+  int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
 template class FeedForwardLayer<__half, __half>;

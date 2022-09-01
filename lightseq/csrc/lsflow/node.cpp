@@ -103,8 +103,10 @@ void Variable::set_value(const char* value_ptr) {
 }
 
 void Variable::set_grad(char* grad_ptr) {
-  _grad->reset_fixed();
-  _grad->set_tensor(grad_ptr);
+  if (_context_ptr->is_training()) {
+    _grad->reset_fixed();
+    _grad->set_tensor(grad_ptr);
+  }
 }
 
 char* Variable::value(bool is_open_interval) {

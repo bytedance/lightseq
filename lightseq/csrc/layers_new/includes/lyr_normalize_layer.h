@@ -4,76 +4,28 @@
 
 namespace lightseq {
 
-class LyrNormalizeLayerWeight {
- public:
-  LyrNormalizeLayerWeight(int hidden_size) : _hidden_size(hidden_size) {}
-  char* _gamma_ptr;
-  char* _betta_ptr;
-
-  char* _grad_gamma_ptr;
-  char* _grad_betta_ptr;
-
-  int _hidden_size;
-
-  template <class T1, class T2>
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
-    int offset = 0;
-    _gamma_ptr = (char*)(para_ptr + offset);
-    _grad_gamma_ptr = (char*)(grad_ptr + offset);
-    offset += _hidden_size;
-
-    _betta_ptr = (char*)(para_ptr + offset);
-    _grad_betta_ptr = (char*)(grad_ptr + offset);
-    offset += _hidden_size;
-
-    return offset;
-  }
-
-  template <typename T>
-  int load_params(const std::vector<const T*>& para_vec, int offset) {
-    int size = 0;
-    _gamma_ptr = (char*)para_vec[offset + size];
-    size++;
-    _betta_ptr = (char*)para_vec[offset + size];
-    size++;
-
-    return size;
-  }
-};
-
-template int LyrNormalizeLayerWeight::load_para_and_grad(const float* para_ptr,
-                                                         float* grad_ptr);
-template int LyrNormalizeLayerWeight::load_para_and_grad(const __half* para_ptr,
-                                                         __half* grad_ptr);
-
-template int LyrNormalizeLayerWeight::load_params(
-    const std::vector<const float*>& para_vec, int offset);
-template int LyrNormalizeLayerWeight::load_params(
-    const std::vector<const __half*>& para_vec, int offset);
-
-using LyrNormalizeLayerWeightPtr = std::shared_ptr<LyrNormalizeLayerWeight>;
-
 template <class T1, class T2>
 class LyrNormalizeLayer : public Layer {
  private:
   // operators
   LayerNormalizeOp<T1, T2>* _lyr_norm_op = nullptr;
 
+  int _hidden_size;
+  int _max_batch_tokens;
+
   // parameters
   Variable* _norm_gamma;
   Variable* _norm_betta;
 
  public:
-  LyrNormalizeLayer(LyrNormalizeLayerWeightPtr norm_wt, int max_batch_tokens,
-                    int hidden_size)
+  LyrNormalizeLayer(int max_batch_tokens, int hidden_size)
       : Layer("LyrNormalizeLayer"),
+        _hidden_size(hidden_size),
+        _max_batch_tokens(max_batch_tokens),
         _lyr_norm_op(
             new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
-    _norm_gamma = new Variable("layer_norm_gamma", norm_wt->_gamma_ptr,
-                               norm_wt->_grad_gamma_ptr);
-
-    _norm_betta = new Variable("layer_norm_betta", norm_wt->_betta_ptr,
-                               norm_wt->_grad_betta_ptr);
+    _norm_gamma = new Variable("layer_norm_gamma");
+    _norm_betta = new Variable("layer_norm_betta");
 
     this->_context_ptr->exit_layer();  // necessary
   }
@@ -81,9 +33,11 @@ class LyrNormalizeLayer : public Layer {
   virtual ~LyrNormalizeLayer() {}
 
   Variable* operator()(Variable* inp) {
-    this->set_inputs({inp});
+    LAYER_PRE_INPUTS({inp});
+
     Variable* out = (*_lyr_norm_op)(inp, _norm_gamma, _norm_betta);
-    this->set_outputs({out});
+
+    LAYER_POST_OUTPUTS({out});
     return out;
   }
 
@@ -92,6 +46,27 @@ class LyrNormalizeLayer : public Layer {
   }
 
   void before_backward() {}
+
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
+    int offset = 0;
+
+    _norm_gamma->set_value((char*)(para_ptr + offset));
+    _norm_gamma->set_grad((char*)(grad_ptr + offset));
+    offset += _hidden_size;
+
+    _norm_betta->set_value((char*)(para_ptr + offset));
+    _norm_betta->set_grad((char*)(grad_ptr + offset));
+    offset += _hidden_size;
+
+    return offset;
+  }
+
+  int load_params(const std::vector<const T1*>& para_vec, int offset) {
+    int size = 0;
+    _norm_gamma->set_value((char*)para_vec[offset + size]), size++;
+    _norm_betta->set_value((char*)para_vec[offset + size]), size++;
+    return size;
+  }
 };
 
 template class LyrNormalizeLayer<__half, __half>;
