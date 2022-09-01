@@ -1,12 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(LightseqProtoType LANGUAGES C CXX CUDA)
 
-set(CMAKE_CUDA_ARCHITECTURES
-    70
-    75
-    80
-    86
-    87)
+set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 87)
 find_package(CUDA 11.6 REQUIRED)
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
