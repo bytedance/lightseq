@@ -3,11 +3,12 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer( int layer_id,
-    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
-    float attn_prob_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, bool mask_future_tokens, bool is_post_ln)
-    : Layer("MultiheadAttentionLayer"), // necessary
+MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
+    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
+    int num_heads, float attn_prob_dropout_ratio,
+    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
+    bool mask_future_tokens, bool is_post_ln)
+    : Layer("MultiheadAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -171,19 +172,18 @@ int MultiheadAttentionLayer<T1, T2>::load_para_and_grad(
   return offset;
 }
 
-
 template <typename T1, typename T2>
 int MultiheadAttentionLayer<T1, T2>::load_params(
     const std::vector<const T1*>& para_vec, int offset) {  // for inference
   int size = 0;
-  _attn_nw->set_value((char*)para_vec[offset + size]), size ++;
-  _attn_nb->set_value((char*)para_vec[offset + size]), size ++;
+  _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_value((char*)para_vec[offset + size]), size++;
 
-  _attn_qkvw->set_value((char*)para_vec[offset + size]), size ++;
-  _attn_qkvb->set_value((char*)para_vec[offset + size]), size ++;
+  _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
 
-  _attn_ow->set_value((char*)para_vec[offset + size]), size ++;
-  _attn_ob->set_value((char*)para_vec[offset + size]), size ++;
+  _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_value((char*)para_vec[offset + size]), size++;
 
   return size;
 }

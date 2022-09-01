@@ -45,7 +45,11 @@ class Layer {
   bool macro_outputs_check = false;
 };
 
-#define LAYER_PRE_INPUTS(...) set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), macro_inputs_check = true
-#define LAYER_POST_OUTPUTS(...) set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), macro_outputs_check = true
+#define LAYER_PRE_INPUTS(...)                                        \
+  set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), \
+      macro_inputs_check = true
+#define LAYER_POST_OUTPUTS(...)                           \
+  set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), \
+      macro_outputs_check = true
 
 }  // namespace lightseq

@@ -18,7 +18,8 @@ class LaunchEncEmbLayer : public Layer {
   Variable* _lang_id;
 
  public:
-  LaunchEncEmbLayer(int max_batch_tokens, int pad_id, int hidden_dim, int multilg_type)
+  LaunchEncEmbLayer(int max_batch_tokens, int pad_id, int hidden_dim,
+                    int multilg_type)
       : Layer("LaunchEncEmbLayer"),
         _launch_enc_op(new LaunchEncEmbOp<T>(max_batch_tokens, pad_id,
                                              hidden_dim, multilg_type)) {

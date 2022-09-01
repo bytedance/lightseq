@@ -41,9 +41,8 @@ class FeedForwardLayer : public Layer {
   bool _is_post_ln;
 
  public:
-  FeedForwardLayer(int layer_id,
-                   int max_batch_tokens, int max_seq_len, int hidden_size,
-                   int num_heads, int intermediate_size,
+  FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+                   int hidden_size, int num_heads, int intermediate_size,
                    float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
                    std::string activation_fn, bool is_post_ln = false);

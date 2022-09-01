@@ -80,6 +80,7 @@ def gen_enc_layer_pair():
     custom_enc_layer_base.train()
     return custom_enc_layer_base, custom_enc_layer_new
 
+
 enc_layer_num = 1
 base_enc_layers = []
 custom_enc_layers = []
@@ -94,7 +95,6 @@ for _ in range(enc_layer_num):
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
-
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
     res = torch.empty_like(hidden_states)

@@ -22,7 +22,8 @@ class LyrNormalizeLayer : public Layer {
       : Layer("LyrNormalizeLayer"),
         _hidden_size(hidden_size),
         _max_batch_tokens(max_batch_tokens),
-        _lyr_norm_op(new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
+        _lyr_norm_op(
+            new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
     _norm_gamma = new Variable("layer_norm_gamma");
     _norm_betta = new Variable("layer_norm_betta");
 
@@ -45,7 +46,6 @@ class LyrNormalizeLayer : public Layer {
   }
 
   void before_backward() {}
-
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
     int offset = 0;

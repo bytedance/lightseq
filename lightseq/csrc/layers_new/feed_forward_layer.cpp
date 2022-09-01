@@ -4,10 +4,10 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 FeedForwardLayer<T1, T2>::FeedForwardLayer(
-    int layer_id, int max_batch_tokens,
-    int max_seq_len, int hidden_size, int num_heads, int intermediate_size,
-    float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn, bool is_post_ln)
+    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
+    int num_heads, int intermediate_size, float activation_dropout_ratio,
+    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
+    std::string activation_fn, bool is_post_ln)
     : Layer("FeedForwardLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -95,8 +95,9 @@ template <typename T1, typename T2>
 void FeedForwardLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-int FeedForwardLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
-                                               T2* grad_ptr) {  // for training
+int FeedForwardLayer<T1, T2>::load_para_and_grad(
+    const T1* para_ptr,
+    T2* grad_ptr) {  // for training
   int offset = 0;
 
   _inter_w->set_value((char*)(para_ptr + offset));
@@ -127,17 +128,18 @@ int FeedForwardLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
 }
 
 template <typename T1, typename T2>
-int FeedForwardLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
-                                         int offset) {  // for inference
+int FeedForwardLayer<T1, T2>::load_params(
+    const std::vector<const T1*>& para_vec,
+    int offset) {  // for inference
   int size = 0;
-  _ffn_nw->set_value((char*)para_vec[offset + size]), size ++;
-  _ffn_nb->set_value((char*)para_vec[offset + size]), size ++;
+  _ffn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _ffn_nb->set_value((char*)para_vec[offset + size]), size++;
 
-  _inter_w->set_value((char*)para_vec[offset + size]), size ++;
-  _inter_b->set_value((char*)para_vec[offset + size]), size ++;
+  _inter_w->set_value((char*)para_vec[offset + size]), size++;
+  _inter_b->set_value((char*)para_vec[offset + size]), size++;
 
-  _output_w->set_value((char*)para_vec[offset + size]), size ++;
-  _output_b->set_value((char*)para_vec[offset + size]), size ++;
+  _output_w->set_value((char*)para_vec[offset + size]), size++;
+  _output_b->set_value((char*)para_vec[offset + size]), size++;
 
   return size;
 }

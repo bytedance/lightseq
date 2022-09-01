@@ -40,7 +40,6 @@ void ContextInitial() {
   context_ptr->set_stream(stream);
 }
 
-
 template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
@@ -52,17 +51,17 @@ int create_transformer_encoder_layer_new(
   ContextInitial();
 
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_dim,
-      num_heads, intermediate_size, attn_prob_dropout_ratio,
-      activation_dropout_ratio, hidden_dropout_ratio, pre_or_postLayerNorm,
-      activation_fn, mask_future_tokens);
+      layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
+      intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
+      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
+      mask_future_tokens);
 
   layer->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
-  Variable *inp(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp"));
-  Variable *inp_mask(new Variable(
-      "transformer_encoder_layer_" + std::to_string(layer_id) + "_inp_mask"));
+  Variable *inp(new Variable("transformer_encoder_layer_" +
+                             std::to_string(layer_id) + "_inp"));
+  Variable *inp_mask(new Variable("transformer_encoder_layer_" +
+                                  std::to_string(layer_id) + "_inp_mask"));
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 

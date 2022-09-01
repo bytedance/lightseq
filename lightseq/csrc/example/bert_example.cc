@@ -17,13 +17,12 @@ int main(int argc, char* argv[]) {
   if (argc == 4) {
     max_batch_size = atoi(argv[2]);
     batch_seq_len = atoi(argv[3]);
-  }
-  else if (argc == 5) {
+  } else if (argc == 5) {
     max_batch_size = atoi(argv[2]);
     batch_seq_len = atoi(argv[3]);
     rand_seed = atoi(argv[4]);
   }
-  
+
   std::vector<int> host_input;
   for (int i = 0; i < max_batch_size; ++i) {
     for (int j = 0; j < batch_seq_len; ++j) {

@@ -40,17 +40,18 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   for (int idx = 0; idx < tw_._n_enc_layer; idx++) {
     TransformerEncoderLayerPtr<OpType_, OpType_> enc_layer_(
         new TransformerEncoderLayer<OpType_, OpType_>(
-            idx, max_batch_tokens, tw_._max_step,
-            tw_._hidden_size, tw_._head_num, tw_._inner_size,
-            attn_prob_dropout_ratio, activation_dropout_ratio,
-            hidden_dropout_ratio, true, tw_._use_gelu ? "gelu" : "relu", false,
-            tw_._is_post_ln));
-    enc_wei_offset += enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
+            idx, max_batch_tokens, tw_._max_step, tw_._hidden_size,
+            tw_._head_num, tw_._inner_size, attn_prob_dropout_ratio,
+            activation_dropout_ratio, hidden_dropout_ratio, true,
+            tw_._use_gelu ? "gelu" : "relu", false, tw_._is_post_ln));
+    enc_wei_offset +=
+        enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
     enc_layer_vec.push_back(enc_layer_);
   }
 
   // initial LayerNormalize layer
-  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(max_batch_tokens, tw_._hidden_size));
+  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size));
   lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   /* --- step.5 construct network --- */
@@ -69,7 +70,7 @@ void Bert::before_forward(int batch_size, int seq_len) {
   for (auto iter : enc_layer_vec) {
     iter->before_forward(batch_size, seq_len);
   }
-  
+
   lyr_norm_layer->before_forward(batch_size * seq_len);
 }
 
@@ -78,7 +79,7 @@ void Bert::Infer() {
 
   before_forward(batch_size, seq_len);
 
-  /* --- notice that the order of forward should be the same with network --- */ 
+  /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();
