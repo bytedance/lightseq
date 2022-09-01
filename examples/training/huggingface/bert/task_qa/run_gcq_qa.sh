@@ -14,6 +14,8 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
+# Set your environment variables according to your training environment,
+# for details, please refer to https://pytorch.org/docs/1.10/distributed.html#launch-utility
 python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
   --nnodes=$WORKER_NUM --node_rank=$WORKER_ID --master_addr=$WORKER_0_HOST \
   --master_port=$WORKER_0_PORT \
