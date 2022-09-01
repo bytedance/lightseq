@@ -22,7 +22,6 @@ class Bert : public LSModel {
 
   LaunchEncEmbLayerPtr<OpType_> launch_enc_emb_layer;
   std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
-  std::vector<TransformerEncoderLayerWeightPtr> enc_layer_wts;
   LyrNormalizeLayerPtr<OpType_, OpType_> lyr_norm_layer;
 
   ContextPtr context_ptr;
@@ -42,8 +41,9 @@ class Bert : public LSModel {
 
  public:
   Bert(const std::string weight_path, const int max_batch_size);
-
   ~Bert();
+
+  void before_forward(int batch_size, int seq_len);
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

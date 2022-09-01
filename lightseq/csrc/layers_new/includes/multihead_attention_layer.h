@@ -12,36 +12,6 @@
 
 namespace lightseq {
 
-class MultiheadAttentionLayerWeight {
- public:
-  MultiheadAttentionLayerWeight(int hidden_size) : _hidden_size(hidden_size) {}
-  char* _attn_qkvw_ptr;
-  char* _attn_qkvb_ptr;
-  char* _attn_ow_ptr;
-  char* _attn_ob_ptr;
-  char* _attn_nw_ptr;
-  char* _attn_nb_ptr;
-
-  char* _grad_attn_qkvw_ptr;
-  char* _grad_attn_qkvb_ptr;
-  char* _grad_attn_ow_ptr;
-  char* _grad_attn_ob_ptr;
-  char* _grad_attn_nw_ptr;
-  char* _grad_attn_nb_ptr;
-
-  int _hidden_size;
-  int _intermediate_size;
-
-  template <class T1, class T2>
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
-
-  template <typename T>
-  void load_params(const std::vector<const T*>& para_vec, int& offset);
-};
-
-using MultiheadAttentionLayerWeightPtr =
-    std::shared_ptr<MultiheadAttentionLayerWeight>;
-
 template <class T1, class T2>
 class MultiheadAttentionLayer : public Layer {
  private:
@@ -79,8 +49,7 @@ class MultiheadAttentionLayer : public Layer {
   bool _is_post_ln;
 
  public:
-  MultiheadAttentionLayer(MultiheadAttentionLayerWeightPtr _attn_wt,
-                          int layer_id, int max_batch_tokens, int max_seq_len,
+  MultiheadAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads,
                           float attn_prob_dropout_ratio,
                           float hidden_output_dropout_ratio,
@@ -94,6 +63,10 @@ class MultiheadAttentionLayer : public Layer {
   void before_forward(int batch_size, int seq_len);
 
   void before_backward();
+
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+
+  int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
 template class MultiheadAttentionLayer<__half, __half>;

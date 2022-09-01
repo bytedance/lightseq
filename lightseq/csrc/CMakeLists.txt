@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 project(LightseqProtoType LANGUAGES C CXX CUDA)
 
 set(CMAKE_CUDA_ARCHITECTURES
-    60
-    61
     70
     75
     80
@@ -29,6 +27,10 @@ else()
   # static link to cuda libraries and protobuf
   set(CMAKE_CUDA_RUNTIME_LIBRARY "Static")
   set(HDF5_USE_STATIC_LIBRARIES ON)
+endif()
+
+if(DEBUG_MODE)
+  add_definitions(-DDEBUG)
 endif()
 
 set(Protobuf_USE_STATIC_LIBS ON)

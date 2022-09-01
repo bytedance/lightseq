@@ -11,7 +11,7 @@ namespace lightseq {
 class Layer {
  protected:
   ContextPtr _context_ptr;
-  std::string _name;
+  std::string _name = "";
 
   std::vector<Variable*> _root_var_vec = {};
   std::vector<Variable*> _leaf_var_vec = {};
@@ -40,8 +40,12 @@ class Layer {
   void gather_root_leaf_var();
 
   std::vector<Operator*> _op_vec;
+
+  bool macro_inputs_check = false;
+  bool macro_outputs_check = false;
 };
 
-// std::map<std::string, int> Layer::_name_cnt = {};
+#define LAYER_PRE_INPUTS(...) set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), macro_inputs_check = true
+#define LAYER_POST_OUTPUTS(...) set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), macro_outputs_check = true
 
 }  // namespace lightseq
