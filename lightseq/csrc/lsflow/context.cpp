@@ -31,7 +31,6 @@ void Context::remove_thread_context() { thread_context_ptr.reset(); }
 void Context::add_op(Operator* op) {
   if (_layer_context.size()) {
     _layer_context[0]->_op_vec.push_back(op);
-    printf("add_op : %s\n", op->name().c_str());
     return;
   }
 #if ONLY_OP == true
