@@ -1,24 +1,12 @@
-#include "includes/normalize_layer.h"
+#include "includes/layer_normalize.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
-NormalizeLayerOp<T1, T2>::NormalizeLayerOp(uint32_t max_batch_tokens,
-                                           uint32_t hidden_dim, bool use_mean)
-    : _max_batch_tokens(max_batch_tokens),
-      _hidden_dim(hidden_dim),
-      _use_mean(use_mean),
-      Operator("NormalizeLayerOp") {
-  vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
-  if (use_mean)
-    means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
-}
+LayerNormalizeOp<T1, T2>::~LayerNormalizeOp() {}
 
 template <typename T1, typename T2>
-NormalizeLayerOp<T1, T2>::~NormalizeLayerOp() {}
-
-template <typename T1, typename T2>
-Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
+Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
                                                Variable* betta) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
   Variable* result = new Variable(this->_name + "/out", max_size * sizeof(T1),
@@ -29,13 +17,12 @@ Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::before_forward(size_t batch_tokens) {
+void LayerNormalizeOp<T1, T2>::before_forward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
-  _max_batch_dim = _batch_tokens * _hidden_dim;
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::forward() {
+void LayerNormalizeOp<T1, T2>::forward() {
   T1* ln_res_val = (T1*)child(0)->value();
   T1* inp_val = (T1*)parent(0)->value();
   T1* gamma_val = (T1*)parent(1)->value();
@@ -48,16 +35,23 @@ void NormalizeLayerOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(ln_res_val, name() + " ans", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::before_backward(size_t batch_tokens) {
+void LayerNormalizeOp<T1, T2>::before_backward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
-  _max_batch_dim = _batch_tokens * _hidden_dim;
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::backward() {
+void LayerNormalizeOp<T1, T2>::backward() {
   T2* gamma_grad = (T2*)parent(1)->grad();
   T2* betta_grad = (T2*)parent(2)->grad();
   T2* inp_grad = (T2*)parent(0)->grad();
@@ -84,7 +78,7 @@ void NormalizeLayerOp<T1, T2>::backward() {
                _batch_tokens, _hidden_dim, streams);
 }
 
-template class NormalizeLayerOp<__half, __half>;
-template class NormalizeLayerOp<float, float>;
+template class LayerNormalizeOp<__half, __half>;
+template class LayerNormalizeOp<float, float>;
 
 }  // namespace lightseq

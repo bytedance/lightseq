@@ -12,7 +12,6 @@ int main(int argc, char* argv[]) {
   std::vector<int> example_input = {63, 47,   65,  1507, 88,  74,
                                     10, 2057, 362, 9,    284, 6};
   int eg_seq_len = example_input.size();
-  int max_batch_size = 128;
   int batch_size = 1;
   int batch_seq_len = eg_seq_len;
 
@@ -20,9 +19,7 @@ int main(int argc, char* argv[]) {
     batch_size = atoi(argv[2]);
     batch_seq_len = atoi(argv[3]);
   }
-  if (batch_size > max_batch_size) {
-    throw std::runtime_error("batch_size exceeds the maximum (128)!");
-  }
+  int max_batch_size = std::max(4, batch_size);
 
   std::vector<int> host_input;
   for (int i = 0; i < batch_size; ++i) {
@@ -41,6 +38,7 @@ int main(int argc, char* argv[]) {
       d_input, host_input.data(), sizeof(int) * batch_size * batch_seq_len,
       cudaMemcpyHostToDevice));
 
+  model->benchmark_mode(true);
   model->set_input_ptr(0, d_input);
   model->set_input_shape(0, {batch_size, batch_seq_len});
 
@@ -58,12 +56,21 @@ int main(int argc, char* argv[]) {
   lightseq::cuda::CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   std::cout << "infer preprocessing finished" << std::endl;
 
+  std::chrono::duration<double> elapsed;
+  int iter = 0;
   /* ---step5. infer and log--- */
   for (int i = 0; i < 20; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    lightseq::cuda::print_time_duration(start, "one infer time", 0);
+    auto finish = std::chrono::high_resolution_clock::now();
+    if (i >= 5) {
+      iter++;
+      elapsed += finish - start;
+    }
   }
+
+  std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
+            << " ms" << std::endl;
 
   for (int i = 0; i < model->get_output_size(); i++) {
     const void* d_output;
@@ -76,9 +83,9 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
 
     if (!i)
-      lightseq::cuda::print_vec((int*)d_output, "output", 15);
+      lightseq::cuda::print_vec((int*)d_output, "output", batch_size);
     else
-      lightseq::cuda::print_vec((float*)d_output, "output", 5);
+      lightseq::cuda::print_vec((float*)d_output, "output", batch_size);
   }
 
   // const int* res = model.get_result_ptr();

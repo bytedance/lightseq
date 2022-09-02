@@ -123,8 +123,8 @@ The main code is as follows (some parameters are omitted). Complete code is avai
 ```python
 model = Transformer()
 encoder_state_dict, decoder_state_dict = _extract_weight(state_dict)
-export_ls_embedding(model, encoder_state_dict, is_encoder=True)
-export_ls_embedding(model, encoder_state_dict, is_encoder=False)
+export_ls_embedding(model, encoder_state_dict, max_length, emb_dim, is_encoder=True)
+export_ls_embedding(model, encoder_state_dict, max_length, emb_dim, is_encoder=False)
 export_ls_encoder(model, encoder_state_dict)
 export_ls_decoder(model, decoder_state_dict)
 export_fs_weights(model, state_dict)

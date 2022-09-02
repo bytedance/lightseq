@@ -7,6 +7,11 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import (
 from lightseq.training.ops.pytorch.transformer_decoder_layer import (
     LSTransformerDecoderLayer as TransformerDecoderLayer,
 )
+from lightseq.training.ops.pytorch.quantization import (
+    weight_quant_config,
+    act_quant_config,
+    relu_quant_config,
+)
 from transformers import (
     BartPretrainedModel,
     BartForConditionalGeneration,
@@ -78,7 +83,7 @@ def get_dec_layer_config(training_args, config):
         activation_fn=config.activation_function,
         nlayer=config.decoder_layers,
         pre_layer_norm=False,
-        max_batch_tokens=4096,
+        max_batch_tokens=10000,
         fp16=training_args.fp16,
         local_rank=training_args.local_rank,
     )
@@ -112,7 +117,11 @@ def inject_lightseq_layer(model, training_args, config):
     for layer_id in range(config.decoder_layers):
         dec_config, dec_params_list = get_dec_layer_config(training_args, config)
         model.decoder.layers[layer_id] = LSHFTransformerDecoderLayer.build_model(
-            dec_config, dec_params_list, model.decoder.layers, layer_id
+            dec_config,
+            dec_params_list,
+            model.decoder.layers,
+            layer_id,
+            training_args.per_device_eval_batch_size,
         ).cuda()
 
 
@@ -288,12 +297,17 @@ class LSHFTransformerEncoderLayer(TransformerEncoderLayer):
             w, b = get_weight_and_bias(module)
             init_ws.append(w)
             init_bs.append(b)
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+        init_ws.append(init_clip_max)
         return cls(config, init_ws, init_bs)
 
 
 class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, eval_batch_size, *args, **kwargs):
         super(LSHFTransformerDecoderLayer, self).__init__(*args, **kwargs)
+        self.eval_batch_size = eval_batch_size
 
     def forward(
         self,
@@ -306,13 +320,21 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
         *args,
         **kwargs,
     ):
-        encoder_hidden_states = encoder_hidden_states.transpose(0, 1).contiguous()
         ls_encoder_padding_mask = (
             encoder_attention_mask.narrow(2, 0, 1)
             .squeeze()
             .ne(0)
             .type_as(encoder_attention_mask)
         )
+
+        ls_encoder_hidden_states = encoder_hidden_states
+        batch_beam = encoder_hidden_states.shape[0]
+        num_beam = batch_beam // self.eval_batch_size
+        if use_cache and batch_beam == hidden_states.shape[0]:
+            ls_encoder_hidden_states = encoder_hidden_states[::num_beam]
+            ls_encoder_padding_mask = ls_encoder_padding_mask[::num_beam]
+        ls_encoder_hidden_states = ls_encoder_hidden_states.transpose(0, 1).contiguous()
+
         cache = None
         self_attn_kv_cache = None
         if use_cache:
@@ -326,7 +348,7 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
                 }
             )
         output = super().forward(
-            hidden_states, encoder_hidden_states, ls_encoder_padding_mask, cache
+            hidden_states, ls_encoder_hidden_states, ls_encoder_padding_mask, cache
         )
         if use_cache:
             self_attn_kv_cache = (
@@ -360,7 +382,7 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
         return params_list
 
     @classmethod
-    def build_model(cls, config, params_list, layer_list, layer_id):
+    def build_model(cls, config, params_list, layer_list, layer_id, eval_batch_size):
         layer = layer_list[layer_id]
         modules_list = []
         for param_name in list(params_list.__dict__.values())[:-2]:
@@ -372,13 +394,18 @@ class LSHFTransformerDecoderLayer(TransformerDecoderLayer):
             w, b = get_weight_and_bias(module)
             init_ws.append(w)
             init_bs.append(b)
+        act_cmax = act_quant_config.amax.tolist()
+        wei_cmax = weight_quant_config.amax.tolist()
+        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 8)
+        init_ws.append(init_clip_max)
+        init_bs.append(None)
         if layer_id == 0:
             enc_kvw, enc_kvb = get_hf_bart_dec_enc_atten_kv(
                 layer_list, params_list, config.nlayer
             )
             init_ws.append(enc_kvw)
             init_bs.append(enc_kvb)
-        return cls(config, init_ws, init_bs)
+        return cls(eval_batch_size, config, init_ws, init_bs)
 
 
 class LSBartPretrainedModel(BartPretrainedModel):
@@ -389,9 +416,9 @@ class LSBartPretrainedModel(BartPretrainedModel):
         inject_lightseq_layer(model, training_args, self.config)
         return model
 
-    def save_pretrained(self, *args, **kwargs):
-        kwargs["state_dict"] = hf_state_dict(self)
-        super().save_pretrained(*args, **kwargs)
+    # def save_pretrained(self, *args, **kwargs):
+    #     kwargs["state_dict"] = hf_state_dict(self)
+    #     super().save_pretrained(*args, **kwargs)
 
 
 class LSBartForConditionalGeneration(

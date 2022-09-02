@@ -55,7 +55,6 @@ def extract_bert_weights(
     model_dir,
     head_num,
     pad_id=0,
-    max_step=50,
 ):
     # load var names
     encoder_state_dict = BertModel.from_pretrained(model_dir).state_dict()
@@ -172,11 +171,9 @@ if __name__ == "__main__":
     head_number = 12
 
     pad_id = 0
-    max_step = 50
     extract_bert_weights(
         output_lightseq_model_name,
         input_huggingface_bert_model,
         head_num=head_number,
         pad_id=pad_id,
-        max_step=max_step,
     )

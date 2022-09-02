@@ -28,14 +28,17 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           (T(1.0) / T(sqrt(_hidden_size / _heads))), T(0.0), CUBLAS_OP_T,
           CUBLAS_OP_N)),
       _softmax(typename Softmax<T>::Config(num_heads)),
-      _attn_prob_dropout(typename Dropout<T>::Config(attn_prob_dropout_ratio),
-                         _max_batch_tokens * _heads * _max_seq_len),
+      _attn_prob_dropout(
+          typename Dropout<T>::Config(attn_prob_dropout_ratio),
+          std::max(
+              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
+              _hidden_size * _hidden_size * 3)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _attn_out_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
       _attn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
-                    _max_batch_tokens * _hidden_size),
+                    std::max(_max_batch_tokens, _hidden_size) * _hidden_size),
       // >>> decoder enc-dec attn layer
       _encdec_attn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
                       _max_batch_tokens),
@@ -49,24 +52,28 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _encdec_softmax(typename Softmax<T>::Config(num_heads)),
       _encdec_attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),
-          _max_batch_tokens * _heads * _max_seq_len),
+          std::max(
+              _max_batch_tokens * std::max(_heads * _max_seq_len, _hidden_size),
+              _hidden_size * _hidden_size)),
       _encdec_attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _encdec_attn_out_linear(
           typename FeedForward<T>::Config(hidden_size, hidden_size)),
       _encdec_attn_dropout(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
-          _max_batch_tokens * _hidden_size),
+          std::max(_max_batch_tokens, _hidden_size) * _hidden_size),
       // >>> decoder ffn layer
       _ffn_ln(typename Normalize_Layer<T>::Config(hidden_size, false),
               _max_batch_tokens),
       _ff1(typename FeedForward<T>::Config(_intermediate_size, hidden_size)),
       _ffn_activation_dropout(
           typename Dropout<T>::Config(activation_dropout_ratio),
-          _max_batch_tokens * _intermediate_size),
+          std::max(_max_batch_tokens, _hidden_size) * _intermediate_size),
       _ff2(typename FeedForward<T>::Config(hidden_size, _intermediate_size)),
-      _ffn_dropout(typename Dropout<T>::Config(hidden_output_dropout_ratio),
-                   _max_batch_tokens * _hidden_size) {
+      _ffn_dropout(
+          typename Dropout<T>::Config(hidden_output_dropout_ratio),
+          std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
+      _enable_quant(false) {
   assert(_hidden_size % _heads == 0);
   allocate_buffer();
   _shared_nlayer += 1;
@@ -90,18 +97,58 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
   int to_len = _predict ? _step + 1 : _trg_seq_len;
   int batch_size = _predict ? _batch_size * _trg_seq_len : _batch_size;
   int batch_heads = _predict ? _batch_heads * _trg_seq_len : _batch_heads;
-  if (_pre_or_postLayerNorm) {
-    _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
-                     _batch_tokens, _stream);
+
+  if (_enable_quant) {
+    int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
+    int8_t *qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim * 3;
+    int8_t *qweight_ptr = i8_buffer_ptr;
+
+    if (_pre_or_postLayerNorm) {
+      _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
+                       _batch_tokens, _stream);
+    }
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    const T *gemmQKV_inp_ptr =
+        _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+    launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(), _igemm_alpha_ptr,
+                       gemmQKV_inp_ptr, _attn_qkv_cmax_ptr,
+                       _hidden_size * _batch_tokens, 2, _stream);
+
+    launch_quantize<T>(qweight_ptr, _attn_prob_dropout.get_mask(), nullptr,
+                       _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1,
+                       _hidden_size * 3 * _hidden_size, 4, _stream);
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
+                        _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
+
+    launch_quant_bias_add_transform_20314(
+        q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
+        _attn_qkv_cmax_ptr + 2, batch_size, from_len, 3, _heads,
+        _hidden_size / _heads, _stream, _attn_qkv_cache_cmax_ptr);
+
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+  } else {
+    if (_pre_or_postLayerNorm) {
+      _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
+                       _batch_tokens, _stream);
+    }
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    const T *gemmQKV_inp_ptr =
+        _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+    _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
+                        _cublasHandle);
+    launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
+                                       batch_size, from_len, 3, _heads,
+                                       _hidden_size / _heads, _stream);
   }
 
-  const T *gemmQKV_inp_ptr =
-      _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
-  _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
-                      _cublasHandle);
-  launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
-                                     batch_size, from_len, 3, _heads,
-                                     _hidden_size / _heads, _stream);
   if (_predict) {
     launch_concat3_dim1(cache[2], k_tf_ptr, cache[0], batch_heads,
                         _hidden_size / _heads, _step, 1, _stream);
@@ -110,6 +157,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     k_tf_ptr = cache[0];
     v_tf_ptr = cache[1];
   }
+
   // attention scores, q*k
   _attn_scores.Forward(batch_heads, _soft_out_ptr, k_tf_ptr, q_tf_ptr,
                        _cublasHandle);
@@ -124,15 +172,45 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
   _attn_context.Forward(batch_heads, buffer, v_tf_ptr, _attn_score_ptr,
                         _cublasHandle);
 
-  // [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
-                             _hidden_size, _heads, 1, _stream);
+  if (_enable_quant) {
+    int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
+    int8_t *qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qweight_ptr = i8_buffer_ptr;
+    // [b, nh, s, ad] -> [b, s, nh, ad]
+    launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
+                               _hidden_size, _heads, 1, _stream);
 
-  _attn_out_linear.Forward(_batch_tokens, _attn_output_ptr, _attn_ow_ptr,
-                           output_ptr, _cublasHandle);
-  _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
-                                      _attn_ob_ptr, _batch_tokens, _hidden_size,
-                                      _stream);
+    launch_quantize<T>(qin_ptr, _attn_dropout.get_mask(), _igemm_alpha_ptr,
+                       _attn_output_ptr, _attn_out_cmax_ptr,
+                       _hidden_size * _batch_tokens, 2, _stream);
+
+    launch_quantize<T>(qweight_ptr, _attn_dropout.get_mask(), nullptr,
+                       _attn_ow_ptr, _attn_out_cmax_ptr + 1,
+                       _hidden_size * _hidden_size, 4, _stream);
+
+    _attn_out_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
+                             _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
+                             _cublasLtHandle, _stream);
+
+    _attn_dropout.quant_bias_dropout_residual(
+        output_ptr, qout_ptr, _attn_out_cmax_ptr + 2, input_ptr, _attn_ob_ptr,
+        _batch_tokens, _hidden_size, _stream);
+
+  } else {
+    // [b, nh, s, ad] -> [b, s, nh, ad]
+    launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
+                               _hidden_size, _heads, 1, _stream);
+
+    _attn_out_linear.Forward(_batch_tokens, _attn_output_ptr, _attn_ow_ptr,
+                             output_ptr, _cublasHandle);
+    _attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
+                                        _attn_ob_ptr, _batch_tokens,
+                                        _hidden_size, _stream);
+  }
+
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
@@ -143,15 +221,28 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 template <typename T>
 void TransformerDecoderLayer<T>::encdec_kv_fw(const T *enc_output_ptr) {
   allocate_encdec_kv_memory();
-  _encdec_kv_linear.Forward(_batch_size * _src_seq_len, enc_output_ptr,
-                            _encdec_attn_kvw_ptr, _shared_grad_encdec_kv_ptr,
-                            _cublasHandle);
+
+  if (_enable_quant) {
+    launch_fake_quantize<T>(nullptr, nullptr, _shared_encdec_kv_ptr,
+                            _encdec_attn_kvw_ptr, _encdec_kv_cmax_ptr + 1,
+                            _shared_nlayer * 2 * _hidden_size * _hidden_size, 4,
+                            _stream);
+    _encdec_kv_linear.Forward(_batch_size * _src_seq_len, enc_output_ptr,
+                              _shared_encdec_kv_ptr, _shared_grad_encdec_kv_ptr,
+                              _cublasHandle);
+  } else {
+    _encdec_kv_linear.Forward(_batch_size * _src_seq_len, enc_output_ptr,
+                              _encdec_attn_kvw_ptr, _shared_grad_encdec_kv_ptr,
+                              _cublasHandle);
+  }
+
   // [batch_size, src_seq_len, n_dec_layer * 2, hidden_size] ->
   // [n_dec_layer * 2, batch_size, nhead, src_seq_len, head_dim]
   launch_bias_add_transform_20314<T>(
       _predict ? _shared_infer_encdec_kv_ptr : _shared_encdec_kv_ptr,
       _shared_grad_encdec_kv_ptr, _encdec_attn_kvb_ptr, _batch_size,
       _src_seq_len, _shared_nlayer * 2, _heads, _hidden_size / _heads, _stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 template <typename T>
@@ -162,6 +253,7 @@ void TransformerDecoderLayer<T>::encdec_kv_bw(const T *enc_output_ptr,
   launch_transform4d_0213<T>(_shared_encdec_kv_ptr, _shared_grad_encdec_kv_ptr,
                              _batch_size, _src_seq_len, _hidden_size, _heads,
                              _shared_nlayer * 2, _stream);
+
   _encdec_kv_linear.Backward(
       _batch_size * _src_seq_len, _shared_encdec_kv_ptr, enc_output_ptr,
       _encdec_attn_kvw_ptr, _grad_encdec_attn_kvw_ptr,
@@ -173,18 +265,52 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
                                                       const T *enc_mask_ptr,
                                                       T *output_ptr,
                                                       T *buffer) {
-  // size of buffer: [batch_size, trg_seq_len, hidden_size]
-  if (_pre_or_postLayerNorm) {
-    _encdec_attn_ln.Forward(_gemmQ_inp_ptr, input_ptr, _encdec_attn_nw_ptr,
-                            _encdec_attn_nb_ptr, _batch_tokens, _stream);
+  if (_enable_quant) {
+    int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
+    int8_t *qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qweight_ptr = i8_buffer_ptr;
+    if (_pre_or_postLayerNorm) {
+      _encdec_attn_ln.Forward(_gemmQ_inp_ptr, input_ptr, _encdec_attn_nw_ptr,
+                              _encdec_attn_nb_ptr, _batch_tokens, _stream);
+    }
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    launch_quantize<T>(qin_ptr, _encdec_attn_prob_dropout.get_mask(),
+                       _igemm_alpha_ptr, _gemmQ_inp_ptr, _encdec_qkv_cmax_ptr,
+                       _batch_tokens * _hidden_size, 2, _stream);
+    launch_quantize<T>(qweight_ptr, _encdec_attn_prob_dropout.get_mask(),
+                       nullptr, _encdec_attn_qw_ptr, _encdec_qkv_cmax_ptr + 1,
+                       _hidden_size * _hidden_size, 4, _stream);
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+    _encdec_q_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
+                             _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
+                             _cublasLtHandle, _stream);
+
+    launch_quant_bias_add_transform_20314<T>(
+        _encdec_q_ptr, _encdec_attn_prob_dropout.get_mask(), qout_ptr,
+        _encdec_attn_qb_ptr, _encdec_qkv_cmax_ptr + 2, _batch_size,
+        _trg_seq_len, 1, _heads, _hidden_size / _heads, _stream);
+
+    CHECK_GPU_ERROR(cudaGetLastError());
+
+  } else {
+    // size of buffer: [batch_size, trg_seq_len, hidden_size]
+    if (_pre_or_postLayerNorm) {
+      _encdec_attn_ln.Forward(_gemmQ_inp_ptr, input_ptr, _encdec_attn_nw_ptr,
+                              _encdec_attn_nb_ptr, _batch_tokens, _stream);
+    }
+    _encdec_q_linear.Forward(_batch_tokens, _gemmQ_inp_ptr, _encdec_attn_qw_ptr,
+                             buffer, _cublasHandle);
+    // query: [batch_size, trg_seq_len, hidden_size] ->
+    // [batch_size, nhead, trg_seq_len, head_dim]
+    launch_bias_add_transform_20314<T>(
+        _encdec_q_ptr, buffer, _encdec_attn_qb_ptr, _batch_size, _trg_seq_len,
+        1, _heads, _hidden_size / _heads, _stream);
   }
-  _encdec_q_linear.Forward(_batch_tokens, _gemmQ_inp_ptr, _encdec_attn_qw_ptr,
-                           buffer, _cublasHandle);
-  // query: [batch_size, trg_seq_len, hidden_size] ->
-  // [batch_size, nhead, trg_seq_len, head_dim]
-  launch_bias_add_transform_20314<T>(_encdec_q_ptr, buffer, _encdec_attn_qb_ptr,
-                                     _batch_size, _trg_seq_len, 1, _heads,
-                                     _hidden_size / _heads, _stream);
 
   // attention scores, q*k
   // key: [batch_size, nhead, src_seq_len, head_dim]
@@ -212,18 +338,49 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
   _encdec_attn_context.Forward(_batch_heads, buffer, encdec_v_ptr,
                                _encdec_attn_score_ptr, _cublasHandle);
 
-  // [batch_size, nhead, trg_seq_len, head_dim] ->
-  // [batch_size, trg_seq_len, hidden_size]
-  launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
-                             _trg_seq_len, _hidden_size, _heads, 1, _stream);
+  if (_enable_quant) {
+    int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
+    int8_t *qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_dim;
+    int8_t *qweight_ptr = i8_buffer_ptr;
+    // [b, nh, s, ad] -> [b, s, nh, ad]
+    launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
+                               _trg_seq_len, _hidden_size, _heads, 1, _stream);
 
-  _encdec_attn_out_linear.Forward(_batch_tokens, _encdec_attn_output_ptr,
-                                  _encdec_attn_ow_ptr, output_ptr,
-                                  _cublasHandle);
+    launch_quantize<T>(qin_ptr, _encdec_attn_dropout.get_mask(),
+                       _igemm_alpha_ptr, _encdec_attn_output_ptr,
+                       _encdec_out_cmax_ptr, _hidden_size * _batch_tokens, 2,
+                       _stream);
 
-  _encdec_attn_dropout.bias_dropout_residual(output_ptr, output_ptr, input_ptr,
-                                             _encdec_attn_ob_ptr, _batch_tokens,
-                                             _hidden_size, _stream);
+    launch_quantize<T>(qweight_ptr, _encdec_attn_dropout.get_mask(), nullptr,
+                       _encdec_attn_ow_ptr, _encdec_out_cmax_ptr + 1,
+                       _hidden_size * _hidden_size, 4, _stream);
+
+    _encdec_attn_out_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
+                                    _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
+                                    _cublasLtHandle, _stream);
+
+    _encdec_attn_dropout.quant_bias_dropout_residual(
+        output_ptr, qout_ptr, _encdec_out_cmax_ptr + 2, input_ptr,
+        _encdec_attn_ob_ptr, _batch_tokens, _hidden_size, _stream);
+
+  } else {
+    // [batch_size, nhead, trg_seq_len, head_dim] ->
+    // [batch_size, trg_seq_len, hidden_size]
+    launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
+                               _trg_seq_len, _hidden_size, _heads, 1, _stream);
+
+    _encdec_attn_out_linear.Forward(_batch_tokens, _encdec_attn_output_ptr,
+                                    _encdec_attn_ow_ptr, output_ptr,
+                                    _cublasHandle);
+
+    _encdec_attn_dropout.bias_dropout_residual(
+        output_ptr, output_ptr, input_ptr, _encdec_attn_ob_ptr, _batch_tokens,
+        _hidden_size, _stream);
+  }
+
   if (!_pre_or_postLayerNorm) {
     // in-place ln since ln-input will not be used in post-ln mode
     _encdec_attn_ln.Forward(output_ptr, output_ptr, _encdec_attn_nw_ptr,
@@ -234,6 +391,66 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
 template <typename T>
 void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   // save _ff1_inp_ptr, _relu_inp_ptr, _ff2_inp_ptr for backward
+  if (_enable_quant) {
+    int8_t *i8_buffer_ptr = _shared_quant_mem_ptr;
+    int8_t *qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_tokens * _hidden_size;
+    int8_t *qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_tokens * _intermediate_size;
+    int8_t *qweight_ptr = i8_buffer_ptr;
+    if (_pre_or_postLayerNorm) {
+      _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
+                      _batch_tokens, _stream);
+    }
+
+    launch_quantize<T>(qin_ptr, _ffn_dropout.get_mask(), _igemm_alpha_ptr,
+                       _ff1_inp_ptr, _inter_cmax_ptr,
+                       _hidden_size * _batch_tokens, 2, _stream);
+
+    launch_quantize<T>(qweight_ptr, _ffn_activation_dropout.get_mask(), nullptr,
+                       _inter_w_ptr, _inter_cmax_ptr + 1,
+                       _hidden_size * _intermediate_size, 4, _stream);
+
+    _ff1.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
+                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream);
+
+    _ffn_activation_dropout.fakequant_bias_act_dropout(
+        _ff2_inp_ptr, _ffn_activation_dropout.get_mask(),
+        _ffn_activation_dropout.get_mask(), _relu_inp_i8_ptr, _inter_b_ptr,
+        _inter_cmax_ptr + 2, _output_cmax_ptr, _batch_tokens,
+        _intermediate_size, _activation_fn, _stream);
+
+    i8_buffer_ptr = _shared_quant_mem_ptr;
+    qin_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_tokens * _intermediate_size;
+    qout_ptr = i8_buffer_ptr;
+    i8_buffer_ptr += _batch_tokens * _hidden_size;
+    qweight_ptr = i8_buffer_ptr;
+
+    T *fake_inp = _pre_or_postLayerNorm
+                      ? inp_ptr + _batch_dim
+                      : _shared_buffer_ptr + _intermediate_size * _hidden_size;
+    T *fake_weight = _shared_buffer_ptr;
+
+    launch_fake_quantize<T>(_ffn_dropout.get_mask(), nullptr, fake_weight,
+                            _output_w_ptr, _output_cmax_ptr + 1,
+                            _intermediate_size * _hidden_size, 4, _stream);
+
+    _ff2.Forward(_batch_tokens, _ff2_inp_ptr, fake_weight, out_ptr,
+                 _cublasHandle);
+
+    _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
+                                       _batch_tokens, _hidden_size, _stream);
+
+    if (!_pre_or_postLayerNorm) {
+      // in-place ln since ln-input will not be used in post-ln mode
+      _ffn_ln.Forward(out_ptr, out_ptr, _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
+                      _stream);
+    }
+
+    return;
+  }
+
   if (_pre_or_postLayerNorm) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
@@ -266,6 +483,10 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
                                          std::vector<T *> &cache) {
   _stream = Context::Instance().get_stream();
   _cublasHandle = Context::Instance().get_cublashandle();
+  _cublasLtHandle = Context::Instance().get_cublaslthandle();
+
+  zero_mask_grad();
+
   if (_predict && _layer_id == 0) {
     _shared_infer_encdec_kv_ptr = cache[4];
     if (_step == 0) {
@@ -277,12 +498,15 @@ void TransformerDecoderLayer<T>::Forward(const T *dec_input_ptr,
   }
 
   T *buffer = _shared_buffer_ptr;  // 3 * _batch_dim
+
   // _batch_dim
   T *encdec_attn_inp_ptr =
       _pre_or_postLayerNorm ? buffer + 3 * _batch_dim : _gemmQ_inp_ptr;
   // _batch_dim
   T *ffn_inp_ptr =
-      _pre_or_postLayerNorm ? buffer + 4 * _batch_dim : _ff1_inp_ptr;
+      _pre_or_postLayerNorm
+          ? buffer + std::max(4 * _batch_dim, _intermediate_size * _hidden_size)
+          : _ff1_inp_ptr;
 
   self_attn_layer_fw(dec_input_ptr, encdec_attn_inp_ptr, buffer, cache);
 
@@ -335,9 +559,20 @@ void TransformerDecoderLayer<T>::self_attn_layer_bw(const T *input_ptr,
                             _attn_ow_ptr, _grad_attn_ow_ptr, _grad_attn_ob_ptr,
                             _cublasHandle, _stream, grad_input_buf_ptr, nullptr,
                             false);
-  launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
-                           _trg_seq_len, _hidden_size, _heads, _stream);
 
+  if (_enable_quant) {
+    launch_d_cmax(_grad_attn_ow_ptr, static_cast<T *>(nullptr),
+                  _attn_dropout.get_mask(), _hidden_size * _hidden_size, 4,
+                  _stream);
+
+    launch_transform_0213_dcmax<T>(grad_input_ptr, _grad_attn_out_cmax_ptr,
+                                   grad_input_buf_ptr, _attn_dropout.get_mask(),
+                                   _batch_size, _trg_seq_len, _hidden_size,
+                                   _heads, _stream);
+  } else {
+    launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
+                             _trg_seq_len, _hidden_size, _heads, _stream);
+  }
   // bw of score * v
   _attn_context.Backward(_batch_heads, grad_input_ptr, v_tf_ptr,
                          _attn_score_ptr, _cublasHandle,
@@ -363,12 +598,31 @@ void TransformerDecoderLayer<T>::self_attn_layer_bw(const T *input_ptr,
   _qkv_linear.Backward(_batch_tokens, grad_qkv_4d_ptr, gemmQKV_inp_ptr,
                        _attn_qkvw_ptr, _grad_attn_qkvw_ptr, _grad_attn_qkvb_ptr,
                        _cublasHandle, _stream, grad_input_buf_ptr);
-
   if (_pre_or_postLayerNorm) {
-    _attn_ln.Backward(_grad_attn_nw_ptr, _grad_attn_nb_ptr, grad_input_ptr,
-                      grad_input_buf_ptr, grad_output_ptr, gemmQKV_inp_ptr,
-                      _attn_nw_ptr, _attn_nb_ptr, _batch_tokens, streams);
+    if (_enable_quant) {
+      launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
+                    _attn_prob_dropout.get_mask(), _hidden_size * _hidden_size,
+                    4, _stream);
+
+      _attn_ln.Backward(_grad_attn_nw_ptr, _grad_attn_nb_ptr, grad_input_ptr,
+                        _grad_attn_qkv_cmax_ptr, grad_input_buf_ptr,
+                        grad_output_ptr, gemmQKV_inp_ptr, _attn_nw_ptr,
+                        _attn_nb_ptr, _attn_prob_dropout.get_mask(),
+                        _batch_tokens, streams);
+    } else {
+      _attn_ln.Backward(_grad_attn_nw_ptr, _grad_attn_nb_ptr, grad_input_ptr,
+                        grad_input_buf_ptr, grad_output_ptr, gemmQKV_inp_ptr,
+                        _attn_nw_ptr, _attn_nb_ptr, _batch_tokens, streams);
+    }
   } else {
+    if (_enable_quant) {
+      launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
+                    _attn_prob_dropout.get_mask(), _hidden_size * _hidden_size,
+                    4, _stream);
+
+      launch_d_cmax(grad_input_buf_ptr, _grad_attn_qkv_cmax_ptr,
+                    _attn_prob_dropout.get_mask(), _batch_dim, 2, _stream);
+    }
     // FIXME later
     launch_fused_add2<T>(grad_input_ptr, grad_input_buf_ptr, grad_residual_ptr,
                          _batch_size, _trg_seq_len, _hidden_size, _stream);
@@ -425,9 +679,20 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_bw(const T *output_ptr,
       _batch_tokens, grad_input_ptr, _encdec_attn_output_ptr,
       _encdec_attn_ow_ptr, _grad_encdec_attn_ow_ptr, _grad_encdec_attn_ob_ptr,
       _cublasHandle, _stream, grad_input_buf_ptr, nullptr, false);
-  launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
-                           _trg_seq_len, _hidden_size, _heads, _stream);
 
+  if (_enable_quant) {
+    launch_d_cmax(_grad_encdec_attn_ow_ptr, static_cast<T *>(nullptr),
+                  _encdec_attn_dropout.get_mask(), _hidden_size * _hidden_size,
+                  4, _stream);
+
+    launch_transform_0213_dcmax<T>(grad_input_ptr, _grad_encdec_out_cmax_ptr,
+                                   grad_input_buf_ptr,
+                                   _encdec_attn_dropout.get_mask(), _batch_size,
+                                   _trg_seq_len, _hidden_size, _heads, _stream);
+  } else {
+    launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
+                             _trg_seq_len, _hidden_size, _heads, _stream);
+  }
   // bw of score * v
   _encdec_attn_context.Backward(_batch_heads, grad_input_ptr, v_ptr,
                                 _encdec_attn_score_ptr, _cublasHandle,
@@ -454,11 +719,32 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_bw(const T *output_ptr,
                             grad_input_buf_ptr);
 
   if (_pre_or_postLayerNorm) {
-    _encdec_attn_ln.Backward(
-        _grad_encdec_attn_nw_ptr, _grad_encdec_attn_nb_ptr, grad_input_ptr,
-        grad_input_buf_ptr, grad_output_ptr, _gemmQ_inp_ptr,
-        _encdec_attn_nw_ptr, _encdec_attn_nb_ptr, _batch_tokens, streams);
+    if (_enable_quant) {
+      launch_d_cmax(_grad_encdec_attn_qw_ptr, static_cast<T *>(nullptr),
+                    _encdec_attn_prob_dropout.get_mask(),
+                    _hidden_size * _hidden_size, 4, _stream);
+
+      _encdec_attn_ln.Backward(
+          _grad_encdec_attn_nw_ptr, _grad_encdec_attn_nb_ptr, grad_input_ptr,
+          _grad_encdec_qkv_cmax_ptr, grad_input_buf_ptr, grad_output_ptr,
+          _gemmQ_inp_ptr, _encdec_attn_nw_ptr, _encdec_attn_nb_ptr,
+          _encdec_attn_prob_dropout.get_mask(), _batch_tokens, streams);
+    } else {
+      _encdec_attn_ln.Backward(
+          _grad_encdec_attn_nw_ptr, _grad_encdec_attn_nb_ptr, grad_input_ptr,
+          grad_input_buf_ptr, grad_output_ptr, _gemmQ_inp_ptr,
+          _encdec_attn_nw_ptr, _encdec_attn_nb_ptr, _batch_tokens, streams);
+    }
   } else {
+    if (_enable_quant) {
+      launch_d_cmax(_grad_encdec_attn_qw_ptr, static_cast<T *>(nullptr),
+                    _encdec_attn_prob_dropout.get_mask(),
+                    _hidden_size * _hidden_size, 4, _stream);
+
+      launch_d_cmax(grad_input_buf_ptr, _grad_encdec_qkv_cmax_ptr,
+                    _encdec_attn_prob_dropout.get_mask(), _batch_dim, 2,
+                    _stream);
+    }
     // FIXME later
     launch_fused_add2<T>(grad_input_ptr, grad_input_buf_ptr, grad_residual_ptr,
                          _batch_size, _trg_seq_len, _hidden_size, _stream);
@@ -497,10 +783,22 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
                 _grad_output_w_ptr, _grad_output_b_ptr, _cublasHandle, _stream,
                 grad_ff1_out_ptr, nullptr, false);
 
-  _ffn_activation_dropout.d_bias_act_dropout(
-      grad_ff1_out_ptr, _grad_inter_b_ptr, _relu_inp_ptr, _inter_b_ptr,
-      _batch_tokens, _intermediate_size, _activation_fn, _stream);
+  if (_enable_quant) {
+    launch_d_cmax(_grad_output_w_ptr, static_cast<T *>(nullptr),
+                  _encdec_attn_prob_dropout.get_mask(),
+                  _hidden_size * _intermediate_size, 4, _stream);
 
+    _ffn_activation_dropout.d_quant_bias_act_dropout(
+        grad_ff1_out_ptr, _grad_inter_b_ptr, _grad_inter_cmax_ptr + 2,
+        _grad_output_cmax_ptr, _relu_inp_i8_ptr,
+        _ffn_activation_dropout.get_mask(), _inter_cmax_ptr + 2,
+        _ffn_activation_dropout.get_mask(), _inter_b_ptr, _batch_tokens,
+        _intermediate_size, _activation_fn, _stream);
+  } else {
+    _ffn_activation_dropout.d_bias_act_dropout(
+        grad_ff1_out_ptr, _grad_inter_b_ptr, _relu_inp_ptr, _inter_b_ptr,
+        _batch_tokens, _intermediate_size, _activation_fn, _stream);
+  }
   _ff1.Backward(_batch_tokens, grad_ff1_out_ptr, _ff1_inp_ptr, _inter_w_ptr,
                 _grad_inter_w_ptr, _grad_inter_b_ptr, _cublasHandle, _stream,
                 grad_ff1_inp_ptr, nullptr, false);
@@ -511,10 +809,29 @@ void TransformerDecoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   */
   const T *add_res_ptr = _ff1_inp_ptr;
   if (_pre_or_postLayerNorm) {
-    _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,
-                     grad_ff1_inp_ptr, grad_output_ptr, _ff1_inp_ptr,
-                     _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens, streams);
+    if (_enable_quant) {
+      launch_d_cmax(_grad_inter_w_ptr, static_cast<T *>(nullptr),
+                    _encdec_attn_prob_dropout.get_mask(),
+                    _hidden_size * _intermediate_size, 4, _stream);
+
+      _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,
+                       _grad_inter_cmax_ptr, grad_ff1_inp_ptr, grad_output_ptr,
+                       _ff1_inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
+                       _ffn_dropout.get_mask(), _batch_tokens, streams);
+    } else {
+      _ffn_ln.Backward(_grad_ffn_nw_ptr, _grad_ffn_nb_ptr, grad_inp_ptr,
+                       grad_ff1_inp_ptr, grad_output_ptr, _ff1_inp_ptr,
+                       _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens, streams);
+    }
   } else {
+    if (_enable_quant) {
+      launch_d_cmax(_grad_inter_w_ptr, static_cast<T *>(nullptr),
+                    _encdec_attn_prob_dropout.get_mask(),
+                    _hidden_size * _intermediate_size, 4, _stream);
+
+      launch_d_cmax(grad_ff1_inp_ptr, _grad_inter_cmax_ptr,
+                    _ffn_dropout.get_mask(), _batch_dim, 2, _stream);
+    }
     launch_fused_add2<T>(grad_inp_ptr, grad_ff1_inp_ptr, grad_residual_ptr,
                          _batch_size, _trg_seq_len, _hidden_size, _stream);
   }
@@ -560,6 +877,17 @@ void TransformerDecoderLayer<T>::Backward(
 }
 
 template <typename T>
+void TransformerDecoderLayer<T>::zero_mask_grad() {
+  cudaMemsetAsync(_grad_attn_qkv_cmax_ptr, 0, 24 * sizeof(T), _stream);
+  _attn_prob_dropout.zero_mask(_stream);
+  _attn_dropout.zero_mask(_stream);
+  _encdec_attn_prob_dropout.zero_mask(_stream);
+  _encdec_attn_dropout.zero_mask(_stream);
+  _ffn_activation_dropout.zero_mask(_stream);
+  _ffn_dropout.zero_mask(_stream);
+}
+
+template <typename T>
 size_t TransformerDecoderLayer<T>::_shared_nlayer = 0;
 template <typename T>
 T *TransformerDecoderLayer<T>::_shared_buffer_ptr = nullptr;
@@ -569,6 +897,8 @@ template <typename T>
 T *TransformerDecoderLayer<T>::_shared_grad_encdec_kv_ptr = nullptr;
 template <typename T>
 T *TransformerDecoderLayer<T>::_shared_infer_encdec_kv_ptr = nullptr;
+template <typename T>
+int8_t *TransformerDecoderLayer<T>::_shared_quant_mem_ptr = nullptr;
 
 template class TransformerDecoderLayer<float>;
 template class TransformerDecoderLayer<__half>;

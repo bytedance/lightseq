@@ -18,6 +18,7 @@ protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
                       transformer.proto)
 protobuf_generate_cpp(MOE_PROTO_SRC MOE_PROTO_HEADER moe.proto)
 protobuf_generate_cpp(VIT_PROTO_SRC VIT_PROTO_HEADER vit.proto)
+protobuf_generate_cpp(Q_VIT_PROTO_SRC Q_VIT_PROTO_HEADER quant_vit.proto)
 protobuf_generate_cpp(T5_PROTO_SRC T5_PROTO_HEADER t5.proto)
 protobuf_generate_cpp(MT5_PROTO_SRC MT5_PROTO_HEADER mt5.proto)
 
@@ -80,6 +81,12 @@ add_library(vit_weight STATIC vit_weight.cc ${VIT_PROTO_SRC}
 target_link_libraries(vit_weight PUBLIC utils ${Protobuf_LIBRARIES})
 target_include_directories(vit_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vit_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+add_library(quant_vit_weight STATIC quant_vit_weight.cc ${Q_VIT_PROTO_SRC}
+                                    ${Q_VIT_PROTO_HEADER})
+target_link_libraries(quant_vit_weight PUBLIC utils ${Protobuf_LIBRARIES})
+target_include_directories(quant_vit_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(quant_vit_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(t5_weight STATIC t5_weight.cc ${T5_PROTO_SRC} ${T5_PROTO_HEADER})
 target_link_libraries(t5_weight PUBLIC utils ${Protobuf_LIBRARIES}

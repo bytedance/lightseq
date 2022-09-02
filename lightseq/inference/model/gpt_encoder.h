@@ -85,6 +85,7 @@ class GptEncoder {
   int _batch_max_seq_len;
   int _layer_id;
   int _weight_offset;
+  bool _is_benchmark;
 
   const std::set<std::string> kSamplingMethods = {"topk", "topp", "ppl"};
 
@@ -103,6 +104,7 @@ class GptEncoder {
   void run_one_infer(int batch_size, int batch_seq_len);
   int run_one_sample(int batch_size, int batch_seq_len);
   void compute_ppl();
+  void benchmark_mode(bool is_benchmark);
 };
 
 }  // namespace cuda

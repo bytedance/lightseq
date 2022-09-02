@@ -4,6 +4,10 @@ from lightseq.training.ops.pytorch import TransformerBuilder
 from lightseq.training.ops.pytorch.transformer_encoder_layer import (
     LSTransformerEncoderLayer,
 )
+from lightseq.training.ops.pytorch.quantization import (
+    weight_quant_config,
+    act_quant_config,
+)
 
 transformer_cuda_module = TransformerBuilder().load()
 
@@ -119,6 +123,11 @@ def get_hf_gpt_enc_layer_params(layer, gpt_config):
     init_bs.append(layer.mlp.c_proj.bias.detach().clone())
     init_ws.append(layer.ln_2.weight.detach().clone())
     init_bs.append(layer.ln_2.bias.detach().clone())
+
+    act_cmax = act_quant_config.amax.tolist()
+    wei_cmax = weight_quant_config.amax.tolist()
+    init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
+    init_ws.append(init_clip_max)
 
     return init_ws, init_bs
 

@@ -276,7 +276,7 @@ void launch_attn_softmax_new<__half>(__half *out, __half *inp,
         out, inp, attn_mask, from_len, to_len, mask_future);
   } else {
     throw std::runtime_error(
-        "Sequence length greater than 512 is currently not supported");
+        "Sequence length greater than 1024 is currently not supported");
   }
 }
 

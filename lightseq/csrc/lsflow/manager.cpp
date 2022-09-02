@@ -28,6 +28,9 @@ void MemoryManager::calculate_buffer_() {
   if (buffer_ != nullptr) {
     cudaFree(buffer_);
   }
+
+  printf("===== Execute MemoryManager calculate_buffer_ =====\n");
+
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
   size_t tmp_buffer_size_ = 0;
@@ -86,23 +89,74 @@ void MemoryManager::calculate_buffer_() {
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
 
+  printf("total_consumption: %zu\n", total_consumption);
+
+  // Add algorithm check module
+  // return true means check success,
+  auto judge_func = [](const std::pair<TensorUsage, size_t> &x,
+                       const std::pair<TensorUsage, size_t> &y) {
+    auto max_time_l = std::max(x.first.first_idx, y.first.first_idx);
+    auto min_time_r = std::min(x.first.last_idx, y.first.last_idx);
+    if (min_time_r < max_time_l) {
+      return true;
+    }
+    auto max_space_l = std::max(x.second, y.second);
+    auto min_space_r =
+        std::min(x.first.size + x.second, y.first.size + y.second);
+    if (min_space_r <= max_space_l) {
+      return true;
+    }
+    return false;
+  };
+  std::vector<std::pair<TensorUsage, size_t>> temp_check_vec{};
+  std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
+            [](const std::pair<TensorUsage, size_t> &x,
+               const std::pair<TensorUsage, size_t> &y) -> bool {
+              // return x.first.first_idx < y.first.first_idx;
+              return x.second < y.second;
+            });
+  for (auto iter : tensor_usages_vec) {
+    int unique_id = iter.first.unique_id;
+    size_t size = iter.first.size;
+#ifdef DEBUG
+    printf(
+        "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu, "
+        "end_addr: %zu\n",
+        unique_id, iter.first.first_idx, iter.first.last_idx,
+        iter.first._name.c_str(), size, iter.second, iter.second + size);
+#endif
+
+    for (auto check_iter : temp_check_vec) {
+      if (judge_func(check_iter, iter)) {
+        continue;
+      }
+      printf("================================\n");
+      printf("ERROR occurred!\n");
+      printf(
+          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          unique_id, iter.first.first_idx, iter.first.last_idx,
+          iter.first._name.c_str(), size, iter.second);
+
+      int check_unique_id = check_iter.first.unique_id;
+      size_t check_size = check_iter.first.size;
+      printf(
+          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          check_unique_id, check_iter.first.first_idx,
+          check_iter.first.last_idx, check_iter.first._name.c_str(), check_size,
+          check_iter.second);
+
+      printf("================================\n");
+      exit(-1);
+    }
+    temp_check_vec.push_back(iter);
+  }
+
   buffer_ = cuda_malloc<char>(total_consumption);
   buffer_size_ = total_consumption;
-
-#ifdef DEBUG
-  printf("total_consumption: %d\n", total_consumption);
-#endif
 
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     tensor_ptr.emplace(unique_id, buffer_ + iter.second);
-    size_t size = iter.first.size;
-
-#ifdef DEBUG
-    printf("idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
-           unique_id, iter.first.first_idx, iter.first.last_idx,
-           iter.first._name.c_str(), size, iter.second);
-#endif
   }
 }
 
