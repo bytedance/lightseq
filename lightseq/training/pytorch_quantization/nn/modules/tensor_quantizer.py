@@ -349,10 +349,10 @@ class TensorQuantizer(nn.Module):
         # amax = self.clip.clip_value_maxs if self.is_embed else self.clip.clip_value_max
         amax = self.clip.clip_value_max
 
-        factor = 0.9999**(self.train_step/0.9999)
-        # factor = 0.999**(self.train_step/0.999)
-        a = self.fa_t * factor
-        fa, fb = 1 + a, a * 4
+        # factor = 0.9999**(self.train_step/0.9999)
+        # # factor = 0.999**(self.train_step/0.999)
+        # a = self.fa_t * factor
+        # fa, fb = 1 + a, a * 4
         
         self.train_step += 1
 
@@ -367,7 +367,7 @@ class TensorQuantizer(nn.Module):
                     self.training,
                     self.smooth_avg,
                     # self.fab,
-                    (fa, fb),
+                    (1, 1),
                     self.is_weight,
                     self.is_embed,
                 )
