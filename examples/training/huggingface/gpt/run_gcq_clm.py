@@ -51,7 +51,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from ls_hf_gpt_layer import inject_ls_layer
-from examples.training.huggingface.gcq_utils import Trainer, GCQArguments
+from examples.training.huggingface.gcq import LSTrainer, GCQArguments
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -547,7 +547,8 @@ def main():
             eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = LSTrainer(
+        gcq_args=gcq_args,
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -555,7 +556,6 @@ def main():
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator,
-        gcq_args=gcq_args,
     )
 
     if not training_args.do_train:

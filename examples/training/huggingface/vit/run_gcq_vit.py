@@ -47,7 +47,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from ls_hf_vit_encoder_layer import inject_ls_enc_layer
-from examples.training.huggingface.gcq_utils import Trainer, GCQArguments
+from examples.training.huggingface.gcq import LSTrainer, GCQArguments
 
 
 """ Fine-tuning a 🤗 Transformers model for image classification"""
@@ -373,7 +373,8 @@ def main():
         ds["validation"].set_transform(val_transforms)
 
     # Initalize our trainer
-    trainer = Trainer(
+    trainer = LSTrainer(
+        gcq_args=gcq_args,
         model=model,
         args=training_args,
         train_dataset=ds["train"] if training_args.do_train else None,
@@ -381,7 +382,6 @@ def main():
         compute_metrics=compute_metrics,
         tokenizer=feature_extractor,
         data_collator=collate_fn,
-        gcq_args=gcq_args,
     )
 
     # Training

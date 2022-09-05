@@ -47,7 +47,7 @@ from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from utils_qa import postprocess_qa_predictions
 from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForQuestionAnswering
-from examples.training.huggingface.gcq_utils import GCQArguments
+from examples.training.huggingface.gcq import GCQArguments
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -688,6 +688,7 @@ def main():
 
     # Initialize our Trainer
     trainer = QuestionAnsweringTrainer(
+        gcq_args=gcq_args,
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -697,7 +698,6 @@ def main():
         data_collator=data_collator,
         post_process_function=post_processing_function,
         compute_metrics=compute_metrics,
-        gcq_args=gcq_args,
     )
 
     # Training

@@ -27,8 +27,9 @@ from fairseq import (
 from fairseq.data import iterators
 from fairseq.logging import meters, metrics, progress_bar
 from fairseq.model_parallel.megatron_trainer import MegatronTrainer
-from .ls_fs_gcq_trainer import Trainer
-
+# Import the Trainer which uses GCQ.
+from .ls_fs_gcq_trainer import LSTrainer as Trainer
+# The following code is from fairseq without change.
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",

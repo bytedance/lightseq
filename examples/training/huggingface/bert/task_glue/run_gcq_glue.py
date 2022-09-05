@@ -37,7 +37,6 @@ from transformers import (
     EvalPrediction,
     HfArgumentParser,
     PretrainedConfig,
-    Trainer,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -48,7 +47,8 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForSequenceClassification
-from examples.training.huggingface.gcq_utils import Trainer, GCQArguments
+from examples.training.huggingface.gcq import LSTrainer, GCQArguments
+
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.8.0")
 
@@ -582,7 +582,8 @@ def main():
         data_collator = None
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = LSTrainer(
+        gcq_args=gcq_args,
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -590,7 +591,6 @@ def main():
         compute_metrics=compute_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        gcq_args=gcq_args,
     )
 
     # Training

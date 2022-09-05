@@ -17,7 +17,7 @@ A subclass of `Trainer` specific to Question-Answering tasks
 """
 
 from transformers import is_torch_tpu_available
-from examples.training.huggingface.gcq_utils import Trainer
+from examples.training.huggingface.gcq import LSTrainer
 from transformers.trainer_utils import PredictionOutput
 
 
@@ -26,7 +26,7 @@ if is_torch_tpu_available():
     import torch_xla.debug.metrics as met
 
 
-class QuestionAnsweringTrainer(Trainer):
+class QuestionAnsweringTrainer(LSTrainer):
     def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples

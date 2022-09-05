@@ -38,14 +38,13 @@ from transformers import (
     DataCollatorForTokenClassification,
     HfArgumentParser,
     PreTrainedTokenizerFast,
-    Trainer,
     TrainingArguments,
     set_seed,
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForTokenClassification
-from examples.training.huggingface.gcq_utils import Trainer, GCQArguments
+from examples.training.huggingface.gcq import LSTrainer, GCQArguments
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -530,7 +529,8 @@ def main():
             }
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = LSTrainer(
+        gcq_args=gcq_args,
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -538,7 +538,6 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
-        gcq_args=gcq_args,
     )
 
     if not training_args.do_train:
