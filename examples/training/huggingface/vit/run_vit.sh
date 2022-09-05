@@ -15,23 +15,21 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
-python3 $THIS_DIR/run_vit.py \
-    --dataset_name beans \
-    --output_dir /tmp/beans_outputs \
-    --overwrite_output_dir \
-    --remove_unused_columns False \
-    --do_train \
-    --do_eval \
-    --learning_rate 2e-5 \
-    --num_train_epochs 5 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 8 \
-    --logging_strategy steps \
-    --logging_steps 10 \
-    --evaluation_strategy epoch \
-    --save_strategy epoch \
-    --load_best_model_at_end True \
-    --save_total_limit 3 \
-    --seed 1337 \
-    --fp16 \
-    --with_lightseq true
+python3 -m torch.distributed.launch \
+  --nproc_per_node=1 \
+  $THIS_DIR/run_vit.py \
+  --dataset_name beans \
+  --output_dir /tmp/beans_outputs \
+  --overwrite_output_dir \
+  --remove_unused_columns False \
+  --do_train \
+  --do_eval \
+  --learning_rate 2e-5 \
+  --num_train_epochs 30 \
+  --per_device_train_batch_size 8 \
+  --per_device_eval_batch_size 8 \
+  --logging_steps 10 \
+  --seed 1337 \
+  --fp16 \
+  --module_type 1 \
+  --enable_quant false

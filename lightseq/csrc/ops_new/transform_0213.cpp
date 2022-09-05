@@ -4,7 +4,7 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* Transform0213<T1, T2>::operator()(Variable* inp) {
-  size_t trans_size = _max_batch * _max_seq * _hidden_size;
+  size_t trans_size = _max_batch_tokens * _hidden_size;
   Variable* res = new Variable(this->_name + "/res", trans_size * sizeof(T1),
                                trans_size * sizeof(T2));
   this->set_parents({inp});
@@ -33,5 +33,8 @@ void Transform0213<T1, T2>::backward() {
   launch_transform_0213<T2>(inp_grad, out_grad, _batch, _seq_len, _hidden_size,
                             _heads, _stream);
 }
+
+template class Transform0213<float, float>;
+template class Transform0213<__half, __half>;
 
 }  // namespace lightseq

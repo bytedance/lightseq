@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #include <fstream>
-#include "cuda_util.h"
+
 #include "kernels.h"
 
 using namespace std;
@@ -20,12 +20,31 @@ class Normalize_Layer {
         : hidden_dim(hidden_dim), use_mean(use_mean) {}
   };
 
-  Normalize_Layer(Config config, size_t max_rows);
+  Normalize_Layer(Config config, size_t max_rows)
+      : config_(config), vars_(nullptr), means_(nullptr) {
+    vars_ = cuda_malloc<T>(max_rows);
+    if (config_.use_mean) {
+      means_ = cuda_malloc<T>(max_rows);
+    }
+  }
 
-  ~Normalize_Layer();
+  ~Normalize_Layer() {
+    cuda_free(vars_);
+    cuda_free(means_);
+  }
 
   void Forward(T *ln_res, const T *inp, const T *gamma, const T *betta,
-               int batch_size, cudaStream_t stream);
+               int batch_size, cudaStream_t stream) {
+    launch_layer_norm(ln_res, vars_, means_, inp, gamma, betta, batch_size,
+                      config_.hidden_dim, stream);
+  }
+
+  void Forward(int8_t *q_out, uint8_t *clip_mask, const T *inp, const T *gamma,
+               const T *betta, const T *clip_max_out, int batch_size,
+               cudaStream_t stream) {
+    launch_layer_norm_i8(q_out, clip_mask, vars_, means_, inp, gamma, betta,
+                         clip_max_out, batch_size, config_.hidden_dim, stream);
+  }
 
   /*
   residual_grad, inp_or_out, betta should be treated carefully.
@@ -38,9 +57,22 @@ class Normalize_Layer {
   */
   void Backward(T *gamma_grad, T *betta_grad, T *inp_grad, const T *out_grad,
                 const T *residual_grad, const T *inp_or_out, const T *gamma,
-                const T *betta, int batch_size, cudaStream_t stream[2]);
+                const T *betta, int batch_size, cudaStream_t stream[2]) {
+    launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
+                 inp_or_out, gamma, betta, vars_, means_, batch_size,
+                 config_.hidden_dim, stream);
+  }
 
-  bool use_mean() const;
+  void Backward(T *gamma_grad, T *betta_grad, T *inp_grad, T *cmax_grad,
+                const T *out_grad, const T *residual_grad, const T *inp,
+                const T *gamma, const T *betta, const uint8_t *cmask,
+                int batch_size, cudaStream_t stream[2]) {
+    launch_quant_ln_bw(gamma_grad, betta_grad, inp_grad, cmax_grad, out_grad,
+                       residual_grad, inp, gamma, betta, vars_, means_, cmask,
+                       batch_size, config_.hidden_dim, stream);
+  }
+
+  inline bool use_mean() const { return config_.use_mean; }
 
  private:
   Config config_;

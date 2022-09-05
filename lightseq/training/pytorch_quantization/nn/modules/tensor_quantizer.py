@@ -172,8 +172,10 @@ class TensorQuantizer(nn.Module):
     def disable_clip(self):
         """Disable clip stage"""
         self._if_clip = False
+        if not self._learn_amax:
+            return
         # self.clip.clip_value_min.required_grad = False
-        if self._learn_amax and hasattr(self.clip, "clip_value_max"):
+        if hasattr(self.clip, "clip_value_max"):
             self.clip.clip_value_max.required_grad = False
 
     def enable_clip(self):

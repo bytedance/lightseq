@@ -19,5 +19,5 @@ python3 -m torch.distributed.launch \
     --fp16 \
     --logging_steps 10 \
     --block_size 512 \
-    --module_type 2 \
+    --module_type 1 \
     --enable_quant true

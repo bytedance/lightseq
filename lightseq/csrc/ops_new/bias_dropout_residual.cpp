@@ -17,6 +17,8 @@ template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
+  // printf("Running! BiasDropoutResOp name: %s\n", this->name().c_str());
+
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
   T1* residual = (T1*)parent(2)->value();
@@ -25,6 +27,16 @@ void BiasDropoutResOp<T1, T2>::forward() {
 
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(residual, this->name() + " residual", 10);
+    print_vec(bias, this->name() + " bias", 10);
+    print_vec(output, this->name() + " ans", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template <typename T1, typename T2>
@@ -49,6 +61,8 @@ void BiasDropoutResOp<T1, T2>::backward() {
                _max_ele_num * sizeof(T2), cudaMemcpyDeviceToDevice);
   } else {  // accumulate
             // launch_fused_add2 ...
+    launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
+                      _cols, stream);
   }
 }
 

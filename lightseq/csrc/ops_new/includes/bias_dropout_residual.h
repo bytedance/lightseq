@@ -21,8 +21,9 @@ class BiasDropoutResOp : public Operator {
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
   BiasDropoutResOp(float r, size_t max_ele_num)
-      : Operator("Dropout"), ratio(r), _max_ele_num(max_ele_num) {
-    _mask.reset(new Tensor("_mask", max_ele_num * sizeof(uint8_t)));
+      : Operator("BiasDropoutResOp"), ratio(r), _max_ele_num(max_ele_num) {
+    _mask.reset(
+        new Tensor("BiasDropoutResOp/_mask", max_ele_num * sizeof(uint8_t)));
   }
 
   virtual ~BiasDropoutResOp() {}

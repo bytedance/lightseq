@@ -52,6 +52,7 @@ class QuantTransformer : public LSModel {
   std::vector<int> get_output_max_shape(int index);
   DataType get_input_dtype(int index);
   DataType get_output_dtype(int index);
+  void benchmark_mode(bool is_benchmark) override;
 };
 
 LSMODEL_REGISTER(QuantTransformer);

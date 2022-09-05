@@ -204,5 +204,9 @@ DataType Gpt::get_output_dtype(int index) {
   }
 }
 
+void Gpt::benchmark_mode(bool is_benchmark) {
+  encoder_->benchmark_mode(is_benchmark);
+}
+
 }  // namespace cuda
 }  // namespace lightseq

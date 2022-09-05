@@ -17,19 +17,28 @@ void FeedForwardOp<T1, T2>::forward() {
   float alpha = float(1.);
   float beta = float(0.);
 
-  T1* weights = (T1*)parent(1)->value();
   T1* input_ptr = (T1*)parent(0)->value();
+  T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, _output_size,
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    print_vec(input_ptr, this->name() + " inp", 10);
+    print_vec(out_ptr, this->name() + " ans", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template <typename T1, typename T2>
 void FeedForwardOp<T1, T2>::backward() {
-  float alpha = (float)1.0, beta = (float)0.0;
+  float alpha = (float)1.0, w_beta = (float)0.0, inp_beta = (float)0.0;
 
   T2* out_grad = (T2*)child(0)->grad();
   T1* weights = (T1*)parent(1)->value();
@@ -38,15 +47,19 @@ void FeedForwardOp<T1, T2>::backward() {
   T2* weights_grad = (T2*)parent(1)->grad();
   T2* inp_grad = (T2*)parent(0)->grad();
 
+  if (!parent(0)->is_cover()) {
+    inp_beta = (float)1.0;
+  }
+
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                 _output_size, _batch_tokens, &alpha, &beta, input_ptr,
+                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr,
                  out_grad, weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
 
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
-                 _batch_tokens, _output_size, &alpha, &beta, weights, out_grad,
-                 inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
+                 _batch_tokens, _output_size, &alpha, &inp_beta, weights,
+                 out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
 }
 
 template class FeedForwardOp<float, float>;

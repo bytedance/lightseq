@@ -5,7 +5,7 @@ from torch._C import ScriptModule, dtype
 from torch.nn import functional
 
 from lightseq.training.ops.pytorch.builder import KernelBuilder, AdamBuilder
-from tests.util import TestDecorator, cast_fp32_tensor
+from tests.util import TestDecorator
 
 cuda_module = KernelBuilder().load()
 adam_module = AdamBuilder().load()
@@ -532,7 +532,9 @@ def test_launch_layer_norm():
         return [custom_res, vars, means] if with_mean else [custom_res, vars]
 
     def baseline():
-        base = torch.nn.functional.layer_norm(inp, [hidden_dim], gamma, beta, 1e-8)
+        base = torch.nn.functional.layer_norm(
+            inp, [hidden_dim], gamma, beta, kt.epsilon
+        )
         if with_mean:
             return [
                 base.contiguous(),
@@ -541,6 +543,80 @@ def test_launch_layer_norm():
             ]
         else:
             return [base.contiguous(), inp.var(dim=1).contiguous()]
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-2, rtol=1e-3)
+def test_launch_layer_norm_i8O():
+    batch_size, seq_len = kt.bs_sl()
+    bsz_seq = batch_size * seq_len
+    hidden_dim = kt.hidden_dim
+    with_mean = random.choice([True, False])
+    print(
+        "(batch_token_num, hidden_dim, with_mean): "
+        f"({bsz_seq}, {hidden_dim}, {with_mean})"
+    )
+
+    # shared weights
+    inp = kt.rand((bsz_seq, hidden_dim))
+    gamma = kt.rand((hidden_dim))
+    beta = kt.rand((hidden_dim))
+    vars = kt.rand((bsz_seq))
+    means = kt.rand((bsz_seq))
+    cmax = kt.topk(inp)
+
+    # custom weights
+    custom_res = kt.randint8((bsz_seq, hidden_dim))
+    custom_cmask = kt.randuint8((bsz_seq, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_layer_norm_i8_fp32
+    else:
+        func = cuda_module.torch_launch_layer_norm_i8_fp16
+
+    def custom():
+        custom_cmask.zero_()
+        test_res = inp.clone()
+        func(
+            custom_res,
+            custom_cmask,
+            vars,
+            means,
+            inp,
+            gamma,
+            beta,
+            cmax,
+            bsz_seq,
+            hidden_dim,
+            with_mean,
+        )
+
+        return (
+            [custom_res, vars, means, custom_cmask]
+            if with_mean
+            else [custom_res, vars, custom_cmask]
+        )
+
+    def baseline():
+        base_res = torch.nn.functional.layer_norm(
+            inp, [hidden_dim], gamma, beta, kt.epsilon
+        )
+        base_res, base_cmask = kt.quantize(base_res, cmax)
+
+        if with_mean:
+            return [
+                base_res.contiguous(),
+                inp.var(dim=1).contiguous(),
+                inp.mean(dim=1).contiguous(),
+                base_cmask.contiguous(),
+            ]
+        else:
+            return [
+                base_res.contiguous(),
+                inp.var(dim=1).contiguous(),
+                base_cmask.contiguous(),
+            ]
 
     return custom, baseline
 
@@ -556,7 +632,6 @@ def test_launch_ln_bw():
         "(batch_token_num, hidden_dim, with_mean, fuse_add): "
         f"({bsz_seq}, {hidden_dim}, {with_mean}, {fuse_add})"
     )
-    epsilon = 1e-12
 
     ln_input = kt.rand((bsz_seq, hidden_dim))
     out_grad = kt.rand((bsz_seq, hidden_dim))
@@ -567,7 +642,7 @@ def test_launch_ln_bw():
     betta_grad = kt.rand((hidden_dim))
     inp_grad = kt.rand((bsz_seq, hidden_dim))
 
-    ln_output = functional.layer_norm(ln_input, [hidden_dim], gamma, betta, epsilon)
+    ln_output = functional.layer_norm(ln_input, [hidden_dim], gamma, betta, kt.epsilon)
     vars = ln_input.var(dim=1).contiguous()
     means = ln_input.mean(dim=1).contiguous()
 
@@ -600,12 +675,17 @@ def test_launch_ln_bw():
 
     def baseline():
         if with_mean:
-            f_out_grad, f_input, f_vars, f_means, f_betta, f_gamma = cast_fp32_tensor(
-                [out_grad, ln_input, vars, means, betta, gamma]
-            )
+            (
+                f_out_grad,
+                f_input,
+                f_vars,
+                f_means,
+                f_betta,
+                f_gamma,
+            ) = kt.cast_fp32_tensor([out_grad, ln_input, vars, means, betta, gamma])
             xhat = (f_input - f_means.unsqueeze(1)) * f_vars.rsqrt().unsqueeze(1)
         else:
-            f_out_grad, f_out, f_vars, f_betta, f_gamma = cast_fp32_tensor(
+            f_out_grad, f_out, f_vars, f_betta, f_gamma = kt.cast_fp32_tensor(
                 [out_grad, ln_output, vars, betta, gamma]
             )
             xhat = (f_out - f_betta) / f_gamma
@@ -619,13 +699,104 @@ def test_launch_ln_bw():
         dinp = dinp * f_vars.rsqrt().unsqueeze(1)
         if fuse_add:
             dinp = dinp + residual_grad
-        # return kt.norm_res_list([dinp])
         return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp])
 
     return custom, baseline
 
 
-@kt.case()
+@kt.case(atol=1e-3, rtol=1e-2)
+def test_launch_ln_i8O_bw():
+    batch_size, seq_len = kt.bs_sl()
+    bsz_seq = batch_size * seq_len
+    hidden_dim = kt.hidden_dim
+    with_mean = random.choice([True, False])
+    fuse_add = random.choice([True, False])
+    print(
+        "(batch_token_num, hidden_dim, with_mean, fuse_add): "
+        f"({bsz_seq}, {hidden_dim}, {with_mean}, {fuse_add})"
+    )
+
+    # shared weights
+    inp = kt.rand((bsz_seq, hidden_dim))
+    out_grad = kt.rand((bsz_seq, hidden_dim))
+    residual_grad = kt.rand((bsz_seq, hidden_dim))
+    gamma = kt.rand((hidden_dim))
+    betta = kt.rand((hidden_dim))
+    # forward
+    ln_output = functional.layer_norm(inp, [hidden_dim], gamma, betta, kt.epsilon)
+    vars = inp.var(dim=1).contiguous()
+    means = inp.mean(dim=1).contiguous()
+    cmax = kt.topk(inp)
+    cmask = kt.get_cmask(ln_output, cmax)
+    inp_or_out = inp if with_mean else ln_output
+
+    # custom weights
+    gamma_grad = kt.rand((hidden_dim))
+    betta_grad = kt.rand((hidden_dim))
+    inp_grad = kt.rand((bsz_seq, hidden_dim))
+    cmax_grad = kt.zeros(1)
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_ln_bw_i8_fp32
+    else:
+        func = cuda_module.torch_launch_ln_bw_i8_fp16
+
+    def custom():
+        func(
+            gamma_grad,
+            betta_grad,
+            inp_grad,
+            cmax_grad,
+            out_grad,
+            residual_grad,
+            inp_or_out,
+            gamma,
+            betta,
+            vars,
+            means,
+            cmask,
+            bsz_seq,
+            hidden_dim,
+            with_mean,
+            fuse_add,
+        )
+        return [gamma_grad, betta_grad, inp_grad, cmax_grad]
+
+    def baseline():
+        if with_mean:
+            (
+                f_out_grad,
+                f_input,
+                f_vars,
+                f_means,
+                f_betta,
+                f_gamma,
+            ) = kt.cast_fp32_tensor([out_grad, inp, vars, means, betta, gamma])
+            xhat = (f_input - f_means.unsqueeze(1)) * f_vars.rsqrt().unsqueeze(1)
+        else:
+            f_out_grad, f_out, f_vars, f_betta, f_gamma = kt.cast_fp32_tensor(
+                [out_grad, ln_output, vars, betta, gamma]
+            )
+            xhat = (f_out - f_betta) / f_gamma
+        f_out_grad_inrange = kt.tensor_inrange(f_out_grad, ln_output, cmax)
+        f_out_grad_outrange = kt.tensor_outrange(f_out_grad, ln_output, cmax)
+        f_cmax_grad = f_out_grad_outrange.sum()
+        dxhat = f_out_grad_inrange * f_gamma
+        f_betta_grad = f_out_grad_inrange.sum(dim=0)
+        f_gamma_grad = (f_out_grad_inrange * xhat).sum(dim=0)
+        dinp = dxhat.sum(dim=1).unsqueeze(1) + xhat * (dxhat * xhat).sum(
+            dim=1
+        ).unsqueeze(1)
+        dinp = dxhat - dinp / hidden_dim
+        dinp = dinp * f_vars.rsqrt().unsqueeze(1)
+        if fuse_add:
+            dinp = dinp + residual_grad
+        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp, f_cmax_grad])
+
+    return custom, baseline
+
+
+@kt.case(rtol=1e-3)
 def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
@@ -762,12 +933,7 @@ def test_launch_dropout_relu_bias():
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
     test_bias = kt.rand((hidden_dim,))
-    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
     test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
-    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
-        dtype=torch.uint8,
-        device="cuda:0",
-    )
     test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -807,13 +973,7 @@ def test_launch_dropout_gelu_bias():
 
     test_input = kt.rand((batch_size, seq_len, hidden_dim))
     test_bias = kt.rand((hidden_dim,))
-    test_out_base = kt.rand((batch_size, seq_len, hidden_dim))
     test_out_cus = kt.rand((batch_size, seq_len, hidden_dim))
-    temp = kt.rand((batch_size, seq_len, hidden_dim))
-    test_mask_base = torch.rand((batch_size, seq_len, hidden_dim)).to(
-        dtype=torch.uint8,
-        device="cuda:0",
-    )
     test_mask_cus = torch.rand((batch_size, seq_len, hidden_dim)).to(
         dtype=torch.uint8, device="cuda:0"
     )
@@ -882,11 +1042,11 @@ def test_launch_dropout_relu_bias_bwd():
         return test_in_grad_cus, test_bias_grad_cus
 
     def baseline():
-        temp = test_out_grad * test_mask * (1 / (1 - 0.1))
-        test_in_grad_base = temp * ((test_input + test_bias) > 0)
-        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1))
+        temp = test_out_grad.float() * test_mask * (1 / (1 - 0.1))
+        test_in_grad_base = temp * ((test_input.float() + test_bias.float()) > 0)
+        test_bias_grad_base = torch.sum(test_in_grad_base, (0, 1), dtype=torch.float)
 
-        return test_in_grad_base, test_bias_grad_base
+        return test_in_grad_base.to(kt.dtype), test_bias_grad_base.to(kt.dtype)
 
     return custom, baseline
 
@@ -1017,27 +1177,551 @@ def test_crf():
     return custom, baseline
 
 
+@kt.case(atol=4, rtol=1e-2)
+def test_launch_dropout_relu_bias_i8I_i8O():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    # shared weights
+    inp = kt.randint8((batch_size, seq_len, hidden_dim))
+    bias = kt.rand((hidden_dim,))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+    cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
+    cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
+
+    # custom weights
+    custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
+    custom_cmask_out = kt.randuint8((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_fp16
+
+    def custom():
+        custom_cmask_in = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+        cus_func(
+            custom_res,
+            custom_cmask_out,
+            custom_cmask_in,
+            custom_cmask_in,
+            inp,
+            bias,
+            cmax_out,
+            cmax_in,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return [custom_res, custom_cmask_in]
+
+    def baseline():
+        inp_dq = kt.dequantize(inp, cmax_out)
+        out_base = torch.nn.functional.relu(inp_dq + bias)
+        out_base = torch.nn.functional.dropout(out_base, p=0)
+        out_base, cmask_in_base = kt.quantize(out_base, cmax_in)
+        cmask_in_base |= mask
+
+        return [out_base, cmask_in_base]
+
+    return [custom, baseline]
+
+
+@kt.case(atol=4, rtol=1e-2)
+def test_launch_dropout_gelu_bias_i8I_i8O():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    # shared weights
+    inp = kt.randint8((batch_size, seq_len, hidden_dim))
+    bias = kt.rand((hidden_dim,))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+    cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
+    cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
+
+    # custom weights
+    custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
+    custom_cmask_out = kt.randuint8((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_fp16
+
+    def custom():
+        custom_cmask_in = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+        cus_func(
+            custom_res,
+            custom_cmask_out,
+            custom_cmask_in,
+            custom_cmask_in,
+            inp,
+            bias,
+            cmax_out,
+            cmax_in,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return [custom_res, custom_cmask_in]
+
+    def baseline():
+        inp_dq = kt.dequantize(inp, cmax_out)
+        out_base = torch.nn.functional.gelu(inp_dq + bias)
+        out_base = torch.nn.functional.dropout(out_base, p=0)
+        out_base, cmask_in_base = kt.quantize(out_base, cmax_in)
+        cmask_in_base |= mask
+
+        return [out_base, cmask_in_base]
+
+    return [custom, baseline]
+
+
+@kt.case(atol=1e-2, rtol=1e-2)
+def test_launch_dropout_relu_bias_i8I_i8O_bwd():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim * 4
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    # shared weights
+    inp = kt.randint8((batch_size, seq_len, hidden_dim))
+    bias = kt.rand((hidden_dim,))
+    out_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+    cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
+    cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
+
+    inp_dq = kt.dequantize(inp, cmax_out, float_out=True)
+    res = torch.nn.functional.relu(inp_dq + bias)
+    res = torch.nn.functional.dropout(res, p=0)
+
+    # custom weights
+    custom_inp_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    custom_bias_grad = kt.rand((hidden_dim))
+    custom_cmask_out = kt.get_cmask(inp, cmax_out)
+    custom_cmask_in = kt.get_cmask(res, cmax_in)
+    custom_cmax_in_grad = kt.zeros(1)
+    custom_cmax_out_grad = kt.zeros(1)
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_relu_bias_bwd_fp16
+
+    def custom():
+        cus_func(
+            custom_inp_grad,
+            custom_bias_grad,
+            custom_cmax_out_grad,
+            custom_cmax_in_grad,
+            mask,
+            inp,
+            cmax_out,
+            custom_cmask_out,
+            custom_cmask_in,
+            bias,
+            out_grad,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+        return custom_inp_grad, custom_bias_grad, custom_cmax_in_grad
+
+    def baseline():
+        out_grad_inrange = kt.tensor_inrange(out_grad, res, cmax_in)
+        out_grad_outrange = kt.tensor_outrange(out_grad, res, cmax_in)
+        base_cmax_in_grad = out_grad_outrange.sum()
+
+        temp = out_grad_inrange * mask
+        base_inp_grad = temp * ((inp_dq + bias) > 0)
+        base_bias_grad = torch.sum(base_inp_grad, (0, 1))
+        return base_inp_grad, base_bias_grad, base_cmax_in_grad
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-2, rtol=1e-2)
+def test_launch_dropout_gelu_bias_i8I_i8O_bwd():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim * 4
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    # shared weights
+    inp = kt.randint8((batch_size, seq_len, hidden_dim))
+    bias = kt.rand((hidden_dim,))
+    out_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+    cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
+    cmax_in = (kt.topk(inp) / 127).to(kt.dtype)
+    inp_dq = kt.dequantize(inp, cmax_out)
+    gelu_inp = inp_dq + bias
+    gelu_inp.requires_grad_()
+    gelu_out = torch.nn.functional.gelu(gelu_inp)
+    gelu_out_sum = gelu_out.sum()
+    res = torch.nn.functional.dropout(gelu_out, p=0)
+
+    # custom weights
+    custom_inp_grad = kt.rand((batch_size, seq_len, hidden_dim))
+    custom_bias_grad = kt.rand((hidden_dim))
+    custom_cmask_out = kt.get_cmask(inp, cmax_out)
+    custom_cmask_in = kt.get_cmask(res, cmax_in)
+    custom_cmax_in_grad = kt.zeros(1)
+    custom_cmax_out_grad = kt.zeros(1)
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_quant_dropout_gelu_bias_bwd_fp16
+
+    def custom():
+        cus_func(
+            custom_inp_grad,
+            custom_bias_grad,
+            custom_cmax_out_grad,
+            custom_cmax_in_grad,
+            mask,
+            inp,
+            cmax_out,
+            custom_cmask_out,
+            custom_cmask_in,
+            bias,
+            out_grad,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return custom_inp_grad, custom_bias_grad, custom_cmax_in_grad
+
+    def baseline():
+        out_grad_inrange = kt.tensor_inrange(out_grad, res, cmax_in)
+        out_grad_outrange = kt.tensor_outrange(out_grad, res, cmax_in)
+        base_cmax_in_grad = out_grad_outrange.sum()
+
+        temp = out_grad_inrange * mask
+        if gelu_inp.grad is not None:
+            gelu_inp.grad.zero_()
+        gelu_out_sum.backward(retain_graph=True)
+        base_inp_grad = temp * gelu_inp.grad
+        base_bias_grad = torch.sum(base_inp_grad, (0, 1))
+
+        return base_inp_grad, base_bias_grad, base_cmax_in_grad
+
+    return custom, baseline
+
+
+@kt.case()
+def test_launch_quant_bias_dropout_residual():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    print("test shape:", (batch_size, seq_len, hidden_dim))
+
+    # shared weights
+    inp = kt.randint8((batch_size, seq_len, hidden_dim))
+    residual = kt.rand((batch_size, seq_len, hidden_dim)) * 0.1
+    bias = kt.rand((hidden_dim,)) * 0.1
+    mask = kt.ones((batch_size, seq_len, hidden_dim)).to(torch.uint8)
+    # cmax_out = (kt.topk(inp) / 127).to(kt.dtype)
+    cmax = torch.tensor([16]).to(kt.dtype).to(kt.device)
+
+    # custom weights
+    custom_res = kt.rand((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        cus_func = cuda_module.torch_launch_ls_quant_bias_dropout_residual_fp32
+    else:
+        cus_func = cuda_module.torch_launch_ls_quant_bias_dropout_residual_fp16
+
+    def custom():
+        cus_func(
+            custom_res,
+            mask,
+            inp,
+            cmax,
+            bias,
+            residual,
+            batch_size * seq_len,
+            hidden_dim,
+            0,
+        )
+
+        return [custom_res]
+
+    def baseline():
+        inp_dq = kt.dequantize(inp, cmax)
+        out_base = inp_dq + bias
+        out_base = torch.nn.functional.dropout(out_base, p=0)
+        out_base = out_base + residual
+
+        return [out_base]
+
+    return [custom, baseline]
+
+
+@kt.case()
+def test_launch_quant_bias_add_transform_20314():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    count = random.randint(1, 20)
+    print(
+        "(batch_size, seq_len, count, nhead, head_dim): "
+        f"({batch_size}, {seq_len}, {count}, {nhead}, {head_dim})"
+    )
+
+    # shared weights
+    qkv = kt.randint8((batch_size, seq_len, count, hidden_dim))
+    bias = kt.zeros((1, 1, count, hidden_dim))
+    cmax = (kt.topk(qkv) / 127).to(kt.dtype)
+    cmask = kt.randuint8((batch_size, seq_len, count, hidden_dim))
+
+    # custom weights
+    custom_res = kt.rand((count, batch_size, nhead, seq_len, head_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_quant_bias_add_transform_20314_fp32
+    else:
+        func = cuda_module.torch_launch_quant_bias_add_transform_20314_fp16
+
+    def custom():
+        func(
+            custom_res,
+            cmask,
+            qkv,
+            bias,
+            cmax,
+            batch_size,
+            seq_len,
+            count,
+            nhead,
+            head_dim,
+        )
+        return [
+            custom_res,
+        ]
+
+    def baseline():
+        # [batch_size, seq_len, count, hidden_dim]
+        qkv_dq = kt.dequantize(qkv, cmax)
+        base = qkv_dq + bias
+        # [count, batch_size, seq_len, hidden_dim]
+        base = base.transpose(1, 2).transpose(0, 1)
+        base = base.reshape((count, batch_size, seq_len, nhead, head_dim)).transpose(
+            2, 3
+        )
+        return [
+            base.contiguous(),
+        ]
+
+    return custom, baseline
+
+
+@kt.case()
+def test_launch_quant_transform4d_0213():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    trans_count = random.choice([1, 3])
+    print(
+        "(batch_size, seq_len, hidden_dim, nhead, trans_count): "
+        f"({batch_size}, {seq_len}, {hidden_dim}, {nhead}, {trans_count})"
+    )
+
+    # shared weights
+    vals = kt.rand((trans_count, batch_size, nhead, seq_len, head_dim))
+    cmax = kt.topk(vals).to(kt.dtype)
+
+    # custom weights
+    custom_cmask = kt.randuint8((batch_size, seq_len, trans_count, nhead, head_dim))
+    custom_res = kt.randint8((batch_size, seq_len, trans_count, nhead, head_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_quant_transform4d_0213_fp32
+    else:
+        func = cuda_module.torch_launch_quant_transform4d_0213_fp16
+
+    # [trans_count, batch_size, nhead, seq_len, head_dim] ->
+    # [batch_size, seq_len, trans_count, nhead, head_dim]
+
+    def custom():
+        custom_cmask.zero_()
+        func(
+            custom_res,
+            custom_cmask,
+            vals,
+            cmax,
+            batch_size,
+            seq_len,
+            hidden_dim,
+            nhead,
+            trans_count,
+        )
+        return [custom_res, custom_cmask]
+
+    def baseline():
+        base = vals.permute(1, 3, 0, 2, 4)
+        base_q, base_cmask = kt.quantize(base, cmax)
+        return [base_q.contiguous(), base_cmask.contiguous()]
+
+    return custom, baseline
+
+
+@kt.case()
+def test_torch_launch_ls_quantize():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+
+    print(
+        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
+    )
+
+    # shared weights
+    inputs = kt.rand((batch_size, seq_len, hidden_dim))
+    base_cmax = torch.tensor(16, dtype=kt.dtype, device=kt.device)
+    custom_cmax = torch.tensor([16, 16], dtype=kt.dtype, device=kt.device)
+    cmask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    igemm_alpha = torch.tensor(1.0, dtype=torch.float, device=kt.device)
+
+    # custom weights
+    custom_res = kt.randint8((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_ls_quantize_fp32
+    else:
+        func = cuda_module.torch_launch_ls_quantize_fp16
+
+    def custom():
+        cmask.zero_()
+        func(custom_res, cmask, igemm_alpha, inputs, custom_cmax, inputs.numel())
+        return [custom_res, cmask]
+
+    def baseline():
+        base, base_mask = kt.quantize(inputs, base_cmax)
+        base_mask *= 4
+
+        return [base.contiguous(), base_mask.contiguous()]
+
+    return custom, baseline
+
+
+@kt.case()
+def test_torch_launch_ls_dequantize():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+
+    print(
+        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
+    )
+
+    # shared weights
+    inputs = kt.randint8((batch_size, seq_len, hidden_dim))
+    base_cmax = torch.tensor(16, dtype=kt.dtype, device=kt.device)
+    custom_cmax = torch.tensor([16, 16], dtype=kt.dtype, device=kt.device)
+
+    # custom weights
+    custom_res = kt.rand((batch_size, seq_len, hidden_dim)).to(kt.dtype)
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_ls_dequantize_fp32
+    else:
+        func = cuda_module.torch_launch_ls_dequantize_fp16
+
+    def custom():
+        func(custom_res, inputs, custom_cmax, inputs.numel())
+        return [custom_res]
+
+    def baseline():
+        base = kt.dequantize(inputs, base_cmax, True)
+        base = base.to(kt.dtype)
+
+        return [base.contiguous()]
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-2, rtol=1e-3)
+def test_torch_launch_fake_quantize():
+    batch_size, seq_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+
+    print(
+        "(batch_size, seq_len, hidden_dim): " f"({batch_size}, {seq_len}, {hidden_dim})"
+    )
+
+    # shared weights
+    inputs = kt.rand((batch_size, seq_len, hidden_dim))
+    base_cmax = torch.tensor(16, dtype=kt.dtype, device=kt.device)
+    custom_cmax = torch.tensor([16, 16], dtype=kt.dtype, device=kt.device)
+    cmask = kt.randuint8((batch_size, seq_len, hidden_dim))
+    igemm_alpha = torch.tensor(1.0, dtype=torch.float, device=kt.device)
+
+    custom_res = kt.rand((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_fake_quantize_fp32
+    else:
+        func = cuda_module.torch_launch_fake_quantize_fp16
+
+    def custom():
+        cmask.zero_()
+        func(
+            cmask,
+            igemm_alpha,
+            custom_res,
+            inputs,
+            custom_cmax,
+            inputs.numel(),
+        )
+        return [custom_res, cmask]
+
+    def baseline():
+        base, base_mask = kt.quantize(inputs, base_cmax)
+        base = kt.dequantize(base, base_cmax)
+
+        return [base.contiguous(), base_mask.contiguous()]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        "test_launch_transform_0213",
-        "test_launch_bias_add_transform_20314",
-        "test_launch_transform4d_0213",
-        "test_launch_bias_add_transform_20314_new",
-        "test_launch_transform_20314_bwd_new",
-        "test_launch_fused_add2",
-        "test_launch_ffn_bias_bwd",
-        "test_launch_attn_softmax",
-        "test_launch_attn_softmax_new",
-        "test_launch_attn_softmax_bw",
-        "test_launch_attn_softmax_bw_new",
-        "test_launch_layer_norm",
-        "test_launch_ln_bw",
-        "test_launch_concat3_dim1",
-        "test_adam",
-        "test_launch_dropout_gelu_bias",
-        "test_launch_dropout_relu_bias",
-        "test_launch_dropout_relu_bias_bwd",
-        "test_launch_dropout_gelu_bias_bwd",
+        # "test_launch_transform_0213",
+        # "test_launch_bias_add_transform_20314",
+        # "test_launch_transform4d_0213",
+        # "test_launch_bias_add_transform_20314_new",
+        # "test_launch_transform_20314_bwd_new",
+        # "test_launch_fused_add2",
+        # "test_launch_ffn_bias_bwd",
+        # "test_launch_attn_softmax",
+        # "test_launch_attn_softmax_new",
+        # "test_launch_attn_softmax_bw",
+        # "test_launch_attn_softmax_bw_new",
+        # "test_launch_layer_norm",
+        # "test_launch_ln_bw",
+        # "test_launch_concat3_dim1",
+        # "test_adam",
+        # "test_launch_dropout_relu_bias",
+        # "test_launch_dropout_relu_bias_bwd",
+        # "test_launch_dropout_gelu_bias",
+        # "test_launch_dropout_gelu_bias_bwd",
+        # "test_launch_layer_norm_i8O",
+        # "test_launch_ln_i8O_bw",
+        # "test_launch_dropout_relu_bias_i8I_i8O",
+        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+        # "test_launch_dropout_gelu_bias_i8I_i8O",
+        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+        # "test_launch_quant_bias_dropout_residual",
+        # "test_launch_quant_bias_add_transform_20314",
+        # "test_launch_quant_transform4d_0213",
+        # "test_torch_launch_ls_quantize",
+        # "test_torch_launch_ls_dequantize",
+        # "test_torch_launch_fake_quantize",
     ]
     kt.run(kernel_list)

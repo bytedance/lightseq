@@ -28,5 +28,5 @@ python3 -m torch.distributed.launch \
   --fp16 \
   --seed 1234 \
   --logging_steps 10 \
-  --module_type 2 \
+  --module_type 1 \
   --enable_quant false
