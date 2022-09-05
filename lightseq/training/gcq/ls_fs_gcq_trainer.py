@@ -1,7 +1,6 @@
 import logging
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
-from fairseq import models
 from fairseq.trainer import Trainer
 from .gcq import GCQState, encode_and_decode
 
@@ -21,18 +20,7 @@ class LSTrainer(Trainer):
     @property
     def model(self):
         if self._wrapped_model is None:
-            if (
-                self.data_parallel_world_size > 1
-                and not self.args.use_bmuf
-                and not self.tpu
-            ):
-                self._wrapped_model = models.DistributedFairseqModel(
-                    self.args,
-                    self._model,
-                    process_group=self.data_parallel_process_group,
-                )
-            else:
-                self._wrapped_model = self._model
+            super().model
             if (
                 isinstance(self._wrapped_model, DistributedDataParallel)
                 and self.args.enable_GCQ
