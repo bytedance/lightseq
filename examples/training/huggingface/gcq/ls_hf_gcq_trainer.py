@@ -2,6 +2,7 @@ import logging
 import torch
 import torch.distributed as dist
 from transformers import Trainer
+from packaging import version
 from lightseq.training.gcq import (
     GCQState,
     encode_and_decode,
@@ -27,6 +28,9 @@ class LSTrainer(Trainer):
             isinstance(model, torch.nn.parallel.DistributedDataParallel)
             and self.gcq_args.enable_GCQ
         ):
+            assert version.parse(torch.__version__) >= version.parse(
+                "1.10"
+            ), "Training with GCQ requires that the version of torch has to be greater than or equal to 1.10!"
             state = GCQState(
                 process_group=dist.group.WORLD if dist.is_initialized() else None,
                 hidden_size=self.gcq_args.hidden_size,
