@@ -14,6 +14,10 @@
 
 THIS_DIR=$(dirname $(readlink -f $0))
 
+# You can use multiple NICs in NCCL communication.
+# E.g., if every machine has 4 NICs: eth0, eth1, eth2, eth3, you can use the following command.
+# export NCCL_SOCKET_IFNAME=eth0,eth1,eth2,eth3
+
 # Set your environment variables according to your training environment,
 # for details, please refer to https://pytorch.org/docs/1.10/distributed.html#launch-utility
 python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
