@@ -27,8 +27,7 @@ class BiasActDropoutOp : public Operator {
         ratio(r),
         _activation_fn(activation_fn),
         _max_ele_num(max_ele_num) {
-    _mask.reset(
-        new Tensor("BiasActDropoutOp/_mask", max_ele_num * sizeof(uint8_t)));
+    _mask.reset(new Tensor(name() + "/_mask", max_ele_num * sizeof(uint8_t)));
   }
 
   virtual ~BiasActDropoutOp() {}

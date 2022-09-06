@@ -29,6 +29,11 @@ void Context::set_thread_context(ContextPtr context_ptr) {
 void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
+  if (built()) {
+    printf("Context has constructed! should not add new operator!\n");
+    exit(-1);
+  }
+
   if (_layer_context.size()) {
     _layer_context[0]->_op_vec.push_back(op);
     return;
@@ -44,6 +49,11 @@ void Context::add_op(Operator* op) {
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
+  if (built()) {
+    printf("Context has constructed! should not modify network\n");
+    exit(-1);
+  }
+
   if (_layer_context.size() == 0 && is_initial == false) {
     _root_layers.push_back(cur_layer);
   } else if (is_initial == true) {
@@ -57,6 +67,8 @@ void Context::build() {
     return;
   }
   _building = true;
+
+  printf("===== start Context build =====\n");
 
   if (!check_validate()) {
     printf("Check validate error!\n");
@@ -82,13 +94,13 @@ void Context::build() {
   }
 
   if (_is_training) {
-    for (Layer* rl : _root_layers) {
+    for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
+      Layer* rl = _root_layers[idx];
       rl->backward();
     }
   }
 
   cuda_free(temporary_buffer_);
-
   _mm_ptr->calculate_buffer_();
   _built = true;
 
@@ -99,6 +111,8 @@ void Context::build() {
 #ifdef DEBUG
   draw_all_context();
 #endif
+
+  printf("===== finish Context build =====\n");
 }
 
 bool Context::check_validate() {

@@ -31,6 +31,7 @@ void BiasDropoutResOp<T1, T2>::forward() {
 #ifdef DEBUG
   if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
+    printf("%s forward\n", name().c_str());
     print_vec(residual, this->name() + " residual", 10);
     print_vec(bias, this->name() + " bias", 10);
     print_vec(output, this->name() + " ans", 10);
@@ -57,13 +58,25 @@ void BiasDropoutResOp<T1, T2>::backward() {
                                  _rows, _cols, RATIO(), stream);
 
   if (is_res_cover) {  // cover
-    cudaMemcpy((void*)residual_grad, (void*)output_grad,
-               _max_ele_num * sizeof(T2), cudaMemcpyDeviceToDevice);
+    CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
+                                    _cols * _rows * sizeof(T2),
+                                    cudaMemcpyDefault, stream));
   } else {  // accumulate
             // launch_fused_add2 ...
     launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
                       _cols, stream);
   }
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(stream);
+    printf("%s backward is_res_cover: %d\n", name().c_str(), is_res_cover);
+    print_vec(input_grad, this->name() + " input_grad", 10);
+    print_vec(output_grad, this->name() + " output_grad", 10);
+    print_vec(residual_grad, this->name() + " residual_grad", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template class BiasDropoutResOp<float, float>;

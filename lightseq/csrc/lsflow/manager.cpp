@@ -91,6 +91,14 @@ void MemoryManager::calculate_buffer_() {
 
   printf("total_consumption: %zu\n", total_consumption);
 
+  buffer_ = cuda_malloc<char>(total_consumption);
+  buffer_size_ = total_consumption;
+
+  for (auto iter : tensor_usages_vec) {
+    int unique_id = iter.first.unique_id;
+    tensor_ptr.emplace(unique_id, buffer_ + iter.second);
+  }
+
   // Add algorithm check module
   // return true means check success,
   auto judge_func = [](const std::pair<TensorUsage, size_t> &x,
@@ -121,9 +129,10 @@ void MemoryManager::calculate_buffer_() {
 #ifdef DEBUG
     printf(
         "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu, "
-        "end_addr: %zu\n",
+        "end_addr: %zu, address: %p\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), size, iter.second, iter.second + size);
+        iter.first._name.c_str(), size, iter.second, iter.second + size,
+        buffer_ + iter.second);
 #endif
 
     for (auto check_iter : temp_check_vec) {
@@ -149,14 +158,6 @@ void MemoryManager::calculate_buffer_() {
       exit(-1);
     }
     temp_check_vec.push_back(iter);
-  }
-
-  buffer_ = cuda_malloc<char>(total_consumption);
-  buffer_size_ = total_consumption;
-
-  for (auto iter : tensor_usages_vec) {
-    int unique_id = iter.first.unique_id;
-    tensor_ptr.emplace(unique_id, buffer_ + iter.second);
   }
 }
 
