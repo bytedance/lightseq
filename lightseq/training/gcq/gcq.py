@@ -3,8 +3,10 @@ import torch
 import torch.distributed as dist
 from packaging import version
 
-assert version.parse(torch.__version__) >= version.parse("1.10"), \
-    "Training with GCQ requires that the version of torch has to be greater than or equal to 1.10!"
+assert version.parse(torch.__version__) >= version.parse(
+    "1.10"
+), "Training with GCQ requires that the version of torch has to be greater than or equal to 1.10!"
+
 
 class GCQ(object):
     """
@@ -113,9 +115,7 @@ class GCQState(object):
         self.quantile_value = quantile_value
 
 
-def encode_and_decode(
-    state: GCQState, bucket: dist.GradBucket
-) -> torch.futures.Future[torch.Tensor]:
+def encode_and_decode(state, bucket) -> torch.futures.Future[torch.Tensor]:
     """
     The Gradient Communication Quantization hook.
     """
