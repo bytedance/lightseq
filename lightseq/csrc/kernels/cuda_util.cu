@@ -64,10 +64,11 @@ template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
 
 template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl; 
   std::vector<T> hout(num_output_ele, (T)0);
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
                              cudaMemcpyDeviceToHost));
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << hout[i] << ", ";
   }
@@ -77,10 +78,11 @@ void print_vec(const T *outv, std::string outn, int num_output_ele) {
 template <>
 void print_vec<__half>(const __half *outv, std::string outn,
                        int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<__half> hout(num_output_ele, (__half)0.f);
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
                              cudaMemcpyDeviceToHost));
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << __half2float(hout[i]) << ", ";
   }
@@ -90,10 +92,11 @@ void print_vec<__half>(const __half *outv, std::string outn,
 template <>
 void print_vec<int8_t>(const int8_t *outv, std::string outn,
                        int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<int8_t> hout(num_output_ele, 0);
   cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(int8_t),
              cudaMemcpyDeviceToHost);
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << static_cast<int>(hout[i]) << ", ";
   }
@@ -103,10 +106,11 @@ void print_vec<int8_t>(const int8_t *outv, std::string outn,
 template <>
 void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
                         int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<uint8_t> hout(num_output_ele, 0);
   cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(uint8_t),
              cudaMemcpyDeviceToHost);
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << static_cast<int>(hout[i]) << ", ";
   }
@@ -294,4 +298,17 @@ int getSMVersion() {
   cudaDeviceProp props;
   CHECK_GPU_ERROR(cudaGetDeviceProperties(&props, device));
   return props.major * 10 + props.minor;
+}
+
+
+void print_time_duration(
+    const std::chrono::high_resolution_clock::time_point& start,
+    std::string duration_name, cudaStream_t stream) {
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
+  auto finish = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = finish - start;
+  std::cout << duration_name
+            << " duration time is: " << (elapsed).count() * 1000 << " ms"
+            << std::endl;
+  return;
 }

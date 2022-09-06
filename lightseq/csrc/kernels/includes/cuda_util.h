@@ -46,3 +46,8 @@ void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
                  cudaStream_t stream);
 
 int getSMVersion();
+
+/* Print run time, for debug */
+void print_time_duration(
+    const std::chrono::high_resolution_clock::time_point& start,
+    std::string duration_name, cudaStream_t stream = 0);

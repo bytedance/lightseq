@@ -41,11 +41,11 @@ void FeedForwardOp<T1, T2>::backward() {
   float alpha = (float)1.0, w_beta = (float)0.0, inp_beta = (float)0.0;
 
   T2* out_grad = (T2*)child(0)->grad();
-  T1* weights = (T1*)parent(1)->value();
   T1* input_ptr = (T1*)parent(0)->value();
+  T1* weights = (T1*)parent(1)->value();
 
-  T2* weights_grad = (T2*)parent(1)->grad();
   T2* inp_grad = (T2*)parent(0)->grad();
+  T2* weights_grad = (T2*)parent(1)->grad();
 
   if (!parent(0)->is_cover()) {
     inp_beta = (float)1.0;
@@ -53,13 +53,28 @@ void FeedForwardOp<T1, T2>::backward() {
 
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
+  // calculate weights_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr,
-                 out_grad, weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
+                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr, out_grad,
+                 weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
 
+  // calculate inp_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
                  _batch_tokens, _output_size, &alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
+
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    printf("%s backward\n", name().c_str());
+    print_vec(inp_grad, "inp_grad", 10);
+    print_vec(out_grad, "out_grad", 10);
+    print_vec(input_ptr, "input_ptr", 10);
+    printf("\n");
+  }
+#endif
+
 }
 
 template class FeedForwardOp<float, float>;

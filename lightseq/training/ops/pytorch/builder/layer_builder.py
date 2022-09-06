@@ -77,4 +77,4 @@ class LayerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]
+        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"] # "-DDEBUG"

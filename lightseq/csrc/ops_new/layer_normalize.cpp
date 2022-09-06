@@ -39,7 +39,8 @@ void LayerNormalizeOp<T1, T2>::forward() {
 #ifdef DEBUG
   if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
-    print_vec(ln_res_val, name() + " ans", 10);
+    printf("%s forward\n", name().c_str());
+    print_vec(ln_res_val, "ln_res_val", 10);
     printf("\n");
   }
 #endif
@@ -76,6 +77,16 @@ void LayerNormalizeOp<T1, T2>::backward() {
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                out_val, gamma_val, betta_val, vars_val, means_val,
                _batch_tokens, _hidden_dim, streams);
+
+#ifdef DEBUG
+  if (_context_ptr->built()) {
+    cudaStreamSynchronize(_context_ptr->get_stream());
+    printf("%s backward\n", name().c_str());
+    print_vec(inp_grad, "inp_grad", 10);
+    print_vec(out_grad, "out_grad", 10);
+    printf("\n");
+  }
+#endif
 }
 
 template class LayerNormalizeOp<__half, __half>;

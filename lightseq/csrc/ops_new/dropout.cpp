@@ -26,6 +26,7 @@ void DropoutOp<T1, T2>::forward() {
 #ifdef DEBUG
   if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
+    printf("%s forward\n", name().c_str());
     print_vec(input, this->name() + " inp", 10);
     print_vec(output, this->name() + " out", 10);
     printf("\n");

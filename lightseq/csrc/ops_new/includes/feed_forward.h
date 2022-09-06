@@ -33,7 +33,7 @@ class FeedForwardOp : public Operator {
 
   void backward() override;
 
-  void before_backward(int batch_tokens) { _batch_tokens = batch_tokens; }
+  void before_backward() { }
 };
 
 }  // namespace lightseq

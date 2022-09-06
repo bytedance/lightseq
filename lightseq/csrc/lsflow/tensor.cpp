@@ -6,8 +6,8 @@ Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
   _name = name;
   _size = size;
   _mtype = size > 0 ? SharedMemory : FixedMemory;
+  _ctx_ptr = thread_context_ptr.get();
   if (_mtype == SharedMemory) {
-    _ctx_ptr = thread_context_ptr.get();
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
     _ctx_ptr->mx_tensor_size =
         std::max(thread_context_ptr->mx_tensor_size, _size);
@@ -34,12 +34,13 @@ char* Tensor::tensor(bool is_open_interval) {
     //   printf("%s is null when use, plz set first!\n", _name.c_str());
     //   exit(-1);
     // }
+    if(!_ctx_ptr->built() && _ptr == nullptr) {
+      return _ctx_ptr->temporary_buffer_;
+    }
     return _ptr;
   }
   if (_ptr == nullptr) {
     if (!_ctx_ptr->built()) {
-      // printf("tensor_name: %s, node_idx: %zu\n", _name.c_str(),
-      // _ctx_ptr->node_idx());
       update_life_idx(_ctx_ptr->node_idx() - is_open_interval);
       return _ctx_ptr->temporary_buffer_;
     }
