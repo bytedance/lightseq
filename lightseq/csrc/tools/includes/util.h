@@ -66,7 +66,6 @@ static std::string _cudaGetErrorString(cublasStatus_t error) {
   return "CUBLAS_UNKNOW";
 }
 
-
 /* Generate distribution */
 void generate_distribution(thrust::device_vector<float>& input_output,
                            std::string mode = "uniform", float a = 0.f,

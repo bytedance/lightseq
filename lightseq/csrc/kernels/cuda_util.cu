@@ -64,7 +64,7 @@ template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
 
 template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
-  std::cout << outn << " address: " << outv << std::endl; 
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<T> hout(num_output_ele, (T)0);
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
                              cudaMemcpyDeviceToHost));
@@ -300,9 +300,8 @@ int getSMVersion() {
   return props.major * 10 + props.minor;
 }
 
-
 void print_time_duration(
-    const std::chrono::high_resolution_clock::time_point& start,
+    const std::chrono::high_resolution_clock::time_point &start,
     std::string duration_name, cudaStream_t stream) {
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
   auto finish = std::chrono::high_resolution_clock::now();

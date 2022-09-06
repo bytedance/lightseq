@@ -36,7 +36,7 @@ class LSTransformerEncoderFuncNew(Function):
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
 
-        (output, ) = forward_func(config.layer_id, input, input_mask, config.training)
+        (output,) = forward_func(config.layer_id, input, input_mask, config.training)
 
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(output, input, input_mask)
@@ -65,8 +65,9 @@ class LSTransformerEncoderFuncNew(Function):
         )
 
         grad = _all_layer_grads[ctx.config.layer_id]
-        
+
         return (grad_input, None, grad, None)
+
 
 class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
     """Initialize the Lightseq Transformer Encoder Layer.
@@ -89,7 +90,9 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
 
         self.config = config
         self.config.layer_id = LSTransformerEncoderLayerNew.layer_id
-        LSTransformerEncoderLayerNew.layer_id = LSTransformerEncoderLayerNew.layer_id + 1
+        LSTransformerEncoderLayerNew.layer_id = (
+            LSTransformerEncoderLayerNew.layer_id + 1
+        )
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
@@ -140,7 +143,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
                 self.register_buffer("para_16", self.para.clone().detach().half())
 
         self.assign_layer_weight_grad()
-        
+
     @staticmethod
     def gen_offset(hidden_size, intermediate_size):
         hs, ims = hidden_size, intermediate_size
@@ -268,7 +271,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
 
     def assign_layer_weight_grad(self):
         if self.assigned_layer_weight_grad == True:
-            return 
+            return
         self.assigned_layer_weight_grad = True
         param = (
             self.para_16

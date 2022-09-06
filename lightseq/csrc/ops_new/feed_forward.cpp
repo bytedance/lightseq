@@ -55,14 +55,13 @@ void FeedForwardOp<T1, T2>::backward() {
 
   // calculate weights_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr, out_grad,
-                 weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
+                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr,
+                 out_grad, weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
 
   // calculate inp_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
                  _batch_tokens, _output_size, &alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
-
 
 #ifdef DEBUG
   if (_context_ptr->built()) {
@@ -74,7 +73,6 @@ void FeedForwardOp<T1, T2>::backward() {
     printf("\n");
   }
 #endif
-
 }
 
 template class FeedForwardOp<float, float>;

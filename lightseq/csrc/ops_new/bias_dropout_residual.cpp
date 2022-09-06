@@ -59,13 +59,13 @@ void BiasDropoutResOp<T1, T2>::backward() {
 
   if (is_res_cover) {  // cover
     CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
-               _cols * _rows * sizeof(T2), cudaMemcpyDefault, stream));
+                                    _cols * _rows * sizeof(T2),
+                                    cudaMemcpyDefault, stream));
   } else {  // accumulate
             // launch_fused_add2 ...
     launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
                       _cols, stream);
   }
-
 
 #ifdef DEBUG
   if (_context_ptr->built()) {

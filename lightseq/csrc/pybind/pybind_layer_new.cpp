@@ -66,7 +66,6 @@ int create_transformer_encoder_layer_new(
 
   s_transformer_encoder_layers[layer_id] = layer;
 
-
   const int default_batch_size = 1;
   const int default_seq_len = 64;
   layer->before_forward(default_batch_size, default_seq_len);
@@ -81,15 +80,12 @@ int create_transformer_encoder_layer_new(
 }
 
 template <typename T1, typename T2>
-std::vector<torch::Tensor> transformer_encoder_layer_fw(int layer_id,
-                                  const torch::Tensor &input,
-                                  const torch::Tensor &input_mask,
-                                  bool training_mode) {
-  
-
+std::vector<torch::Tensor> transformer_encoder_layer_fw(
+    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
+    bool training_mode) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
-  
+
   auto output = torch::empty_like(input);
 
   const char *input_ptr = (const char *)input.data_ptr();
@@ -113,18 +109,13 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(int layer_id,
 
   layer->forward();
 
-
   return {output};
 }
 
-
 template <typename T1, typename T2>
 std::vector<torch::Tensor> transformer_encoder_layer_bw(
-    int layer_id, const torch::Tensor &grad_out,
-    const torch::Tensor &output, const torch::Tensor &input,
-    const torch::Tensor &input_mask) {
-  
-
+    int layer_id, const torch::Tensor &grad_out, const torch::Tensor &output,
+    const torch::Tensor &input, const torch::Tensor &input_mask) {
   CHECK_INPUT(grad_out);
   CHECK_INPUT(output);
   CHECK_INPUT(input);
@@ -133,13 +124,13 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
   auto grad_inp = torch::empty_like(grad_out);
 
   // inputs.
-  char* grad_output_ptr = (char* )grad_out.data_ptr();
-  const char* input_ptr = (const char* )input.data_ptr();
-  const char* output_ptr = (const char* )output.data_ptr();
-  const char* input_mask_ptr = (const char* )input_mask.data_ptr();
+  char *grad_output_ptr = (char *)grad_out.data_ptr();
+  const char *input_ptr = (const char *)input.data_ptr();
+  const char *output_ptr = (const char *)output.data_ptr();
+  const char *input_mask_ptr = (const char *)input_mask.data_ptr();
 
   // outputs.
-  char* grad_input_ptr = (char* )grad_inp.data_ptr();
+  char *grad_input_ptr = (char *)grad_inp.data_ptr();
 
   std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
       std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
@@ -155,12 +146,10 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
   out_node->set_value(output_ptr);
   out_node->set_grad(grad_output_ptr);
 
-
   layer->backward();
 
   return {grad_inp};
 }
-
 
 template <typename T1, typename T2>
 void assign_layer_weight_grad(const torch::Tensor &weights,
@@ -177,8 +166,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
         std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
             s_transformer_encoder_layers[layer_id]);
     layer->load_para_and_grad(wptr, gptr);
-  } 
-  else {
+  } else {
     printf("Error! layer_name %s is unsupported!\n", layer_name.c_str());
     exit(-1);
   }
@@ -211,8 +199,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &lightseq::transformer_encoder_layer_bw<__half, __half>,
         "LightSeq Transformer Encoder forward with fp16 (CUDA)");
 
-  m.def("assign_layer_weight_grad_fp32", &lightseq::assign_layer_weight_grad<float, float>,
+  m.def("assign_layer_weight_grad_fp32",
+        &lightseq::assign_layer_weight_grad<float, float>,
         "Bind layer weights and grads");
-  m.def("assign_layer_weight_grad_fp16", &lightseq::assign_layer_weight_grad<__half, __half>,
+  m.def("assign_layer_weight_grad_fp16",
+        &lightseq::assign_layer_weight_grad<__half, __half>,
         "Bind layer weights and grads");
 }

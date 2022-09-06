@@ -91,7 +91,6 @@ void MemoryManager::calculate_buffer_() {
 
   printf("total_consumption: %zu\n", total_consumption);
 
-
   buffer_ = cuda_malloc<char>(total_consumption);
   buffer_size_ = total_consumption;
 
@@ -160,7 +159,6 @@ void MemoryManager::calculate_buffer_() {
     }
     temp_check_vec.push_back(iter);
   }
-
 }
 
 }  // namespace lightseq

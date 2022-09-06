@@ -73,10 +73,10 @@ def gen_enc_layer_pair():
     fairseq_enc_layer = fairseq_layers.generate_enc_layer()
     fairseq_enc_layer.train()
     initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
-    
+
     custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
     custom_enc_layer_base.train()
-    
+
     custom_enc_layer_new = generate_enc_layer_new(
         initial_enc_weights, initial_enc_biases
     )
@@ -107,7 +107,6 @@ def test_encoder_layer_forward():
         res = hidden_states.clone()
         for i in range(ENC_LAYER_NUM):
             res = custom_enc_layers[i](res, self_attn_padding_mask)
-        print("custom ans: ", res)
         return [
             res.contiguous().detach(),
         ]
@@ -116,16 +115,16 @@ def test_encoder_layer_forward():
         res = hidden_states.clone()
         for i in range(ENC_LAYER_NUM):
             res = base_enc_layers[i](res, self_attn_padding_mask)
-        print("baseline ans: ", res)
         return [
             res.contiguous().detach(),
         ]
 
     return custom, baseline
 
+
 @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_backward():
-    batch_size, seq_len = kt.bs_sl() 
+    batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     hidden_size = 1024
@@ -133,7 +132,6 @@ def test_encoder_layer_backward():
     hidden_states = kt.rand((batch_size, seq_len, hidden_size)).requires_grad_()
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
     loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
-
 
     def custom():
         for i in range(ENC_LAYER_NUM):
@@ -177,12 +175,8 @@ def test_encoder_layer_backward():
 
     return custom, baseline
 
+
 if __name__ == "__main__":
 
     kt.init(device="cuda:0", nhead=16)
-    kt.run(
-        [
-            # "test_encoder_layer_forward",
-            "test_encoder_layer_backward"
-        ]
-    )
+    kt.run(["test_encoder_layer_forward", "test_encoder_layer_backward"])

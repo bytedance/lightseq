@@ -33,7 +33,7 @@ class FeedForwardOp : public Operator {
 
   void backward() override;
 
-  void before_backward() { }
+  void before_backward() {}
 };
 
 }  // namespace lightseq

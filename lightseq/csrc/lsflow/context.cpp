@@ -29,7 +29,7 @@ void Context::set_thread_context(ContextPtr context_ptr) {
 void Context::remove_thread_context() { thread_context_ptr.reset(); }
 
 void Context::add_op(Operator* op) {
-  if(built()) {
+  if (built()) {
     printf("Context has constructed! should not add new operator!\n");
     exit(-1);
   }
@@ -49,7 +49,7 @@ void Context::add_op(Operator* op) {
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
-  if(built()) {
+  if (built()) {
     printf("Context has constructed! should not modify network\n");
     exit(-1);
   }
@@ -94,8 +94,7 @@ void Context::build() {
   }
 
   if (_is_training) {
-
-    for (int idx = _root_layers.size() - 1; idx >= 0; idx --) {
+    for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
       rl->backward();
     }

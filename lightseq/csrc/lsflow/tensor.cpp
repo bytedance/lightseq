@@ -34,7 +34,7 @@ char* Tensor::tensor(bool is_open_interval) {
     //   printf("%s is null when use, plz set first!\n", _name.c_str());
     //   exit(-1);
     // }
-    if(!_ctx_ptr->built() && _ptr == nullptr) {
+    if (!_ctx_ptr->built() && _ptr == nullptr) {
       return _ctx_ptr->temporary_buffer_;
     }
     return _ptr;

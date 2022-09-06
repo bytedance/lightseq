@@ -42,7 +42,6 @@ void BiasActDropoutOp<T1, T2>::forward() {
     printf("\n");
   }
 #endif
-
 }
 
 template <typename T1, typename T2>
@@ -70,11 +69,11 @@ void BiasActDropoutOp<T1, T2>::backward() {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
 
-
 #ifdef DEBUG
   if (_context_ptr->built()) {
     cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s backward _activation_fn: %s\n", name().c_str(), _activation_fn.c_str());
+    printf("%s backward _activation_fn: %s\n", name().c_str(),
+           _activation_fn.c_str());
     print_vec(input, "input", 10);
     print_vec(bias, "bias", 10);
     print_vec(grad_inp, "grad_inp", 10);
@@ -84,7 +83,6 @@ void BiasActDropoutOp<T1, T2>::backward() {
     printf("\n");
   }
 #endif
-
 }
 
 template class BiasActDropoutOp<float, float>;
