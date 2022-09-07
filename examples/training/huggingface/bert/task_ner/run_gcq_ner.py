@@ -43,7 +43,10 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
-from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForTokenClassification
+from examples.training.huggingface.bert.ls_hf_transformer_layer import (
+    inject_ls_layer,
+    LSBertForTokenClassification,
+)
 from examples.training.huggingface.gcq import LSTrainer, GCQArguments
 
 
@@ -216,6 +219,7 @@ class DataTrainingArguments:
                     "json",
                 ], "`validation_file` should be a csv or a json file."
         self.task_name = self.task_name.lower()
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py

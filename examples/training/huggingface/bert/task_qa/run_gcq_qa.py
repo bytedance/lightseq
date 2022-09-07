@@ -46,7 +46,10 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 from utils_qa import postprocess_qa_predictions
-from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForQuestionAnswering
+from examples.training.huggingface.bert.ls_hf_transformer_layer import (
+    inject_ls_layer,
+    LSBertForQuestionAnswering,
+)
 from examples.training.huggingface.gcq import GCQArguments
 
 
@@ -253,8 +256,6 @@ class DataTrainingArguments:
                 ], "`test_file` should be a csv or a json file."
 
 
-
-
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -270,7 +271,12 @@ def main():
             json_file=os.path.abspath(sys.argv[1])
         )
     else:
-        model_args, data_args, gcq_args, training_args = parser.parse_args_into_dataclasses()
+        (
+            model_args,
+            data_args,
+            gcq_args,
+            training_args,
+        ) = parser.parse_args_into_dataclasses()
 
     # Setup logging
     logging.basicConfig(

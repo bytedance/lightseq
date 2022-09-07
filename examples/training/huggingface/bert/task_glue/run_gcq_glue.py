@@ -46,7 +46,10 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
-from examples.training.huggingface.bert.ls_hf_transformer_layer import inject_ls_layer, LSBertForSequenceClassification
+from examples.training.huggingface.bert.ls_hf_transformer_layer import (
+    inject_ls_layer,
+    LSBertForSequenceClassification,
+)
 from examples.training.huggingface.gcq import LSTrainer, GCQArguments
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -236,6 +239,7 @@ class ModelArguments:
         metadata={"help": "Whether to enable quantization"},
     )
 
+
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -251,7 +255,12 @@ def main():
             json_file=os.path.abspath(sys.argv[1])
         )
     else:
-        model_args, data_args, gcq_args, training_args = parser.parse_args_into_dataclasses()
+        (
+            model_args,
+            data_args,
+            gcq_args,
+            training_args,
+        ) = parser.parse_args_into_dataclasses()
 
     # Setup logging
     logging.basicConfig(

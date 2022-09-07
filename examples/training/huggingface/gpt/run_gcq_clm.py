@@ -261,7 +261,12 @@ def main():
             json_file=os.path.abspath(sys.argv[1])
         )
     else:
-        model_args, data_args, gcq_args, training_args = parser.parse_args_into_dataclasses()
+        (
+            model_args,
+            data_args,
+            gcq_args,
+            training_args,
+        ) = parser.parse_args_into_dataclasses()
 
     # Setup logging
     logging.basicConfig(

@@ -45,4 +45,4 @@ python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
     --fp16 \
     --with_lightseq true \
     --enable_GCQ true \
-    --GCQ_quantile 0.99 
+    --GCQ_quantile 0.99

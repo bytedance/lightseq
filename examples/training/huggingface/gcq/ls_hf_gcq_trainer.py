@@ -11,16 +11,18 @@ from examples.training.huggingface.gcq import GCQArguments
 
 logger = logging.getLogger("lightseq_hf_trainer")
 
+
 class LSTrainer(Trainer):
     """
-    LSTrainer supports GCQ (Gradient Communication Quantization) for distributed multi-machine training 
+    LSTrainer supports GCQ (Gradient Communication Quantization) for distributed multi-machine training
     based on transformers.Trainer.
     """
+
     def __init__(self, gcq_args: GCQArguments = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         logger.setLevel(logging.INFO if self.args.should_log else logging.WARN)
         self.gcq_args = gcq_args
-        
+
     def _wrap_model(self, model, training=True, dataloader=None):
         model = super()._wrap_model(model, training, dataloader)
         # Enable GCQ.
@@ -41,5 +43,3 @@ class LSTrainer(Trainer):
             logger.info("############ register communication hook done ###########")
 
         return model
-
-    
