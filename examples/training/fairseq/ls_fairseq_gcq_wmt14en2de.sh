@@ -18,7 +18,7 @@ fi
 python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
     --nnodes=$WORKER_NUM --node_rank=$WORKER_ID --master_addr=$WORKER_0_HOST \
     --master_port=$WORKER_0_PORT \
-    lightseq-train /tmp/wmt14_en_de/ \
+    $(which lightseq-train) /tmp/wmt14_en_de/ \
     --task translation \
     --arch ls_transformer_wmt_en_de_big_t2t --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
@@ -35,4 +35,4 @@ python3 -m torch.distributed.launch --nproc_per_node=$WORKER_GPU_NUM \
     --maximize-best-checkpoint-metric \
     --fp16 \
     --enable_GCQ \
-    --GCQ_quantile 0.99 
+    --GCQ_quantile 0.99
