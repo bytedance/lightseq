@@ -45,6 +45,7 @@ def generate_enc_layer_new(initial_weights=None, initial_biases=None):
         activation_fn="relu",
     )
     layer = LSTransformerEncoderLayerNew(config, initial_weights, initial_biases)
+    layer.to(torch.device("cuda:0"), dtype=torch.half)
     return layer
 
 
@@ -72,20 +73,23 @@ def gen_enc_layer_pair():
     fairseq_enc_layer = fairseq_layers.generate_enc_layer()
     fairseq_enc_layer.train()
     initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
+
+    custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
+    custom_enc_layer_base.train()
+
     custom_enc_layer_new = generate_enc_layer_new(
         initial_enc_weights, initial_enc_biases
     )
     custom_enc_layer_new.train()
-    custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
-    custom_enc_layer_base.train()
+
     return custom_enc_layer_base, custom_enc_layer_new
 
 
-enc_layer_num = 1
+ENC_LAYER_NUM = 2
 base_enc_layers = []
 custom_enc_layers = []
 
-for _ in range(enc_layer_num):
+for _ in range(ENC_LAYER_NUM):
     base_enc, custom_enc = gen_enc_layer_pair()
     base_enc_layers.append(base_enc)
     custom_enc_layers.append(custom_enc)
@@ -97,19 +101,20 @@ def test_encoder_layer_forward():
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
 
     hidden_states = kt.rand((batch_size, seq_len, 1024))
-    res = torch.empty_like(hidden_states)
     self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
 
     def custom():
-        inp = hidden_states.clone()
-        custom_enc_layers[0](res, inp, self_attn_padding_mask)
+        res = hidden_states.clone()
+        for i in range(ENC_LAYER_NUM):
+            res = custom_enc_layers[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
         ]
 
     def baseline():
         res = hidden_states.clone()
-        res = base_enc_layers[0](res, self_attn_padding_mask)
+        for i in range(ENC_LAYER_NUM):
+            res = base_enc_layers[i](res, self_attn_padding_mask)
         return [
             res.contiguous().detach(),
         ]
@@ -117,11 +122,61 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
+def test_encoder_layer_backward():
+    batch_size, seq_len = kt.bs_sl()
+    print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
+
+    hidden_size = 1024
+
+    hidden_states = kt.rand((batch_size, seq_len, hidden_size)).requires_grad_()
+    self_attn_padding_mask = kt.attn_mask(batch_size, seq_len, dtype=torch.bool)
+    loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
+
+    def custom():
+        for i in range(ENC_LAYER_NUM):
+            custom_enc_layers[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(ENC_LAYER_NUM):
+            res = custom_enc_layers[i](res, self_attn_padding_mask)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        grad_list = []
+        for i in range(ENC_LAYER_NUM - 1, -1, -1):
+            """
+            attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            """
+            grads = split_custom_layer_grad(custom_enc_layers[i])
+            grad_list.extend(grads[:11])
+            pass
+        return grad_list
+
+    def baseline():
+        for i in range(ENC_LAYER_NUM):
+            base_enc_layers[i].zero_grad()
+        res = hidden_states.clone()
+        for i in range(ENC_LAYER_NUM):
+            res = base_enc_layers[i](res, self_attn_padding_mask)
+        custom_loss = (res / 1000).sum()
+        custom_loss.data.copy_(loss_data)
+        custom_loss.backward()
+        grad_list = []
+        for i in range(ENC_LAYER_NUM - 1, -1, -1):
+            """
+            attn_qkvw, attn_qkvb, attn_ow, attn_ob, attn_nw, attn_nb,
+            inter_w, inter_b, output_w, output_b, ffn_nw, ffn_nb
+            """
+            grads = split_custom_layer_grad(base_enc_layers[i])
+            grad_list.extend(grads[:11])
+            pass
+        return grad_list
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
 
     kt.init(device="cuda:0", nhead=16)
-    kt.run(
-        [
-            "test_encoder_layer_forward",
-        ]
-    )
+    kt.run(["test_encoder_layer_forward", "test_encoder_layer_backward"])

@@ -66,11 +66,6 @@ static std::string _cudaGetErrorString(cublasStatus_t error) {
   return "CUBLAS_UNKNOW";
 }
 
-/* Print run time, for debug */
-void print_time_duration(
-    const std::chrono::high_resolution_clock::time_point& start,
-    std::string duration_name, cudaStream_t stream = 0);
-
 /* Generate distribution */
 void generate_distribution(thrust::device_vector<float>& input_output,
                            std::string mode = "uniform", float a = 0.f,
