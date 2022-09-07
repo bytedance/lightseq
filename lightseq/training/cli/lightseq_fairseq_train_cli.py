@@ -1,7 +1,7 @@
 import pathlib
 import sys
 
-from fairseq_cli.train import cli_main
+from lightseq.training.gcq.ls_fs_gcq_train import cli_main
 
 
 def ls_cli_main(*args, **kwargs):
