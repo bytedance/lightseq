@@ -57,10 +57,8 @@ int create_transformer_encoder_layer_new(
 
   // layer->load_para_and_grad(rptr<T1>(para_ptr), rptr<T2>(grad_ptr));
 
-  Variable *inp(new Variable("transformer_encoder_layer_" +
-                             std::to_string(layer_id) + "_inp"));
-  Variable *inp_mask(new Variable("transformer_encoder_layer_" +
-                                  std::to_string(layer_id) + "_inp_mask"));
+  Variable *inp(new Variable("input"));
+  Variable *inp_mask(new Variable("inp_mask"));
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 

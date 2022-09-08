@@ -9,7 +9,7 @@ template <typename T1, typename T2>
 Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
                                                Variable* betta) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
-  Variable* result = new Variable(this->_name + "/out", max_size * sizeof(T1),
+  Variable* result = new Variable("LayerNormalizeOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
   this->set_parents({inp, gamma, betta});
   this->set_children({result});
@@ -35,15 +35,6 @@ void LayerNormalizeOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
-
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s forward\n", name().c_str());
-    print_vec(ln_res_val, "ln_res_val", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>
@@ -77,16 +68,6 @@ void LayerNormalizeOp<T1, T2>::backward() {
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                out_val, gamma_val, betta_val, vars_val, means_val,
                _batch_tokens, _hidden_dim, streams);
-
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s backward\n", name().c_str());
-    print_vec(inp_grad, "inp_grad", 10);
-    print_vec(out_grad, "out_grad", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template class LayerNormalizeOp<__half, __half>;

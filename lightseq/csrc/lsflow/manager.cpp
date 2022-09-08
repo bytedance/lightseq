@@ -9,12 +9,11 @@ void MemoryManager::update_tensor_life_idx(int unique_id, int node_idx,
         unique_id, TensorUsage(unique_id, node_idx, node_idx, size, name));
     return;
   }
-  if (iter->second.first_idx > node_idx) {
-    iter->second.first_idx = node_idx;
-  }
-  if (iter->second.last_idx < node_idx) {
-    iter->second.last_idx = node_idx;
-  }
+
+  iter->second.first_idx = std::min(iter->second.first_idx, node_idx);
+
+  iter->second.last_idx = std::max(iter->second.last_idx, node_idx);
+
   return;
 }
 
@@ -65,7 +64,8 @@ void MemoryManager::calculate_buffer_() {
       if (max_first_op <= min_last_op) {
         size_t gap = allocated_offset - prev_offset;
         if (allocated_offset > prev_offset && gap >= cal_tensor_usage.size &&
-            gap < smallest_gap) {  // 注意对于无符号类型的减法处理
+            gap < smallest_gap) {  // Note the subtraction handling for unsigned
+                                   // types
           smallest_gap = gap;
           best_offset = prev_offset;
           best_offset_flag = true;
@@ -120,25 +120,36 @@ void MemoryManager::calculate_buffer_() {
   std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
-              // return x.first.first_idx < y.first.first_idx;
-              return x.second < y.second;
+              if (x.second != y.second) return x.second < y.second;
+              if (x.second + x.first.size != y.second + y.first.size)
+                return x.second + x.first.size > y.second + y.first.size;
+              return x.first.first_idx < y.first.first_idx;
             });
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
-#ifdef DEBUG
+#ifdef DEBUG_TYPE
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu, "
-        "end_addr: %zu, address: %p\n",
+        "idx: %d, life cycle : [%d, %d], name: %s\n"
+        "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), size, iter.second, iter.second + size,
-        buffer_ + iter.second);
+        iter.first._name.c_str(), iter.second, size, buffer_ + iter.second,
+        buffer_ + iter.second + size);
 #endif
+  }
 
+  for (auto iter : tensor_usages_vec) {
     for (auto check_iter : temp_check_vec) {
       if (judge_func(check_iter, iter)) {
         continue;
       }
+      int unique_id = iter.first.unique_id;
+      size_t size = iter.first.size;
+
+      // Logically, this part of the processing will never be executed. If it is
+      // executed, it means that there is a bug in the shared memory scheduling
+      // algorithm.
+
       printf("================================\n");
       printf("ERROR occurred!\n");
       printf(

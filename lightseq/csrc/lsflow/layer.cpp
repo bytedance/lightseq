@@ -4,9 +4,13 @@ namespace lightseq {
 
 Layer::Layer(std::string name) : _op_vec({}) {
   _context_ptr = thread_context_ptr;
-  int idx = _context_ptr->layer_name_cnt[name];
-  _context_ptr->layer_name_cnt[name] += 1;
-  _name = name + "_" + std::to_string(idx);
+  std::string real_name =
+      _context_ptr->last_layer()
+          ? (_context_ptr->last_layer()->name() + "/" + name)
+          : name;
+  int idx = _context_ptr->layer_name_cnt[real_name];
+  _context_ptr->layer_name_cnt[real_name] += 1;
+  _name = real_name + "_" + std::to_string(idx);
   _context_ptr->enter_layer(this, true);
 }
 

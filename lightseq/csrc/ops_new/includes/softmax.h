@@ -30,7 +30,7 @@ class SoftmaxOp : public Operator {
 
   virtual ~SoftmaxOp() {}
 
-  Variable* operator()(Variable* inp, Variable* mask);
+  Variable* operator()(Variable* inp, Variable* mask = nullptr);
 
   void forward() override;
 

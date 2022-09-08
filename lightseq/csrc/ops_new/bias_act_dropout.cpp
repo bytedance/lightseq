@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inp, bias});
   this->set_children({result});
@@ -31,17 +31,6 @@ void BiasActDropoutOp<T1, T2>::forward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
-
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s forward\n", name().c_str());
-    print_vec(input, "input", 10);
-    print_vec(output, "output", 10);
-    print_vec((int*)mask_ptr, "mask_ptr", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>
@@ -68,21 +57,6 @@ void BiasActDropoutOp<T1, T2>::backward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
-
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s backward _activation_fn: %s\n", name().c_str(),
-           _activation_fn.c_str());
-    print_vec(input, "input", 10);
-    print_vec(bias, "bias", 10);
-    print_vec(grad_inp, "grad_inp", 10);
-    print_vec(grad_bias, "grad_bias", 10);
-    print_vec(grad_out, "grad_out", 10);
-    print_vec((int*)mask_ptr, "mask_ptr", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template class BiasActDropoutOp<float, float>;

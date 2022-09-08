@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* Transform0213<T1, T2>::operator()(Variable* inp) {
   size_t trans_size = _max_batch_tokens * _hidden_size;
-  Variable* res = new Variable(this->_name + "/res", trans_size * sizeof(T1),
+  Variable* res = new Variable("Transform0213_res", trans_size * sizeof(T1),
                                trans_size * sizeof(T2));
   this->set_parents({inp});
   this->set_children({res});

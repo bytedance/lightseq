@@ -80,6 +80,14 @@ class Context {  // model only
   void build();
 
   void draw_all_context();
+
+  Layer* last_layer() {
+    return _layer_context.size() ? _layer_context.back() : nullptr;
+  }
+  Node* last_node() {
+    return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
+                                : nullptr;
+  }
 };
 
 }  // namespace lightseq

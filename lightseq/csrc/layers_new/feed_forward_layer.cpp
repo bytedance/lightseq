@@ -31,14 +31,14 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
       _ffn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters node
-  _inter_w = new Variable(name() + "_inter_w");
-  _inter_b = new Variable(this->_name + "_inter_b");
+  _inter_w = new Variable("_inter_w");
+  _inter_b = new Variable("_inter_b");
 
-  _output_w = new Variable(this->_name + "_output_w");
-  _output_b = new Variable(this->_name + "_output_b");
+  _output_w = new Variable("_output_w");
+  _output_b = new Variable("_output_b");
 
-  _ffn_nw = new Variable(this->_name + "_ffn_nw");
-  _ffn_nb = new Variable(this->_name + "_ffn_nb");
+  _ffn_nw = new Variable("_ffn_nw");
+  _ffn_nb = new Variable("_ffn_nb");
 
   this->_context_ptr->exit_layer();  // necessary
 }

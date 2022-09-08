@@ -13,6 +13,7 @@ class Node {
  protected:
   Context* _context_ptr;
   std::string _name;
+  NodeType _node_type;
 
   bool _fw_flag;
   bool _bw_flag;
@@ -22,16 +23,17 @@ class Node {
   std::vector<Node*> _children{};
 
  public:
-  Node(std::string name);
+  Node(std::string name, NodeType nt_);
   std::string name() { return _name; }
   virtual ~Node();
-
+  NodeType node_type() { return _node_type; }
   void set_parents(std::vector<Node*> parents);
 
   void add_child(Node* child) { _children.push_back(child); }
 
   virtual void forward() {}   // need to implement
   virtual void backward() {}  // need to implement
+
   const std::vector<Node*>& parents() { return _parents; }
   const std::vector<Node*>& children() { return _children; }
 
@@ -75,23 +77,14 @@ class Variable : public Node {
   bool enable_override_grad();
 };
 
-enum class OperatorType {
-  LaunchEmbOp,
-  NormalOp,
-};
-
 class Operator : public Node {
  protected:
-  OperatorType _op_type;
-
  public:
-  Operator(std::string name, OperatorType op_type = OperatorType::NormalOp);
+  Operator(std::string name);
   virtual ~Operator() {}
   void check_override_grad();
 
   void set_children(std::vector<Node*> children);
-
-  OperatorType op_type() { return _op_type; }
 
   Variable* child(int index) {
     return static_cast<Variable*>(_children[index]);

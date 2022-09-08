@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
                                                  Variable* inpB) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("StridedBatchGemmOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inpA, inpB});
   this->set_children({result});
@@ -29,16 +29,6 @@ void StridedBatchGemmOp<T1, T2>::forward() {
                               _buffer_b, output, _op_A, _op_B, stride_a,
                               stride_b, stride_c, _batch_heads,
                               cublasGemmAlgo_t(_gemm_algos[0]));
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    std::cout << "_op_A, _op_B: " << _op_A << " " << _op_B << std::endl;
-    print_vec(_buffer_a, this->name() + " inpA", 10);
-    print_vec(_buffer_b, this->name() + " inpB", 10);
-    print_vec(output, this->name() + " ans", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>

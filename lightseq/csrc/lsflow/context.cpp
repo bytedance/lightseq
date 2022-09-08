@@ -108,7 +108,7 @@ void Context::build() {
   thread_context_ptr.reset();
 #endif
 
-#ifdef DEBUG
+#ifdef DEBUG_TYPE
   draw_all_context();
 #endif
 

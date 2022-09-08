@@ -60,7 +60,7 @@ def test_launch_bias_add_transform_20314_new():
     hidden_dim = kt.hidden_dim
     nhead = kt.nhead
     head_dim = int(hidden_dim / nhead)
-    count = 3
+    count = random.randint(1, 3)
     print(
         "(batch_size, seq_len, count, nhead, head_dim): "
         f"({batch_size}, {seq_len}, {count}, {nhead}, {head_dim})"
@@ -96,6 +96,10 @@ def test_launch_bias_add_transform_20314_new():
             nhead,
             head_dim,
         )
+        if count == 1:
+            return [custom_q]
+        if count == 2:
+            return [torch.cat((custom_q, custom_k), dim=0)]
         return [torch.cat((custom_q, custom_k, custom_v), dim=0)]
 
     def baseline():
@@ -113,7 +117,7 @@ def test_launch_transform_20314_bwd_new():
     hidden_dim = kt.hidden_dim
     nhead = kt.nhead
     head_dim = int(hidden_dim / nhead)
-    trans_count = 3
+    trans_count = random.randint(1, 3)
     print(
         "(batch_size, seq_len, hidden_dim, nhead, trans_count): "
         f"({batch_size}, {seq_len}, {hidden_dim}, {nhead}, {trans_count})"
@@ -141,7 +145,15 @@ def test_launch_transform_20314_bwd_new():
 
     def custom():
         cust_func(
-            custom_res, q_inp, k_inp, v_inp, batch_size, seq_len, hidden_dim, nhead
+            custom_res,
+            q_inp,
+            k_inp,
+            v_inp,
+            batch_size,
+            seq_len,
+            hidden_dim,
+            nhead,
+            trans_count,
         )
         return [
             custom_res.contiguous(),
@@ -1695,7 +1707,7 @@ if __name__ == "__main__":
         # "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
-        # "test_launch_bias_add_transform_20314_new",
+        "test_launch_bias_add_transform_20314_new",
         # "test_launch_transform_20314_bwd_new",
         # "test_launch_fused_add2",
         # "test_launch_ffn_bias_bwd",
