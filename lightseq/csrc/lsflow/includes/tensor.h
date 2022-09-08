@@ -26,7 +26,7 @@ class Tensor {
 
   void set_tensor(const char* inp);
 
-  char* tensor(bool is_open_interval = false);
+  char* tensor(bool is_open_interval = false, bool just_view = false);
 
   LSMemoryType memory_type() { return _mtype; }
 

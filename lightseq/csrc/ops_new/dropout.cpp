@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("DropoutOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inp});
   this->set_children({result});
@@ -23,15 +23,6 @@ void DropoutOp<T1, T2>::forward() {
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s forward\n", name().c_str());
-    print_vec(input, this->name() + " inp", 10);
-    print_vec(output, this->name() + " out", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>

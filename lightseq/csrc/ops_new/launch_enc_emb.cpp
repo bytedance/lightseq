@@ -9,7 +9,7 @@ Variable* LaunchEncEmbOp<T>::operator()(Variable* inp_tokens,
                                         Variable* lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
   Variable* result =
-      new Variable(this->_name + "/out", max_size * sizeof(T), 0);
+      new Variable("LaunchEncEmbOp_out", max_size * sizeof(T), 0);
   this->set_parents(
       {inp_tokens, token_emb, pos_emb, pad_mask, lang_emb, lang_id});
   this->set_children({result});
@@ -34,13 +34,6 @@ void LaunchEncEmbOp<T>::forward() {
                           _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
                           lang_emb, lang_id, _multilg_type);
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    print_vec(output_ptr, this->name() + " ans", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template class LaunchEncEmbOp<float>;

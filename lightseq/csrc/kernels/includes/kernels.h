@@ -99,7 +99,7 @@ void launch_transform4d_0213(T *output, const T *vals, int batch_size,
 template <typename T>
 void launch_transform_20314_bwd_new(T *output, const T *q_inp, const T *k_inp,
                                     const T *v_inp, int batch_size, int seq_len,
-                                    int hidden_dim, int nhead,
+                                    int hidden_dim, int nhead, int trans_count,
                                     cudaStream_t stream);
 
 template <typename T>

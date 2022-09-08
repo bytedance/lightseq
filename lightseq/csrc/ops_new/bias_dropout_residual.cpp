@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* BiasDropoutResOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                                Variable* residual) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("BiasDropoutResOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inp, bias, residual});
   this->set_children({result});
@@ -28,16 +28,6 @@ void BiasDropoutResOp<T1, T2>::forward() {
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s forward\n", name().c_str());
-    print_vec(residual, this->name() + " residual", 10);
-    print_vec(bias, this->name() + " bias", 10);
-    print_vec(output, this->name() + " ans", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>
@@ -67,16 +57,6 @@ void BiasDropoutResOp<T1, T2>::backward() {
                       _cols, stream);
   }
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(stream);
-    printf("%s backward is_res_cover: %d\n", name().c_str(), is_res_cover);
-    print_vec(input_grad, this->name() + " input_grad", 10);
-    print_vec(output_grad, this->name() + " output_grad", 10);
-    print_vec(residual_grad, this->name() + " residual_grad", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template class BiasDropoutResOp<float, float>;

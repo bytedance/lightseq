@@ -19,7 +19,7 @@
 
 namespace lightseq {
 
-enum NodeType { VariableNode, IONode, ParametersNode, OperatorNode };
+enum class NodeType { FixedVariable, SharedVariable, Operator};
 
 class Node;
 

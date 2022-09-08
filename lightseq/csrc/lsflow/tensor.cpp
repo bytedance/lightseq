@@ -3,10 +3,12 @@
 namespace lightseq {
 int Tensor::global_tensor_id = 0;
 Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
-  _name = name;
+  _ctx_ptr = thread_context_ptr.get();
+  std::string prefix_name = _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
+
+  _name = prefix_name + name;
   _size = size;
   _mtype = size > 0 ? SharedMemory : FixedMemory;
-  _ctx_ptr = thread_context_ptr.get();
   if (_mtype == SharedMemory) {
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
     _ctx_ptr->mx_tensor_size =
@@ -28,7 +30,7 @@ void Tensor::set_tensor(char* inp) {
 
 void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
-char* Tensor::tensor(bool is_open_interval) {
+char* Tensor::tensor(bool is_open_interval, bool just_view) {
   if (_mtype == FixedMemory) {
     // if (!_ptr) {
     //   printf("%s is null when use, plz set first!\n", _name.c_str());
@@ -40,7 +42,7 @@ char* Tensor::tensor(bool is_open_interval) {
     return _ptr;
   }
   if (_ptr == nullptr) {
-    if (!_ctx_ptr->built()) {
+    if (!_ctx_ptr->built() && !just_view) {
       update_life_idx(_ctx_ptr->node_idx() - is_open_interval);
       return _ctx_ptr->temporary_buffer_;
     }
@@ -51,6 +53,9 @@ char* Tensor::tensor(bool is_open_interval) {
 
 void Tensor::update_life_idx(int node_idx) {
   if (_mtype == FixedMemory) {
+    return;
+  }
+  if (_size == 0) {
     return;
   }
   _mm_ptr->update_tensor_life_idx(_id, node_idx, _size, _name);

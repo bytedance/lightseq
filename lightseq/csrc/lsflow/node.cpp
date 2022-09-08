@@ -1,12 +1,20 @@
 #include "node.h"
 
+#if DEBUG_TYPE == FP16
+typedef __half TENSOR_TYPE;
+#elif DEBUG_TYPE == FP32
+typedef float TENSOR_TYPE;
+#endif
+
 namespace lightseq {
 
-Node::Node(std::string name) : _context_ptr(thread_context_ptr.get()) {
-  int idx = _context_ptr->node_name_cnt[name];
-  _context_ptr->node_name_cnt[name] += 1;
-  _name = name + "_" + std::to_string(idx);
-  _bw_first_flag = true;
+Node::Node(std::string name, NodeType nt_)
+    : _context_ptr(thread_context_ptr.get()), _bw_first_flag(true), _node_type(nt_) {
+  std::string prefix_name = _context_ptr->last_layer() ? (_context_ptr->last_layer()->name() + ":") : "";
+  std::string real_name = prefix_name + name;
+  int idx = _context_ptr->node_name_cnt[real_name];
+  _context_ptr->node_name_cnt[real_name] += 1;
+  _name = real_name + "_" + std::to_string(idx);
   thread_context_ptr->add_node(this);
 }
 
@@ -32,7 +40,29 @@ void Node::recursive_forward() {
 
   _context_ptr->update_node_idx();
 
+#ifdef DEBUG_TYPE
+  auto start = std::chrono::high_resolution_clock::now();
+#endif
+
   forward();
+
+#ifdef DEBUG_TYPE
+  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+    return;
+  }
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  print_time_duration(start, name() + " Forward ****", 0);
+  Operator* this_op = static_cast<Operator*>(this);
+  for (int idx = 0; idx < _parents.size(); idx ++) {
+    if(_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
+      print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(), this_op->parent(idx)->name()+ ":value", 10);
+  }
+  for (int idx = 0; idx < _children.size(); idx ++) {
+    if(_children[idx] != nullptr && this_op->child(idx)->value() != nullptr)
+      print_vec((TENSOR_TYPE*)this_op->child(idx)->value(), this_op->child(idx)->name()+ ":value", 10);
+  }
+  printf("\n");
+#endif
 }
 
 void Node::recursive_backward() {
@@ -44,7 +74,29 @@ void Node::recursive_backward() {
   _bw_flag = true;
   _context_ptr->update_node_idx();
 
+#ifdef DEBUG_TYPE
+  auto start = std::chrono::high_resolution_clock::now();
+#endif
+
   backward();
+
+#ifdef DEBUG_TYPE
+  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+    return;
+  }
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  print_time_duration(start, name() + " Backward ****", 0);
+  Operator* this_op = static_cast<Operator*>(this);
+  for (int idx = 0; idx < _parents.size(); idx ++) {
+    if(_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)
+      print_vec((TENSOR_TYPE*)this_op->parent(idx)->grad(), this_op->parent(idx)->name() + ":grad", 10);
+  }
+  for (int idx = 0; idx < _children.size(); idx ++) {
+    if(_children[idx] != nullptr && this_op->child(idx)->grad() != nullptr)
+      print_vec((TENSOR_TYPE*)this_op->child(idx)->grad(), this_op->child(idx)->name() + ":grad", 10);
+  }
+  printf("\n");
+#endif
 }
 
 bool Node::is_cover() {  // true means assign, false means accumulate
@@ -56,20 +108,21 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name), _value_byte_size(0), _grad_byte_size(0) {
-  _value.reset(new Tensor(this->_name + "/value", 0));
-  if (_context_ptr->is_training())
-    _grad.reset(new Tensor(this->_name + "/grad", 0));
+    : Node(name, NodeType::FixedVariable),
+      _value_byte_size(0),
+      _grad_byte_size(0) {
+  _value.reset(new Tensor("value", 0));
+  if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", 0));
 }
 
 Variable::Variable(std::string name, size_t value_byte_size,
                    size_t grad_byte_size)
-    : Node(name),
+    : Node(name, NodeType::SharedVariable),
       _value_byte_size(value_byte_size),
       _grad_byte_size(grad_byte_size) {
-  _value.reset(new Tensor(this->_name + "/value", _value_byte_size));
+  _value.reset(new Tensor("value", _value_byte_size));
   if (_context_ptr->is_training())
-    _grad.reset(new Tensor(this->_name + "/grad", _grad_byte_size));
+    _grad.reset(new Tensor("grad", _grad_byte_size));
 }
 
 Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
@@ -123,8 +176,8 @@ bool Variable::enable_override_grad() {
   }
 }
 
-Operator::Operator(std::string name, OperatorType op_type)
-    : Node(name), _op_type(op_type) {
+Operator::Operator(std::string name)
+    : Node(name, NodeType::Operator) {
   _context_ptr->add_op(this);
 }
 

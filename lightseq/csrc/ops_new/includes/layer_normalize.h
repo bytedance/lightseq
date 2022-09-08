@@ -24,9 +24,9 @@ class LayerNormalizeOp : public Operator {
         _max_batch_tokens(max_batch_tokens),
         _hidden_dim(hidden_dim),
         _use_mean(use_mean) {
-    vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
+    vars_.reset(new Tensor("vars", max_batch_tokens * sizeof(T1)));
     if (use_mean)
-      means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
+      means_.reset(new Tensor("means", max_batch_tokens * sizeof(T1)));
   }
 
   Variable* operator()(Variable* inp, Variable* gamma, Variable* betta);

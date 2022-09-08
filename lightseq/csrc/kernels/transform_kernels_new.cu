@@ -149,10 +149,6 @@ void launch_bias_add_transform_20314_new<__half>(
     __half *q_out, __half *k_out, __half *v_out, const __half *input,
     const __half *bias, int dim_0, int dim_1, int dim_2, int dim_3, int dim_4,
     cudaStream_t stream) {
-  if (dim_2 != 3) {
-    printf("launch_bias_add_transform_20314_new error!\n");
-    exit(0);
-  }
   dim_4 >>= 3;
 
   dim3 grid_dim(dim_0, dim_1, dim_2);
@@ -183,10 +179,11 @@ nhead: number of attention heads
 template <typename T>
 __global__ void transform_20314_bwd_new(T *output, const T *q_inp,
                                         const T *k_inp, const T *v_inp,
-                                        int batch_size, int seq_len, int nhead,
+                                        int batch_size, int seq_len,
+                                        int trans_count, int nhead,
                                         int head_dim, int batch_ele_num) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
-  if (offset >= batch_ele_num * 3) {
+  if (offset >= batch_ele_num * trans_count) {
     return;
   }
   int trans_id, batch_id, head_id, token_id, dim_id;
@@ -194,7 +191,7 @@ __global__ void transform_20314_bwd_new(T *output, const T *q_inp,
                  &batch_id, &head_id, &token_id, &dim_id);
   // [b, s, tc, nh, ad]
   int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
-                             seq_len, 3, nhead, head_dim);
+                             seq_len, trans_count, nhead, head_dim);
 
   const float4 *q_inp4 = reinterpret_cast<const float4 *>(q_inp);
   const float4 *k_inp4 = reinterpret_cast<const float4 *>(k_inp);
@@ -215,29 +212,29 @@ void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp,
                                            const float *k_inp,
                                            const float *v_inp, int batch_size,
                                            int seq_len, int hidden_dim,
-                                           int nhead, cudaStream_t stream) {
+                                           int nhead, int trans_count,
+                                           cudaStream_t stream) {
   hidden_dim >>= 2;
   int head_dim = hidden_dim / nhead;
   int batch_ele_num = batch_size * seq_len * hidden_dim;
   int nblock = (batch_ele_num * 3 + MAX_THREADS - 1) / MAX_THREADS;
 
   transform_20314_bwd_new<float><<<nblock, MAX_THREADS, 0, stream>>>(
-      output, q_inp, k_inp, v_inp, batch_size, seq_len, nhead, head_dim,
-      batch_ele_num);
+      output, q_inp, k_inp, v_inp, batch_size, seq_len, trans_count, nhead,
+      head_dim, batch_ele_num);
 }
 
 template <>
-void launch_transform_20314_bwd_new<__half>(__half *output, const __half *q_inp,
-                                            const __half *k_inp,
-                                            const __half *v_inp, int batch_size,
-                                            int seq_len, int hidden_dim,
-                                            int nhead, cudaStream_t stream) {
+void launch_transform_20314_bwd_new<__half>(
+    __half *output, const __half *q_inp, const __half *k_inp,
+    const __half *v_inp, int batch_size, int seq_len, int hidden_dim, int nhead,
+    int trans_count, cudaStream_t stream) {
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
   int batch_ele_num = batch_size * seq_len * hidden_dim;
   int nblock = (batch_ele_num * 3 + MAX_THREADS - 1) / MAX_THREADS;
 
   transform_20314_bwd_new<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-      output, q_inp, k_inp, v_inp, batch_size, seq_len, nhead, head_dim,
-      batch_ele_num);
+      output, q_inp, k_inp, v_inp, batch_size, seq_len, trans_count, nhead,
+      head_dim, batch_ele_num);
 }

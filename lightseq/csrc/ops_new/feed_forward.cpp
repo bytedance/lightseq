@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* FeedForwardOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
   size_t max_size = _max_batch_tokens * _output_size;
-  Variable* result = new Variable(this->_name + "/out", max_size * sizeof(T1),
+  Variable* result = new Variable("FeedForwardOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
   this->set_parents({inp, weight});
   this->set_children({result});
@@ -26,14 +26,6 @@ void FeedForwardOp<T1, T2>::forward() {
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    print_vec(input_ptr, this->name() + " inp", 10);
-    print_vec(out_ptr, this->name() + " ans", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template <typename T1, typename T2>
@@ -63,16 +55,6 @@ void FeedForwardOp<T1, T2>::backward() {
                  _batch_tokens, _output_size, &alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
 
-#ifdef DEBUG
-  if (_context_ptr->built()) {
-    cudaStreamSynchronize(_context_ptr->get_stream());
-    printf("%s backward\n", name().c_str());
-    print_vec(inp_grad, "inp_grad", 10);
-    print_vec(out_grad, "out_grad", 10);
-    print_vec(input_ptr, "input_ptr", 10);
-    printf("\n");
-  }
-#endif
 }
 
 template class FeedForwardOp<float, float>;

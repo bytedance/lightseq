@@ -97,16 +97,14 @@ void torch_launch_quant_transform4d_0213(
 }
 
 template <typename T>
-void torch_launch_transform_20314_bwd_new(torch::Tensor &out,
-                                          const torch::Tensor &q_inp,
-                                          const torch::Tensor &k_inp,
-                                          const torch::Tensor &v_inp,
-                                          int batch_size, int seq_len,
-                                          int hidden_dim, int nhead) {
+void torch_launch_transform_20314_bwd_new(
+    torch::Tensor &out, const torch::Tensor &q_inp, const torch::Tensor &k_inp,
+    const torch::Tensor &v_inp, int batch_size, int seq_len, int hidden_dim,
+    int nhead, int trans_count) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_transform_20314_bwd_new(rptr<T>(out), rptr<T>(q_inp), rptr<T>(k_inp),
                                  rptr<T>(v_inp), batch_size, seq_len,
-                                 hidden_dim, nhead, stream);
+                                 hidden_dim, nhead, trans_count, stream);
   //   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
