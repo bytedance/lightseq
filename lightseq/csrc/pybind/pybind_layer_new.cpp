@@ -149,6 +149,90 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
   return {grad_inp};
 }
 
+/* Transformer decoder layer */
+template <typename T1, typename T2>
+int create_transformer_decoder_layer(
+    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
+    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
+    float activation_dropout_ratio, float hidden_dropout_ratio,
+    bool pre_or_postLayerNorm, std::string activation_fn) {
+  
+  // necessary
+  ContextInitial();
+
+  auto layer = std::make_shared<TransformerDecoderLayer<T>>(
+      layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
+      intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
+      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn);
+
+  s_transformer_decoder_layers[layer_id] = layer;
+
+  Varialbe* dec_inp = new Variable("decoder_input");
+  Variable* enc_out = new Variable("encoder_out");
+  Variable* cache_self_k = new Variable("cache_self_k");
+  Variable* cache_self_v = new Variable("cache_self_v");
+
+  
+
+  std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
+
+  std::cout << "Decoder layer #" << layer_id << " is created with date type ["
+            << dtype << "]." << std::endl;
+
+  return 0;
+}
+
+template <typename T>
+std::vector<torch::Tensor> transformer_decoder_layer_fw(
+    int layer_id, const torch::Tensor &dec_input,
+    const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
+    bool training_mode, bool prelayernorm, bool quant_mode,
+    std::vector<torch::Tensor> &cache) {
+  CHECK_INPUT(dec_input);
+  CHECK_INPUT(enc_output);
+  CHECK_INPUT(enc_mask);
+
+  const T *dec_input_ptr = (const T *)dec_input.data_ptr();
+  const T *enc_output_ptr = (const T *)enc_output.data_ptr();
+  const T *enc_mask_ptr = (const T *)enc_mask.data_ptr();
+
+  auto dec_output = torch::empty_like(dec_input);
+  T *dec_output_ptr = (T *)dec_output.data_ptr();
+
+  std::shared_ptr<TransformerDecoderLayer<T>> layer =
+      std::static_pointer_cast<TransformerDecoderLayer<T>>(
+          s_transformer_decoder_layers[layer_id]);
+
+  int batch_size = enc_output.size(0);
+  int trg_seq_len = dec_input.size(1);
+  int src_seq_len = enc_output.size(1);
+  int step = -1;
+  std::vector<T *> cache_ptr;
+  if (cache.size() > 0) {
+    trg_seq_len = dec_input.size(0) / batch_size;  // beam_size
+    step = cache[0].size(2) - 1;
+    cache_ptr = {nullptr, nullptr, nullptr, nullptr, nullptr};
+    cache_ptr[0] = (T *)cache[0].data_ptr();  // new dec-self-attn k
+    cache_ptr[1] = (T *)cache[1].data_ptr();  // new dec-self-attn v
+    if (step > 0) {
+      cache_ptr[2] = (T *)cache[2].data_ptr();  // old dec-self-attn k
+      cache_ptr[3] = (T *)cache[3].data_ptr();  // old dec-self-attn v
+    }
+    if (layer_id == 0) {
+      cache_ptr[4] =
+          (T *)cache[cache.size() - 1].data_ptr();  // enc-dec-attn kv
+    }
+  }
+  layer->set_cur_batch_shape(batch_size, trg_seq_len, src_seq_len, step);
+  layer->SetTrainingMode(training_mode);
+  layer->SetQuantMode(quant_mode);
+  layer->Forward(dec_input_ptr, enc_output_ptr, enc_mask_ptr, dec_output_ptr,
+                 cache_ptr);
+
+  return {dec_output};
+}
+
+
 template <typename T1, typename T2>
 void assign_layer_weight_grad(const torch::Tensor &weights,
                               torch::Tensor &grads, std::string layer_name,

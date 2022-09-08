@@ -3,8 +3,8 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
-                                               Variable* chache) {
+Variable* LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
+                                                Variable* cache) {
   Variable* new_cache = new Variable("LaunchConcat3Dim1_new_cache");
   this->set_parents({inp, cache});
   this->set_children({new_cache});
@@ -22,7 +22,7 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
   if (real_val != inp_ptr)
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
-                        _batchs * _hidden_size * seq_len * sizeof(T1),
+                        _batchs * _hidden_size * _seq_len * sizeof(T1),
                         cudaMemcpyDefault, _stream));
   if (_predict) {
     launch_concat3_dim1(real_val, inp_ptr, cache_ptr, _batchs * _heads,
@@ -35,10 +35,10 @@ void LaunchConcat3Dim1<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* val_grad = (T1*)child(0)->grad();
-  if (real_val != inp_ptr)
+  if (inp_grad != val_grad)
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,
-                        _batchs * _hidden_size * seq_len * sizeof(T2),
+                        _batchs * _hidden_size * _seq_len * sizeof(T2),
                         cudaMemcpyDefault, _stream));
 }
 

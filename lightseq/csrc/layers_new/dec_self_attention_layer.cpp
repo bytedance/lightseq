@@ -1,4 +1,4 @@
-#include "multihead_attention_layer.h"
+#include "dec_self_attention_layer.h"
 
 namespace lightseq {
 
@@ -14,7 +14,6 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _training(true),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
       _is_post_ln(is_post_ln),
       // operators
@@ -127,9 +126,9 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len,
 
   _bias_add_transform_20314->before_forward(batch_size, seq_len);
 
-  _deal_cache_k->before_backward(batch_size, steps, predict);
+  _deal_cache_k->before_forward(batch_size, seq_len, steps, predict);
 
-  _deal_cache_v->before_backward(batch_size, steps, predict);
+  _deal_cache_v->before_forward(batch_size, seq_len, steps, predict);
 
   _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
                                _batch_heads);

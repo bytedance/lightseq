@@ -8,9 +8,12 @@ namespace lightseq {
 template <class T1, class T2>
 class TransformerDecoderLayer : public Layer {
  private:
+  EncDecKvLayerPtr<T1, T2> _enc_kv_layer;
   DecSelfAttentionLayerPtr<T1, T2> _self_attn_layer;
   DecEncAttentionLayerPtr<T1, T2> _enc_attn_layer;
   FeedForwardLayerPtr<T1, T2> _ffn_layer;
+
+  int _layer_id;
 
  public:
   TransformerDecoderLayer(int layer_id, int max_batch_tokens, int max_seq_len,
@@ -20,17 +23,23 @@ class TransformerDecoderLayer : public Layer {
                           float hidden_output_dropout_ratio,
                           bool pre_or_postLayerNorm, std::string activation_fn,
                           bool mask_future_tokens, bool is_post_ln = false);
+                          
   virtual ~TransformerDecoderLayer() {}
 
   Variable* operator()(Variable* inp, Variable* inp_mask);
 
   void before_forward(int batch_size, int seq_len, int step) {
+    _enc_kv_layer->before_forward(batch_size, seq_len);
     _self_attn_layer->before_forward(batch_size, seq_len, step);
     _enc_attn_layer->before_forward(batch_size, seq_len);
     _ffn_layer->before_forward(batch_size, seq_len);
   }
 
   void before_backward() { return; }
+
+  void forward() override;
+
+  void backward() override;
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 

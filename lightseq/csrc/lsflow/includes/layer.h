@@ -9,10 +9,9 @@
 namespace lightseq {
 
 class Layer {
- protected:
+protected:
   ContextPtr _context_ptr;
   std::string _name = "";
-
   std::vector<Variable*> _root_var_vec = {};
   std::vector<Variable*> _leaf_var_vec = {};
 
@@ -36,6 +35,10 @@ class Layer {
   void clear_fw_flag();
 
   void clear_bw_flag();
+
+  void tag_fw_flag();
+
+  void tag_bw_flag();
 
   void gather_root_leaf_var();
 

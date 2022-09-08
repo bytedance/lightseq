@@ -4,13 +4,24 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
-    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
+    int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, bool is_post_ln)
-    : Layer("TransformerDecoderLayer") {
-  _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
+    : Layer("TransformerDecoderLayer"),
+      _layer_id(layer_id) {
+
+  if(_layer_id == 0){
+    _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(layer_id, max_batch_tokens, hidden_size, num_heads));
+  }
+  
+  _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
+      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
+      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
+      pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
+
+  _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
@@ -24,16 +35,51 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 }
 
 template <typename T1, typename T2>
-Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp,
-                                                      Variable* inp_mask) {
-  LAYER_PRE_INPUTS({inp, inp_mask});
+Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out, Variable* cache_self_k, 
+                                                      Variable* cache_self_v, Variable* enc_k, Variable* enc_v) {
+  LAYER_PRE_INPUTS({inp, cache_self_k, cache_self_v});
 
-  Variable* attn_out = (*_attn_layer)(inp, inp_mask);
+  if(_layer_id == 0)
+    std::tuple<Variable*, Variable*> enc_kv = (*_enc_kv_layer)(enc_out);
+
+  }
+  else {
+    enc_kv = std::
+  }
+
+  std::tuple<Variable*, Variable*, Variable*> _self_attn_out = (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
+
+  Variable* _enc_attn_out = (*_enc_attn_layer)(std::get<0>(_self_attn_layer), std::get<0>(enc_kv), std::get<1>(enc_kv));
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
-  LAYER_POST_OUTPUTS({ffn_out});
+  LAYER_POST_OUTPUTS({ffn_out, std::get<1>(_self_attn_out), std::get<2>(_self_attn_out)});
   return ffn_out;
+}
+
+template <typename T1, typename T2>
+void forward() {
+  if (xxx) {
+    _enc_kv_layer->forward();
+  }
+  else {
+    _enc_kv_layer->tag_fw_flag();
+  }
+
+  _self_attn_layer->forward();
+
+  _enc_attn_layer->forward();
+
+  _ffn_layer->forward();
+}
+
+template <typename T1, typename T2>
+void backward() {
+  _ffn_layer->backward();
+  _enc_attn_layer->backward();
+  _self_attn_layer->backward();
+  if(_layer_id == 0)
+    _enc_kv_layer->backward();
 }
 
 template <typename T1, typename T2>

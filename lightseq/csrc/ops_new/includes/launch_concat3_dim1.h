@@ -28,8 +28,8 @@ class LaunchConcat3Dim1 : public Operator {
 
   Variable* operator()(Variable* inp, Variable* cache);
 
-  void before_forward(int batchs, int steps, bool predict) {
-    _batchs = batchs, _steps = steps, _predict = predict;
+  void before_forward(int batchs, int seq_len, int steps, bool predict) {
+    _batchs = batchs, _seq_len = seq_len, _steps = steps, _predict = predict;
   }
 
   void forward() override;

@@ -44,7 +44,6 @@ class MultiheadAttentionLayer : public Layer {
   int _max_seq_len;
   int _hidden_size;
   int _heads;
-  int _training;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 
