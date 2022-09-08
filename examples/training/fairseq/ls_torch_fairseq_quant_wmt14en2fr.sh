@@ -29,7 +29,7 @@ lightseq-train /tmp/wmt14/ \
     --enable-quant \
     --finetune-from-model fp16/checkpoint_best.pt \
     --quant-mode qat --quant-bits 4 \
-    --n-gpus-intk 1 --n-gpus-intwhat 16 \
+    --n-gpus-intwhat 16 \
     --max-epoch 160 --keep-last-epochs 1 \
     --smooth-avg-update 200 $@
 

@@ -355,7 +355,7 @@ class FakeTensorQuantFunction(Function):
     def backward(ctx, grad_outputs):
         return grad_outputs, None, None, None, None, None, None
 
-
+import random
 class FakeTensorQuantFunctionX(Function):
     """Fake version of TensorQuantFunction
     See comments of TensorQuantFunction, arguments are the same.
@@ -373,7 +373,7 @@ class FakeTensorQuantFunctionX(Function):
         smooth_avg=1,
         fab=(1.3, 1.2),
         is_weight=False,
-        is_embed=False,
+        special=None,
     ):
         # ctx.save_for_backward(inputs, amax)
         # if is_embed:
@@ -385,17 +385,11 @@ class FakeTensorQuantFunctionX(Function):
             outputs += (2.0 ** (num_bits - 1)) - 1.0
         outputs = (outputs * scale).to(inputs.dtype)
         if training:
-            # if is_embed:
-            #     x = inputs.view(-1, inputs.shape[-1])
-            #     amax.data = amax * 0.999 + 0.001 * torch.max(x, 0)[0]
-            # else:
-            #     amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
-            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
-        #         ctx.can_scale = (not unsigned)
-        #         ctx.fab = fab
-        #         if ctx.can_scale:
-        #             diff = torch.abs(inputs-outputs) / scale
-        #             ctx.save_for_backward(diff)
+            if special == "weight":
+                k = random.randint(0, inputs.shape[0] - 1)
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[k])
+            else:
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
         return outputs
 
     @staticmethod

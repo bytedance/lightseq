@@ -45,18 +45,14 @@ class QuantLinear(Linear):
         self.output_quant = None
         # if pre_activation is None:
         self.output_quant = TensorQuantizer(out_quant_config, special=special)
-        self.weight_quant = TensorQuantizer(weight_quant_config, special=special)
+        self.weight_quant = TensorQuantizer(weight_quant_config, special="weight")
 
     def forward(self, input):
         qinput = input
         if self.input_quant is not None:
             qinput = self.input_quant(input)
 
-        if self.skip_weight_quant:
-            qweight = self.weight
-        else:
-            qweight = self.weight_quant(self.weight)
-
+        qweight = self.weight_quant(self.weight)
         output = F.linear(qinput, qweight)
         if self.output_quant is not None:
             output = self.output_quant(output)

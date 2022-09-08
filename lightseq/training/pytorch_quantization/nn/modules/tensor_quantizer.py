@@ -369,7 +369,7 @@ class TensorQuantizer(nn.Module):
                     # self.fab,
                     (1, 1),
                     self.is_weight,
-                    self.is_embed,
+                    self.special,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
