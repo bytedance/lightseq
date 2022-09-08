@@ -4,7 +4,8 @@ namespace lightseq {
 int Tensor::global_tensor_id = 0;
 Tensor::Tensor(std::string name, size_t size) : _id(global_tensor_id++) {
   _ctx_ptr = thread_context_ptr.get();
-  std::string prefix_name = _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
+  std::string prefix_name =
+      _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
 
   _name = prefix_name + name;
   _size = size;

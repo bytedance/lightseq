@@ -25,7 +25,6 @@ void FeedForwardOp<T1, T2>::forward() {
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, _output_size,
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
-
 }
 
 template <typename T1, typename T2>
@@ -54,7 +53,6 @@ void FeedForwardOp<T1, T2>::backward() {
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
                  _batch_tokens, _output_size, &alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
-
 }
 
 template class FeedForwardOp<float, float>;

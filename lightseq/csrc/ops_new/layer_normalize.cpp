@@ -35,7 +35,6 @@ void LayerNormalizeOp<T1, T2>::forward() {
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
-
 }
 
 template <typename T1, typename T2>
@@ -69,7 +68,6 @@ void LayerNormalizeOp<T1, T2>::backward() {
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
                out_val, gamma_val, betta_val, vars_val, means_val,
                _batch_tokens, _hidden_dim, streams);
-
 }
 
 template class LayerNormalizeOp<__half, __half>;

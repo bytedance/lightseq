@@ -81,4 +81,4 @@ class LayerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"] #, "-DDEBUG_TYPE=FP16"]
+        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]  # , "-DDEBUG_TYPE=FP16"]

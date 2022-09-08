@@ -120,8 +120,8 @@ void MemoryManager::calculate_buffer_() {
   std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
-              if(x.second != y.second) return x.second < y.second;
-              if(x.second + x.first.size != y.second + y.first.size) 
+              if (x.second != y.second) return x.second < y.second;
+              if (x.second + x.first.size != y.second + y.first.size)
                 return x.second + x.first.size > y.second + y.first.size;
               return x.first.first_idx < y.first.first_idx;
             });

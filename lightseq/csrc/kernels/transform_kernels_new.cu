@@ -225,10 +225,12 @@ void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp,
 }
 
 template <>
-void launch_transform_20314_bwd_new<__half>(
-    __half *output, const __half *q_inp, const __half *k_inp,
-    const __half *v_inp, int batch_size, int seq_len, int hidden_dim, int nhead,
-    int trans_count, cudaStream_t stream) {
+void launch_transform_20314_bwd_new<__half>(__half *output, const __half *q_inp,
+                                            const __half *k_inp,
+                                            const __half *v_inp, int batch_size,
+                                            int seq_len, int hidden_dim,
+                                            int nhead, int trans_count,
+                                            cudaStream_t stream) {
   hidden_dim >>= 3;
   int head_dim = hidden_dim / nhead;
   int batch_ele_num = batch_size * seq_len * hidden_dim;

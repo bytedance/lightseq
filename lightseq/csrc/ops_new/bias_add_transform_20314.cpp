@@ -7,11 +7,14 @@ std::tuple<Variable*, Variable*, Variable*>
 BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
   size_t trans_size = _max_batch_tokens * _hidden_size;
   Variable* res0 =
-      new Variable("BiasAddTrans20314_res_0", trans_size * sizeof(T1), trans_size * sizeof(T2));
+      new Variable("BiasAddTrans20314_res_0", trans_size * sizeof(T1),
+                   trans_size * sizeof(T2));
   Variable* res1 =
-      new Variable("BiasAddTrans20314_res_1", trans_size * sizeof(T1), trans_size * sizeof(T2));
+      new Variable("BiasAddTrans20314_res_1", trans_size * sizeof(T1),
+                   trans_size * sizeof(T2));
   Variable* res2 =
-      new Variable("BiasAddTrans20314_res_2", trans_size * sizeof(T1), trans_size * sizeof(T2));
+      new Variable("BiasAddTrans20314_res_2", trans_size * sizeof(T1),
+                   trans_size * sizeof(T2));
   this->set_parents({inp, bias});
   this->set_children({res0, res1, res2});
   return std::make_tuple(res0, res1, res2);
@@ -31,7 +34,6 @@ void BiasAddTrans20314<T1, T2>::forward() {
   launch_bias_add_transform_20314_new<T1>(
       q_ptr, k_ptr, v_ptr, inp_ptr, bias_ptr, _batch, _seq_len, _trans_count,
       _heads, _hidden_size / _heads, _stream);
-
 }
 
 template <typename T1, typename T2>

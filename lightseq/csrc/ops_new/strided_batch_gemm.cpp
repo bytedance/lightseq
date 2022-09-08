@@ -29,7 +29,6 @@ void StridedBatchGemmOp<T1, T2>::forward() {
                               _buffer_b, output, _op_A, _op_B, stride_a,
                               stride_b, stride_c, _batch_heads,
                               cublasGemmAlgo_t(_gemm_algos[0]));
-
 }
 
 template <typename T1, typename T2>

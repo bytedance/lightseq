@@ -4,8 +4,9 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
-  Variable* result = new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
-                                  _max_ele_num * sizeof(T2));
+  Variable* result =
+      new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
+                   _max_ele_num * sizeof(T2));
   this->set_parents({inp, bias});
   this->set_children({result});
   return result;
@@ -30,7 +31,6 @@ void BiasActDropoutOp<T1, T2>::forward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
-
 }
 
 template <typename T1, typename T2>
@@ -57,7 +57,6 @@ void BiasActDropoutOp<T1, T2>::backward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
-
 }
 
 template class BiasActDropoutOp<float, float>;

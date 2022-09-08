@@ -27,7 +27,6 @@ void BiasDropoutResOp<T1, T2>::forward() {
 
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
-
 }
 
 template <typename T1, typename T2>
@@ -56,7 +55,6 @@ void BiasDropoutResOp<T1, T2>::backward() {
     launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
                       _cols, stream);
   }
-
 }
 
 template class BiasDropoutResOp<float, float>;

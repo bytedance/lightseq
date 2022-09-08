@@ -4,9 +4,8 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
-  Variable* result =
-      new Variable("DropoutOp_out", _max_ele_num * sizeof(T1),
-                   _max_ele_num * sizeof(T2));
+  Variable* result = new Variable("DropoutOp_out", _max_ele_num * sizeof(T1),
+                                  _max_ele_num * sizeof(T2));
   this->set_parents({inp});
   this->set_children({result});
   return result;
@@ -22,7 +21,6 @@ void DropoutOp<T1, T2>::forward() {
 
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
-
 }
 
 template <typename T1, typename T2>
