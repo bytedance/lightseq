@@ -344,6 +344,7 @@ class TensorQuantizer(nn.Module):
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""
+        inp = inputs
         inputs = self.clip(inputs)
 
         # amax = self.clip.clip_value_maxs if self.is_embed else self.clip.clip_value_max
@@ -370,6 +371,7 @@ class TensorQuantizer(nn.Module):
                     (1, 1),
                     self.is_weight,
                     self.special,
+                    inp,
                 )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:

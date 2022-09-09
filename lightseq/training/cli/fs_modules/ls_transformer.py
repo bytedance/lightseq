@@ -323,23 +323,11 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         if self.params_clip is None:
             self.params_clip, self.buffer = self.get_params()
 
-        if self.training:
-            if self.last_model is False:
-                rank = int(dist.get_rank())
-                if rank < self.args.n_gpus_intk:
-                    self.apply(enable_bits[self.args.n_gpus_intwhat])
-            self.last_model = True
-        else:
-            if self.last_model is True:
-                self.apply(enable_int4)
-                logger.info("avg_clip_max")
-                self.avg_clip_max(self.params_clip)
-            self.last_model = False
-
         encoder_out = self.encoder(src_tokens)
         decoder_out = self.decoder(
             prev_output_tokens, encoder_out, features_only=features_only
         )
+        self.avg_clip_max(self.params_clip)
         return decoder_out
 
     # def set_params(self):
