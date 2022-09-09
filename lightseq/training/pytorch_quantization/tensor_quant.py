@@ -381,7 +381,7 @@ class FakeTensorQuantFunctionX(Function):
             outputs += (2.0 ** (num_bits - 1)) - 1.0
         outputs = (outputs * scale).to(inputs.dtype)
         if training:
-            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inp)
+            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs)
         return outputs
 
     @staticmethod
