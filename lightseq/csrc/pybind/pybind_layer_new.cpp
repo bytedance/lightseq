@@ -64,9 +64,9 @@ int create_transformer_encoder_layer_new(
 
   s_transformer_encoder_layers[layer_id] = layer;
 
-  const int default_batch_size = 1;
-  const int default_seq_len = 64;
-  layer->before_forward(default_batch_size, default_seq_len);
+  // const int default_batch_size = 1;
+  // const int default_seq_len = 64;
+  // layer->before_forward(default_batch_size, default_seq_len);
 
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";

@@ -10,10 +10,11 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens, bool is_post_ln)
     : Layer("TransformerDecoderLayer"),
-      _layer_id(layer_id) {
+      _layer_id(layer_id),
+      _nshared_layer(nshared_layer) {
 
   if(_layer_id == 0){
-    _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(layer_id, max_batch_tokens, hidden_size, num_heads));
+    _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(nshared_layer, layer_id, max_batch_tokens, hidden_size, num_heads));
   }
   
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
@@ -36,40 +37,36 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 
 template <typename T1, typename T2>
 Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out, Variable* cache_self_k, 
-                                                      Variable* cache_self_v, Variable* enc_k, Variable* enc_v) {
-  LAYER_PRE_INPUTS({inp, cache_self_k, cache_self_v});
+                                                      Variable* cache_self_v) {
 
-  if(_layer_id == 0)
-    std::tuple<Variable*, Variable*> enc_kv = (*_enc_kv_layer)(enc_out);
-
+  std::tuple<Variable*, Variable*> enc_kv;
+  if(_layer_id == 0){
+    enc_kv = (*_enc_kv_layer)(enc_out);
+    // regist at _context_ptr
   }
   else {
-    enc_kv = std::
+    enc_kv = std::make_tuple(enc_k, enc_v);
   }
 
   std::tuple<Variable*, Variable*, Variable*> _self_attn_out = (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
 
-  Variable* _enc_attn_out = (*_enc_attn_layer)(std::get<0>(_self_attn_layer), std::get<0>(enc_kv), std::get<1>(enc_kv));
+  Variable* _enc_attn_out = (*_enc_attn_layer)(std::get<0>(_self_attn_out), std::get<0>(enc_kv), std::get<1>(enc_kv));
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
-  LAYER_POST_OUTPUTS({ffn_out, std::get<1>(_self_attn_out), std::get<2>(_self_attn_out)});
-  return ffn_out;
+  return std::make_tuple(ffn_out, );
 }
 
 template <typename T1, typename T2>
 void forward() {
-  if (xxx) {
+  if (_layer_id == 0 && _step <= 0) {
     _enc_kv_layer->forward();
   }
-  else {
+  else if(_layer_id == 0 && _step > 0) {
     _enc_kv_layer->tag_fw_flag();
   }
-
   _self_attn_layer->forward();
-
   _enc_attn_layer->forward();
-
   _ffn_layer->forward();
 }
 
@@ -78,7 +75,7 @@ void backward() {
   _ffn_layer->backward();
   _enc_attn_layer->backward();
   _self_attn_layer->backward();
-  if(_layer_id == 0)
+  if(_layer_id == 0) //  && _step == -1
     _enc_kv_layer->backward();
 }
 

@@ -14,9 +14,10 @@ class TransformerDecoderLayer : public Layer {
   FeedForwardLayerPtr<T1, T2> _ffn_layer;
 
   int _layer_id;
+  int _nshared_layer;
 
  public:
-  TransformerDecoderLayer(int layer_id, int max_batch_tokens, int max_seq_len,
+  TransformerDecoderLayer(int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_prob_dropout_ratio,
                           float activation_dropout_ratio,
@@ -29,7 +30,9 @@ class TransformerDecoderLayer : public Layer {
   Variable* operator()(Variable* inp, Variable* inp_mask);
 
   void before_forward(int batch_size, int seq_len, int step) {
-    _enc_kv_layer->before_forward(batch_size, seq_len);
+    if(_layer_id == 0 && step <= 0){
+      _enc_kv_layer->before_forward(batch_size, seq_len);
+    }
     _self_attn_layer->before_forward(batch_size, seq_len, step);
     _enc_attn_layer->before_forward(batch_size, seq_len);
     _ffn_layer->before_forward(batch_size, seq_len);

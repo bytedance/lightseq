@@ -3,12 +3,13 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-EncDecKvLayer<T1, T2>::EncDecKvLayer(int layer_id, int max_batch_tokens, int hidden_size, int num_heads)
+EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens, int hidden_size, int num_heads)
     : Layer("EncDecKvLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _hidden_size(hidden_size),
       _heads(num_heads),
+      _nshared_layer(nshared_layer),
       // operators
       _kv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 2 * hidden_size,
                                             hidden_size)),

@@ -118,14 +118,6 @@ void Context::build() {
 bool Context::check_validate() {
   bool check_flag = true;
   for (Layer* lyr : _all_layers) {
-    if (lyr->macro_inputs_check == false) {
-      printf("error! layer %s didn't set inputs\n", lyr->name().c_str());
-      check_flag = false;
-    }
-    if (lyr->macro_outputs_check == false) {
-      printf("error! layer %s didn't set outputs\n", lyr->name().c_str());
-      check_flag = false;
-    }
     if (lyr->name().size() == 0) {
       printf("error! some LAYERS didn't initialize!\n");
       check_flag = false;
@@ -145,7 +137,5 @@ bool Context::check_validate() {
 thread_local ContextPtr thread_context_ptr = nullptr;
 
 void Context::draw_all_context() {}
-
-// thread_local ContextPtr thread_context_ptr = nullptr;
 
 }  // namespace lightseq
