@@ -45,6 +45,7 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/ops_new/softmax.cpp",
             "csrc/ops_new/strided_batch_gemm.cpp",
             "csrc/ops_new/transform_0213.cpp",
+            "csrc/ops_new/crf.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
 
