@@ -381,7 +381,11 @@ class FakeTensorQuantFunctionX(Function):
             outputs += (2.0 ** (num_bits - 1)) - 1.0
         outputs = (outputs * scale).to(inputs.dtype)
         if training:
-            amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs)
+            if special == "weight":
+                k = random.randint(0, inputs.shape[0] - 1)
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[k])
+            else:
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
         return outputs
 
     @staticmethod
