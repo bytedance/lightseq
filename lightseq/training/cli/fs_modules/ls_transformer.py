@@ -320,14 +320,23 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             #     dist.all_reduce(value.data, op=dist.ReduceOp.SUM)
 
     def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
-        if self.params_clip is None:
-            self.params_clip, self.buffer = self.get_params()
+        if self.args.enable_quant:
+            if self.params_clip is None:
+                self.params_clip, self.buffer = self.get_params()
+
+            if self.training:
+                self.last_model = True
+            else:
+                if self.last_model is True:
+                    logger.info("avg_clip_max")
+                    self.avg_clip_max(self.params_clip)
+                self.last_model = False
 
         encoder_out = self.encoder(src_tokens)
         decoder_out = self.decoder(
             prev_output_tokens, encoder_out, features_only=features_only
         )
-        self.avg_clip_max(self.params_clip)
+        # self.avg_clip_max(self.params_clip)
         return decoder_out
 
     # def set_params(self):
