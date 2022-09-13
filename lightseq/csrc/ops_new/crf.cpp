@@ -2,20 +2,6 @@
 
 namespace lightseq {
 
-/*
-start_transition: [num_tags]
-end_transition: [num_tags]
-transition: [num_tags, num_tags]
-  transition[i, j] means the score of tag_j -> tag_i
-emission: [batch_size, seq_len, num_tags]
-mask: [batch_size, seq_len]
-  0 for invalid token
-best_score: [batch_size]
-history: [batch_size, seq_len, num_tags]:
-  i, j, k store the tag of i-th batch, j-th step when
-  the tag of i-th batch, (j+1)-th step is k
-best_tag: [batch_size, seq_len]
-*/
 template <typename T>
 CRFOP<T>::CRFOP(int max_batch_tokens, int max_batch_size, int num_tags)
     : Operator("crf"),
@@ -90,5 +76,7 @@ template <typename T>
 void CRFOP<T>::backward() {
   throw std::runtime_error("CRF not support backward currently!");
 }
+
+template class CRFOP<__half>;
 
 }  // namespace lightseq

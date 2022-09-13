@@ -38,4 +38,5 @@ class CRFOP : public Operator {
 
   void backward() override;
 };
+
 }  // namespace lightseq

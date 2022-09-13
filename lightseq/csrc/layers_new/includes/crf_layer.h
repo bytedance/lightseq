@@ -18,9 +18,9 @@ class CRFLayer : public Layer {
   int _num_tags;
   int _max_batch_tokens;
   int _max_batch_size;
+
   int _seq_len;
   int _batch_size;
-
   bool _forward_or_decode;    // ture for forward, false for decode
   bool _output_decode_score;  // ture for output decode score
 
@@ -38,10 +38,5 @@ class CRFLayer : public Layer {
 
   void before_backward();
 };
-
-template class CRFLayer<__half>;
-
-template <class T>
-using CRFLayerPtr = std::shared_ptr<CRFLayer<T>>;
 
 }  // namespace lightseq

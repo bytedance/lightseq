@@ -48,6 +48,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/feed_forward_layer.cpp",
             "csrc/layers_new/self_attention_layer.cpp",
             "csrc/layers_new/transformer_encoder_layer.cpp",
+            "csrc/layers_new/crf_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
