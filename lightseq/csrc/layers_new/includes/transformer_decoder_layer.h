@@ -27,14 +27,33 @@ class TransformerDecoderLayer : public Layer {
                           
   virtual ~TransformerDecoderLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* inp_mask);
+  /* 
+    Inputs: 
+      index 0, Transformer encoder output;
+      index 1, 
+  */
+  Variable* operator()(Variable* inp, Variable* input_mask, 
+                      Variable* enc_out, Variable* cache_self_k, 
+                      Variable* cache_self_v);
 
-  void before_forward(int batch_size, int seq_len, int step) {
+  void before_forward(int batch_size, int trg_seq_len, int src_seq_len, int step = -1) {
+
+     if (step >= 0) {
+      _predict = true;
+      _attn_scores.SetConfig(step + 1, 1, _hidden_size / _heads);
+      _attn_context.SetConfig(_hidden_size / _heads, 1, step + 1);
+    } else {
+      _predict = false;
+      _attn_scores.SetConfig(_trg_seq_len, _trg_seq_len, _hidden_size / _heads);
+      _attn_context.SetConfig(_hidden_size / _heads, _trg_seq_len,
+                              _trg_seq_len);
+    }
+
     if(_layer_id == 0 && step <= 0){
       _enc_kv_layer->before_forward(batch_size, seq_len);
     }
-    _self_attn_layer->before_forward(batch_size, seq_len, step);
-    _enc_attn_layer->before_forward(batch_size, seq_len);
+    _self_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
+    _enc_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len);
     _ffn_layer->before_forward(batch_size, seq_len);
   }
 

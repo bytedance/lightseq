@@ -25,22 +25,16 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id, int max_ba
 template <typename T1, typename T2>
 std::tuple<Variable*, Variable*> EncDecKvLayer<T1, T2>::operator()(Variable* enc_out) {
   LAYER_PRE_INPUTS({enc_out});
+
   Variable* kv_out = (*_kv_linear)(enc_out, _enc_kvw);
 
   std::tuple<Variable*, Variable*, Variable*> transform_20314_out =
       (*_bias_add_transform_20314)(kv_out, _enc_kvb);
   Variable* k_out = std::get<0>(transform_20314_out);
   Variable* v_out = std::get<1>(transform_20314_out);
-
-  k_out->set_value(cuda_malloc<char>(_max_batch_tokens * _hidden_size * sizeof(T1)));
-  if(_context_ptr->is_training())
-    k_out->set_grad(cuda_malloc<char>(_max_batch_tokens * _hidden_size * sizeof(T2)));
-
-  v_out->set_value(cuda_malloc<char>(_max_batch_tokens * _hidden_size * sizeof(T1)));
-  if(_context_ptr->is_training())
-    v_out->set_grad(cuda_malloc<char>(_max_batch_tokens * _hidden_size * sizeof(T2)));
-
+  
   LAYER_POST_OUTPUTS({k_out, v_out});
+  
   return std::make_tuple(k_out, v_out);
 }
 

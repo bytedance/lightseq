@@ -23,6 +23,9 @@ class EncDecKvLayer : public Layer {
   int _hidden_size;
   int _heads;
 
+  static T1* _encdec_kv_buffer;
+  static T2* _grad_encdec_kv_buffer
+
  public:
   EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens, int hidden_size, int num_heads);
 

@@ -39,6 +39,4 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
 
-extern thread_local ContextPtr thread_context_ptr;
-
 }  // namespace lightseq

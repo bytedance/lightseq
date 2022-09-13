@@ -3,7 +3,7 @@
 namespace lightseq {
 
 Layer::Layer(std::string name) : _op_vec({}) {
-  _context_ptr = thread_context_ptr;
+  _context_ptr = Context::global_instance();
   std::string real_name =
       _context_ptr->last_layer()
           ? (_context_ptr->last_layer()->name() + "/" + name)

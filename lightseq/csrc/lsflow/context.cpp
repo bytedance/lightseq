@@ -2,9 +2,8 @@
 
 namespace lightseq {
 
-Context::Context(bool training, int device_id)
+Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()),
-      _is_training(training),
       _device_id(device_id) {
   CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
@@ -18,15 +17,23 @@ Context::~Context() {
   }
 }
 
-void Context::new_thread_context(bool training) {
-  thread_context_ptr.reset(new Context(training));
+void Context::convert_into_train() {
+  _st = StatusType::Training;
 }
 
-void Context::set_thread_context(ContextPtr context_ptr) {
-  thread_context_ptr = context_ptr;
+void Context::convert_into_eval(){ 
+  if(_st != StatusType::Inference) 
+    _st = StatusType::Evaluation; 
 }
 
-void Context::remove_thread_context() { thread_context_ptr.reset(); }
+void Context::create_global_context(StatusType status_type, int device_id) {
+  _global_context_ptr.reset(new Context(status_type, device_id));
+}
+
+void Context::set_global_context(ContextPtr context_ptr) {
+  _global_context_ptr = context_ptr;
+}
+
 
 void Context::add_op(Operator* op) {
   if (built()) {
@@ -93,7 +100,7 @@ void Context::build() {
     rl->forward();
   }
 
-  if (_is_training) {
+  if (is_training()) {
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
       rl->backward();
@@ -103,10 +110,6 @@ void Context::build() {
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
-
-#ifndef ONLY_OP
-  thread_context_ptr.reset();
-#endif
 
 #ifdef DEBUG_TYPE
   draw_all_context();
@@ -134,8 +137,8 @@ bool Context::check_validate() {
   return check_flag;
 }
 
-thread_local ContextPtr thread_context_ptr = nullptr;
-
 void Context::draw_all_context() {}
+
+std::shared_ptr<Context> Context::_global_context_ptr = nullptr;
 
 }  // namespace lightseq

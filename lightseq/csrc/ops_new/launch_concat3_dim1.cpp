@@ -24,7 +24,7 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
                         _batchs * _hidden_size * _seq_len * sizeof(T1),
                         cudaMemcpyDefault, _stream));
-  if (_predict) {
+  if (!_context_ptr->is_training()) {
     launch_concat3_dim1(real_val, inp_ptr, cache_ptr, _batchs * _heads,
                         _hidden_size / _heads, _steps, 1, _stream);
   }

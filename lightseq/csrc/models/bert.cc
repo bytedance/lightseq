@@ -8,7 +8,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
   context_ptr.reset(new Context());
-  Context::set_thread_context(context_ptr);
+  Context::set_global_context(context_ptr);
 
   /* --- step.2 load model weights into GPU memory --- */
   // saved in custom proto file

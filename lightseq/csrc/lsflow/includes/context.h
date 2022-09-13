@@ -12,14 +12,16 @@
 
 namespace lightseq {
 
+enum class StatusType {Training, Inference, Evaluation};
+
 class Context {  // model only
- private:
+private:
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
   std::vector<Layer*> _all_layers{};
   std::deque<Layer*> _layer_context;
-  bool _is_training = false;
+  StatusType _st;
 
   bool _built = false;
   bool _building = false;
@@ -31,10 +33,13 @@ class Context {  // model only
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
 
+  static std::shared_ptr<Context> _global_context_ptr;
+
+
   bool check_validate();
 
- public:
-  Context(bool training = false, int device_id = 0);
+public:
+  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
@@ -46,11 +51,12 @@ class Context {  // model only
     CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
   }
 
-  static void new_thread_context(bool training = false);
+  void convert_into_train();
+  void convert_into_eval();
 
-  static void remove_thread_context();
-
-  static void set_thread_context(ContextPtr context_ptr);
+  static void create_global_context(StatusType status_type = StatusType::Inference, int device_id = 0);
+  static void set_global_context(ContextPtr context_ptr);
+  static std::shared_ptr<Context> global_instance() { return _global_context_ptr; }
 
   // for initial calculation
   size_t mx_tensor_size = 0;
@@ -60,7 +66,7 @@ class Context {  // model only
   std::map<std::string, int> node_name_cnt;
 
   // property field
-  bool is_training() { return _is_training; }
+  bool is_training() { return _st == StatusType::Training; }
   int node_idx() { return _node_idx; }
   void update_node_idx() {
     if (_built) return;
@@ -89,5 +95,6 @@ class Context {  // model only
                                 : nullptr;
   }
 };
+
 
 }  // namespace lightseq

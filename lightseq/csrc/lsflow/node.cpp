@@ -9,7 +9,7 @@ typedef float TENSOR_TYPE;
 namespace lightseq {
 
 Node::Node(std::string name, NodeType nt_)
-    : _context_ptr(thread_context_ptr.get()),
+    : _context_ptr(Context::global_instance().get()),
       _bw_first_flag(true),
       _node_type(nt_) {
   std::string prefix_name = _context_ptr->last_layer()
@@ -19,7 +19,7 @@ Node::Node(std::string name, NodeType nt_)
   int idx = _context_ptr->node_name_cnt[real_name];
   _context_ptr->node_name_cnt[real_name] += 1;
   _name = real_name + "_" + std::to_string(idx);
-  thread_context_ptr->add_node(this);
+  _context_ptr->add_node(this);
 }
 
 Node::~Node() {

@@ -59,9 +59,11 @@ template <typename T1, typename T2>
 std::tuple<Variable*, Variable*, Variable*>
 DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
                                           Variable* cache_v) {
+  LAYER_PRE_INPUTS({inp, cache_k, cache_v});
+  
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
-  LAYER_PRE_INPUTS({inp, cache_k, cache_v});
+
   if (_pre_or_postLayerNorm) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
@@ -114,7 +116,7 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 }
 
 template <typename T1, typename T2>
-void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len,
+void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size, int trg_seq_len, int src_seq_len,
                                                    int steps, bool predict) {
   _batch_tokens = batch_size * seq_len;
   _batch_heads = batch_size * _heads;

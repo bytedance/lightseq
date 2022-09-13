@@ -32,29 +32,56 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, activation_fn, is_post_ln));
 
+
+  if(_encdec_kv_buffer == nullptr) {
+    _encdec_kv_buffer = cuda_malloc<T1>(max_batch_tokens * 2 * hidden_size * nshared_layer);
+    if(_context_ptr->is_training()) {
+      _grad_encdec_kv_buffer = cuda_malloc<T2>(max_batch_tokens * 2 * hidden_size * nshared_layer);
+    }
+  }
+
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
-Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out, Variable* cache_self_k, 
+Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* input_mask, Variable* enc_out, Variable* cache_self_k, 
                                                       Variable* cache_self_v) {
+  LAYER_PRE_INPUTS({inp, input_mask, enc_out, cache_self_k, cache_self_v});
 
-  std::tuple<Variable*, Variable*> enc_kv;
+  Variable* enc_k;
+  Variable* enc_v;
+
   if(_layer_id == 0){
-    enc_kv = (*_enc_kv_layer)(enc_out);
-    // regist at _context_ptr
+    std::tuple<Variable*, Variable*> enc_kv = (*_enc_kv_layer)(enc_out);
+    enc_k = enc_kv.first;
+    enc_v = enc_kv.second;
   }
   else {
-    enc_kv = std::make_tuple(enc_k, enc_v);
+    enc_k = new Variable("enc_k");
+    enc_v = new Variable("enc_v");
+  }
+  
+  enc_k->set_value(_encdec_kv_buffer);
+  _encdec_kv_buffer += _nshared_layer * hidden_size * max_batch_tokens;
+  enc_v->set_value(_encdec_kv_buffer);
+
+  if(_context_ptr->is_training()){
+    enc_k->set_grad(_grad_encdec_kv_buffer);
+    _grad_encdec_kv_buffer += _nshared_layer * hidden_size * max_batch_tokens;
+    enc_v->set_grad(_grad_encdec_kv_buffer);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> _self_attn_out = (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
+  std::tuple<Variable*, Variable*, Variable*> self_attn_layer_product = (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
+  Variable* self_attn_out = std::get<0>(self_attn_layer_product);
+  Variable* new_self_k = std::get<1>(self_attn_layer_product);
+  Variable* new_self_v = std::get<2>(self_attn_layer_product);
 
-  Variable* _enc_attn_out = (*_enc_attn_layer)(std::get<0>(_self_attn_out), std::get<0>(enc_kv), std::get<1>(enc_kv));
+  Variable* _enc_attn_out = (*_enc_attn_layer)(self_attn_out, enc_k, enc_v);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
-  return std::make_tuple(ffn_out, );
+  LAYER_POST_OUTPUTS({ffn_out, new_self_k, new_self_v});
+  return std::make_tuple(ffn_out, new_self_k, new_self_v);
 }
 
 template <typename T1, typename T2>

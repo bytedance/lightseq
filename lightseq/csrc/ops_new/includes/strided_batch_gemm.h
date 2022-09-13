@@ -20,6 +20,8 @@ class StridedBatchGemmOp : public Operator {
   cublasOperation_t _op_B;
   std::array<int, 3> _gemm_algos;
 
+  int _dec_layer_id;
+
  public:
   StridedBatchGemmOp(size_t max_ele_num, float param_alpha, float param_beta,
                      cublasOperation_t opA, cublasOperation_t opB)
@@ -35,9 +37,10 @@ class StridedBatchGemmOp : public Operator {
 
   Variable* operator()(Variable* inpA, Variable* inpB);
 
-  void before_forward(int mm, int nn, int kk, int batch_heads) {
+  void before_forward(int mm, int nn, int kk, int batch_heads, int dec_layer_id = -1) {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
+    _dec_layer_id = dec_layer_id;
   }
 
   void forward() override;
