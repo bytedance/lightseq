@@ -109,6 +109,14 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
                                                      int src_seq_len,
                                                      int step) {
   _step = step;
+
+  if(step < 0) {
+    _context_ptr->convert_into_train();
+  }
+  else {
+    _context_ptr->convert_into_eval();
+  }
+
   if (_layer_id == 0 && step <= 0) {
     _enc_kv_layer->before_forward(batch_size, src_seq_len);
   }
