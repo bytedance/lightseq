@@ -4,19 +4,19 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
-    int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
-    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-    float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, bool is_post_ln)
+    int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
+    int hidden_size, int num_heads, int intermediate_size,
+    float attn_prob_dropout_ratio, float activation_dropout_ratio,
+    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
+    std::string activation_fn, bool mask_future_tokens, bool is_post_ln)
     : Layer("TransformerDecoderLayer"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer) {
-
-  if(_layer_id == 0){
-    _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(nshared_layer, layer_id, max_batch_tokens, hidden_size, num_heads));
+  if (_layer_id == 0) {
+    _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(
+        nshared_layer, layer_id, max_batch_tokens, hidden_size, num_heads));
   }
-  
+
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
@@ -32,11 +32,12 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, activation_fn, is_post_ln));
 
-
-  if(_encdec_kv_buffer == nullptr) {
-    _encdec_kv_buffer = cuda_malloc<T1>(max_batch_tokens * 2 * hidden_size * nshared_layer);
-    if(_context_ptr->is_training()) {
-      _grad_encdec_kv_buffer = cuda_malloc<T2>(max_batch_tokens * 2 * hidden_size * nshared_layer);
+  if (_encdec_kv_buffer == nullptr) {
+    _encdec_kv_buffer =
+        cuda_malloc<T1>(max_batch_tokens * 2 * hidden_size * nshared_layer);
+    if (_context_ptr->is_training()) {
+      _grad_encdec_kv_buffer =
+          cuda_malloc<T2>(max_batch_tokens * 2 * hidden_size * nshared_layer);
     }
   }
 
@@ -44,34 +45,37 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 }
 
 template <typename T1, typename T2>
-Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* input_mask, Variable* enc_out, Variable* cache_self_k, 
+Variable* TransformerDecoderLayer<T1, T2>::operator()(Variable* inp,
+                                                      Variable* input_mask,
+                                                      Variable* enc_out,
+                                                      Variable* cache_self_k,
                                                       Variable* cache_self_v) {
   LAYER_PRE_INPUTS({inp, input_mask, enc_out, cache_self_k, cache_self_v});
 
   Variable* enc_k;
   Variable* enc_v;
 
-  if(_layer_id == 0){
+  if (_layer_id == 0) {
     std::tuple<Variable*, Variable*> enc_kv = (*_enc_kv_layer)(enc_out);
     enc_k = enc_kv.first;
     enc_v = enc_kv.second;
-  }
-  else {
+  } else {
     enc_k = new Variable("enc_k");
     enc_v = new Variable("enc_v");
   }
-  
+
   enc_k->set_value(_encdec_kv_buffer);
   _encdec_kv_buffer += _nshared_layer * hidden_size * max_batch_tokens;
   enc_v->set_value(_encdec_kv_buffer);
 
-  if(_context_ptr->is_training()){
+  if (_context_ptr->is_training()) {
     enc_k->set_grad(_grad_encdec_kv_buffer);
     _grad_encdec_kv_buffer += _nshared_layer * hidden_size * max_batch_tokens;
     enc_v->set_grad(_grad_encdec_kv_buffer);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> self_attn_layer_product = (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
+  std::tuple<Variable*, Variable*, Variable*> self_attn_layer_product =
+      (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
   Variable* self_attn_out = std::get<0>(self_attn_layer_product);
   Variable* new_self_k = std::get<1>(self_attn_layer_product);
   Variable* new_self_v = std::get<2>(self_attn_layer_product);
@@ -88,8 +92,7 @@ template <typename T1, typename T2>
 void forward() {
   if (_layer_id == 0 && _step <= 0) {
     _enc_kv_layer->forward();
-  }
-  else if(_layer_id == 0 && _step > 0) {
+  } else if (_layer_id == 0 && _step > 0) {
     _enc_kv_layer->tag_fw_flag();
   }
   _self_attn_layer->forward();
@@ -102,7 +105,7 @@ void backward() {
   _ffn_layer->backward();
   _enc_attn_layer->backward();
   _self_attn_layer->backward();
-  if(_layer_id == 0) //  && _step == -1
+  if (_layer_id == 0)  //  && _step == -1
     _enc_kv_layer->backward();
 }
 

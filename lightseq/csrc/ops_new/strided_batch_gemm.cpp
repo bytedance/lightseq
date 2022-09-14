@@ -62,7 +62,7 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   if (_dec_layer_id >= 0) {
     inpGradA += _dec_layer_id * _m * _k;
   }
-  
+
   T2* inpGradB = (T2*)parent(1)->grad();
 
   // Calculate d_A.

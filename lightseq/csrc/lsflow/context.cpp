@@ -3,8 +3,7 @@
 namespace lightseq {
 
 Context::Context(StatusType status_type, int device_id)
-    : _mm_ptr(new MemoryManager()),
-      _device_id(device_id) {
+    : _mm_ptr(new MemoryManager()), _device_id(device_id) {
   CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
@@ -17,13 +16,10 @@ Context::~Context() {
   }
 }
 
-void Context::convert_into_train() {
-  _st = StatusType::Training;
-}
+void Context::convert_into_train() { _st = StatusType::Training; }
 
-void Context::convert_into_eval(){ 
-  if(_st != StatusType::Inference) 
-    _st = StatusType::Evaluation; 
+void Context::convert_into_eval() {
+  if (_st != StatusType::Inference) _st = StatusType::Evaluation;
 }
 
 void Context::create_global_context(StatusType status_type, int device_id) {
@@ -33,7 +29,6 @@ void Context::create_global_context(StatusType status_type, int device_id) {
 void Context::set_global_context(ContextPtr context_ptr) {
   _global_context_ptr = context_ptr;
 }
-
 
 void Context::add_op(Operator* op) {
   if (built()) {

@@ -27,7 +27,8 @@ class EncDecKvLayer : public Layer {
   static T2* _grad_encdec_kv_buffer;
 
  public:
-  EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens, int hidden_size, int num_heads);
+  EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens,
+                int hidden_size, int num_heads);
 
   virtual ~EncDecKvLayer() {}
 
@@ -36,7 +37,7 @@ class EncDecKvLayer : public Layer {
   void before_forward(int batch_size, int seq_len);
 
   void before_backward();
-  
+
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);

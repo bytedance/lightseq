@@ -42,8 +42,6 @@ int create_transformer_encoder_layer_new(
     float activation_dropout_ratio, float hidden_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
     bool mask_future_tokens) {
-
-
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
@@ -149,7 +147,7 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
 //     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
 //     float activation_dropout_ratio, float hidden_dropout_ratio,
 //     bool pre_or_postLayerNorm, std::string activation_fn) {
-  
+
 //   // necessary
 //   ContextInitial();
 
@@ -169,7 +167,8 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
 
 //   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
 
-//   std::cout << "Decoder layer #" << layer_id << " is created with date type ["
+//   std::cout << "Decoder layer #" << layer_id << " is created with date type
+//   ["
 //             << dtype << "]." << std::endl;
 
 //   return 0;
@@ -226,7 +225,6 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
 
 //   return {dec_output};
 // }
-
 
 template <typename T1, typename T2>
 void assign_layer_weight_grad(const torch::Tensor &weights,

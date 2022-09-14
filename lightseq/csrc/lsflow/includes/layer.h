@@ -9,7 +9,7 @@
 namespace lightseq {
 
 class Layer {
-protected:
+ protected:
   ContextPtr _context_ptr;
   std::string _name = "";
   std::vector<Variable*> _root_var_vec = {};
@@ -51,7 +51,7 @@ protected:
 #define LAYER_PRE_INPUTS(...)                                        \
   set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), \
       macro_inputs_check = true
-      
+
 #define LAYER_POST_OUTPUTS(...)                           \
   set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), \
       macro_outputs_check = true

@@ -3,7 +3,9 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens, int hidden_size, int num_heads)
+EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id,
+                                     int max_batch_tokens, int hidden_size,
+                                     int num_heads)
     : Layer("EncDecKvLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -12,9 +14,9 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id, int max_ba
       _nshared_layer(nshared_layer),
       // operators
       _kv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 2 * hidden_size,
-                                            hidden_size)),
+                                           hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
-          max_batch_tokens, num_heads, hidden_size, 2)){
+          max_batch_tokens, num_heads, hidden_size, 2)) {
   // parameters
   _enc_kvw = new Variable("_enc_kvw");
   _enc_kvb = new Variable("_enc_kvb");
@@ -23,7 +25,8 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id, int max_ba
 }
 
 template <typename T1, typename T2>
-std::tuple<Variable*, Variable*> EncDecKvLayer<T1, T2>::operator()(Variable* enc_out) {
+std::tuple<Variable*, Variable*> EncDecKvLayer<T1, T2>::operator()(
+    Variable* enc_out) {
   LAYER_PRE_INPUTS({enc_out});
 
   Variable* kv_out = (*_kv_linear)(enc_out, _enc_kvw);
@@ -32,9 +35,9 @@ std::tuple<Variable*, Variable*> EncDecKvLayer<T1, T2>::operator()(Variable* enc
       (*_bias_add_transform_20314)(kv_out, _enc_kvb);
   Variable* k_out = std::get<0>(transform_20314_out);
   Variable* v_out = std::get<1>(transform_20314_out);
-  
+
   LAYER_POST_OUTPUTS({k_out, v_out});
-  
+
   return std::make_tuple(k_out, v_out);
 }
 
@@ -51,8 +54,8 @@ template <typename T1, typename T2>
 void EncDecKvLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-int EncDecKvLayer<T1, T2>::load_para_and_grad(
-    const T1* para_ptr, T2* grad_ptr) {  // for training
+int EncDecKvLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
+                                              T2* grad_ptr) {  // for training
   int offset = 0;
   _enc_kvw->set_value((char*)(para_ptr + offset));
   _enc_kvw->set_grad((char*)(grad_ptr + offset));
@@ -62,13 +65,12 @@ int EncDecKvLayer<T1, T2>::load_para_and_grad(
   _enc_kvb->set_grad((char*)(grad_ptr + offset));
   offset += _hidden_size * 2;
 
-
   return offset;
 }
 
 template <typename T1, typename T2>
-int EncDecKvLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+int EncDecKvLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
+                                       int offset) {  // for inference
   int size = 0;
   _enc_kvw->set_value((char*)para_vec[offset + size]), size++;
   _enc_kvb->set_value((char*)para_vec[offset + size]), size++;

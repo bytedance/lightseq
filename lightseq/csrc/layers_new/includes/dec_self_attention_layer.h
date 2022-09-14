@@ -64,7 +64,8 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_k,
                                                          Variable* cache_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int src_seq_len, int steps, bool predict);
+  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
+                      int steps, bool predict);
 
   void before_backward();
 

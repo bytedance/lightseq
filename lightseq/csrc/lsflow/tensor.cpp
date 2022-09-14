@@ -2,9 +2,8 @@
 
 namespace lightseq {
 int Tensor::global_tensor_id = 0;
-Tensor::Tensor(std::string name, size_t size) : 
-  _id(global_tensor_id++),
-  _ctx_ptr(Context::global_instance().get()) {
+Tensor::Tensor(std::string name, size_t size)
+    : _id(global_tensor_id++), _ctx_ptr(Context::global_instance().get()) {
   std::string prefix_name =
       _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
 
@@ -13,8 +12,7 @@ Tensor::Tensor(std::string name, size_t size) :
   _mtype = size > 0 ? SharedMemory : FixedMemory;
   if (_mtype == SharedMemory) {
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
-    _ctx_ptr->mx_tensor_size =
-        std::max(_ctx_ptr->mx_tensor_size, _size);
+    _ctx_ptr->mx_tensor_size = std::max(_ctx_ptr->mx_tensor_size, _size);
   }
 }
 
