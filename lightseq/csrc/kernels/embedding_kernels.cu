@@ -313,7 +313,8 @@ void launch_lookup_scale_pos_dropout<float>(
   embedding_dim >>= 2;
 
   int threads_per_token = min(embedding_dim, MAX_THREADS);
-  int tokens_per_block = MAX_THREADS / threads_per_token;
+  // int tokens_per_block = MAX_THREADS / threads_per_token;
+  int tokens_per_block = 1;
   int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
   dim3 grid_dim(batch_size, blocks_per_seq);
   dim3 block_dim(tokens_per_block, threads_per_token);
@@ -344,7 +345,8 @@ void launch_lookup_scale_pos_dropout<__half>(
   embedding_dim >>= 3;
 
   int threads_per_token = min(embedding_dim, MAX_THREADS);
-  int tokens_per_block = MAX_THREADS / threads_per_token;
+  // int tokens_per_block = MAX_THREADS / threads_per_token;
+  int tokens_per_block = 1;
   int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;
   dim3 grid_dim(batch_size, blocks_per_seq);
   dim3 block_dim(tokens_per_block, threads_per_token);
