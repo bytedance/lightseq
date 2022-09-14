@@ -3,7 +3,7 @@
 namespace lightseq {
 
 Context::Context(StatusType status_type, int device_id)
-    : _mm_ptr(new MemoryManager()), _device_id(device_id) {
+    : _mm_ptr(new MemoryManager()), _device_id(device_id), _st(status_type) {
   CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
@@ -70,7 +70,9 @@ void Context::build() {
   }
   _building = true;
 
-  printf("===== start Context build =====\n");
+  printf("========== start Context build ==========\n");
+  printf("========== construct StatusType: %s ==========\n",
+         StatusTypeString[int(_st)].c_str());
 
   if (!check_validate()) {
     printf("Check validate error!\n");
@@ -134,6 +136,41 @@ bool Context::check_validate() {
 
 void Context::draw_all_context() {}
 
+void Context::regist_pybind_layer(std::string layer_name, int layer_id,
+                                  std::shared_ptr<void> layer_ptr) {
+  std::string full_name = layer_name + std::to_string(layer_id);
+  if (pybind_layers.find(full_name) != pybind_layers.end()) {
+    printf(
+        "The layer applied for registration has been occupied!\n"
+        "Layer name is %s!\n",
+        full_name.c_str());
+    throw std::runtime_error(
+        "The layer applied for registration has been occupied!\n");
+  }
+#ifdef DEBUG_TYPE
+  printf("regist_pybind_layer %s\n", full_name.c_str());
+#endif
+  pybind_layers.emplace(full_name, layer_ptr);
+}
+
+std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
+                                                int layer_id) {
+  std::string full_name = layer_name + std::to_string(layer_id);
+  auto iter = pybind_layers.find(full_name);
+  if (iter == pybind_layers.end()) {
+    printf(
+        "The requested layer was not found!\n"
+        "Layer name is %s!\n",
+        full_name.c_str());
+    throw std::runtime_error("The requested layer was not found!");
+  }
+  return iter->second;
+}
+// TransformerEncoderLayer0
+// TransformerEncoderLayer0
+
 std::shared_ptr<Context> Context::_global_context_ptr = nullptr;
+std::unordered_map<std::string, std::shared_ptr<void>> Context::pybind_layers =
+    {};
 
 }  // namespace lightseq

@@ -52,6 +52,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/dec_self_attention_layer.cpp",
             "csrc/layers_new/encdec_kv_layer.cpp",
             "csrc/layers_new/dec_enc_attention_layer.cpp",
+            "csrc/layers_new/transformer_decoder_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
@@ -81,4 +82,10 @@ class LayerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]  # , "-DDEBUG_TYPE=FP16"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+            # "-DDEBUG_TYPE=FP16",
+        ]

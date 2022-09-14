@@ -42,11 +42,15 @@ class DecSelfAttentionLayer : public Layer {
   int _batch_dim;
   int _batch_heads;
   int _batch_tokens;
+  int _src_seq_len;
+  int _trg_seq_len;
+  int _trg_batch_tokens;
   int _layer_id;
   int _max_batch_tokens;
   int _max_seq_len;
   int _hidden_size;
   int _heads;
+  int _step;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 
@@ -65,7 +69,7 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_v);
 
   void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
-                      int steps, bool predict);
+                      int steps);
 
   void before_backward();
 

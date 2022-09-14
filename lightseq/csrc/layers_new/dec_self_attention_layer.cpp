@@ -118,37 +118,49 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 template <typename T1, typename T2>
 void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
                                                    int trg_seq_len,
-                                                   int src_seq_len, int steps,
-                                                   bool predict) {
-  _batch_tokens = batch_size * seq_len;
+                                                   int src_seq_len, int steps) {
+  _src_seq_len = src_seq_len;
+  _trg_seq_len = _trg_seq_len;
   _batch_heads = batch_size * _heads;
-  _batch_dim = _batch_tokens * _hidden_size;
+  _trg_batch_tokens = batch_size * trg_seq_len;
+  _batch_dim = _trg_batch_tokens * _hidden_size;
+  _step = (steps >= 0 ? steps : -1);
 
-  _attn_ln->before_forward(_batch_tokens);
+  int from_len = _context_ptr->is_training() ? _trg_seq_len : 1;
+  int to_len = _context_ptr->is_training() ? _trg_seq_len : steps + 1;
 
-  _qkv_linear->before_forward(_batch_tokens);
+  _attn_ln->before_forward(_trg_batch_tokens);
 
-  _bias_add_transform_20314->before_forward(batch_size, seq_len);
+  _qkv_linear->before_forward(_trg_batch_tokens);
 
-  _deal_cache_k->before_forward(batch_size, seq_len, steps, predict);
+  _bias_add_transform_20314->before_forward(batch_size, from_len);
 
-  _deal_cache_v->before_forward(batch_size, seq_len, steps, predict);
+  _deal_cache_k->before_forward(batch_size, from_len, steps);
 
-  _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
-                               _batch_heads);
+  _deal_cache_v->before_forward(batch_size, from_len, steps);
 
-  _softmax->before_forward(batch_size, seq_len, seq_len);
+  _softmax->before_forward(batch_size, from_len, to_len,
+                           (!_context_ptr->is_training()) ? false : true);
 
-  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len);
+  _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);
 
-  _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
-                                _batch_heads);
+  _transform_0213->before_forward(batch_size, from_len);
 
-  _transform_0213->before_forward(batch_size, seq_len);
+  _attn_out_linear->before_forward(_trg_batch_tokens);
 
-  _attn_out_linear->before_forward(_batch_tokens);
+  _attn_dropout->before_forward(_trg_batch_tokens, _hidden_size);
 
-  _attn_dropout->before_forward(_batch_tokens, _hidden_size);
+  if (steps >= 0) {
+    _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
+                                 _batch_heads);
+    _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
+                                  _batch_heads);
+  } else {
+    _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
+                                 _hidden_size / _heads, _batch_heads);
+    _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
+                                  _trg_seq_len, _batch_heads);
+  }
 }
 
 template <typename T1, typename T2>

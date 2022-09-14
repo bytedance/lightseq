@@ -9,13 +9,17 @@
 #include "layer.h"
 #include "node.h"
 #include "cuda_util.h"
+#include "unordered_map"
 
 namespace lightseq {
 
-enum class StatusType { Training, Inference, Evaluation };
+enum StatusType { Training, Inference, Evaluation };
+const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 
 class Context {  // model only
  private:
+  static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
@@ -96,6 +100,11 @@ class Context {  // model only
     return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
                                 : nullptr;
   }
+
+  static void regist_pybind_layer(std::string layer_name, int layer_id,
+                                  std::shared_ptr<void> layer_ptr);
+  static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
+                                                int layer_id);
 };
 
 }  // namespace lightseq

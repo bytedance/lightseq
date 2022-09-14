@@ -5,6 +5,7 @@
 #include "context.h"
 #include "cuda_util.h"
 #include "transformer_encoder_layer.h"
+#include "transformer_decoder_layer.h"
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
@@ -25,9 +26,6 @@ template <typename T>
 T *rptr(torch::Tensor &tensor) {
   return reinterpret_cast<T *>(tensor.data_ptr());
 }
-
-static std::unordered_map<int, std::shared_ptr<void>>
-    s_transformer_encoder_layers;
 
 void ContextInitial() {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
@@ -53,11 +51,9 @@ int create_transformer_encoder_layer_new(
 
   Variable *layer_out = (*layer)(inp, inp_mask);
 
-  s_transformer_encoder_layers[layer_id] = layer;
+  Context::regist_pybind_layer("TransformerEncoderLayer", layer_id, layer);
 
-  const int default_batch_size = 1;
-  const int default_seq_len = 64;
-  layer->before_forward(default_batch_size, default_seq_len);
+  layer->before_forward(1, 32);
 
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
@@ -84,7 +80,7 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
 
   std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
       std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
-          s_transformer_encoder_layers[layer_id]);
+          Context::get_pybind_layer("TransformerEncoderLayer", layer_id));
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
@@ -123,7 +119,7 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
 
   std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
       std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
-          s_transformer_encoder_layers[layer_id]);
+          Context::get_pybind_layer("TransformerEncoderLayer", layer_id));
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
@@ -140,39 +136,39 @@ std::vector<torch::Tensor> transformer_encoder_layer_bw(
   return {grad_inp};
 }
 
-// /* Transformer decoder layer */
-// template <typename T1, typename T2>
-// int create_transformer_decoder_layer(
-//     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
-//     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-//     float activation_dropout_ratio, float hidden_dropout_ratio,
-//     bool pre_or_postLayerNorm, std::string activation_fn) {
+/* Transformer decoder layer */
+template <typename T1, typename T2>
+int create_transformer_decoder_layer(
+    int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
+    int hidden_dim, int num_heads, int intermediate_size,
+    float attn_prob_dropout_ratio, float activation_dropout_ratio,
+    float hidden_dropout_ratio, bool pre_or_postLayerNorm,
+    std::string activation_fn) {
+  // necessary
+  ContextInitial();
 
-//   // necessary
-//   ContextInitial();
+  auto layer = std::make_shared<TransformerDecoderLayer<T1, T2>>(
+      nshared_layer, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
+      num_heads, intermediate_size, attn_prob_dropout_ratio,
+      activation_dropout_ratio, hidden_dropout_ratio, pre_or_postLayerNorm,
+      activation_fn);
 
-//   auto layer = std::make_shared<TransformerDecoderLayer<T>>(
-//       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
-//       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-//       hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn);
+  Context::regist_pybind_layer("TransformerDecoderLayer", layer_id, layer);
 
-//   s_transformer_decoder_layers[layer_id] = layer;
+  Variable *dec_inp = new Variable("decoder_input");
+  Variable *enc_out = new Variable("encoder_out");
+  Variable *cache_self_k = new Variable("cache_self_k");
+  Variable *cache_self_v = new Variable("cache_self_v");
 
-//   Varialbe* dec_inp = new Variable("decoder_input");
-//   Variable* enc_out = new Variable("encoder_out");
-//   Variable* cache_self_k = new Variable("cache_self_k");
-//   Variable* cache_self_v = new Variable("cache_self_v");
+  layer->before_forward(1, 32);
 
-//   layer->before_forward(1, 32);
+  std::string dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
 
-//   std::string dtype = (std::is_same<T, __half>::value) ? "half" : "float";
+  std::cout << "Decoder layer #" << layer_id << " is created with date type ["
+            << dtype << "]." << std::endl;
 
-//   std::cout << "Decoder layer #" << layer_id << " is created with date type
-//   ["
-//             << dtype << "]." << std::endl;
-
-//   return 0;
-// }
+  return 0;
+}
 
 // template <typename T1, typename T2>
 // std::vector<torch::Tensor> transformer_decoder_layer_fw(
@@ -239,7 +235,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
   if (layer_name == "TransformerEncoderLayer") {
     std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
         std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
-            s_transformer_encoder_layers[layer_id]);
+            Context::get_pybind_layer("TransformerEncoderLayer", layer_id));
     layer->load_para_and_grad(wptr, gptr);
   } else {
     printf("Error! layer_name %s is unsupported!\n", layer_name.c_str());

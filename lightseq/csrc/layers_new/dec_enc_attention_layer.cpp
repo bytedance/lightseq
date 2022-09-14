@@ -107,8 +107,10 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
-  _batch_tokens = batch_size * seq_len;
+void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
+                                                  int trg_seq_len,
+                                                  int src_seq_len) {
+  _batch_tokens = batch_size * trg_seq_len;
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
 
@@ -116,19 +118,19 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
 
   _q_linear->before_forward(_batch_tokens);
 
-  _bias_add_transform_20314_q->before_forward(batch_size, seq_len);
+  _bias_add_transform_20314_q->before_forward(batch_size, trg_seq_len);
 
-  _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
+  _attn_scores->before_forward(src_seq_len, trg_seq_len, _hidden_size / _heads,
                                _batch_heads);
 
-  _softmax->before_forward(batch_size, seq_len, seq_len);
+  _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len);
+  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
 
-  _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
+  _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
                                 _batch_heads);
 
-  _transform_0213->before_forward(batch_size, seq_len);
+  _transform_0213->before_forward(batch_size, trg_seq_len);
 
   _attn_out_linear->before_forward(_batch_tokens);
 

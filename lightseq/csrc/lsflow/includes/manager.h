@@ -12,8 +12,6 @@
 namespace lightseq {
 enum LSMemoryType { FixedMemory, SharedMemory };
 
-enum RuntimeStatus { Inference, Training };
-
 class TensorUsage {
  public:
   int first_idx, last_idx;
