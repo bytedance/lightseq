@@ -12,6 +12,7 @@ pybind11_add_module(
   quant_gpt.cc
   moe.cc
   vit.cc
+  quant_vit.cc
   t5.cc
   mt5.cc)
 
@@ -23,6 +24,7 @@ target_link_libraries(lightseq PUBLIC quant_bert_model)
 target_link_libraries(lightseq PUBLIC quant_gpt_model)
 target_link_libraries(lightseq PUBLIC moe_model)
 target_link_libraries(lightseq PUBLIC vit_model)
+target_link_libraries(lightseq PUBLIC quant_vit_model)
 target_link_libraries(lightseq PUBLIC t5_model)
 target_link_libraries(lightseq PUBLIC mt5_model)
 set_target_properties(lightseq PROPERTIES OUTPUT_NAME inference)
@@ -37,6 +39,7 @@ add_library(
   quant_gpt.cc
   moe.cc
   vit.cc
+  quant_vit.cc
   t5.cc
   mt5.cc)
 target_link_libraries(liblightseq PUBLIC transformer_model)
@@ -47,6 +50,7 @@ target_link_libraries(liblightseq PUBLIC gpt_model)
 target_link_libraries(liblightseq PUBLIC bert_model)
 target_link_libraries(liblightseq PUBLIC moe_model)
 target_link_libraries(liblightseq PUBLIC vit_model)
+target_link_libraries(liblightseq PUBLIC quant_vit_model)
 target_link_libraries(liblightseq PUBLIC t5_model)
 target_link_libraries(liblightseq PUBLIC mt5_model)
 target_link_options(liblightseq PUBLIC $<DEVICE_LINK:-Xcompiler

@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* BiasDropoutResOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                                Variable* residual) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("BiasDropoutResOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inp, bias, residual});
   this->set_children({result});
@@ -16,6 +16,8 @@ Variable* BiasDropoutResOp<T1, T2>::operator()(Variable* inp, Variable* bias,
 template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
+
+  // printf("Running! BiasDropoutResOp name: %s\n", this->name().c_str());
 
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
@@ -45,8 +47,9 @@ void BiasDropoutResOp<T1, T2>::backward() {
                                  _rows, _cols, RATIO(), stream);
 
   if (is_res_cover) {  // cover
-    cudaMemcpy((void*)residual_grad, (void*)output_grad,
-               _max_ele_num * sizeof(T2), cudaMemcpyDeviceToDevice);
+    CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
+                                    _cols * _rows * sizeof(T2),
+                                    cudaMemcpyDefault, stream));
   } else {  // accumulate
             // launch_fused_add2 ...
     launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,

@@ -9,9 +9,9 @@ from .layer_builder import LayerBuilder
 # List of all available ops
 __op_builders__ = [
     LayerBuilder(),
-    # KernelBuilder(),
-    # OperatorBuilder(),
-    # TransformerBuilder(),
-    # AdamBuilder(),
+    KernelBuilder(),
+    OperatorBuilder(),
+    TransformerBuilder(),
+    AdamBuilder(),
 ]
 ALL_OPS = {op.name: op for op in __op_builders__}

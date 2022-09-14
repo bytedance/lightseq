@@ -2,7 +2,7 @@
 #include "bias_act_dropout.h"
 #include "bias_dropout_residual.h"
 #include "feed_forward.h"
-#include "normalize_layer.h"
+#include "layer_normalize.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -11,7 +11,7 @@ template <class T1, class T2>
 class FeedForwardLayer : public Layer {
  private:
   // operators
-  NormalizeLayerOp<T1, T2>* _ffn_ln = nullptr;
+  LayerNormalizeOp<T1, T2>* _ffn_ln = nullptr;
   FeedForwardOp<T1, T2>* _ff1 = nullptr;
   BiasActDropoutOp<T1, T2>* _ffn_activation_dropout = nullptr;
   FeedForwardOp<T1, T2>* _ff2 = nullptr;
@@ -38,14 +38,14 @@ class FeedForwardLayer : public Layer {
   int _intermediate_size;
   bool _pre_or_postLayerNorm;
   std::string _activation_fn;
+  bool _is_post_ln;
 
  public:
   FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                    int hidden_size, int num_heads, int intermediate_size,
                    float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-                   std::string activation_fn, const T1* para_ptr, T2* grad_ptr,
-                   int& offset);
+                   std::string activation_fn, bool is_post_ln = false);
 
   virtual ~FeedForwardLayer() {}
 
@@ -54,6 +54,10 @@ class FeedForwardLayer : public Layer {
   void before_forward(int batch_size, int seq_len);
 
   void before_backward();
+
+  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+
+  int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
 template class FeedForwardLayer<__half, __half>;

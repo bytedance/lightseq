@@ -1,14 +1,14 @@
-#include "self_attention_layer.h"
+#include "multihead_attention_layer.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
-SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
+MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, const T1* para_ptr, T2* grad_ptr, int& offset)
-    : Layer("SelfAttentionLayer"),
+    bool mask_future_tokens, bool is_post_ln)
+    : Layer("MultiheadAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -16,13 +16,14 @@ SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
       _heads(num_heads),
       _training(true),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_post_ln(is_post_ln),
       // operators
       _attn_ln(
-          new NormalizeLayerOp<T1, T2>(max_batch_tokens, hidden_size, false)),
+          new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
       _qkv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 3 * hidden_size,
                                             hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
-          max_batch_tokens, num_heads, hidden_size)),
+          max_batch_tokens, num_heads, hidden_size, 3)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
@@ -41,39 +42,26 @@ SelfAttentionLayer<T1, T2>::SelfAttentionLayer(
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters
-  _attn_qkvw =
-      new Variable(this->_name + "_attn_qkvw", (char*)(para_ptr + offset),
-                   (char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size * 3;
-  _attn_qkvb =
-      new Variable(this->_name + "_attn_qkvb", (char*)(para_ptr + offset),
-                   (char*)(grad_ptr + offset));
-  offset += _hidden_size * 3;
+  _attn_qkvw = new Variable("_attn_qkvw");
+  _attn_qkvb = new Variable("_attn_qkvb");
 
-  _attn_ow = new Variable(this->_name + "_attn_ow", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size;
-  _attn_ob = new Variable(this->_name + "_attn_ob", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
+  _attn_ow = new Variable("_attn_ow");
+  _attn_ob = new Variable("_attn_ob");
 
-  _attn_nw = new Variable(this->_name + "_attn_nw", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
-  _attn_nb = new Variable(this->_name + "_attn_nb", (char*)(para_ptr + offset),
-                          (char*)(grad_ptr + offset));
-  offset += _hidden_size;
+  _attn_nw = new Variable("_attn_nw");
+  _attn_nb = new Variable("_attn_nb");
 
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
-Variable* SelfAttentionLayer<T1, T2>::operator()(Variable* inp,
-                                                 Variable* inp_mask) {
+Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
+                                                      Variable* inp_mask) {
   Variable* qkv_out = nullptr;
-  this->set_inputs({inp, inp_mask});
+  Variable* attn_ln_out = nullptr;
+  LAYER_PRE_INPUTS({inp, inp_mask});
   if (_pre_or_postLayerNorm) {
-    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
   } else {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
@@ -89,28 +77,40 @@ Variable* SelfAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* soft_out = (*_softmax)(attn_score, inp_mask);
 
-  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-
-  Variable* attn_context = (*_attn_context)(v_out, prob_dropout);
+  Variable* attn_context = nullptr;
+  if (_context_ptr->is_training()) {
+    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+    attn_context = (*_attn_context)(v_out, prob_dropout);
+  } else {
+    attn_context = (*_attn_context)(v_out, soft_out);
+  }
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  Variable* attn_dropout_residual;
+  if (_pre_or_postLayerNorm && _is_post_ln) {
+    attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+  } else {
+    attn_dropout_residual = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  }
 
   if (!_pre_or_postLayerNorm) {
-    Variable* attn_ln_out = (*_attn_ln)(attn_dropout, _attn_nw, _attn_nb);
-    this->set_outputs({attn_ln_out});
+    Variable* attn_ln_out =
+        (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
+    LAYER_POST_OUTPUTS({attn_ln_out});
     return attn_ln_out;
   } else {
-    this->set_outputs({attn_dropout});
-    return attn_dropout;
+    LAYER_POST_OUTPUTS({attn_dropout_residual});
+    return attn_dropout_residual;
   }
 }
 
 template <typename T1, typename T2>
-void SelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
+void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
+                                                     int seq_len) {
   _batch_tokens = batch_size * seq_len;
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
@@ -139,9 +139,53 @@ void SelfAttentionLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
 }
 
 template <typename T1, typename T2>
-void SelfAttentionLayer<T1, T2>::before_backward() {}
+void MultiheadAttentionLayer<T1, T2>::before_backward() {}
 
-// template class SelfAttentionLayer<float, float>;
-// template class SelfAttentionLayer<__half, __half>;
+template <typename T1, typename T2>
+int MultiheadAttentionLayer<T1, T2>::load_para_and_grad(
+    const T1* para_ptr, T2* grad_ptr) {  // for training
+  int offset = 0;
+  _attn_qkvw->set_value((char*)(para_ptr + offset));
+  _attn_qkvw->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size * _hidden_size * 3;
+
+  _attn_qkvb->set_value((char*)(para_ptr + offset));
+  _attn_qkvb->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size * 3;
+
+  _attn_ow->set_value((char*)(para_ptr + offset));
+  _attn_ow->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size * _hidden_size;
+
+  _attn_ob->set_value((char*)(para_ptr + offset));
+  _attn_ob->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size;
+
+  _attn_nw->set_value((char*)(para_ptr + offset));
+  _attn_nw->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size;
+
+  _attn_nb->set_value((char*)(para_ptr + offset));
+  _attn_nb->set_grad((char*)(grad_ptr + offset));
+  offset += _hidden_size;
+
+  return offset;
+}
+
+template <typename T1, typename T2>
+int MultiheadAttentionLayer<T1, T2>::load_params(
+    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+  int size = 0;
+  _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+
+  _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+
+  _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+
+  return size;
+}
 
 }  // namespace lightseq

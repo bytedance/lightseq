@@ -45,7 +45,8 @@ QuantGptEncoder<OpType_>::QuantGptEncoder(
       _h_real_seq_len(max_batch_size, 0),
       _h_ppl(max_batch_size, 0.f),
       _h_sample_id(max_batch_size * tw._max_step, 0),
-      _h_unfinished(1) {
+      _h_unfinished(1),
+      _is_benchmark(false) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
 
@@ -288,6 +289,11 @@ void QuantGptEncoder<OpType_>::run_one_infer(int batch_size,
 }
 
 template <OperationType OpType_>
+void QuantGptEncoder<OpType_>::benchmark_mode(bool is_benchmark) {
+  _is_benchmark = is_benchmark;
+}
+
+template <OperationType OpType_>
 int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
                                              int batch_seq_len) {
   if (batch_size > _max_batch_size) {
@@ -346,7 +352,7 @@ int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
     return _batch_seq_len;
   }
 
-  while (1) {
+  while (_batch_seq_len < _tw._max_step) {
 #ifdef DEBUG_RESULT
     std::cout << "before sample:batch_size-" << _batch_size << " batch_seq_len-"
               << _batch_seq_len << std::endl;
@@ -372,8 +378,8 @@ int QuantGptEncoder<OpType_>::run_one_sample(int batch_size,
     _p_d_self_v_cache2 = _p_d_self_v_cache1;
     _p_d_self_v_cache1 = ftmp;
 
-    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
-      break;
+    bool unfinish = sample_one_token_with_cache();
+    if (!unfinish && !_is_benchmark) break;
   }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
@@ -392,7 +398,7 @@ int QuantGptEncoder<OpType_>::sample_one_token() {
                            _output_ln_clip_max * _src_emb_clip_max /
                                (_logits_clip_max * _quant_range),
                            _int8_ffn_in_buf, _int8_p_d_src_emb_wei,
-                           _cublas_lt_handle, _stream, false);
+                           _cublas_lt_handle, _stream, use_ORDER_COL32_2R_4R4);
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   /* ---step 2. sample new tokens from logits */
   if (_tw._sampling_method == "topk") {
@@ -434,7 +440,7 @@ int QuantGptEncoder<OpType_>::sample_one_token_with_cache() {
                            _output_ln_clip_max * _src_emb_clip_max /
                                (_logits_clip_max * _quant_range),
                            _int8_ffn_in_buf, _int8_p_d_src_emb_wei,
-                           _cublas_lt_handle, _stream, false);
+                           _cublas_lt_handle, _stream, use_ORDER_COL32_2R_4R4);
 
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   // /* ---step 2. sample new tokens from logits */
@@ -487,7 +493,7 @@ void QuantGptEncoder<OpType_>::self_attention() {
       _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
           (_enc_clip_max[_layer_id * 12 + 8] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "attn qkv in", 20);
@@ -580,7 +586,7 @@ void QuantGptEncoder<OpType_>::self_attention_with_cache() {
       _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
           (_enc_clip_max[_layer_id * 12 + 8] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   // get q, k, v by split and reshape qkv
   ker_arrange_qkv_with_cache_i8I_i8O_launcher<_DataType>(
@@ -636,7 +642,7 @@ void QuantGptEncoder<OpType_>::ffn_add_norm() {
       _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
           (_enc_clip_max[_layer_id * 12 + 10] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 2], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "ffn1 in", 20);
@@ -697,7 +703,7 @@ void QuantGptEncoder<OpType_>::ffn_add_norm_with_cache() {
       _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
           (_enc_clip_max[_layer_id * 12 + 10] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 2], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   ker_bias_gelu_i8I_i8O_launcher<_DataType>(
       _batch_size, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
@@ -748,7 +754,7 @@ void QuantGptEncoder<OpType_>::compute_ppl() {
                            _output_ln_clip_max * _src_emb_clip_max /
                                (_logits_clip_max * _quant_range),
                            _int8_ffn_in_buf, _int8_p_d_src_emb_wei,
-                           _cublas_lt_handle, _stream, false);
+                           _cublas_lt_handle, _stream, use_ORDER_COL32_2R_4R4);
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "logits in", 20);
   print_vec(_int8_p_d_src_emb_wei, "logits w", 20);

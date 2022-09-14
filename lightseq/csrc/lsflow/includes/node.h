@@ -13,6 +13,7 @@ class Node {
  protected:
   Context* _context_ptr;
   std::string _name;
+  NodeType _node_type;
 
   bool _fw_flag;
   bool _bw_flag;
@@ -22,16 +23,17 @@ class Node {
   std::vector<Node*> _children{};
 
  public:
-  Node(std::string name);
+  Node(std::string name, NodeType nt_);
   std::string name() { return _name; }
   virtual ~Node();
-
+  NodeType node_type() { return _node_type; }
   void set_parents(std::vector<Node*> parents);
 
   void add_child(Node* child) { _children.push_back(child); }
 
   virtual void forward() {}   // need to implement
   virtual void backward() {}  // need to implement
+
   const std::vector<Node*>& parents() { return _parents; }
   const std::vector<Node*>& children() { return _children; }
 
@@ -55,6 +57,7 @@ class Variable : public Node {
   TensorPtr _grad = nullptr;
 
  public:
+  Variable(std::string name);
   Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
   Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
   virtual ~Variable() {}
@@ -67,7 +70,7 @@ class Variable : public Node {
 
   void set_grad(char* grad_ptr);
 
-  char* value();
+  char* value(bool is_open_interval = false);
 
   char* grad();
 
@@ -75,6 +78,7 @@ class Variable : public Node {
 };
 
 class Operator : public Node {
+ protected:
  public:
   Operator(std::string name);
   virtual ~Operator() {}

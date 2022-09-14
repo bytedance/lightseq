@@ -6,7 +6,7 @@
 namespace lightseq {
 
 template <class T1, class T2>
-class NormalizeLayerOp : public Operator {
+class LayerNormalizeOp : public Operator {
  private:
   size_t _hidden_dim;
   size_t _max_batch_tokens;
@@ -18,20 +18,20 @@ class NormalizeLayerOp : public Operator {
   TensorPtr vars_;
 
  public:
-  NormalizeLayerOp(uint32_t max_batch_tokens, uint32_t hidden_dim,
+  LayerNormalizeOp(uint32_t max_batch_tokens, uint32_t hidden_dim,
                    bool use_mean = false)
-      : Operator("NormalizeLayerOp"),
+      : Operator("LayerNormalizeOp"),
         _max_batch_tokens(max_batch_tokens),
         _hidden_dim(hidden_dim),
         _use_mean(use_mean) {
-    vars_.reset(new Tensor(_name + "/vars", max_batch_tokens * sizeof(T1)));
+    vars_.reset(new Tensor("vars", max_batch_tokens * sizeof(T1)));
     if (use_mean)
-      means_.reset(new Tensor(_name + "/means", max_batch_tokens * sizeof(T1)));
+      means_.reset(new Tensor("means", max_batch_tokens * sizeof(T1)));
   }
 
   Variable* operator()(Variable* inp, Variable* gamma, Variable* betta);
 
-  virtual ~NormalizeLayerOp();
+  virtual ~LayerNormalizeOp();
 
   void before_forward(size_t batch_tokens);
 

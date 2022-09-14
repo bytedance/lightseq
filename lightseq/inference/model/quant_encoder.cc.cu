@@ -288,7 +288,7 @@ void QuantEncoder<OpType_>::self_attention() {
       _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
           (_enc_clip_max[_layer_id * 12 + 8] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   // get q, k, v by split and reshape qkv
 
@@ -336,7 +336,7 @@ void QuantEncoder<OpType_>::self_attention() {
       _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
           (_enc_clip_max[_layer_id * 12 + 9] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 1], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
       _int8_ffn_out_buf, _p_device_wei[_weight_offset + 6],
@@ -357,7 +357,7 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
       _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
           (_enc_clip_max[_layer_id * 12 + 10] * _quant_range),
       _int8_ffn_in_buf, _int8_p_d_enc_wei[_layer_id * 4 + 2], _cublas_lt_handle,
-      _stream, false);
+      _stream, use_ORDER_COL32_2R_4R4);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(
@@ -378,7 +378,7 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
   cublasLtMM_withAlgo(_int32_ffn_out_buf, 1, _batch_token_num, _tw._hidden_size,
                       _tw._inner_size, 0, 0, 0, _int8_ffn_in_buf,
                       _int8_p_d_enc_wei[_layer_id * 4 + 3], _cublas_lt_handle,
-                      _stream, false);
+                      _stream, use_ORDER_COL32_2R_4R4);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max, dequant_scale;

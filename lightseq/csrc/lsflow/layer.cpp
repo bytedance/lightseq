@@ -4,20 +4,22 @@ namespace lightseq {
 
 Layer::Layer(std::string name) : _op_vec({}) {
   _context_ptr = thread_context_ptr;
-  int idx = _context_ptr->layer_name_cnt[name];
-  _context_ptr->layer_name_cnt[name] += 1;
-  _name = name + "_" + std::to_string(idx);
-  _context_ptr->enter_layer(this);
+  std::string real_name =
+      _context_ptr->last_layer()
+          ? (_context_ptr->last_layer()->name() + "/" + name)
+          : name;
+  int idx = _context_ptr->layer_name_cnt[real_name];
+  _context_ptr->layer_name_cnt[real_name] += 1;
+  _name = real_name + "_" + std::to_string(idx);
+  _context_ptr->enter_layer(this, true);
 }
 
-Layer::~Layer() {
-  // printf("~Layer() %s\n", _name.c_str());
-}
+Layer::~Layer() {}
 
 void Layer::forward() {
   _context_ptr->build();
   clear_fw_flag();
-  for (Variable* var : _leaf_var_vec) {
+  for (Variable* var : _out_var_vec) {
     var->recursive_forward();
   }
 }
@@ -25,7 +27,7 @@ void Layer::forward() {
 void Layer::backward() {
   _context_ptr->build();
   clear_bw_flag();
-  for (Variable* var : _root_var_vec) {
+  for (Variable* var : _inp_var_vec) {
     var->recursive_backward();
   }
 }

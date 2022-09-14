@@ -8,14 +8,16 @@
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
+#include "cuda_util.h"
 
 namespace lightseq {
 
 class Context {  // model only
  private:
   std::vector<Node*> _all_node_vec{};
-  std::vector<Operator*> _all_op_vec{};
+  std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
+  std::vector<Layer*> _all_layers{};
   std::deque<Layer*> _layer_context;
   bool _is_training = false;
 
@@ -28,6 +30,8 @@ class Context {  // model only
 
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
+
+  bool check_validate();
 
  public:
   Context(bool training = false, int device_id = 0);
@@ -68,7 +72,7 @@ class Context {  // model only
   void add_op(Operator* op);
   void add_node(Node* node);
 
-  void enter_layer(Layer* cur_layer);
+  void enter_layer(Layer* cur_layer, bool is_initial = true);
 
   // collaborate with enter_layer()
   void exit_layer() { _layer_context.pop_back(); }
@@ -76,6 +80,14 @@ class Context {  // model only
   void build();
 
   void draw_all_context();
+
+  Layer* last_layer() {
+    return _layer_context.size() ? _layer_context.back() : nullptr;
+  }
+  Node* last_node() {
+    return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
+                                : nullptr;
+  }
 };
 
 }  // namespace lightseq

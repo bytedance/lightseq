@@ -1,15 +1,15 @@
-#include "includes/normalize_layer.h"
+#include "includes/layer_normalize.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
-NormalizeLayerOp<T1, T2>::~NormalizeLayerOp() {}
+LayerNormalizeOp<T1, T2>::~LayerNormalizeOp() {}
 
 template <typename T1, typename T2>
-Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
+Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
                                                Variable* betta) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
-  Variable* result = new Variable(this->_name + "/out", max_size * sizeof(T1),
+  Variable* result = new Variable("LayerNormalizeOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
   this->set_parents({inp, gamma, betta});
   this->set_children({result});
@@ -17,12 +17,12 @@ Variable* NormalizeLayerOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::before_forward(size_t batch_tokens) {
+void LayerNormalizeOp<T1, T2>::before_forward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::forward() {
+void LayerNormalizeOp<T1, T2>::forward() {
   T1* ln_res_val = (T1*)child(0)->value();
   T1* inp_val = (T1*)parent(0)->value();
   T1* gamma_val = (T1*)parent(1)->value();
@@ -38,12 +38,12 @@ void NormalizeLayerOp<T1, T2>::forward() {
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::before_backward(size_t batch_tokens) {
+void LayerNormalizeOp<T1, T2>::before_backward(size_t batch_tokens) {
   _batch_tokens = batch_tokens;
 }
 
 template <typename T1, typename T2>
-void NormalizeLayerOp<T1, T2>::backward() {
+void LayerNormalizeOp<T1, T2>::backward() {
   T2* gamma_grad = (T2*)parent(1)->grad();
   T2* betta_grad = (T2*)parent(2)->grad();
   T2* inp_grad = (T2*)parent(0)->grad();
@@ -70,7 +70,7 @@ void NormalizeLayerOp<T1, T2>::backward() {
                _batch_tokens, _hidden_dim, streams);
 }
 
-template class NormalizeLayerOp<__half, __half>;
-template class NormalizeLayerOp<float, float>;
+template class LayerNormalizeOp<__half, __half>;
+template class LayerNormalizeOp<float, float>;
 
 }  // namespace lightseq

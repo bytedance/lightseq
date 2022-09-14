@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
                                                  Variable* inpB) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("StridedBatchGemmOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inpA, inpB});
   this->set_children({result});

@@ -64,10 +64,11 @@ template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
 
 template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<T> hout(num_output_ele, (T)0);
-  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
-             cudaMemcpyDeviceToHost);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
+                             cudaMemcpyDeviceToHost));
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << hout[i] << ", ";
   }
@@ -77,12 +78,41 @@ void print_vec(const T *outv, std::string outn, int num_output_ele) {
 template <>
 void print_vec<__half>(const __half *outv, std::string outn,
                        int num_output_ele) {
-  std::cout << outn << ": ";
+  std::cout << outn << " address: " << outv << std::endl;
   std::vector<__half> hout(num_output_ele, (__half)0.f);
-  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
-             cudaMemcpyDeviceToHost);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
+                             cudaMemcpyDeviceToHost));
+  printf("value: ");
   for (int i = 0; i < num_output_ele; i++) {
     std::cout << __half2float(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<int8_t>(const int8_t *outv, std::string outn,
+                       int num_output_ele) {
+  std::cout << outn << " address: " << outv << std::endl;
+  std::vector<int8_t> hout(num_output_ele, 0);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(int8_t),
+             cudaMemcpyDeviceToHost);
+  printf("value: ");
+  for (int i = 0; i < num_output_ele; i++) {
+    std::cout << static_cast<int>(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
+                        int num_output_ele) {
+  std::cout << outn << " address: " << outv << std::endl;
+  std::vector<uint8_t> hout(num_output_ele, 0);
+  cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(uint8_t),
+             cudaMemcpyDeviceToHost);
+  printf("value: ");
+  for (int i = 0; i < num_output_ele; i++) {
+    std::cout << static_cast<int>(hout[i]) << ", ";
   }
   std::cout << std::endl;
 }
@@ -93,8 +123,47 @@ template void print_vec<float>(const float *outv, std::string outn,
 template void print_vec<int>(const int *outv, std::string outn,
                              int num_output_ele);
 
+template void print_vec<int8_t>(const int8_t *outv, std::string outn,
+                                int num_output_ele);
+
 template void print_vec<__half>(const __half *outv, std::string outn,
                                 int num_output_ele);
+
+template void print_vec<int8_t>(const int8_t *outv, std::string outn,
+                                int num_output_ele);
+
+template void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
+                                 int num_output_ele);
+
+template <typename T>
+void print_vec(const T *outv, std::string outn, int start, int end) {
+  std::cout << outn << ": ";
+  thrust::copy(thrust::device_pointer_cast(outv + start),
+               thrust::device_pointer_cast(outv + end),
+               std::ostream_iterator<T>(std::cout, ", "));
+  std::cout << std::endl;
+}
+
+template <>
+void print_vec<__half>(const __half *outv, std::string outn, int start,
+                       int end) {
+  std::cout << outn << ": ";
+  int num_elements = end - start;
+  std::vector<__half> hout(num_elements, (__half)0.f);
+  CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv + start,
+                             num_elements * sizeof(__half),
+                             cudaMemcpyDeviceToHost));
+  for (int i = 0; i < num_elements; i++) {
+    std::cout << __half2float(hout[i]) << ", ";
+  }
+  std::cout << std::endl;
+}
+
+template void print_vec<float>(const float *outv, std::string outn, int start,
+                               int end);
+
+template void print_vec<int>(const int *outv, std::string outn, int start,
+                             int end);
 
 template <typename T>
 T *cuda_malloc(size_t ele_num) {
@@ -104,6 +173,8 @@ T *cuda_malloc(size_t ele_num) {
   return pdata;
 }
 
+template int *cuda_malloc<int>(size_t ele_num);
+
 template char *cuda_malloc<char>(size_t ele_num);
 
 template float *cuda_malloc<float>(size_t ele_num);
@@ -112,11 +183,30 @@ template __half *cuda_malloc<__half>(size_t ele_num);
 
 template uint8_t *cuda_malloc<uint8_t>(size_t ele_num);
 
+template int8_t *cuda_malloc<int8_t>(size_t ele_num);
+
 void cuda_free(void *pdata) {
   if (pdata != nullptr) {
-    cudaFree(pdata);
+    CHECK_GPU_ERROR(cudaFree(pdata));
   }
 }
+
+template <typename T>
+void cuda_set(T *pdata, int value, size_t ele_num) {
+  size_t byte_size = ele_num * sizeof(T);
+
+  if (pdata != nullptr) {
+    CHECK_GPU_ERROR(cudaMemset(pdata, value, byte_size));
+  }
+}
+
+template void cuda_set<float>(float *pdata, int value, size_t ele_num);
+
+template void cuda_set<__half>(__half *pdata, int value, size_t ele_num);
+
+template void cuda_set<uint8_t>(uint8_t *pdata, int value, size_t ele_num);
+
+template void cuda_set<int8_t>(int8_t *pdata, int value, size_t ele_num);
 
 template <typename T>
 struct _isnan {
@@ -157,6 +247,8 @@ void check_nan_inf(const T *data_ptr, int dsize, bool check_nan_inf,
                                    thrust::logical_or<bool>());
   }
   if (res) {
+    print_vec(data_ptr, "data(head)", 20);
+    print_vec(data_ptr + dsize - 20, "data(tail)", 20);
     throw std::runtime_error(msg);
   }
   std::cout << msg << " [check pass]." << std::endl;
@@ -169,3 +261,53 @@ template void check_nan_inf<float>(const float *data_ptr, int dsize,
 template void check_nan_inf<__half>(const __half *data_ptr, int dsize,
                                     bool check_nan_inf, std::string file,
                                     int line, cudaStream_t stream);
+
+// square<T> computes the square of a number f(x) -> x*x
+template <typename T>
+struct _square {
+  __host__ __device__ float operator()(const T &x) const { return x * x; }
+};
+template <>
+struct _square<__half> {
+  __host__ __device__ float operator()(const __half &x) const {
+    return __half2float(x) * __half2float(x);
+  }
+};
+
+template <typename T>
+void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
+                 cudaStream_t stream) {
+  // thrust::cuda::par.on(stream), data_ptr, data_ptr + dsize, _square<T>(), 0,
+  float res = thrust::transform_reduce(thrust::cuda::par.on(stream), data_ptr,
+                                       data_ptr + dsize, _square<T>(), 0,
+                                       thrust::plus<float>());
+  res = std::sqrt(res);
+  std::cout << tensor_name << " norm: " << res << std::endl;
+}
+
+template void check_2norm<float>(const float *data_ptr, std::string tensor_name,
+                                 int dsize, cudaStream_t stream);
+
+template void check_2norm<__half>(const __half *data_ptr,
+                                  std::string tensor_name, int dsize,
+                                  cudaStream_t stream);
+
+int getSMVersion() {
+  int device{-1};
+  CHECK_GPU_ERROR(cudaGetDevice(&device));
+  cudaDeviceProp props;
+  CHECK_GPU_ERROR(cudaGetDeviceProperties(&props, device));
+  return props.major * 10 + props.minor;
+}
+
+void print_time_duration(
+    const std::chrono::high_resolution_clock::time_point &start,
+    std::string duration_name, cudaStream_t stream) {
+  CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
+  auto finish = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = finish - start;
+  std::cout << duration_name
+            << " duration time is: " << (elapsed).count() * 1000 << " ms"
+            << std::endl;
+  return;
+}

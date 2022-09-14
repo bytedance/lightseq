@@ -207,5 +207,9 @@ DataType QuantTransformer::get_output_dtype(int index) {
   }
 }
 
+void QuantTransformer::benchmark_mode(bool is_benchmark) {
+  decoder_->benchmark_mode(is_benchmark);
+}
+
 }  // namespace cuda
 }  // namespace lightseq

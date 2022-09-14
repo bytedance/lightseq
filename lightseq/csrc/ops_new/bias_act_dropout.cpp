@@ -5,7 +5,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
   Variable* result =
-      new Variable(this->_name + "/out", _max_ele_num * sizeof(T1),
+      new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
   this->set_parents({inp, bias});
   this->set_children({result});

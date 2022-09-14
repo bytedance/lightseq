@@ -221,7 +221,6 @@ def save_bart_proto_to_hdf5(transformer: Transformer, f: h5py.File):
 def extract_transformer_weights(
     output_file,
     model_dir,
-    head_num,
     generation_method,
     max_step,
     extra_decode_length=50,
@@ -235,7 +234,10 @@ def extract_transformer_weights(
 ):
     transformer = Transformer()
     # load var names
-    reloaded = BartForConditionalGeneration.from_pretrained(model_dir).state_dict()
+    model = BartForConditionalGeneration.from_pretrained(model_dir)
+    assert model.config.encoder_attention_heads == model.config.decoder_attention_heads
+    head_num = model.config.encoder_attention_heads
+    reloaded = model.state_dict()
 
     encoder_state_dict = {}
     decoder_state_dict = {}
@@ -521,7 +523,6 @@ if __name__ == "__main__":
     input_huggingface_bart_model = (
         "facebook/bart-base"  # Example: you can try "facebook/bart-large" as well
     )
-    head_number = 12  # change this to 16 for "bart-large" model
     beam_size = 4
     max_step = 50  # max step for generation, it decides GPU memory occupancy
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
@@ -530,7 +531,6 @@ if __name__ == "__main__":
     extract_transformer_weights(
         output_lightseq_model_name,
         input_huggingface_bart_model,
-        head_num=head_number,  # layer number
         generation_method=args.generation_method,
         beam_size=beam_size,
         max_step=max_step,
