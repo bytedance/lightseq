@@ -31,6 +31,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda_util.cu",
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/cross_entropy.cu",
+            "csrc/kernels/crf.cu",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
             "csrc/lsflow/manager.cpp",
@@ -46,6 +47,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/softmax.cpp",
             "csrc/ops_new/launch_concat3_dim1.cpp",
             "csrc/ops_new/transform_0213.cpp",
+            "csrc/ops_new/crf.cpp",
             "csrc/layers_new/feed_forward_layer.cpp",
             "csrc/layers_new/multihead_attention_layer.cpp",
             "csrc/layers_new/transformer_encoder_layer.cpp",
@@ -53,6 +55,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/encdec_kv_layer.cpp",
             "csrc/layers_new/dec_enc_attention_layer.cpp",
             "csrc/layers_new/transformer_decoder_layer.cpp",
+            "csrc/layers_new/crf_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
