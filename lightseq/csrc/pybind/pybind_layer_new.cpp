@@ -30,11 +30,6 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 
 void ContextInitial() {
-  static bool is_initialed = false;
-  if (is_initialed == true) {
-    return ;
-  }
-  is_initialed = true;
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::create_global_context(StatusType::Training);
   Context::global_instance()->set_stream(stream);
