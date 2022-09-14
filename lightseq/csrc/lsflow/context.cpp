@@ -166,8 +166,6 @@ std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
   }
   return iter->second;
 }
-// TransformerEncoderLayer0
-// TransformerEncoderLayer0
 
 std::shared_ptr<Context> Context::_global_context_ptr = nullptr;
 std::unordered_map<std::string, std::shared_ptr<void>> Context::pybind_layers =
