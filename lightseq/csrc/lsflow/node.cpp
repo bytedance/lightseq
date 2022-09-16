@@ -9,7 +9,7 @@ typedef float TENSOR_TYPE;
 namespace lightseq {
 
 Node::Node(std::string name, NodeType nt_)
-    : _context_ptr(thread_context_ptr.get()),
+    : _context_ptr(Context::global_instance().get()),
       _bw_first_flag(true),
       _node_type(nt_) {
   std::string prefix_name = _context_ptr->last_layer()
@@ -19,7 +19,7 @@ Node::Node(std::string name, NodeType nt_)
   int idx = _context_ptr->node_name_cnt[real_name];
   _context_ptr->node_name_cnt[real_name] += 1;
   _name = real_name + "_" + std::to_string(idx);
-  thread_context_ptr->add_node(this);
+  _context_ptr->add_node(this);
 }
 
 Node::~Node() {
@@ -51,11 +51,12 @@ void Node::recursive_forward() {
   forward();
 
 #ifdef DEBUG_TYPE
-  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+  if (node_type() != NodeType::Operator) {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  print_time_duration(start, name() + " Forward ****", 0);
+  printf("##### %s forward #####\n", name().c_str());
+  print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
@@ -87,11 +88,12 @@ void Node::recursive_backward() {
   backward();
 
 #ifdef DEBUG_TYPE
-  if (node_type() != NodeType::Operator || !_context_ptr->built()) {
+  if (node_type() != NodeType::Operator) {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  print_time_duration(start, name() + " Backward ****", 0);
+  printf("##### %s backward #####\n", name().c_str());
+  print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)

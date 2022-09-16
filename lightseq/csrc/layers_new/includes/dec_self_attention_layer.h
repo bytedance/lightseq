@@ -42,12 +42,15 @@ class DecSelfAttentionLayer : public Layer {
   int _batch_dim;
   int _batch_heads;
   int _batch_tokens;
+  int _src_seq_len;
+  int _trg_seq_len;
+  int _trg_batch_tokens;
   int _layer_id;
   int _max_batch_tokens;
   int _max_seq_len;
   int _hidden_size;
   int _heads;
-  int _training;
+  int _step;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 
@@ -56,8 +59,7 @@ class DecSelfAttentionLayer : public Layer {
                         int hidden_size, int num_heads,
                         float attn_prob_dropout_ratio,
                         float hidden_output_dropout_ratio,
-                        bool pre_or_postLayerNorm, bool mask_future_tokens,
-                        bool is_post_ln = false);
+                        bool pre_or_postLayerNorm, bool is_post_ln = false);
 
   virtual ~DecSelfAttentionLayer() {}
 
@@ -65,7 +67,8 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_k,
                                                          Variable* cache_v);
 
-  void before_forward(int batch_size, int seq_len, int steps);
+  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
+                      int steps);
 
   void before_backward();
 

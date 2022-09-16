@@ -1,3 +1,4 @@
+/* Copyright 2022 The LightSeq Team */
 #pragma once
 #include "cstdio"
 #include "queue"
@@ -9,17 +10,23 @@
 #include "layer.h"
 #include "node.h"
 #include "cuda_util.h"
+#include "unordered_map"
 
 namespace lightseq {
 
+enum StatusType { Training, Inference, Evaluation };
+const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
+
 class Context {  // model only
  private:
+  static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
   std::vector<Layer*> _root_layers{};
   std::vector<Layer*> _all_layers{};
   std::deque<Layer*> _layer_context;
-  bool _is_training = false;
+  StatusType _status_type;
 
   bool _built = false;
   bool _building = false;
@@ -31,26 +38,30 @@ class Context {  // model only
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
 
+  static std::shared_ptr<Context> _global_context_ptr;
+
   bool check_validate();
 
+  static std::unordered_map<int, std::shared_ptr<Context>> global_contexts_map;
+  static int global_context_id;
+
  public:
-  Context(bool training = false, int device_id = 0);
+  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
 
   cublasHandle_t get_cublashandle() { return _cublasHandle; }
 
-  void set_stream(cudaStream_t stream) {
-    _stream = stream;
-    CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
-  }
+  void set_stream(cudaStream_t stream);
 
-  static void new_thread_context(bool training = false);
+  void convert_into_train();
+  void convert_into_eval();
 
-  static void remove_thread_context();
-
-  static void set_thread_context(ContextPtr context_ptr);
+  static int create_global_context(
+      StatusType status_type = StatusType::Inference, int device_id = 0);
+  static void set_global_context(int context_id);
+  static std::shared_ptr<Context> global_instance();
 
   // for initial calculation
   size_t mx_tensor_size = 0;
@@ -60,13 +71,11 @@ class Context {  // model only
   std::map<std::string, int> node_name_cnt;
 
   // property field
-  bool is_training() { return _is_training; }
+  bool is_training() { return _status_type == StatusType::Training; }
   int node_idx() { return _node_idx; }
-  void update_node_idx() {
-    if (_built) return;
-    _node_idx++;
-  }
-  bool built() { return _built; }
+  void update_node_idx();
+  bool is_built() { return _built; }
+  bool is_building() { return _building; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }
 
   void add_op(Operator* op);
@@ -88,6 +97,13 @@ class Context {  // model only
     return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
                                 : nullptr;
   }
+
+  std::string status_type_str() { return StatusTypeString[_status_type]; }
+
+  static void regist_pybind_layer(std::string layer_name, int layer_id,
+                                  std::shared_ptr<void> layer_ptr);
+  static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
+                                                int layer_id);
 };
 
 }  // namespace lightseq

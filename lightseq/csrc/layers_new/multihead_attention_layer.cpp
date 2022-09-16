@@ -14,7 +14,6 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _training(true),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
       _is_post_ln(is_post_ln),
       // operators

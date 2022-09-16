@@ -6,7 +6,7 @@ template <typename T>
 CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size,
                       const T* start_transition, const T* end_transition,
                       const T* transition)
-    : Layer("crflayer"),
+    : Layer("CRFLayer"),
       _num_tags(num_tags),
       _max_batch_tokens(max_batch_tokens),
       _max_batch_size(max_batch_size) {

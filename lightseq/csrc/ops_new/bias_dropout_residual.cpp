@@ -17,8 +17,6 @@ template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
-  // printf("Running! BiasDropoutResOp name: %s\n", this->name().c_str());
-
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
   T1* residual = (T1*)parent(2)->value();
@@ -50,8 +48,7 @@ void BiasDropoutResOp<T1, T2>::backward() {
     CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
                                     _cols * _rows * sizeof(T2),
                                     cudaMemcpyDefault, stream));
-  } else {  // accumulate
-            // launch_fused_add2 ...
+  } else {
     launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
                       _cols, stream);
   }

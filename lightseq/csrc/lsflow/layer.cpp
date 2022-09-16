@@ -3,7 +3,7 @@
 namespace lightseq {
 
 Layer::Layer(std::string name) : _op_vec({}) {
-  _context_ptr = thread_context_ptr;
+  _context_ptr = Context::global_instance();
   std::string real_name =
       _context_ptr->last_layer()
           ? (_context_ptr->last_layer()->name() + "/" + name)
@@ -41,11 +41,29 @@ void Layer::clear_fw_flag() {
   }
 }
 
+void Layer::tag_fw_flag() {
+  for (Operator* op : _op_vec) {
+    op->tag_fw_flag();
+    for (Node* var : op->children()) {
+      var->tag_fw_flag();
+    }
+  }
+}
+
 void Layer::clear_bw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_bw_flag();
     for (Node* var : op->parents()) {
       var->clear_bw_flag();
+    }
+  }
+}
+
+void Layer::tag_bw_flag() {
+  for (Operator* op : _op_vec) {
+    op->tag_bw_flag();
+    for (Node* var : op->parents()) {
+      var->tag_bw_flag();
     }
   }
 }

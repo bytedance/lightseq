@@ -45,16 +45,17 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/bias_add_transform_20314.cpp",
             "csrc/ops_new/dropout.cpp",
             "csrc/ops_new/softmax.cpp",
-            # "csrc/ops_new/launch_concat3_dim1.cpp",
+            "csrc/ops_new/launch_concat3_dim1.cpp",
             "csrc/ops_new/transform_0213.cpp",
             "csrc/ops_new/crf.cpp",
             "csrc/layers_new/feed_forward_layer.cpp",
             "csrc/layers_new/multihead_attention_layer.cpp",
             "csrc/layers_new/transformer_encoder_layer.cpp",
+            "csrc/layers_new/dec_self_attention_layer.cpp",
+            "csrc/layers_new/encdec_kv_layer.cpp",
+            "csrc/layers_new/dec_enc_attention_layer.cpp",
+            "csrc/layers_new/transformer_decoder_layer.cpp",
             "csrc/layers_new/crf_layer.cpp",
-            # "csrc/layers_new/dec_enc_attention_layer.cpp",
-            # "csrc/layers_new/dec_self_attention_layer.cpp",
-            # "csrc/layers_new/dec_enc_attention_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
@@ -84,4 +85,11 @@ class LayerBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]  # , "-DDEBUG_TYPE=FP16"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+            "-DPYBIND_LAYER",
+            "-DDEBUG_TYPE=FP16",
+        ]
