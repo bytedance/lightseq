@@ -28,8 +28,6 @@ class Tensor {
 
   char* tensor(bool is_open_interval = false, bool just_view = false);
 
-  LSMemoryType memory_type() { return _mtype; }
-
   size_t size() { return _size; }
   int unique_id() { return _id; }
 

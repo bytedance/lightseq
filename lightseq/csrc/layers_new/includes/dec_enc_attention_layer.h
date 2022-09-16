@@ -18,9 +18,8 @@ class DecEncAttentionLayer : public Layer {
  private:
   // operators
   LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
-  FeedForwardOp<T1, T2>* _qkv_linear = nullptr;
+  FeedForwardOp<T1, T2>* _q_linear = nullptr;
   BiasAddTrans20314<T1, T2>* _bias_add_transform_20314_q = nullptr;
-  BiasAddTrans20314<T1, T2>* _bias_add_transform_20314_kv = nullptr;
   StridedBatchGemmOp<T1, T2>* _attn_scores = nullptr;
   SoftmaxOp<T1, T2>* _softmax = nullptr;
   DropoutOp<T1, T2>* _attn_prob_dropout = nullptr;
@@ -30,8 +29,8 @@ class DecEncAttentionLayer : public Layer {
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
 
   // parameters
-  Variable* _attn_qkvw;
-  Variable* _attn_qkvb;
+  Variable* _attn_qw;
+  Variable* _attn_qb;
   Variable* _attn_ow;
   Variable* _attn_ob;
   Variable* _attn_nw;
@@ -46,7 +45,6 @@ class DecEncAttentionLayer : public Layer {
   int _max_seq_len;
   int _hidden_size;
   int _heads;
-  int _training;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 
@@ -55,14 +53,13 @@ class DecEncAttentionLayer : public Layer {
                        int hidden_size, int num_heads,
                        float attn_prob_dropout_ratio,
                        float hidden_output_dropout_ratio,
-                       bool pre_or_postLayerNorm, bool mask_future_tokens,
-                       bool is_post_ln = false);
+                       bool pre_or_postLayerNorm, bool is_post_ln = false);
 
   virtual ~DecEncAttentionLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* enc_out);
+  Variable* operator()(Variable* inp, Variable* enc_k, Variable* enc_v);
 
-  void before_forward(int batch_size, int seq_len);
+  void before_forward(int batch_size, int src_seq_len, int trg_seq_len);
 
   void before_backward();
 

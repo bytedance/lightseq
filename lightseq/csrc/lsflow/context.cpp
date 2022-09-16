@@ -2,11 +2,12 @@
 
 namespace lightseq {
 
-Context::Context(bool training, int device_id)
+Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()),
-      _is_training(training),
-      _device_id(device_id) {
-  CHECK_GPU_ERROR(cudaSetDevice(device_id));
+      _device_id(device_id),
+      _status_type(status_type) {
+  printf("Initial Context, status_type: %s\n", status_type_str().c_str());
+  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -18,24 +19,55 @@ Context::~Context() {
   }
 }
 
-void Context::new_thread_context(bool training) {
-  thread_context_ptr.reset(new Context(training));
+void Context::set_stream(cudaStream_t stream) {
+  _stream = stream;
+  CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
 }
 
-void Context::set_thread_context(ContextPtr context_ptr) {
-  thread_context_ptr = context_ptr;
+void Context::convert_into_train() { _status_type = StatusType::Training; }
+
+void Context::convert_into_eval() {
+  if (_status_type != StatusType::Inference)
+    _status_type = StatusType::Evaluation;
 }
 
-void Context::remove_thread_context() { thread_context_ptr.reset(); }
+int Context::create_global_context(StatusType status_type, int device_id) {
+  global_context_id++;
+  std::shared_ptr<Context> new_context =
+      std::make_shared<Context>(status_type, device_id);
+  _global_context_ptr = new_context;
+  global_contexts_map.emplace(global_context_id, new_context);
+  return global_context_id;
+}
+
+void Context::set_global_context(int context_id) {
+  auto iter = global_contexts_map.find(context_id);
+  if (iter == global_contexts_map.end()) {
+    printf("Error occured! context_id %d does not exist!\n", context_id);
+    exit(-1);
+  }
+  _global_context_ptr = iter->second;
+}
+
+std::shared_ptr<Context> Context::global_instance() {
+  return _global_context_ptr;
+}
+
+void Context::update_node_idx() {
+  if (_built) return;
+  _node_idx++;
+}
 
 void Context::add_op(Operator* op) {
-  if (built()) {
+  if (is_built()) {
     printf("Context has constructed! should not add new operator!\n");
     exit(-1);
   }
 
   if (_layer_context.size()) {
-    _layer_context[0]->_op_vec.push_back(op);
+    for (Layer* lyr : _layer_context) {
+      lyr->_op_vec.push_back(op);
+    }
     return;
   }
 #if ONLY_OP == true
@@ -49,7 +81,7 @@ void Context::add_op(Operator* op) {
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
-  if (built()) {
+  if (is_built()) {
     printf("Context has constructed! should not modify network\n");
     exit(-1);
   }
@@ -68,7 +100,9 @@ void Context::build() {
   }
   _building = true;
 
-  printf("===== start Context build =====\n");
+  printf("========== start Context build ==========\n");
+  printf("========== construct StatusType: %s, StatusType id: %d ==========\n",
+         status_type_str().c_str(), int(_status_type));
 
   if (!check_validate()) {
     printf("Check validate error!\n");
@@ -90,12 +124,21 @@ void Context::build() {
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
+#ifdef DEBUG_TYPE
+    printf("\n########## Context build layer %s forward ##########\n",
+           rl->name().c_str());
+#endif
     rl->forward();
   }
 
-  if (_is_training) {
+  if (is_training()) {
+    printf("is training!\n");
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
+#ifdef DEBUG_TYPE
+      printf("\n########## Context build layer %s backward ##########\n",
+             rl->name().c_str());
+#endif
       rl->backward();
     }
   }
@@ -103,10 +146,6 @@ void Context::build() {
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
-
-#ifndef ONLY_OP
-  thread_context_ptr.reset();
-#endif
 
 #ifdef DEBUG_TYPE
   draw_all_context();
@@ -118,14 +157,6 @@ void Context::build() {
 bool Context::check_validate() {
   bool check_flag = true;
   for (Layer* lyr : _all_layers) {
-    if (lyr->macro_inputs_check == false) {
-      printf("error! layer %s didn't set inputs\n", lyr->name().c_str());
-      check_flag = false;
-    }
-    if (lyr->macro_outputs_check == false) {
-      printf("error! layer %s didn't set outputs\n", lyr->name().c_str());
-      check_flag = false;
-    }
     if (lyr->name().size() == 0) {
       printf("error! some LAYERS didn't initialize!\n");
       check_flag = false;
@@ -142,10 +173,44 @@ bool Context::check_validate() {
   return check_flag;
 }
 
-thread_local ContextPtr thread_context_ptr = nullptr;
-
 void Context::draw_all_context() {}
 
-// thread_local ContextPtr thread_context_ptr = nullptr;
+void Context::regist_pybind_layer(std::string layer_name, int layer_id,
+                                  std::shared_ptr<void> layer_ptr) {
+  std::string full_name = layer_name + std::to_string(layer_id);
+  if (pybind_layers.find(full_name) != pybind_layers.end()) {
+    printf(
+        "The layer applied for registration has been occupied!\n"
+        "Layer name is %s!\n",
+        full_name.c_str());
+    throw std::runtime_error(
+        "The layer applied for registration has been occupied!\n");
+  }
+#ifdef DEBUG_TYPE
+  printf("regist_pybind_layer %s\n", full_name.c_str());
+#endif
+  pybind_layers.emplace(full_name, layer_ptr);
+}
+
+std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
+                                                int layer_id) {
+  std::string full_name = layer_name + std::to_string(layer_id);
+  auto iter = pybind_layers.find(full_name);
+  if (iter == pybind_layers.end()) {
+    printf(
+        "The requested layer was not found!\n"
+        "Layer name is %s!\n",
+        full_name.c_str());
+    throw std::runtime_error("The requested layer was not found!");
+  }
+  return iter->second;
+}
+
+std::shared_ptr<Context> Context::_global_context_ptr = nullptr;
+std::unordered_map<std::string, std::shared_ptr<void>> Context::pybind_layers =
+    {};
+std::unordered_map<int, std::shared_ptr<Context>> Context::global_contexts_map =
+    {};
+int Context::global_context_id = 0;
 
 }  // namespace lightseq
