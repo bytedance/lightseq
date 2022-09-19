@@ -19,11 +19,12 @@ class TensorUsage {
   size_t size;
   std::string _name;
   TensorUsage(int uid, int fidx, int lidx, size_t s, std::string name)
-      : unique_id(uid), first_idx(fidx), last_idx(lidx), size(s), _name(name) {}
+      : first_idx(fidx), last_idx(lidx), unique_id(uid), size(s), _name(name) {}
 };
 
 class MemoryManager {
  private:
+  std::vector<char*> buffer_vec_;
   char* buffer_ = nullptr;
   std::map<int, TensorUsage> tensor_usages_;
   size_t buffer_size_;

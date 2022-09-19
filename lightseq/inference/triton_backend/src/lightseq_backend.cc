@@ -312,9 +312,8 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
                          &memory_type, &memory_type_id),
                      "failed get input buffer");
 
-        ::lightseq::cuda::CHECK_GPU_ERROR(
-            cudaMemcpy(moved_d_input, partial_buffer, buffer_byte_size,
-                       cudaMemcpyHostToDevice));
+        cudaMemcpy(moved_d_input, partial_buffer, buffer_byte_size,
+                   cudaMemcpyHostToDevice);
         moved_d_input = (void*)(reinterpret_cast<uint64_t>(moved_d_input) +
                                 buffer_byte_size);
       }
@@ -379,9 +378,8 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
         const void* d_output = static_cast<const void*>(
             lightseq_model_ptr->get_output_ptr(output_idx));
 
-        ::lightseq::cuda::CHECK_GPU_ERROR(cudaMemcpy(single_output_buffer,
-                                                     d_output, buffer_byte_size,
-                                                     cudaMemcpyDeviceToHost));
+        cudaMemcpy(single_output_buffer, d_output, buffer_byte_size,
+                   cudaMemcpyDeviceToHost);
       }
     }
   }
