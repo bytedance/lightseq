@@ -7,11 +7,11 @@ namespace lightseq {
 template <class T1, class T2>
 class LyrNormalizeLayer : public Layer {
  private:
-  // operators
-  LayerNormalizeOp<T1, T2>* _lyr_norm_op = nullptr;
-
   int _hidden_size;
   int _max_batch_tokens;
+
+  // operators
+  LayerNormalizeOp<T1, T2>* _lyr_norm_op = nullptr;
 
   // parameters
   Variable* _norm_gamma;
