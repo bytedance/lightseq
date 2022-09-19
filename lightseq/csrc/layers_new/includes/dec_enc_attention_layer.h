@@ -3,7 +3,7 @@
 #include "bias_add_transform_20314.h"
 #include "bias_dropout_residual.h"
 #include "dropout.h"
-#include "feed_forward.h"
+#include "linear.h"
 #include "layer_normalize.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"

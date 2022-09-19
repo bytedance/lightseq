@@ -1,6 +1,6 @@
 #pragma once
 #include "bias_add_transform_20314.h"
-#include "feed_forward.h"
+#include "linear.h"
 #include "layer.h"
 
 namespace lightseq {

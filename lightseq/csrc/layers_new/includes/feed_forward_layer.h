@@ -1,7 +1,7 @@
 #pragma once
 #include "bias_act_dropout.h"
 #include "bias_dropout_residual.h"
-#include "feed_forward.h"
+#include "linear.h"
 #include "layer_normalize.h"
 #include "layer.h"
 

@@ -1,4 +1,4 @@
-#include "feed_forward.h"
+#include "linear.h"
 
 namespace lightseq {
 

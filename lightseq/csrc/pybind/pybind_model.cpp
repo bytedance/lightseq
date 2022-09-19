@@ -3,13 +3,11 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include "bert.h"
-#include "bert_crf.h"
-
 #include "model_base.h"
 #include "util.h"
 
 #include "bert.h"
+#include "bert_crf.h"
 
 namespace py = pybind11;
 

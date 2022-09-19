@@ -3,7 +3,7 @@ set(operator_files
     bias_add_transform_20314.cpp
     bias_dropout_residual.cpp
     dropout.cpp
-    feed_forward.cpp
+    linear.cpp
     launch_enc_emb.cpp
     layer_normalize.cpp
     softmax.cpp
