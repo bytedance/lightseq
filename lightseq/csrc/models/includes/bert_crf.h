@@ -1,7 +1,7 @@
 #pragma once
 #include "model_base.h"
 
-#include "bert_weight.h"
+#include "bert_crf_weight.h"
 
 #include "launch_enc_emb_layer.h"
 #include "transformer_encoder_layer.h"
@@ -16,9 +16,9 @@ typedef float OpType_;
 namespace lightseq {
 namespace cuda {
 
-class Bert : public LSModel {
+class BertCrf : public LSModel {
  private:
-  BertWeight<OpType_> tw_;
+  BertCrfWeight<OpType_> tw_;
 
   LaunchEncEmbLayerPtr<OpType_> launch_enc_emb_layer;
   std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
@@ -40,8 +40,8 @@ class Bert : public LSModel {
   int* pad_mask_ptr;
 
  public:
-  Bert(const std::string weight_path, const int max_batch_size);
-  ~Bert();
+  BertCrf(const std::string weight_path, const int max_batch_size);
+  ~BertCrf();
 
   void before_forward(int batch_size, int seq_len);
 
@@ -55,7 +55,7 @@ class Bert : public LSModel {
   DataType get_output_dtype(int index) override;
 };
 
-LSMODEL_REGISTER(Bert);
+LSMODEL_REGISTER(BertCrf);
 
 }  // namespace cuda
 }  // namespace lightseq

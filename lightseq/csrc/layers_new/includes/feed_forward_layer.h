@@ -12,9 +12,9 @@ class FeedForwardLayer : public Layer {
  private:
   // operators
   LayerNormalizeOp<T1, T2>* _ffn_ln = nullptr;
-  FeedForwardOp<T1, T2>* _ff1 = nullptr;
+  LinearOp<T1, T2>* _ff1 = nullptr;
   BiasActDropoutOp<T1, T2>* _ffn_activation_dropout = nullptr;
-  FeedForwardOp<T1, T2>* _ff2 = nullptr;
+  LinearOp<T1, T2>* _ff2 = nullptr;
   BiasDropoutResOp<T1, T2>* _ffn_dropout = nullptr;
 
   // parameters
