@@ -1,6 +1,6 @@
 #pragma once
 #include "bias_add_transform_20314.h"
-#include "feed_forward.h"
+#include "linear.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -8,7 +8,7 @@ namespace lightseq {
 template <class T1, class T2>
 class EncDecKvLayer : public Layer {
  private:
-  FeedForwardOp<T1, T2>* _kv_linear = nullptr;
+  LinearOp<T1, T2>* _kv_linear = nullptr;
   BiasAddTrans20314<T1, T2>* _bias_add_transform_20314 = nullptr;
 
   // parameters

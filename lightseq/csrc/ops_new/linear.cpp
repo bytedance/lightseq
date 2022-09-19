@@ -1,11 +1,11 @@
-#include "feed_forward.h"
+#include "linear.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* FeedForwardOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
+Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
   size_t max_size = _max_batch_tokens * _output_size;
-  Variable* result = new Variable("FeedForwardOp_out", max_size * sizeof(T1),
+  Variable* result = new Variable("LinearOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
   this->set_parents({inp, weight});
   this->set_children({result});
@@ -13,7 +13,7 @@ Variable* FeedForwardOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
 }
 
 template <typename T1, typename T2>
-void FeedForwardOp<T1, T2>::forward() {
+void LinearOp<T1, T2>::forward() {
   float alpha = float(1.);
   float beta = float(0.);
 
@@ -28,7 +28,7 @@ void FeedForwardOp<T1, T2>::forward() {
 }
 
 template <typename T1, typename T2>
-void FeedForwardOp<T1, T2>::backward() {
+void LinearOp<T1, T2>::backward() {
   float alpha = (float)1.0, w_beta = (float)0.0, inp_beta = (float)0.0;
 
   T2* out_grad = (T2*)child(0)->grad();
@@ -55,7 +55,7 @@ void FeedForwardOp<T1, T2>::backward() {
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
 }
 
-template class FeedForwardOp<float, float>;
-template class FeedForwardOp<__half, __half>;
+template class LinearOp<float, float>;
+template class LinearOp<__half, __half>;
 
 }  // namespace lightseq
