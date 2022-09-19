@@ -1,8 +1,8 @@
 #include "node.h"
 
-#if DEBUG_TYPE == FP16
+#ifdef FP16_MODE
 typedef __half TENSOR_TYPE;
-#elif DEBUG_TYPE == FP32
+#else
 typedef float TENSOR_TYPE;
 #endif
 
@@ -44,13 +44,13 @@ void Node::recursive_forward() {
 
   _context_ptr->update_node_idx();
 
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
   forward();
 
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   if (node_type() != NodeType::Operator) {
     return;
   }
@@ -81,13 +81,13 @@ void Node::recursive_backward() {
   _bw_flag = true;
   _context_ptr->update_node_idx();
 
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
   backward();
 
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   if (node_type() != NodeType::Operator) {
     return;
   }

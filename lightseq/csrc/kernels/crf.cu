@@ -41,6 +41,7 @@ transition: [num_tags, num_tags]
 emission: [batch_size, seq_len, num_tags]
 mask: [batch_size, seq_len]
   0 for invalid token
+bias: [num_tags]
 best_score: [batch_size]
 history: [batch_size, seq_len, num_tags]:
   i, j, k store the tag of i-th batch, j-th step when
@@ -50,9 +51,9 @@ best_tag: [batch_size, seq_len]
 template <typename T>
 __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
                             const T* transition, const T* emission,
-                            const uint8_t* mask, float* best_score,
-                            int* history, int* best_tags, int num_tags,
-                            int seq_len) {
+                            const uint8_t* mask, const T* bias,
+                            float* best_score, int* history, int* best_tags,
+                            int num_tags, int seq_len) {
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
 
@@ -63,9 +64,11 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   // step 1. compute first step's score
   if (threadIdx.y == 0) {
     for (int cur_tag = threadIdx.x; cur_tag < num_tags; cur_tag += blockDim.x) {
+      float linear_bias = bias ? float(bias[cur_tag]) : float(0);
       s_score[cur_tag] =
-          emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)] +
-          start_transition[cur_tag];
+          float(
+              emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)]) +
+          linear_bias + float(start_transition[cur_tag]);
     }
   }
   b.sync();
@@ -91,9 +94,12 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
       g.sync();
       warp_reduce_max(g, &max_score, &idx);
       if (threadIdx.x == 0) {
+        float linear_bias = bias ? float(bias[cur_tag]) : float(0);
         s_next_score[cur_tag] =
-            max_score + (float)emission[flat_3dim(blockIdx.x, seq_idx, cur_tag,
-                                                  seq_len, num_tags)];
+            max_score +
+            float(emission[flat_3dim(blockIdx.x, seq_idx, cur_tag, seq_len,
+                                     num_tags)]) +
+            linear_bias;
         history[flat_3dim(blockIdx.x, seq_idx - 1, cur_tag, seq_len,
                           num_tags)] = idx;
       }
@@ -144,13 +150,14 @@ void launch_viterbi<__half>(const __half* start_transition,
                             const __half* transition, const __half* emission,
                             const uint8_t* mask, float* best_score,
                             int* history, int* best_tags, int num_tags,
-                            int seq_len, int batch_size, cudaStream_t stream) {
+                            int seq_len, int batch_size, cudaStream_t stream,
+                            const __half* bias) {
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
   ker_viterbi<__half>
       <<<grid_dim, block_dim, 2 * num_tags * sizeof(float), stream>>>(
-          start_transition, end_transition, transition, emission, mask,
+          start_transition, end_transition, transition, emission, mask, bias,
           best_score, history, best_tags, num_tags, seq_len);
 }
 
@@ -160,12 +167,12 @@ void launch_viterbi<float>(const float* start_transition,
                            const float* emission, const uint8_t* mask,
                            float* best_score, int* history, int* best_tags,
                            int num_tags, int seq_len, int batch_size,
-                           cudaStream_t stream) {
+                           cudaStream_t stream, const float* bias) {
   dim3 grid_dim(batch_size);
   dim3 block_dim(WARP_SIZE, WARP_SIZE);
 
   ker_viterbi<float>
       <<<grid_dim, block_dim, 2 * num_tags * sizeof(float), stream>>>(
-          start_transition, end_transition, transition, emission, mask,
+          start_transition, end_transition, transition, emission, mask, bias,
           best_score, history, best_tags, num_tags, seq_len);
 }

@@ -6,10 +6,13 @@
 #include "triton/backend/backend_output_responder.h"
 #include "triton/core/tritonbackend.h"
 #include "bert.h"
+
+#ifndef NEW_ARCH
 #include "gpt.h"
 #include "transformer.h"
 #include "model_base.h"
 #include "quant_transformer.h"
+#endif
 
 namespace triton {
 namespace backend {
@@ -280,7 +283,7 @@ ModelInstanceState::ModelInstanceState(
       model_state_->RepositoryPath() + "/" + model_state_->ModelFileName();
   std::cout << file_name << std::endl;
 
-  ::lightseq::cuda::CHECK_GPU_ERROR(cudaSetDevice(DeviceId()));
+  cudaSetDevice(DeviceId());
   lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(
       ::lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
           model_state->GetModelType(), file_name,
