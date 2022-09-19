@@ -8,9 +8,9 @@ namespace lightseq {
 template <class T1, class T2>
 class LayerNormalizeOp : public Operator {
  private:
-  size_t _hidden_dim;
-  size_t _max_batch_tokens;
-  size_t _batch_tokens;
+  int _max_batch_tokens;
+  int _hidden_dim;
+  int _batch_tokens;
 
   bool _use_mean;
 

@@ -1,10 +1,10 @@
 #pragma once
 #include "model_base.h"
+
 #include "bert_weight.h"
-#include "layer.h"
+
 #include "launch_enc_emb_layer.h"
 #include "transformer_encoder_layer.h"
-#include "launch_enc_emb.h"
 #include "lyr_normalize_layer.h"
 
 #ifdef FP16_MODE

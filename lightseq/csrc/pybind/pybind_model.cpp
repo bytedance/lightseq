@@ -6,6 +6,8 @@
 #include "model_base.h"
 #include "util.h"
 
+#include "bert.h"
+
 namespace py = pybind11;
 
 class PyTransformer {

@@ -2,4 +2,4 @@ if [ ! -d 'build' ]; then
     mkdir build
 fi
 
-cd build && cmake -DNEW_ARCH=ON .. && make -j${nproc}
+cd build && cmake -DUSE_NEW_ARCH=ON -DUSE_TRITONBACKEND=OFF .. && make -j${nproc}

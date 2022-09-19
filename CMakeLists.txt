@@ -3,7 +3,7 @@ project(LightSeq LANGUAGES C CXX CUDA)
 
 find_package(CUDA 11 REQUIRED)
 
-option(NEW_ARCH "inference with fp16" OFF)
+option(USE_NEW_ARCH "inference with new arch" OFF)
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
@@ -34,7 +34,8 @@ set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(NEW_ARCH)
+if(USE_NEW_ARCH)
+  add_definitions(-DNEW_ARCH)
 
   set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 87)
 
@@ -74,6 +75,9 @@ if(NEW_ARCH)
   add_subdirectory(lightseq/csrc/proto)
   add_subdirectory(lightseq/csrc/pybind)
   add_subdirectory(lightseq/csrc/example)
+  if(USE_TRITONBACKEND)
+    add_subdirectory(lightseq/inference/triton_backend)
+  endif()
 
 else()
 
