@@ -24,7 +24,7 @@ Variable* CRFLayer<T>::operator()(Variable* emission, Variable* mask) {
   LAYER_PRE_INPUTS({emission, mask});
   Variable* crf_out = (*_crf_op)(_start_transition, _end_transition,
                                  _transition, emission, mask, _linear_b);
-  LAYER_POST_OUTPUTS(crf_out);
+  LAYER_POST_OUTPUTS({crf_out});
   return crf_out;
 }
 

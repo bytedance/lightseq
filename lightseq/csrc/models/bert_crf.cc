@@ -60,7 +60,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
 
   // initial crf layer
   crf_layer.reset(
-      new CRFLayer<OpType_>(max_batch_tokens, tw_._hidden_size, tw_._num_tags));
+      new CRFLayer<OpType_>(tw_._num_tags, max_batch_tokens, _max_batch_size));
   crf_layer->load_params(tw_.get_src_emb_wei(), 5);
 
   /* --- step.5 construct network --- */
@@ -90,17 +90,22 @@ void BertCrf::before_forward(int batch_size, int seq_len) {
 
 void BertCrf::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
-
+  std::cout << "000" << std::endl;
   before_forward(batch_size, seq_len);
-
+  std::cout << "111" << std::endl;
   /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
+  std::cout << "222" << std::endl;
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
+  std::cout << "333" << std::endl;
   lyr_norm_layer->forward();
+  std::cout << "666" << std::endl;
   linear_layer->forward();
+  std::cout << "777" << std::endl;
   crf_layer->forward();
+  std::cout << "888" << std::endl;
 
   set_output_shape(0, {batch_size, seq_len});
 }

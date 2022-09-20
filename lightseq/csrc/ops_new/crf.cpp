@@ -4,7 +4,7 @@ namespace lightseq {
 
 template <typename T>
 CRFOP<T>::CRFOP(int max_batch_tokens, int max_batch_size, int num_tags)
-    : Operator("crf"),
+    : Operator("CRFOP"),
       _max_batch_tokens(max_batch_tokens),
       _max_batch_size(max_batch_size),
       _num_tags(_num_tags) {
@@ -26,10 +26,10 @@ Variable* CRFOP<T>::operator()(Variable* start_transition,
   } else {
     throw std::runtime_error("output_decode_score not supported");
   }
-  Variable* best_score =
-      new Variable("best_score", _max_batch_size * sizeof(float));
-  this->set_children({best_tags, best_score});
-  return best_tags;
+  // Variable* best_score =
+  //     new Variable("best_score", _max_batch_size * sizeof(float));
+  // this->set_children({best_tags, best_score});
+  // return best_tags;
 }
 
 template <typename T>
