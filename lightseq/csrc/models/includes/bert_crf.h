@@ -6,6 +6,8 @@
 #include "launch_enc_emb_layer.h"
 #include "transformer_encoder_layer.h"
 #include "lyr_normalize_layer.h"
+#include "linear_layer.h"
+#include "crf_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -23,6 +25,8 @@ class BertCrf : public LSModel {
   LaunchEncEmbLayerPtr<OpType_> launch_enc_emb_layer;
   std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> lyr_norm_layer;
+  LinearLayerPtr<OpType_, OpType_> linear_layer;
+  CRFLayerPtr<OpType_> crf_layer;
 
   ContextPtr context_ptr;
 

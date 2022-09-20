@@ -53,12 +53,24 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
       max_batch_tokens, tw_._hidden_size));
   lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
+  // initial linear layer
+  linear_layer.reset(new LinearLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size, tw_._num_tags));
+  linear_layer->load_params(tw_.get_src_emb_wei(), 4);
+
+  // initial crf layer
+  crf_layer.reset(
+      new CRFLayer<OpType_>(max_batch_tokens, tw_._hidden_size, tw_._num_tags));
+  crf_layer->load_params(tw_.get_src_emb_wei(), 5);
+
   /* --- step.5 construct network --- */
   Variable *enc_emb = (*launch_enc_emb_layer)(inp_tokens, pad_mask);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
-  bert_out = (*lyr_norm_layer)(enc_emb);
+  enc_emb = (*lyr_norm_layer)(enc_emb);
+  enc_emb = (*linear_layer)(enc_emb);
+  bert_out = (*crf_layer)(enc_emb, pad_mask);
 }
 
 BertCrf::~BertCrf() { cuda_free(pad_mask_ptr); }
@@ -71,6 +83,9 @@ void BertCrf::before_forward(int batch_size, int seq_len) {
   }
 
   lyr_norm_layer->before_forward(batch_size * seq_len);
+
+  linear_layer->before_forward(batch_size, seq_len);
+  crf_layer->before_forward(batch_size, seq_len, false, false);
 }
 
 void BertCrf::Infer() {
@@ -84,8 +99,10 @@ void BertCrf::Infer() {
     iter->forward();
   }
   lyr_norm_layer->forward();
+  linear_layer->forward();
+  crf_layer->forward();
 
-  set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
+  set_output_shape(0, {batch_size, seq_len});
 }
 
 void BertCrf::set_input_ptr(int index, void *input_ptr) {
@@ -135,7 +152,7 @@ std::vector<int> BertCrf::get_input_max_shape(int index) {
 std::vector<int> BertCrf::get_output_max_shape(int index) {
   switch (index) {
     case 0:
-      return {_max_batch_size, tw_._max_step, tw_._hidden_size};
+      return {_max_batch_size, tw_._max_step};
 
     default:
       throw std::runtime_error("invalid output index");
@@ -158,12 +175,7 @@ DataType BertCrf::get_input_dtype(int index) {
 DataType BertCrf::get_output_dtype(int index) {
   switch (index) {
     case 0:
-#ifdef FP16_MODE
-      return DataType::kFloat16;
-#else
-      return DataType::kFloat32;
-#endif
-
+      return DataType::kInt32;
       break;
 
     default:

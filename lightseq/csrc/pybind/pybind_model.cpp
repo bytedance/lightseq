@@ -213,30 +213,13 @@ class PyBertCrf {
     model_->Infer();
 
     std::vector<int> output_shape = model_->get_output_shape(0);
-    auto output = py::array_t<float>(output_shape);
-    float *output_data = output.mutable_data(0, 0);
-    lightseq::cuda::DataType output_type = model_->get_output_dtype(0);
-    if (output_type == lightseq::cuda::kFloat32) {
-      const float *d_output =
-          static_cast<const float *>(model_->get_output_ptr(0));
+    auto output = py::array_t<int>(output_shape);
+    int *output_data = output.mutable_data(0, 0);
+    const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
 
-      CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
-                                 sizeof(float) * output.size(),
-                                 cudaMemcpyDeviceToHost));
-    } else if (output_type == lightseq::cuda::kFloat16) {
-      const half *d_output =
-          static_cast<const half *>(model_->get_output_ptr(0));
-      std::vector<half> h_bert_out(output.size());
-      CHECK_GPU_ERROR(cudaMemcpy(h_bert_out.data(), d_output,
-                                 sizeof(half) * output.size(),
-                                 cudaMemcpyDeviceToHost));
-      for (auto i = 0; i < h_bert_out.size(); i++) {
-        float f_data = __half2float(h_bert_out[i]);
-        output_data[i] = f_data;
-      }
-    } else {
-      throw std::runtime_error("Not supported output type");
-    }
+    CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
+                               sizeof(int) * output.size(),
+                               cudaMemcpyDeviceToHost));
 
     return output;
   }

@@ -47,6 +47,13 @@ if(USE_NEW_ARCH)
     endif()
   endif()
 
+  if(FP16_MODE)
+    add_definitions(-DFP16_MODE)
+    message(STATUS "Build using fp16 precision")
+  else()
+    message(STATUS "Build using fp32 precision")
+  endif()
+
   set(COMMON_HEADER_DIRS
       ${PROJECT_SOURCE_DIR}
       ${CUDA_PATH}/include
