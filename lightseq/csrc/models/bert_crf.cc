@@ -90,22 +90,17 @@ void BertCrf::before_forward(int batch_size, int seq_len) {
 
 void BertCrf::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
-  std::cout << "000" << std::endl;
+
   before_forward(batch_size, seq_len);
-  std::cout << "111" << std::endl;
+
   /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
-  std::cout << "222" << std::endl;
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
-  std::cout << "333" << std::endl;
   lyr_norm_layer->forward();
-  std::cout << "666" << std::endl;
   linear_layer->forward();
-  std::cout << "777" << std::endl;
   crf_layer->forward();
-  std::cout << "888" << std::endl;
 
   set_output_shape(0, {batch_size, seq_len});
 }
