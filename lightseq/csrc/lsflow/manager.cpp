@@ -3,6 +3,9 @@
 namespace lightseq {
 void MemoryManager::update_tensor_life_idx(int unique_id, int node_idx,
                                            size_t size, std::string name) {
+  if (size == 0) {
+    return;
+  }
   std::map<int, TensorUsage>::iterator iter = tensor_usages_.find(unique_id);
   if (iter == tensor_usages_.end()) {
     tensor_usages_.emplace(
@@ -20,19 +23,16 @@ void MemoryManager::update_tensor_life_idx(int unique_id, int node_idx,
 void MemoryManager::remove_life_cycle(int unique_id) {
   if (tensor_usages_.find(unique_id) != tensor_usages_.end()) {
     tensor_usages_.erase(unique_id);
+  } else {
+    printf("Can't find tensor %d in tensor_usages_!\n", unique_id);
   }
 }
 
 void MemoryManager::calculate_buffer_() {
-  if (buffer_ != nullptr) {
-    cudaFree(buffer_);
-  }
-
   printf("===== Execute MemoryManager calculate_buffer_ =====\n");
 
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
-  size_t tmp_buffer_size_ = 0;
   for (auto iter : tensor_usages_) {
     tensor_usages_vec.push_back(std::make_pair(iter.second, 0));
   }
@@ -90,13 +90,33 @@ void MemoryManager::calculate_buffer_() {
   }
 
   printf("total_consumption: %zu\n", total_consumption);
+  for (auto iter : buffer_vec_) {
+    cuda_free(iter);
+  }
+  buffer_vec_.clear();
 
-  buffer_ = cuda_malloc<char>(total_consumption);
-  buffer_size_ = total_consumption;
+  size_t max_last_addr = 0;
+  size_t record_last_addr = 0;
+  std::vector<std::pair<TensorUsage, size_t>> temp_usages_vec{};
 
-  for (auto iter : tensor_usages_vec) {
-    int unique_id = iter.first.unique_id;
-    tensor_ptr.emplace(unique_id, buffer_ + iter.second);
+  for (int i = 0; i < ordered_tensor_usages.size(); i++) {
+    max_last_addr =
+        std::max(max_last_addr, (size_t)(ordered_tensor_usages[i].first.size +
+                                         ordered_tensor_usages[i].second));
+    temp_usages_vec.push_back(ordered_tensor_usages[i]);
+    if ((i + 1 == ordered_tensor_usages.size()) ||
+        (max_last_addr == ordered_tensor_usages[i + 1].second)) {
+      char *current_buffer =
+          cuda_malloc<char>(max_last_addr - record_last_addr);
+      buffer_vec_.push_back(current_buffer);
+      for (auto iter : temp_usages_vec) {
+        int unique_id = iter.first.unique_id;
+        tensor_ptr.emplace(unique_id,
+                           current_buffer + iter.second - record_last_addr);
+      }
+      temp_usages_vec.clear();
+      record_last_addr = max_last_addr;
+    }
   }
 
   // Add algorithm check module
@@ -116,7 +136,7 @@ void MemoryManager::calculate_buffer_() {
     }
     return false;
   };
-  std::vector<std::pair<TensorUsage, size_t>> temp_check_vec{};
+  temp_usages_vec.clear();
   std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
@@ -128,18 +148,18 @@ void MemoryManager::calculate_buffer_() {
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
+    char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef DEBUG_TYPE
     printf(
         "idx: %d, life cycle : [%d, %d], name: %s\n"
         "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), iter.second, size, buffer_ + iter.second,
-        buffer_ + iter.second + size);
+        iter.first._name.c_str(), iter.second, size, addr, addr + size);
 #endif
   }
 
   for (auto iter : tensor_usages_vec) {
-    for (auto check_iter : temp_check_vec) {
+    for (auto check_iter : temp_usages_vec) {
       if (judge_func(check_iter, iter)) {
         continue;
       }
@@ -168,8 +188,10 @@ void MemoryManager::calculate_buffer_() {
       printf("================================\n");
       exit(-1);
     }
-    temp_check_vec.push_back(iter);
+    temp_usages_vec.push_back(iter);
   }
+
+  // exit(0);
 }
 
 }  // namespace lightseq
