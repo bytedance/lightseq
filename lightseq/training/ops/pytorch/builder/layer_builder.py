@@ -39,7 +39,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/lsflow/tensor.cpp",
             "csrc/ops_new/bias_act_dropout.cpp",
             "csrc/ops_new/bias_dropout_residual.cpp",
-            "csrc/ops_new/feed_forward.cpp",
+            "csrc/ops_new/linear.cpp",
             "csrc/ops_new/layer_normalize.cpp",
             "csrc/ops_new/strided_batch_gemm.cpp",
             "csrc/ops_new/bias_add_transform_20314.cpp",

@@ -1178,11 +1178,12 @@ def test_crf():
             seq_len,
             batch_size,
         )
-        return [best_score]
+        return [best_tags, best_score]
 
     def baseline():
         res, best_score = crf.decode(emissions, torch_mask, pad_tag=-1)
         return [
+            res.detach().to(torch.int32),
             best_score.detach().to(torch.float),
         ]
 
@@ -1707,7 +1708,7 @@ if __name__ == "__main__":
         # "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
-        "test_launch_bias_add_transform_20314_new",
+        # "test_launch_bias_add_transform_20314_new",
         # "test_launch_transform_20314_bwd_new",
         # "test_launch_fused_add2",
         # "test_launch_ffn_bias_bwd",
@@ -1735,5 +1736,6 @@ if __name__ == "__main__":
         # "test_torch_launch_ls_quantize",
         # "test_torch_launch_ls_dequantize",
         # "test_torch_launch_fake_quantize",
+        "test_crf",
     ]
     kt.run(kernel_list)

@@ -24,8 +24,8 @@ class CRFLayer : public Layer {
 
   int _seq_len;
   int _batch_size;
-  bool _forward_or_decode;    // ture for forward, false for decode
-  bool _output_decode_score;  // ture for output decode score
+  bool _forward_or_decode;    // true for forward, false for decode
+  bool _output_decode_score;  // true for output decode score
 
  public:
   CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size);
