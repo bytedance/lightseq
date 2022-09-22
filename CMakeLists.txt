@@ -40,11 +40,8 @@ if(USE_NEW_ARCH)
   set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 87)
 
   if(DEBUG_MODE)
-    if(FP16_MODE)
-      add_definitions(-DDEBUG_TYPE=FP16)
-    else()
-      add_definitions(-DDEBUG_TYPE=FP32)
-    endif()
+    add_definitions(-DDEBUG_MODE)
+    message(STATUS "Build using debug mode")
   endif()
 
   if(FP16_MODE)

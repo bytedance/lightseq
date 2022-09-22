@@ -91,5 +91,5 @@ class LayerBuilder(CUDAOpBuilder):
             "-g",
             "-Wno-reorder",
             "-DPYBIND_LAYER",
-            "-DDEBUG_TYPE=FP16",
+            # "-DDEBUG_MODE",
         ]

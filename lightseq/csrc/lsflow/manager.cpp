@@ -149,7 +149,7 @@ void MemoryManager::calculate_buffer_() {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
     char *addr = tensor_ptr.find(unique_id)->second;
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
     printf(
         "idx: %d, life cycle : [%d, %d], name: %s\n"
         "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",

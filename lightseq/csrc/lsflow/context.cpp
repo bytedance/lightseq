@@ -124,7 +124,7 @@ void Context::build() {
 
   for (Layer* rl : _root_layers) {
     rl->gather_root_leaf_var();
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
     printf("\n########## Context build layer %s forward ##########\n",
            rl->name().c_str());
 #endif
@@ -135,7 +135,7 @@ void Context::build() {
     printf("is training!\n");
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
       printf("\n########## Context build layer %s backward ##########\n",
              rl->name().c_str());
 #endif
@@ -147,7 +147,7 @@ void Context::build() {
   _mm_ptr->calculate_buffer_();
   _built = true;
 
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   draw_all_context();
 #endif
 
@@ -186,7 +186,7 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
     throw std::runtime_error(
         "The layer applied for registration has been occupied!\n");
   }
-#ifdef DEBUG_TYPE
+#ifdef DEBUG_MODE
   printf("regist_pybind_layer %s\n", full_name.c_str());
 #endif
   pybind_layers.emplace(full_name, layer_ptr);
