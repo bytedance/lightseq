@@ -64,10 +64,11 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
   // step 1. compute first step's score
   if (threadIdx.y == 0) {
     for (int cur_tag = threadIdx.x; cur_tag < num_tags; cur_tag += blockDim.x) {
-      T linear_bias = bias ? bias[cur_tag] : T(0);
+      float linear_bias = bias ? float(bias[cur_tag]) : float(0);
       s_score[cur_tag] =
-          emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)] +
-          linear_bias + start_transition[cur_tag];
+          float(
+              emission[flat_3dim(blockIdx.x, 0, cur_tag, seq_len, num_tags)]) +
+          linear_bias + float(start_transition[cur_tag]);
     }
   }
   b.sync();
@@ -93,11 +94,12 @@ __global__ void ker_viterbi(const T* start_transition, const T* end_transition,
       g.sync();
       warp_reduce_max(g, &max_score, &idx);
       if (threadIdx.x == 0) {
-        T linear_bias = bias ? bias[cur_tag] : T(0);
+        float linear_bias = bias ? float(bias[cur_tag]) : float(0);
         s_next_score[cur_tag] =
-            max_score + (float)(emission[flat_3dim(blockIdx.x, seq_idx, cur_tag,
-                                                   seq_len, num_tags)] +
-                                linear_bias);
+            max_score +
+            float(emission[flat_3dim(blockIdx.x, seq_idx, cur_tag, seq_len,
+                                     num_tags)]) +
+            linear_bias;
         history[flat_3dim(blockIdx.x, seq_idx - 1, cur_tag, seq_len,
                           num_tags)] = idx;
       }
