@@ -8,7 +8,8 @@ CRFOP<T>::CRFOP(int max_batch_tokens, int max_batch_size, int num_tags)
       _max_batch_tokens(max_batch_tokens),
       _max_batch_size(max_batch_size),
       _num_tags(num_tags) {
-  _history.reset(new Tensor("history", _max_batch_tokens * sizeof(int)));
+  _history.reset(
+      new Tensor("history", _max_batch_tokens * _num_tags * sizeof(int)));
 }
 
 template <typename T>
