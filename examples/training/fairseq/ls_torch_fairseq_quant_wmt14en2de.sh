@@ -11,7 +11,7 @@ fi
 
 lightseq-train /tmp/wmt14_en_de/ \
     --task translation \
-    --save-dir int4 \
+    --save-dir int4_2 \
     --finetune-from-model fp16/checkpoint_best.pt \
     --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
@@ -32,6 +32,8 @@ lightseq-train /tmp/wmt14_en_de/ \
     --quant-mode qat  \
     --keep-last-epochs 1 --max-epoch 300 \
     --n-gpus-intk 1 --n-gpus-intwhat 16 \
-    --quant-bits 4 --smooth-avg-update 200 $@
+    --quant-bits 4 --smooth-avg-update 200 \
+    --arch ls_transformer --lr-scheduler polynomial_decay \
+    --lr 5e-4 --total-num-update 200000 --end-learning-rate 1e-6 
 
 # --arch ls_transformer --lr-scheduler polynomial_decay

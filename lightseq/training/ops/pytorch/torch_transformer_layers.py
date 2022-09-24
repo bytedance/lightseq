@@ -23,6 +23,7 @@ from .quantization import (
     TensorQuantizer,
     act_quant_config,
     weight_quant_config,
+    relu_quant_config,
 )
 
 
@@ -90,9 +91,6 @@ class MultiheadAttention(nn.Module):
             # self.qkv_proj = Linear(embed_dim, 3*embed_dim, bias=bias)
             self.qkv_proj = QuantLinear(embed_dim, 3 * embed_dim, bias=bias, special=True)
 
-            self.attention_quant = (
-                TensorQuantizer(act_quant_config, special=True) if self.is_decoder else None
-            )
         elif self.encoder_decoder_attention and self.is_decoder:
             self.k_proj = QuantLinear(
                 self.kdim, embed_dim, pre_activation="encoder_out", bias=bias
@@ -103,6 +101,10 @@ class MultiheadAttention(nn.Module):
             self.q_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
 
         self.out_proj = QuantLinear(embed_dim, embed_dim, bias=bias)
+        self.probs_quant = TensorQuantizer(relu_quant_config, special=True)
+        self.q_quant = TensorQuantizer(act_quant_config, special=True)
+        self.k_quant = TensorQuantizer(act_quant_config, special=True)
+        self.v_quant = TensorQuantizer(act_quant_config, special=True)
 
         if add_bias_kv:
             self.bias_k = Parameter(torch.Tensor(1, 1, embed_dim))
@@ -219,6 +221,12 @@ class MultiheadAttention(nn.Module):
             q = self.q_proj(query)
             k = self.k_proj(key)
             v = self.v_proj(value)
+
+        q = self.q_quant(q)
+        if key is not None:
+            k = self.k_quant(k)
+            v = self.v_quant(v)
+
         q = q * self.scaling
 
         if self.bias_k is not None:
@@ -366,6 +374,7 @@ class MultiheadAttention(nn.Module):
         attn_weights_float = util.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
+        attn_weights_float = self.probs_quant(attn_weights_float)
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = self.dropout_module(attn_weights)
 

@@ -44,7 +44,8 @@ class QuantLinear(Linear):
             self.input_quant = TensorQuantizer(input_quant_config, special=special)
         self.output_quant = None
         # if pre_activation is None:
-        self.output_quant = TensorQuantizer(out_quant_config, special=special)
+        # self.output_quant = TensorQuantizer(out_quant_config, special=special)
+        self.output_quant = None
         self.weight_quant = TensorQuantizer(weight_quant_config, special="weight")
 
     def forward(self, input):
