@@ -40,23 +40,14 @@ class QuantLinear(Linear):
             input_quant_config = act_quant_config
 
         self.input_quant = None
-        if pre_activation != "encoder_out":
-            self.input_quant = TensorQuantizer(input_quant_config, special=special)
-        self.output_quant = None
-        # if pre_activation is None:
-        # self.output_quant = TensorQuantizer(out_quant_config, special=special)
-        self.output_quant = None
+        self.input_quant = TensorQuantizer(input_quant_config, special=special)
         self.weight_quant = TensorQuantizer(weight_quant_config, special="weight")
 
     def forward(self, input):
-        qinput = input
-        if self.input_quant is not None:
-            qinput = self.input_quant(input)
-
+        qinput = self.input_quant(input)
         qweight = self.weight_quant(self.weight)
+
         output = F.linear(qinput, qweight)
-        if self.output_quant is not None:
-            output = self.output_quant(output)
         if self.bias is not None:
             output = output + self.bias
 
