@@ -3,13 +3,12 @@ set(operator_files
     bias_add_transform_20314.cpp
     bias_dropout_residual.cpp
     dropout.cpp
-    linear.cpp
+    feed_forward.cpp
     launch_enc_emb.cpp
     layer_normalize.cpp
     softmax.cpp
     strided_batch_gemm.cpp
-    transform_0213.cpp
-    crf.cpp)
+    transform_0213.cpp)
 
 add_library(lightseq_operators STATIC ${operator_files})
 target_link_libraries(lightseq_operators PUBLIC cuda_kernels -lcublas lsflow)

@@ -13,8 +13,7 @@ set(cuda_kernel_files
     softmax_kernels.cu
     softmax_kernels_new.cu
     transform_kernels.cu
-    transform_kernels_new.cu
-    crf.cu)
+    transform_kernels_new.cu)
 
 add_library(cuda_kernels STATIC ${cuda_kernel_files})
 target_include_directories(cuda_kernels INTERFACE includes)

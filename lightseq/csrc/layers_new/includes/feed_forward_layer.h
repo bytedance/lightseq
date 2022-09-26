@@ -1,7 +1,7 @@
 #pragma once
 #include "bias_act_dropout.h"
 #include "bias_dropout_residual.h"
-#include "linear.h"
+#include "feed_forward.h"
 #include "layer_normalize.h"
 #include "layer.h"
 
@@ -12,9 +12,9 @@ class FeedForwardLayer : public Layer {
  private:
   // operators
   LayerNormalizeOp<T1, T2>* _ffn_ln = nullptr;
-  LinearOp<T1, T2>* _ff1 = nullptr;
+  FeedForwardOp<T1, T2>* _ff1 = nullptr;
   BiasActDropoutOp<T1, T2>* _ffn_activation_dropout = nullptr;
-  LinearOp<T1, T2>* _ff2 = nullptr;
+  FeedForwardOp<T1, T2>* _ff2 = nullptr;
   BiasDropoutResOp<T1, T2>* _ffn_dropout = nullptr;
 
   // parameters

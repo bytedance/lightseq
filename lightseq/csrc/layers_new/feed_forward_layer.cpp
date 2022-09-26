@@ -21,13 +21,13 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
 
       // operators
       _ffn_ln(new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)),
-      _ff1(new LinearOp<T1, T2>(max_batch_tokens, intermediate_size,
-                                hidden_size)),
+      _ff1(new FeedForwardOp<T1, T2>(max_batch_tokens, intermediate_size,
+                                     hidden_size)),
       _ffn_activation_dropout(new BiasActDropoutOp<T1, T2>(
           activation_dropout_ratio, max_batch_tokens * intermediate_size,
           activation_fn)),
-      _ff2(new LinearOp<T1, T2>(max_batch_tokens, hidden_size,
-                                intermediate_size)),
+      _ff2(new FeedForwardOp<T1, T2>(max_batch_tokens, hidden_size,
+                                     intermediate_size)),
       _ffn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters node

@@ -19,8 +19,8 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
-      _q_linear(
-          new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
+      _q_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, hidden_size,
+                                          hidden_size)),
       _bias_add_transform_20314_q(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 1)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
@@ -35,8 +35,8 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
           CUBLAS_OP_N)),
       _transform_0213(
           new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
-      _attn_out_linear(
-          new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
+      _attn_out_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, hidden_size,
+                                                 hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters

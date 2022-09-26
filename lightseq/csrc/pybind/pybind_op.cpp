@@ -109,8 +109,8 @@ void feed_forward_fw(const torch::Tensor& inp, const torch::Tensor& weights,
   Variable* inp_var = new Variable("inp", (char*)inp_ptr);
   Variable* weight_var = new Variable("weights", (char*)weights_ptr);
 
-  LinearOp<T1, T2>* op =
-      new LinearOp<T1, T2>(batch_tokens, output_dim, input_dim);
+  FeedForwardOp<T1, T2>* op =
+      new FeedForwardOp<T1, T2>(batch_tokens, output_dim, input_dim);
 
   Variable* op_out = (*op)(inp_var, weight_var);
 

@@ -471,66 +471,20 @@ __global__ void transform4d_0213(T *output, const T *input, int batch_size,
   res4[trg_offset] = input4[offset];
 }
 
-/**
-@brief: transform4d_0213_slow
-Reshape the input matrix to merge the heads
-Not use float4 for dim % 4 != 0 or dim % 8 != 0
-
-@thread
-gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
-blockDim.x = max_block_thread
-
-@param
-input: [trans_count, batch_size, nhead, seq_len, head_dim]
-output: [batch_size, seq_len, trans_count, nhead, head_dim]
-batch_size: the size of the current batch
-seq_len: the sequence length of the current batch
-hidden_dim: dim of the hidden tensor
-nhead: number of attention heads
-trans_count: 1 or 3, the count of matrice need to be transformed
-*/
-template <typename T>
-__global__ void transform4d_0213_slow(T *output, const T *input, int batch_size,
-                                      int seq_len, int trans_count, int nhead,
-                                      int head_dim, int num_all) {
-  int offset = blockIdx.x * blockDim.x + threadIdx.x;
-  if (offset >= num_all) {
-    return;
-  }
-  int trans_id, batch_id, head_id, token_id, dim_id;
-  decompose_5dim(offset, batch_size, nhead, seq_len, head_dim, &trans_id,
-                 &batch_id, &head_id, &token_id, &dim_id);
-  // [b, s, tc, nh, ad]
-  int trg_offset = flat_5dim(batch_id, token_id, trans_id, head_id, dim_id,
-                             seq_len, trans_count, nhead, head_dim);
-
-  output[trg_offset] = input[offset];
-}
-
 // [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
 template <>
 void launch_transform4d_0213<float>(float *output, const float *input,
                                     int batch_size, int seq_len, int hidden_dim,
                                     int nhead, int trans_count,
                                     cudaStream_t stream) {
-  if ((hidden_dim / nhead) % 4 == 0) {
-    hidden_dim >>= 2;
-    int head_dim = hidden_dim / nhead;
-    int num_all = batch_size * seq_len * trans_count * hidden_dim;
-    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  hidden_dim >>= 2;
+  int head_dim = hidden_dim / nhead;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
 
-    transform4d_0213<float><<<nblock, MAX_THREADS, 0, stream>>>(
-        output, input, batch_size, seq_len, trans_count, nhead, head_dim,
-        num_all);
-  } else {
-    int head_dim = hidden_dim / nhead;
-    int num_all = batch_size * seq_len * trans_count * hidden_dim;
-    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-
-    transform4d_0213_slow<float><<<nblock, MAX_THREADS, 0, stream>>>(
-        output, input, batch_size, seq_len, trans_count, nhead, head_dim,
-        num_all);
-  }
+  transform4d_0213<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim,
+      num_all);
 }
 
 template <>
@@ -538,24 +492,14 @@ void launch_transform4d_0213<__half>(__half *output, const __half *input,
                                      int batch_size, int seq_len,
                                      int hidden_dim, int nhead, int trans_count,
                                      cudaStream_t stream) {
-  if ((hidden_dim / nhead) % 8 == 0) {
-    hidden_dim >>= 3;
-    int head_dim = hidden_dim / nhead;
-    int num_all = batch_size * seq_len * trans_count * hidden_dim;
-    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  hidden_dim >>= 3;
+  int head_dim = hidden_dim / nhead;
+  int num_all = batch_size * seq_len * trans_count * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
 
-    transform4d_0213<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-        output, input, batch_size, seq_len, trans_count, nhead, head_dim,
-        num_all);
-  } else {
-    int head_dim = hidden_dim / nhead;
-    int num_all = batch_size * seq_len * trans_count * hidden_dim;
-    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-
-    transform4d_0213_slow<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-        output, input, batch_size, seq_len, trans_count, nhead, head_dim,
-        num_all);
-  }
+  transform4d_0213<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      output, input, batch_size, seq_len, trans_count, nhead, head_dim,
+      num_all);
 }
 
 /**

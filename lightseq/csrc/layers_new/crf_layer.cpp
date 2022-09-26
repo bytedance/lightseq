@@ -3,7 +3,9 @@
 namespace lightseq {
 
 template <typename T>
-CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
+CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size,
+                      const T* start_transition, const T* end_transition,
+                      const T* transition)
     : Layer("CRFLayer"),
       _num_tags(num_tags),
       _max_batch_tokens(max_batch_tokens),
@@ -11,21 +13,20 @@ CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
   // operators node
   _crf_op = new CRFOP<T>(max_batch_tokens, max_batch_size, num_tags);
   // parameters node
-  _linear_b = new Variable("linear_b");
-  _start_transition = new Variable("start_transition");
-  _end_transition = new Variable("end_transition");
-  _transition = new Variable("transition");
-
+  _start_transition = new Variable(this->_name + ":start_transition",
+                                   (const char*)start_transition);
+  _end_transition = new Variable(this->_name + ":end_transition",
+                                 (const char*)end_transition);
+  _transition =
+      new Variable(this->_name + ":transition", (const char*)transition);
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T>
-Variable* CRFLayer<T>::operator()(Variable* emission, Variable* mask) {
-  LAYER_PRE_INPUTS({emission, mask});
-  Variable* crf_out = (*_crf_op)(_start_transition, _end_transition,
-                                 _transition, emission, mask, _linear_b);
-  LAYER_POST_OUTPUTS({crf_out});
-  return crf_out;
+std::vector<Variable*> CRFLayer<T>::operator()(Variable* emission,
+                                               Variable* mask) {
+  return (*_crf_op)(_start_transition, _end_transition, _transition, emission,
+                    mask);
 }
 
 template <typename T>
@@ -41,16 +42,6 @@ void CRFLayer<T>::before_backward() {
   throw std::runtime_error("CRF not support backward currently!");
 }
 
-template <typename T>
-int CRFLayer<T>::load_params(const std::vector<const T*>& para_vec,
-                             int offset) {  // for inference
-  int size = 0;
-  _linear_b->set_value((char*)para_vec[offset + size]), size++;
-  _start_transition->set_value((char*)para_vec[offset + size]), size++;
-  _end_transition->set_value((char*)para_vec[offset + size]), size++;
-  _transition->set_value((char*)para_vec[offset + size]), size++;
-
-  return size;
-}
+template class CRFLayer<__half>;
 
 }  // namespace lightseq

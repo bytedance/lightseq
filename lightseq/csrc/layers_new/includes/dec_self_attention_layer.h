@@ -3,7 +3,7 @@
 #include "bias_add_transform_20314.h"
 #include "bias_dropout_residual.h"
 #include "dropout.h"
-#include "linear.h"
+#include "feed_forward.h"
 #include "layer_normalize.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
@@ -18,14 +18,14 @@ class DecSelfAttentionLayer : public Layer {
  private:
   // operators
   LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
-  LinearOp<T1, T2>* _qkv_linear = nullptr;
+  FeedForwardOp<T1, T2>* _qkv_linear = nullptr;
   BiasAddTrans20314<T1, T2>* _bias_add_transform_20314 = nullptr;
   StridedBatchGemmOp<T1, T2>* _attn_scores = nullptr;
   SoftmaxOp<T1, T2>* _softmax = nullptr;
   DropoutOp<T1, T2>* _attn_prob_dropout = nullptr;
   StridedBatchGemmOp<T1, T2>* _attn_context = nullptr;
   Transform0213<T1, T2>* _transform_0213 = nullptr;
-  LinearOp<T1, T2>* _attn_out_linear = nullptr;
+  FeedForwardOp<T1, T2>* _attn_out_linear = nullptr;
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
   LaunchConcat3Dim1<T1, T2>* _deal_cache_k = nullptr;
   LaunchConcat3Dim1<T1, T2>* _deal_cache_v = nullptr;

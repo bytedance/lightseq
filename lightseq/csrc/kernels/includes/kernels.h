@@ -228,7 +228,7 @@ void launch_viterbi(const T *start_transition, const T *end_transition,
                     const T *transition, const T *emission, const uint8_t *mask,
                     float *best_score, int *history, int *best_tags,
                     int num_tags, int seq_len, int batch_size,
-                    cudaStream_t stream, const T *bias = nullptr);
+                    cudaStream_t stream);
 
 template <typename T>
 void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,

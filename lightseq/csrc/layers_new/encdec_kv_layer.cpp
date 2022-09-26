@@ -13,8 +13,8 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int layer_id,
       _heads(num_heads),
       _nshared_layer(nshared_layer),
       // operators
-      _kv_linear(
-          new LinearOp<T1, T2>(max_batch_tokens, 2 * hidden_size, hidden_size)),
+      _kv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 2 * hidden_size,
+                                           hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 2)) {
   // parameters

@@ -148,13 +148,13 @@ void MemoryManager::calculate_buffer_() {
   for (auto iter : tensor_usages_vec) {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
-    char *addr = tensor_ptr.find(unique_id)->second;
-#ifdef DEBUG_MODE
+#ifdef DEBUG_TYPE
     printf(
         "idx: %d, life cycle : [%d, %d], name: %s\n"
         "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), iter.second, size, addr, addr + size);
+        iter.first._name.c_str(), iter.second, size, buffer_ + iter.second,
+        buffer_ + iter.second + size);
 #endif
   }
 

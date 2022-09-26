@@ -15,7 +15,7 @@ class CRFOP : public Operator {
   int _max_batch_tokens;
   int _max_batch_size;
 
-  bool _forward_or_decode;  // true for forward, false for decode
+  bool _forward_or_decode;  // ture for forward, false for decode
   bool _output_decode_score;
   TensorPtr _history;
 
@@ -24,9 +24,10 @@ class CRFOP : public Operator {
 
   virtual ~CRFOP() {}
 
-  Variable* operator()(Variable* start_transition, Variable* end_transition,
-                       Variable* transition, Variable* emission, Variable* mask,
-                       Variable* bias);
+  std::vector<Variable*> operator()(Variable* start_transition,
+                                    Variable* end_transition,
+                                    Variable* transition, Variable* emission,
+                                    Variable* mask);
 
   void before_forward(int batch_size, int seq_len, bool forward_or_decode,
                       bool output_decode_score);
