@@ -36,7 +36,7 @@ using namespace std;
     exit(-1);                                                       \
   }
 
-int RUN_WITH_A100 = 1;
+int SM_GREATER_THAN_80 = 1;
 string gemm_test_result = "";
 char tmp_cstr[1024];
 string tmp_str;
@@ -424,7 +424,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   cublasLtMatrixTransformDesc_t transformDesc = NULL;
   int ldaTransform = 32 * m;
   int ldbTransform;
-  if (RUN_WITH_A100 == 0)
+  if (SM_GREATER_THAN_80 == 0)
     ldbTransform = 32 * roundoff(n, 8);
   else
     ldbTransform = 32 * roundoff(n, 32);
@@ -449,7 +449,7 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
                                    &order_COL32, sizeof(order_COL32));
 
   cublasLtMatrixLayoutCreate(&BtransformDesc, CUDA_R_8I, n, k, ldbTransform);
-  if (RUN_WITH_A100 == 0)
+  if (SM_GREATER_THAN_80 == 0)
     cublasLtMatrixLayoutSetAttribute(
         BtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
         sizeof(order_COL4_4R2_8C));
@@ -626,8 +626,8 @@ int LtIgemmCustomFindINT8OutputCOL32_2R_4R4(
   for (int i = 0; i < AlgoCount; i++) {
     memset(tmp_cstr, 0, sizeof tmp_cstr);
     sprintf(tmp_cstr, "INT8 NT-gemm %s INT8 IO cublasLt %03d : ",
-            RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
-                          : "CUBLASLT_ORDER_COL4_4R2_8C",
+            SM_GREATER_THAN_80 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                               : "CUBLASLT_ORDER_COL4_4R2_8C",
             i);
     tmp_str = string(tmp_cstr);
     gemm_test_result += tmp_str;
@@ -678,7 +678,7 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
   cublasLtMatrixTransformDesc_t transformDesc = NULL;
   int ldaTransform = 32 * m;
   int ldbTransform;
-  if (RUN_WITH_A100 == 0)
+  if (SM_GREATER_THAN_80 == 0)
     ldbTransform = 32 * roundoff(n, 8);
   else
     ldbTransform = 32 * roundoff(n, 32);
@@ -714,7 +714,7 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
                                    &order_COL32, sizeof(order_COL32));
 
   cublasLtMatrixLayoutCreate(&BtransformDesc, CUDA_R_8I, n, k, ldbTransform);
-  if (RUN_WITH_A100 == 0)
+  if (SM_GREATER_THAN_80 == 0)
     cublasLtMatrixLayoutSetAttribute(
         BtransformDesc, CUBLASLT_MATRIX_LAYOUT_ORDER, &order_COL4_4R2_8C,
         sizeof(order_COL4_4R2_8C));
@@ -805,8 +805,8 @@ void int8gemm_with_cublasLtMatmul_ORDER_COL32_2R_4R4(
     sprintf(tmp_cstr,
             "INT8 NT-gemm with B = %s cublasLtMatmul INT8 output "
             "best algo %d exec_time %f(ms)\n",
-            RUN_WITH_A100 ? "CUBLASLT_ORDER_COL32_2R_4R4"
-                          : "CUBLASLT_ORDER_COL4_4R2_8C",
+            SM_GREATER_THAN_80 ? "CUBLASLT_ORDER_COL32_2R_4R4"
+                               : "CUBLASLT_ORDER_COL4_4R2_8C",
             INT8_gemm_cublasLt_INT8Output_best_algo.algoId, time_used);
     tmp_str = string(tmp_cstr);
     gemm_test_result += tmp_str;
@@ -1238,9 +1238,9 @@ string launch_gemm_test(int m, int n, int k) {
   gemm_test_result += tmp_str;
 
   if (devProp.major == 7 && devProp.minor == 5) {
-    RUN_WITH_A100 = 0;
+    SM_GREATER_THAN_80 = 0;
   } else if (devProp.major >= 8) {
-    RUN_WITH_A100 = 1;
+    SM_GREATER_THAN_80 = 1;
   } else {
     throw std::runtime_error("This device does not support INT8 gemm.");
   }

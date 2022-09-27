@@ -9,7 +9,19 @@ cublasAlgoMap::cublasAlgoMap(const std::string filename)
   loadGemmConfig();
 }
 
-cublasAlgoMap::cublasAlgoMap() : _config_filename(IGEMM_SM80_CONFIG) {
+cublasAlgoMap::cublasAlgoMap() {
+  std::string gpu_name = getGPUName();
+  if (gpu_name == "T4") {
+    _config_filename = IGEMM_T4_CONFIG;
+  } else if (gpu_name == "A100") {
+    _config_filename = IGEMM_A100_CONFIG;
+  } else if (gpu_name == "A30") {
+    _config_filename = IGEMM_A30_CONFIG;
+  } else if (gpu_name == "A10") {
+    _config_filename = IGEMM_A10_CONFIG;
+  } else {
+    _config_filename = "";
+  }
   loadGemmConfig();
 }
 
@@ -37,6 +49,7 @@ void cublasAlgoMap::loadGemmConfig() {
     printf("[ERROR] fgets fail at %s:%d \n", __FILE__, __LINE__);
     exit(-1);
   }
+  std::cout << "Load igemm config from " << _config_filename << std::endl;
   while (fscanf(fd, "%d %d %d %s | %d %d %d %d %d %d %d %d | %f %f %f %d\n", &m,
                 &n, &k, &data_order, &algoId, &tile, &splitK_val,
                 &reductionScheme, &swizzle, &customOption, &stages,

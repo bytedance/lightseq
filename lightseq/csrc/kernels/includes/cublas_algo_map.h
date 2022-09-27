@@ -14,10 +14,14 @@
 #include <cuda_runtime.h>
 #include <cublasLt.h>
 #include "kernels.h"
+#include "cuda_util.h"
 
 #define STRIDE 32
 #define BORDER 512
-#define IGEMM_SM80_CONFIG "/tmp/igemm_configs/igemm_sm80.cfg"
+#define IGEMM_T4_CONFIG "/tmp/igemm_configs/igemm_T4.cfg"
+#define IGEMM_A100_CONFIG "/tmp/igemm_configs/igemm_A100.cfg"
+#define IGEMM_A30_CONFIG "/tmp/igemm_configs/igemm_A30.cfg"
+#define IGEMM_A10_CONFIG "/tmp/igemm_configs/igemm_A10.cfg"
 
 typedef struct {
   int algoId, customOption, tile, splitK_val, swizzle, reductionScheme,

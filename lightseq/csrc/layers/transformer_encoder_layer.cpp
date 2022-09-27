@@ -83,7 +83,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     const T *gemmQKV_inp_ptr =
         _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-    // use best gemm algo
+    // TODO: use best gemm algo
     // cublasLtMatmulAlgo_info qkv_algo_info =
     //     _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
     // std::vector<LSLayout> qkv_layout = getLSLayout(qkv_algo_info.dataOrder);
