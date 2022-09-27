@@ -1,35 +1,31 @@
-FROM quay.io/pypa/manylinux_2_24_x86_64
+FROM quay.io/pypa/manylinux2014_x86_64
 
+RUN yum -y install yum-utils && yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo && \
+    yum install --setopt=obsoletes=0 -y \
+    # base
+    cuda-cudart-11-3-11.3.58-1 \
+    cuda-compat-11-3 \
+    # runtime
+    cuda-libraries-11-3-11.3.0-1 \
+    cuda-nvtx-11-3-11.3.58-1 \
+    libnpp-11-3-11.3.3.44-1 \
+    libcublas-11-3-11.4.2.10064-1 \
+    libnccl-2.9.6-1+cuda11.3 \
+    # devel
+    cuda-nvml-devel-11-3-11.3.58-1 \
+    cuda-command-line-tools-11-3-11.3.0-1 \
+    libcublas-devel-11-3-11.4.2.10064-1 \
+    cuda-cudart-devel-11-3-11.3.58-1 \
+    cuda-libraries-devel-11-3-11.3.0-1 \
+    cuda-minimal-build-11-3-11.3.0-1 \
+    cuda-nvprof-11-3-11.3.58-1 \
+    libnpp-devel-11-3-11.3.3.44-1 \
+    libnccl-devel-2.9.6-1+cuda11.3 \
+    && ln -s cuda-11.3 /usr/local/cuda \
+    && yum clean all \
+    && rm -rf /var/cache/yum/*
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gnupg2 curl ca-certificates build-essential \
-    python3-dev \
-    python3-pip \
-    python3-setuptools \
-    python3-wheel \
-    automake \
-    libtool \
-    curl \
-    make \
-    g++ \
-    unzip \
-    sshpass \
-    software-properties-common \
-    dirmngr\
-    apt-transport-https \
-    lsb-release \
-    ca-certificates \
-    openssh-client && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN curl -O -L -C - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
-    mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
-    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /" && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    cuda-toolkit-11-3 && \
-    rm -rf /var/lib/apt/lists/*
-
+RUN yum install -y yum-plugin-versionlock && yum versionlock libcublas11
 
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
@@ -60,12 +56,6 @@ RUN curl -O -L -C - \
     cd hdf5-hdf5-1_12_0 && \
     ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
     make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
-
-# install rapidjson
-RUN curl -L -o rapidjson.tar.gz -C - https://github.com/Tencent/rapidjson/archive/refs/tags/v1.1.0.tar.gz && \
-    tar xf rapidjson.tar.gz && rm rapidjson.tar.gz && \
-    mkdir rapidjson-1.1.0/build && cd rapidjson-1.1.0/build && \
-    cmake .. && make install && cd ../.. && rm -rf rapidjson-1.1.0
 
 ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:${PATH}
