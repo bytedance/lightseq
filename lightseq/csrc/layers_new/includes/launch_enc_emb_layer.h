@@ -52,7 +52,7 @@ class LaunchEncEmbLayer : public Layer {
   int load_params(const std::vector<const T*>& para_vec, int offset) {
     _token_emb->set_value((char*)para_vec[offset]);
     _pos_emb->set_value((char*)para_vec[offset + 1]);
-    _lang_emb->set_value((char*)para_vec[offset + 4]);
+    // _lang_emb->set_value((char*)para_vec[offset + 4]);
     return 0;
   }
 };

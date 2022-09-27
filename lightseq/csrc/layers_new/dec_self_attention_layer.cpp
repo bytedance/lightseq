@@ -19,8 +19,8 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
-      _qkv_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, 3 * hidden_size,
-                                            hidden_size)),
+      _qkv_linear(
+          new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 3)),
       _deal_cache_k(new LaunchConcat3Dim1<T1, T2>(num_heads, hidden_size)),
@@ -37,8 +37,8 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
           CUBLAS_OP_N)),
       _transform_0213(
           new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
-      _attn_out_linear(new FeedForwardOp<T1, T2>(max_batch_tokens, hidden_size,
-                                                 hidden_size)),
+      _attn_out_linear(
+          new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters
