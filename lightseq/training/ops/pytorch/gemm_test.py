@@ -76,10 +76,8 @@ def extract(outputs):
                 col32_algo_info.fp16_time / col32_algo_info.int8_time
             )
             col_algo_info.speedup = col_algo_info.fp16_time / col_algo_info.int8_time
-            if col32_algo_info.int8_time < col_algo_info.int8_time:
-                best_gemm_algos.append(deepcopy(col32_algo_info))
-            else:
-                best_gemm_algos.append(deepcopy(col_algo_info))
+            best_gemm_algos.append(deepcopy(col32_algo_info))
+            best_gemm_algos.append(deepcopy(col_algo_info))
         elif line.startswith("m "):
             shape = tuple([int(s.split()[1]) for s in line.split(";")])
             col32_algo_info.shape = shape
@@ -117,10 +115,11 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
 
     best_gemm_algos = extract(all_outputs)
     for d in best_gemm_algos:
-        d_str = "{:>5d} {:>5d} {:>5d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}".format(
+        d_str = "{:>5d} {:>5d} {:>5d} {:>27} | {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d} | {:.4f} {:.4f} {:.2f} {:>2d}".format(
             d.shape[0],
             d.shape[1],
             d.shape[2],
+            d.data_order,
             d.algo_id,
             d.tile,
             d.splitk,
@@ -133,7 +132,6 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
             d.int8_time,
             d.speedup,
             d.sm,
-            d.data_order,
         )
         output_cfg_str.append((d.shape[0], d.shape[1], d.shape[2], d_str))
 

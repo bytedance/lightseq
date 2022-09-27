@@ -22,12 +22,14 @@
 typedef struct {
   int algoId, customOption, tile, splitK_val, swizzle, reductionScheme,
       workspaceSize, stages;
+  float fp16_time, int8_time, speedup;
   std::string dataOrder;
 } cublasLtMatmulAlgo_info;
 
 class cublasAlgoMap {
  private:
-  std::map<std::vector<int>, cublasLtMatmulAlgo_info> _algo_map;
+  std::map<std::vector<int>, std::map<std::string, cublasLtMatmulAlgo_info> >
+      _algo_map;
   std::string _config_filename;
 
  public:
@@ -38,5 +40,7 @@ class cublasAlgoMap {
 
   void loadGemmConfig();
   bool isExist(int m, int n, int k);
+  cublasLtMatmulAlgo_info findBestAlgo(
+      std::map<std::string, cublasLtMatmulAlgo_info> mp);
   cublasLtMatmulAlgo_info getAlgo(int m, int n, int k);
 };

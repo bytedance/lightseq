@@ -37,23 +37,24 @@ void cublasAlgoMap::loadGemmConfig() {
     printf("[ERROR] fgets fail at %s:%d \n", __FILE__, __LINE__);
     exit(-1);
   }
-  while (fscanf(fd, "%d %d %d %d %d %d %d %d %d %d %d %f %f %f %d %s\n", &m, &n,
-                &k, &algoId, &tile, &splitK_val, &reductionScheme, &swizzle,
-                &customOption, &stages, &workspaceSize, &fp16_time, &int8_time,
-                &speedup, &sm, &data_order) != EOF) {
+  while (fscanf(fd, "%d %d %d %s | %d %d %d %d %d %d %d %d | %f %f %f %d\n", &m,
+                &n, &k, &data_order, &algoId, &tile, &splitK_val,
+                &reductionScheme, &swizzle, &customOption, &stages,
+                &workspaceSize, &fp16_time, &int8_time, &speedup, &sm) != EOF) {
     std::string dataOrder(data_order);
     std::vector<int> mnk = {m, n, k};
-    if (_algo_map.find(mnk) == _algo_map.end()) {
-      _algo_map[mnk].algoId = algoId;
-      _algo_map[mnk].customOption = customOption;
-      _algo_map[mnk].tile = tile;
-      _algo_map[mnk].splitK_val = splitK_val;
-      _algo_map[mnk].swizzle = swizzle;
-      _algo_map[mnk].reductionScheme = reductionScheme;
-      _algo_map[mnk].workspaceSize = workspaceSize;
-      _algo_map[mnk].stages = stages;
-      _algo_map[mnk].dataOrder = dataOrder;
-    }
+    _algo_map[mnk][dataOrder].algoId = algoId;
+    _algo_map[mnk][dataOrder].customOption = customOption;
+    _algo_map[mnk][dataOrder].tile = tile;
+    _algo_map[mnk][dataOrder].splitK_val = splitK_val;
+    _algo_map[mnk][dataOrder].swizzle = swizzle;
+    _algo_map[mnk][dataOrder].reductionScheme = reductionScheme;
+    _algo_map[mnk][dataOrder].workspaceSize = workspaceSize;
+    _algo_map[mnk][dataOrder].stages = stages;
+    _algo_map[mnk][dataOrder].dataOrder = dataOrder;
+    _algo_map[mnk][dataOrder].fp16_time = fp16_time;
+    _algo_map[mnk][dataOrder].int8_time = int8_time;
+    _algo_map[mnk][dataOrder].speedup = speedup;
   }
   fclose(fd);
 }
@@ -67,17 +68,30 @@ bool cublasAlgoMap::isExist(int m, int n, int k) {
   return _algo_map.find(mnk) != _algo_map.end();
 }
 
+cublasLtMatmulAlgo_info cublasAlgoMap::findBestAlgo(
+    std::map<std::string, cublasLtMatmulAlgo_info> mp) {
+  cublasLtMatmulAlgo_info best_algo = mp.begin()->second;
+  for (auto algo : mp) {
+    if (algo.second.int8_time < best_algo.int8_time) {
+      best_algo = algo.second;
+    }
+  }
+  return best_algo;
+}
+
 cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k) {
   std::vector<int> mnk = {m, n, k};
-  if (_algo_map.find(mnk) != _algo_map.end()) return _algo_map[mnk];
+  if (_algo_map.find(mnk) != _algo_map.end()) {
+    return findBestAlgo(_algo_map[mnk]);
+  }
 
   if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
   mnk = {m, n, k};
   if (_algo_map.find(mnk) != _algo_map.end()) {
-    return _algo_map[mnk];
+    return findBestAlgo(_algo_map[mnk]);
   } else {
     cublasLtMatmulAlgo_info tmp_algo;
-    tmp_algo.algoId = static_cast<int>(CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    tmp_algo.algoId = -1;
     tmp_algo.customOption = -1;
     tmp_algo.tile = -1;
     tmp_algo.splitK_val = -1;
