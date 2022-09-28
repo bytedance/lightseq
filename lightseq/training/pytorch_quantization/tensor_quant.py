@@ -380,7 +380,7 @@ class FakeTensorQuantFunctionX(Function):
         #     _amax = amax[None,None,:] if inputs.dim() == 3 else amax[None,:]
         # else:
         #     _amax = amax
-        _amax = amax + torch.randn(1)[0] * 1e-3 if (training and special != 'weight') else amax
+        _amax = amax + torch.randn(1)[0] * 1e-2 if (training and special != 'weight') else amax
         outputs, scale = _tensor_quant(inputs, _amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
