@@ -54,7 +54,7 @@ def enable_int4(m):
         m.enable()
         m.enable_quant()
         m.disable_calib()
-        m.num_bits = 4.0 if m.special == "weight" else 8.0
+        m.num_bits = 4.0
 
 
 enable_bits = {
@@ -233,10 +233,11 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 m.smooth_avg = smooth_avg_update
                 # m.fab = (args.fa, fb)
                 m.fa_t = args.faa
-                if m.special == "weight":
-                    m.num_bits = args.quant_bits
-                else:
-                    m.num_bits = 8
+                m.num_bits = args.quant_bits
+#                 if m.special == "weight":
+#                     m.num_bits = args.quant_bits
+#                 else:
+#                     m.num_bits = 8
 
         if args.enable_quant:
             encoder.apply(enable_tensorQuantizer)
