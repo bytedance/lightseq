@@ -49,12 +49,19 @@ def enable_int6(m):
         m.num_bits = 6.0
 
 
+def get_bits(m):
+    if m.special == "embed":
+        return 8.0
+    else:
+        return 4.0
+
+
 def enable_int4(m):
     if isinstance(m, TensorQuantizer):
         m.enable()
         m.enable_quant()
         m.disable_calib()
-        m.num_bits = 4.0
+        m.num_bits = get_bits(m)
 
 
 enable_bits = {
@@ -233,11 +240,12 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 m.smooth_avg = smooth_avg_update
                 # m.fab = (args.fa, fb)
                 m.fa_t = args.faa
-                m.num_bits = args.quant_bits
-#                 if m.special == "weight":
-#                     m.num_bits = args.quant_bits
-#                 else:
-#                     m.num_bits = 8
+                # m.num_bits = args.quant_bits
+                m.num_bits = get_bits(m)
+                # if m.special != "embed":
+                #     m.num_bits = args.quant_bits
+                # else:
+                #     m.num_bits = 8
 
         if args.enable_quant:
             encoder.apply(enable_tensorQuantizer)
