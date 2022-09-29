@@ -17,7 +17,7 @@ typedef struct {
 } cublasLtMatmulAlgo_info;
 
 /**
- * @brief cublasLt imma gemm for i8 in i32 out
+ * @brief cublasLt igemm using COL32 with i32 out
  *
  * @param res int32 output
  * @param batchCount batch for batched gemm
@@ -119,7 +119,7 @@ void cublasLtMM_withAlgo(int* res, int batchCount, int m, int n, int k,
 }
 
 /**
- * @brief cublasLt imma gemm for i8 in i8 out
+ * @brief cublasLt igemm using COL32 with i8 out
  *
  * @param res
  * @param batchCount
@@ -271,7 +271,7 @@ void cublasLtMM_withAlgo_i8IO(int8_t* res, int batchCount, int m, int n, int k,
 }
 
 /**
- * @brief cublasLt gemm without imma
+ * @brief cublasLt igemm using COL
  *
  * @tparam OutType output dtype
  * @tparam ScaleType scale dtype
