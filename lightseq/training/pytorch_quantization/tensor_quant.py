@@ -18,6 +18,7 @@
 
 """Basic tensor quantization functions"""
 import numpy as np
+from torch._C import device
 import yaml
 
 import logging
@@ -387,7 +388,7 @@ class FakeTensorQuantFunctionX(Function):
                 amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[k])
             else:
                 x = inputs[0]
-                mask = (torch.rand(x.shape) > 0.1).float()
+                mask = (torch.rand(x.shape, device=x.device) > 0.1).float()
                 x = mask * x
                 amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(x)
         return outputs
