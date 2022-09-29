@@ -375,12 +375,8 @@ class FakeTensorQuantFunctionX(Function):
         is_weight=False,
         special=None,
     ):
-        # ctx.save_for_backward(inputs, amax)
-        # if is_embed:
-        #     _amax = amax[None,None,:] if inputs.dim() == 3 else amax[None,:]
-        # else:
-        #     _amax = amax
-        _amax = amax + torch.randn(1)[0] * 1e-5 if (training and special != 'weight') else amax
+        _amax = amax
+        # _amax = amax + torch.randn(1)[0] * 1e-5 if (training and special != 'weight') else amax
         outputs, scale = _tensor_quant(inputs, _amax, num_bits, unsigned, narrow_range)
         if unsigned:
             outputs += (2.0 ** (num_bits - 1)) - 1.0
@@ -390,7 +386,10 @@ class FakeTensorQuantFunctionX(Function):
                 k = random.randint(0, inputs.shape[0] - 1)
                 amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[k])
             else:
-                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
+                x = inputs[0]
+                mask = (torch.rand(x.shape) > 0.3).float()
+                x = mask * x
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(x)
         return outputs
 
     @staticmethod
