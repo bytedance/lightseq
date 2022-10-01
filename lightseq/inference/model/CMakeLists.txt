@@ -41,7 +41,7 @@ endif()
 target_include_directories(mt5_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(quant_transformer_files quant_decoder.cc.cu quant_encoder.cc.cu
-                            cublas_helper.cc)
+                            cublas_helper.cc cublas_algo_map.cc)
 add_library(quant_transformer_model STATIC ${quant_transformer_files})
 target_link_libraries(quant_transformer_model PUBLIC cuda_kernels)
 target_link_libraries(quant_transformer_model PUBLIC quant_transformer_weight)

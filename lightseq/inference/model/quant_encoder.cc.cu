@@ -41,7 +41,8 @@ QuantEncoder<OpType_>::QuantEncoder(int max_batch_size, int *p_d_token_id,
 
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
-      _max_thread_per_block(1024) {
+      _max_thread_per_block(1024),
+      _algo_map(cublasAlgoMap()) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
 
@@ -287,7 +288,7 @@ void QuantEncoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _batch_token_num, _tw._hidden_size, 0, 0, 0,
       _enc_clip_max[_layer_id * 12] * _enc_clip_max[_layer_id * 12 + 4] /
           (_enc_clip_max[_layer_id * 12 + 8] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
   // get q, k, v by split and reshape qkv
 
@@ -334,7 +335,7 @@ void QuantEncoder<OpType_>::self_attention() {
       1, _tw._hidden_size, _batch_token_num, _tw._hidden_size, 0, 0, 0,
       _enc_clip_max[_layer_id * 12 + 1] * _enc_clip_max[_layer_id * 12 + 5] /
           (_enc_clip_max[_layer_id * 12 + 9] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
   ker_residual_bias_ln_i8I_i8O_launcher<_DataType>(
       _int8_ffn_out_buf, _p_device_wei[_weight_offset + 6],
@@ -354,7 +355,7 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
       1, _tw._inner_size, _batch_token_num, _tw._hidden_size, 0, 0, 0,
       _enc_clip_max[_layer_id * 12 + 2] * _enc_clip_max[_layer_id * 12 + 6] /
           (_enc_clip_max[_layer_id * 12 + 10] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(
@@ -374,7 +375,8 @@ void QuantEncoder<OpType_>::ffn_add_norm() {
   /* ---step 2. second ffn layer--- */
   cublaslt_gemm(_int8_p_d_enc_wei[_layer_id * 4 + 3], _int8_ffn_in_buf,
                 _int32_ffn_out_buf, 1, _tw._hidden_size, _batch_token_num,
-                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream,
+                _algo_map);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max, dequant_scale;

@@ -5,6 +5,7 @@
 #include <cublasLt.h>
 
 #include "transformerKernels_int8.h"
+#include "cublas_algo_map.h"
 
 namespace lightseq {
 namespace cuda {
@@ -38,6 +39,13 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
                    int64_t stridea, int64_t strideb, int64_t stridec,
                    const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
                    cudaStream_t stream);
+
+template <typename OutType, typename ScaleType>
+void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
+                   OutType* output_c, int batch_count, int m, int n, int k,
+                   int64_t stridea, int64_t strideb, int64_t stridec,
+                   const ScaleType alpha, cublasLtHandle_t cublasLt_handle,
+                   cudaStream_t stream, cublasAlgoMap& algo_map);
 
 inline int round_up(int v, int d) { return (v + d - 1) / d * d; }
 

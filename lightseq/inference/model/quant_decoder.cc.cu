@@ -58,7 +58,8 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
       _h_unfinished(1),
-      _is_benchmark(false) {
+      _is_benchmark(false),
+      _algo_map(cublasAlgoMap()) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
   }
@@ -530,7 +531,7 @@ bool QuantDecoder<OpType_>::run_step() {
                 _tw._trg_vocab_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
                 _output_ln_clip_max * _trg_emb_clip_max /
                     (_logits_clip_max * _quant_range),
-                _cublas_lt_handle, _stream);
+                _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -634,7 +635,7 @@ void QuantDecoder<OpType_>::self_attention() {
       _tw._hidden_size * 3, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19] * _dec_clip_max[_layer_id * 19 + 6] /
           (_dec_clip_max[_layer_id * 19 + 12] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "self qkv(head): ", 5);
@@ -696,7 +697,7 @@ void QuantDecoder<OpType_>::self_attention() {
       1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 1] * _dec_clip_max[_layer_id * 19 + 7] /
           (_dec_clip_max[_layer_id * 19 + 13] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "self attn ffn out w/o bias(head): ", 40);
@@ -730,7 +731,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 2] * _dec_clip_max[_layer_id * 19 + 8] /
           (_dec_clip_max[_layer_id * 19 + 14] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "encdec q(head): ", 5);
@@ -799,7 +800,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 3] * _dec_clip_max[_layer_id * 19 + 9] /
           (_dec_clip_max[_layer_id * 19 + 15] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "encdec attn ffn out w/o bias(head): ", 3);
@@ -837,7 +838,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
       1, _tw._inner_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 4] * _dec_clip_max[_layer_id * 19 + 10] /
           (_dec_clip_max[_layer_id * 19 + 16] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(
@@ -863,7 +864,8 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
   cublaslt_gemm(_int8_p_d_dec_wei[_layer_id * 6 + 5], _int8_ffn_in_buf,
                 _int32_ffn_out_buf, 1, _tw._hidden_size, _step_token_num,
-                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream,
+                _algo_map);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max, dequant_scale;
