@@ -437,7 +437,7 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
   if (algo_info.algoId != -1) {
     cublasLtMatmulAlgo_t algo;
     char* workSpace = NULL;
-    int workspaceSize = algo_info.workspaceSize;
+    int workspaceSize = sizeof(char) * algo_info.workspaceSize;
     cublasLtMatmulAlgoInit(cublasLt_handle, compute_type, CUDA_R_32F, CUDA_R_8I,
                            CUDA_R_8I, CUDA_R_8I, CUDA_R_8I, algo_info.algoId,
                            &algo);
@@ -460,7 +460,7 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
                                          &(algo_info.stages),
                                          sizeof(algo_info.stages));
     if (workspaceSize != 0) {
-      cudaMalloc((void**)&workSpace, sizeof(char) * workspaceSize);
+      cudaMalloc((void**)&workSpace, workspaceSize);
     }
 
     ScaleType beta = ScaleType(0);
