@@ -436,8 +436,6 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
 
   if (algo_info.algoId != -1) {
     cublasLtMatmulAlgo_t algo;
-    char* workSpace = NULL;
-    int workspaceSize = sizeof(char*) * algo_info.workspaceSize;
     cublasLtMatmulAlgoInit(cublasLt_handle, compute_type, CUDA_R_32F, CUDA_R_8I,
                            CUDA_R_8I, CUDA_R_8I, CUDA_R_8I, algo_info.algoId,
                            &algo);
@@ -459,15 +457,12 @@ void cublaslt_gemm(const int8_t* input_a, const int8_t* input_b,
     cublasLtMatmulAlgoConfigSetAttribute(&algo, CUBLASLT_ALGO_CONFIG_STAGES_ID,
                                          &(algo_info.stages),
                                          sizeof(algo_info.stages));
-    if (workspaceSize != 0) {
-      cudaMalloc((void**)&workSpace, workspaceSize);
-    }
 
     ScaleType beta = ScaleType(0);
-    CHECK_GPU_ERROR(cublasLtMatmul(cublasLt_handle, matmul_desc, &alpha,
-                                   input_a, desc_a, input_b, desc_b, &beta,
-                                   output_c, desc_c, output_c, desc_c, &algo,
-                                   workSpace, workspaceSize, stream));
+    CHECK_GPU_ERROR(cublasLtMatmul(
+        cublasLt_handle, matmul_desc, &alpha, input_a, desc_a, input_b, desc_b,
+        &beta, output_c, desc_c, output_c, desc_c, &algo,
+        algo_map.get_workspace(), algo_map.get_workspace_size(), stream));
   } else {
     ScaleType beta = ScaleType(0);
     CHECK_GPU_ERROR(cublasLtMatmul(

@@ -32,7 +32,10 @@ cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map)
     : _config_filename(algo_map._config_filename),
       _algo_map(algo_map._algo_map) {}
 
-cublasAlgoMap::~cublasAlgoMap() { _algo_map.clear(); }
+cublasAlgoMap::~cublasAlgoMap() {
+  _algo_map.clear();
+  CHECK_GPU_ERROR(cudaFree(_workspace));
+}
 
 void cublasAlgoMap::loadGemmConfig() {
   FILE* fd;
@@ -52,6 +55,7 @@ void cublasAlgoMap::loadGemmConfig() {
     printf("[ERROR] fgets fail at %s:%d \n", __FILE__, __LINE__);
     exit(-1);
   }
+  _workspace_size = 0;
   std::cout << "Load igemm config from " << _config_filename << std::endl;
   while (fscanf(fd, "%d %d %d %s | %d %d %d %d %d %d %d %d | %f %f %f %d\n", &m,
                 &n, &k, &data_order, &algoId, &tile, &splitK_val,
@@ -71,8 +75,13 @@ void cublasAlgoMap::loadGemmConfig() {
     _algo_map[mnk][dataOrder].fp16_time = fp16_time;
     _algo_map[mnk][dataOrder].int8_time = int8_time;
     _algo_map[mnk][dataOrder].speedup = speedup;
+    _workspace_size = std::max(_workspace_size, workspaceSize);
   }
   fclose(fd);
+  if (_workspace_size > 0) {
+    CHECK_GPU_ERROR(
+        cudaMalloc((void**)&_workspace, sizeof(char*) * _workspace_size));
+  }
 }
 
 bool cublasAlgoMap::isExist(int m, int n, int k) {
@@ -132,6 +141,10 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
     return defaultAlgo();
   }
 }
+
+char* cublasAlgoMap::get_workspace() { return _workspace; }
+
+int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
 
 }  // namespace cuda
 }  // namespace lightseq
