@@ -387,10 +387,7 @@ class FakeTensorQuantFunctionX(Function):
                 k = random.randint(0, inputs.shape[0] - 1)
                 amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[k])
             else:
-                x = inputs[0]
-                mask = (torch.rand(x.shape, device=x.device) > 0.975).float()
-                x = mask * x
-                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(x)
+                amax.data = amax * (1 - smooth_avg) + smooth_avg * torch.max(inputs[0])
         return outputs
 
     @staticmethod

@@ -50,10 +50,7 @@ def enable_int6(m):
 
 
 def get_bits(m):
-    if m.special == "embed":
-        return 8.0
-    else:
-        return 4.0
+    return 4.0
 
 
 def enable_int4(m):

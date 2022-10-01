@@ -30,8 +30,9 @@ lightseq-train /tmp/wmt14/ \
     --finetune-from-model fp16/checkpoint_best.pt \
     --quant-mode qat --quant-bits 4 \
     --n-gpus-intwhat 16 \
-    --max-epoch 160 --keep-last-epochs 1 \
-    --smooth-avg-update 200 $@
+    --max-epoch 160 --keep-last-epochs 1 $@
+
+# --smooth-avg-update 200 $@
 
 # --arch ls_transformer --lr 5e-4 --lr-scheduler inverse_sqrt 
 # --arch ls_transformer --lr 5e-4 --lr-scheduler polynomial_decay --total-num-update 150000 --end-learning-rate 1e-6
