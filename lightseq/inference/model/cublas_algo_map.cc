@@ -79,8 +79,8 @@ void cublasAlgoMap::loadGemmConfig() {
   }
   fclose(fd);
   if (_workspace_size > 0) {
-    CHECK_GPU_ERROR(
-        cudaMalloc((void**)&_workspace, sizeof(char*) * _workspace_size));
+    _workspace_size = sizeof(char*) * _workspace_size;
+    CHECK_GPU_ERROR(cudaMalloc((void**)&_workspace, _workspace_size));
   }
 }
 
