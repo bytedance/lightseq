@@ -14,7 +14,7 @@ lightseq-train /tmp/wmt14/ \
     --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
     --clip-norm 0.0 \
-    --warmup-updates 4000 --weight-decay 0.0001 \
+    --warmup-updates 4000 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
     --max-tokens 8192 \
     --eval-bleu \
@@ -30,9 +30,9 @@ lightseq-train /tmp/wmt14/ \
     --finetune-from-model fp16/checkpoint_best.pt \
     --quant-mode qat --quant-bits 4 \
     --n-gpus-intwhat 16 \
-    --max-epoch 160 --keep-last-epochs 1 $@
+    --max-epoch 160 --keep-last-epochs 1 --smooth-avg-update 200 $@
 
-# --smooth-avg-update 200 $@
+# --weight-decay 0.0001
 
 # --arch ls_transformer --lr 5e-4 --lr-scheduler inverse_sqrt 
 # --arch ls_transformer --lr 5e-4 --lr-scheduler polynomial_decay --total-num-update 150000 --end-learning-rate 1e-6
