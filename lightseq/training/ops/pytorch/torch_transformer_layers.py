@@ -11,6 +11,7 @@ from typing import Dict, Optional, List
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter, LayerNorm, Dropout
+import torch.nn.functional as F
 
 from lightseq.training.ops.pytorch import util
 from lightseq.training.ops.pytorch.layer_base import (
@@ -1031,8 +1032,10 @@ class TransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
         self.config = config
 
     def forward(self, input, step=0):
-        x = self.emb_lookup(input)
-        x = self.emb_quant(x)
+        qw = self.emb_quant(self.emb_lookup.weight)
+        x = F.embedding(input, qw)
+        # x = self.emb_lookup(input)
+        # x = self.emb_quant(x)
         x = self.embed_scale * x
         x += self.embed_positions(input, step)
         if self.layernorm_embedding is not None:
