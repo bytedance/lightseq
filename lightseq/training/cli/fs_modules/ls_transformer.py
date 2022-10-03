@@ -244,6 +244,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
                 # else:
                 #     m.num_bits = 8
 
+        # if args.enable_quant:
         if args.enable_quant:
             encoder.apply(enable_tensorQuantizer)
             decoder.apply(enable_tensorQuantizer)
@@ -328,21 +329,21 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
             #     dist.all_reduce(value.data, op=dist.ReduceOp.SUM)
 
     def forward(self, src_tokens, prev_output_tokens, features_only=False, **kwargs):
-        if self.params_clip is None:
-            self.params_clip, self.buffer = self.get_params()
+        # if self.params_clip is None:
+        #     self.params_clip, self.buffer = self.get_params()
 
-        if self.training:
-            if self.last_model is False:
-                rank = int(dist.get_rank())
-                if rank < self.args.n_gpus_intk:
-                    self.apply(enable_bits[self.args.n_gpus_intwhat])
-            self.last_model = True
-        else:
-            if self.last_model is True:
-                self.apply(enable_int4)
-                logger.info("avg_clip_max")
-                self.avg_clip_max(self.params_clip)
-            self.last_model = False
+        # if self.training:
+        #     if self.last_model is False:
+        #         rank = int(dist.get_rank())
+        #         if rank < self.args.n_gpus_intk:
+        #             self.apply(enable_bits[self.args.n_gpus_intwhat])
+        #     self.last_model = True
+        # else:
+        #     if self.last_model is True:
+        #         self.apply(enable_int4)
+        #         # logger.info("avg_clip_max")
+        #         # self.avg_clip_max(self.params_clip)
+        #     self.last_model = False
 
         encoder_out = self.encoder(src_tokens)
         decoder_out = self.decoder(

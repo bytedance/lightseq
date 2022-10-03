@@ -14,16 +14,16 @@ from lightseq.training.pytorch_quantization.nn.modules.tensor_quantizer import (
 
 
 act_quant_config = QuantDescriptor(
-    num_bits=8, narrow_range=True, learn_amax=False, amax=16.0
+    num_bits=8, narrow_range=True, learn_amax=True, amax=16.0
 )
 out_quant_config = QuantDescriptor(
-    num_bits=8, narrow_range=True, learn_amax=False, amax=16.0
+    num_bits=8, narrow_range=True, learn_amax=True, amax=16.0
 )
 relu_quant_config = QuantDescriptor(
-    num_bits=8, narrow_range=True, learn_amax=False, amax=16.0, unsigned=True
+    num_bits=8, narrow_range=True, learn_amax=True, amax=16.0, unsigned=True
 )
 weight_quant_config = QuantDescriptor(
-    num_bits=8, narrow_range=True, learn_amax=False, amax=1.0
+    num_bits=8, narrow_range=True, learn_amax=True, amax=1.0
 )
 
 

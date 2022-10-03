@@ -528,6 +528,86 @@ class FakeAffineTensorQuantFunction(Function):
         return grad_inputs, None, None, None
 
 
+import math
+
+num_bit = 4
+max_bound = 2 ** (num_bit - 1) - 1
+# min_bound = -max_bound
+
+class FunLSQ(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, weight, alpha, Qn, Qp):
+        g = 1.0 / math.sqrt(weight.numel() * Qp)
+        assert alpha > 0, 'alpha = {}'.format(alpha)
+        ctx.save_for_backward(weight, alpha)
+        ctx.other = g, Qn, Qp
+        q_w = (weight / alpha).round().clamp(Qn, Qp)
+        w_q = q_w * alpha
+        return w_q
+
+    @staticmethod
+    def backward(ctx, grad_weight):
+        weight, alpha = ctx.saved_tensors
+        g, Qn, Qp = ctx.other
+        q_w = weight / alpha
+        indicate_small = (q_w < Qn).float()
+        indicate_big = (q_w > Qp).float()
+        indicate_middle = 1.0 - indicate_small - indicate_big
+        grad_alpha = ((indicate_small * Qn + indicate_big * Qp + indicate_middle * (
+                -q_w + q_w.round())) * grad_weight * g).sum().unsqueeze(dim=0)
+        grad_weight = indicate_middle * grad_weight
+        return grad_weight, grad_alpha, None, None
+
+
+class FunPACT(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, weight, amin, amax, unsigned=False):
+        if unsigned:
+            Qn, Qp = 0., max_bound * 2
+        else:
+            Qn, Qp = -max_bound, max_bound
+        scale = amax / Qp
+        assert amax > 0, 'amax = {}'.format(amax)
+        ctx.save_for_backward(weight, amax)
+        ctx.other = Qn, Qp
+        q_w = (weight / scale).round().clamp(Qn, Qp)
+        w_q = q_w * scale
+        return w_q
+
+    @staticmethod
+    def backward(ctx, grad_weight):
+        weight, amax = ctx.saved_tensors
+        Qn, Qp = ctx.other
+        scale = amax / Qp
+        q_w = weight / scale
+        indicate_small = (q_w < Qn).float()
+        indicate_big = (q_w > Qp).float()
+        indicate_middle = 1.0 - indicate_small - indicate_big
+        grad_weight = indicate_middle * grad_weight
+
+        grad_min = (
+            (grad_weight * (1.0 - indicate_small)).sum().to(amax.dtype)
+            if amax.requires_grad
+            else None
+        )
+        grad_max = (
+            (grad_weight * (1.0 - indicate_big)).sum().to(amax.dtype)
+            if amax.requires_grad
+            else None
+        )
+        return grad_weight, grad_min, grad_max, None, None, None
+
+
+def fun_lsq(x, amax, unsigned=False):
+    if unsigned:
+        Qn, Qp = 0., max_bound * 2
+    else:
+        Qn, Qp = -max_bound, max_bound
+    scale = amax / Qp
+    x = FunLSQ.apply(x, scale, Qn, Qp)
+    return x
+
+
 tensor_quant = TensorQuantFunction.apply
 fake_tensor_quant = FakeTensorQuantFunction.apply
 fake_tensor_quantx = FakeTensorQuantFunctionX.apply

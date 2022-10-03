@@ -27,6 +27,7 @@ from lightseq.training.pytorch_quantization.tensor_quant import (
     tensor_quant,
     fake_tensor_quant,
     fake_tensor_quantx,
+    fun_lsq,
 )
 from lightseq.training.pytorch_quantization.nn.modules.clip import Clip
 
@@ -344,7 +345,7 @@ class TensorQuantizer(nn.Module):
 
     def _quant_forward(self, inputs):
         """Quantized forward pass."""
-        inputs = self.clip(inputs)
+        # inputs = self.clip(inputs)
 
         # amax = self.clip.clip_value_maxs if self.is_embed else self.clip.clip_value_max
         amax = self.clip.clip_value_max
@@ -354,23 +355,24 @@ class TensorQuantizer(nn.Module):
         # a = self.fa_t * factor
         # fa, fb = 1 + a, a * 4
         
-        self.train_step += 1
+        # self.train_step += 1
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                outputs = fake_tensor_quantx(
-                    inputs, 
-                    amax, 
-                    self._num_bits, 
-                    self._unsigned, 
-                    self._narrow_range, 
-                    self.training,
-                    self.smooth_avg,
-                    # self.fab,
-                    (1, 1),
-                    self.is_weight,
-                    self.special,
-                )
+                outputs = fun_lsq(inputs, amax, self._unsigned)
+                # fake_tensor_quantx(
+                #     inputs, 
+                #     amax, 
+                #     self._num_bits, 
+                #     self._unsigned, 
+                #     self._narrow_range, 
+                #     self.training,
+                #     self.smooth_avg,
+                #     # self.fab,
+                #     (1, 1),
+                #     self.is_weight,
+                #     self.special,
+                # )
             else:
                 if inputs.dtype == torch.half or amax.dtype == torch.half:
                     raise Exception(
