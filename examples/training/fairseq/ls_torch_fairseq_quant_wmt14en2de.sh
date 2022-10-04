@@ -11,11 +11,11 @@ fi
 
 lightseq-train /tmp/wmt14_en_de/ \
     --task translation \
-    --save-dir int4 \
+    --save-dir int4_pact_endebase \
     --finetune-from-model fp16/checkpoint_best.pt \
     --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
-    --lr-scheduler inverse_sqrt --lr 5e-4 \
+    --lr-scheduler polynomial_decay --total-num-update 200000 --end-learning-rate 1e-6 --lr 5e-4 \
     --clip-norm 0.0 \
     --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \

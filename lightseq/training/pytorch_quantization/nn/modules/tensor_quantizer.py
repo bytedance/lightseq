@@ -28,6 +28,7 @@ from lightseq.training.pytorch_quantization.tensor_quant import (
     fake_tensor_quant,
     fake_tensor_quantx,
     fun_lsq,
+    fun_pact,
 )
 from lightseq.training.pytorch_quantization.nn.modules.clip import Clip
 
@@ -359,7 +360,8 @@ class TensorQuantizer(nn.Module):
 
         if self._fake_quant:
             if not TensorQuantizer.use_fb_fake_quant:
-                outputs = fun_lsq(inputs, amax, self._unsigned)
+                # outputs = fun_lsq(inputs, amax, self._unsigned)
+                outputs = fun_pact(inputs, -amax, amax, self._unsigned)
                 # fake_tensor_quantx(
                 #     inputs, 
                 #     amax, 

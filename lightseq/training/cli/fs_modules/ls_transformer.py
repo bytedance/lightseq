@@ -371,9 +371,18 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         for n, v in self.named_parameters():
             if n.endswith("clip_value_max"):
                 params.append(v)
+                print(n, v)
         len_params = len(params)
         buffer = torch.zeros(len_params).to(params[0].data)
         return params, buffer
+
+    def upgrade_state_dict_named(self, state_dict, name):
+        name_ls = []
+        for k, v in state_dict.items():
+            if k.endswith("clip_value_max"):
+                name_ls.append(k)
+        for k in name_ls:
+            state_dict.pop(k)
 
 
 class LSTransformerEncoder(FairseqEncoder):

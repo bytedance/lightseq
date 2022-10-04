@@ -568,30 +568,29 @@ class FunPACT(torch.autograd.Function):
             Qn, Qp = -max_bound, max_bound
         scale = amax / Qp
         assert amax > 0, 'amax = {}'.format(amax)
-        ctx.save_for_backward(weight, amax)
         ctx.other = Qn, Qp
-        q_w = (weight / scale).round().clamp(Qn, Qp)
+        s_w = weight / scale
+        ctx.save_for_backward(s_w, amax)
+        q_w = (s_w).round().clamp(Qn, Qp)
         w_q = q_w * scale
         return w_q
 
     @staticmethod
     def backward(ctx, grad_weight):
-        weight, amax = ctx.saved_tensors
+        s_w, amax = ctx.saved_tensors
         Qn, Qp = ctx.other
-        scale = amax / Qp
-        q_w = weight / scale
-        indicate_small = (q_w < Qn).float()
-        indicate_big = (q_w > Qp).float()
+        indicate_small = (s_w < Qn).float()
+        indicate_big = (s_w > Qp).float()
         indicate_middle = 1.0 - indicate_small - indicate_big
         grad_weight = indicate_middle * grad_weight
 
         grad_min = (
-            (grad_weight * (1.0 - indicate_small)).sum().to(amax.dtype)
+            (grad_weight * indicate_small).sum().to(amax.dtype)
             if amax.requires_grad
             else None
         )
         grad_max = (
-            (grad_weight * (1.0 - indicate_big)).sum().to(amax.dtype)
+            (grad_weight * indicate_big).sum().to(amax.dtype)
             if amax.requires_grad
             else None
         )
@@ -607,7 +606,7 @@ def fun_lsq(x, amax, unsigned=False):
     x = FunLSQ.apply(x, scale, Qn, Qp)
     return x
 
-
+fun_pact = FunPACT.apply
 tensor_quant = TensorQuantFunction.apply
 fake_tensor_quant = FakeTensorQuantFunction.apply
 fake_tensor_quantx = FakeTensorQuantFunctionX.apply
