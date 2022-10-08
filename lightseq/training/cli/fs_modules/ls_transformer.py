@@ -335,7 +335,7 @@ class LSTransformerModel(FairseqEncoderDecoderModel):
         if self.training:
             if self.last_model is False:
                 rank = int(dist.get_rank())
-                if rank < self.args.n_gpus_intk:
+                if rank < 1:
                     self.apply(enable_bits[16])
             self.last_model = True
         else:
