@@ -13,7 +13,7 @@ lightseq-train /tmp/wmt14/ \
     --save-dir int4 \
     --share-decoder-input-output-embed \
     --optimizer ls_adam --adam-betas '(0.9, 0.98)' \
-    --lr 5e-4 --lr-scheduler polynomial_decay --total-num-update 300000 --end-learning-rate 1e-6 \
+    --lr-scheduler inverse_sqrt --save-interval-updates 3000 --keep-interval-updates 1 \
     --clip-norm 0.0 \
     --warmup-updates 4000 --weight-decay 0.0001 \
     --criterion ls_label_smoothed_cross_entropy --label-smoothing 0.1 \
