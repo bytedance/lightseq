@@ -35,6 +35,8 @@ class cublasAlgoMap {
   std::map<std::vector<int>, std::map<std::string, cublasLtMatmulAlgo_info> >
       _algo_map;
   std::string _config_filename;
+  int _workspace_size;
+  char* _workspace = NULL;
 
  public:
   explicit cublasAlgoMap(const std::string filename);
@@ -44,7 +46,12 @@ class cublasAlgoMap {
 
   void loadGemmConfig();
   bool isExist(int m, int n, int k);
+  cublasLtMatmulAlgo_info defaultAlgo();
   cublasLtMatmulAlgo_info findBestAlgo(
-      std::map<std::string, cublasLtMatmulAlgo_info> mp);
-  cublasLtMatmulAlgo_info getAlgo(int m, int n, int k);
+      std::map<std::string, cublasLtMatmulAlgo_info> mp,
+      std::string data_order);
+  cublasLtMatmulAlgo_info getAlgo(int m, int n, int k,
+                                  std::string data_order = "");
+  char* get_workspace();
+  int get_workspace_size();
 };

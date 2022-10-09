@@ -83,34 +83,19 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     const T *gemmQKV_inp_ptr =
         _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
 
-    // TODO: use best gemm algo
-    // cublasLtMatmulAlgo_info qkv_algo_info =
-    //     _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
-    // std::vector<LSLayout> qkv_layout = getLSLayout(qkv_algo_info.dataOrder);
-    // launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(),
-    // _igemm_alpha_ptr,
-    //                    gemmQKV_inp_ptr, _attn_qkv_cmax_ptr, _batch_tokens,
-    //                    _hidden_size, 2, _stream, qkv_layout[0]);
-    // launch_quantize<T>(qweight_ptr, _attn_prob_dropout.get_mask(), nullptr,
-    //                    _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1, 3 *
-    //                    _hidden_size, _hidden_size, 4, _stream,
-    //                    qkv_layout[1]);
-
-    // _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-    // _igemm_alpha_ptr,
-    //                     _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream,
-    //                     qkv_algo_info);
-
+    cublasLtMatmulAlgo_info qkv_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
+    std::vector<LSLayout> qkv_layout = getLSLayout(qkv_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(), _igemm_alpha_ptr,
-                       gemmQKV_inp_ptr, _attn_qkv_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
-
+                       gemmQKV_inp_ptr, _attn_qkv_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, qkv_layout[0]);
     launch_quantize<T>(qweight_ptr, _attn_prob_dropout.get_mask(), nullptr,
-                       _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1,
-                       _hidden_size * 3 * _hidden_size, 4, _stream);
+                       _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1, 3 * _hidden_size,
+                       _hidden_size, 4, _stream, qkv_layout[1]);
 
     _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
-                        _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
+                        _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream,
+                        qkv_algo_info, _algo_map);
 
     const T *attn_qkv_cache_cmax =
         _mask_future_tokens ? _attn_qkv_cache_cmax_ptr : nullptr;
@@ -118,8 +103,8 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     launch_quant_bias_add_transform_20314<T>(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
         _attn_qkv_cmax_ptr + 2, _batch_size, _seq_len, 3, _heads,
-        _hidden_size / _heads, _stream, attn_qkv_cache_cmax);
-
+        _hidden_size / _heads, _stream, attn_qkv_cache_cmax,
+        qkv_layout[2] == kCol32);
   } else {
     if (_pre_or_postLayerNorm) {
       _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
@@ -163,22 +148,23 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
                                _hidden_size, _heads, 1, _stream);
 
+    cublasLtMatmulAlgo_info attn_out_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size, _hidden_size);
+    std::vector<LSLayout> attn_out_layout =
+        getLSLayout(attn_out_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _attn_dropout.get_mask(), _igemm_alpha_ptr,
-                       _attn_o_inp_ptr, _attn_out_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
-
+                       _attn_o_inp_ptr, _attn_out_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, attn_out_layout[0]);
     launch_quantize<T>(qweight_ptr, _attn_dropout.get_mask(), nullptr,
-                       _attn_ow_ptr, _attn_out_cmax_ptr + 1,
-                       _hidden_size * _hidden_size, 4, _stream);
-
-    _attn_out_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-                             _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
-                             _cublasLtHandle, _stream);
+                       _attn_ow_ptr, _attn_out_cmax_ptr + 1, _hidden_size,
+                       _hidden_size, 4, _stream, attn_out_layout[1]);
+    _attn_out_linear.Forward(
+        _batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr, _igemm_beta_ptr,
+        qout_ptr, _cublasLtHandle, _stream, attn_out_algo_info, _algo_map);
 
     _attn_dropout.quant_bias_dropout_residual(
         output_ptr, qout_ptr, _attn_out_cmax_ptr + 2, input_ptr, _attn_ob_ptr,
-        _batch_tokens, _hidden_size, _stream);
-
+        _batch_tokens, _hidden_size, _stream, attn_out_layout[2] == kCol32);
   } else {
     // [b, nh, s, ad] -> [b, s, nh, ad]
     launch_transform4d_0213<T>(_attn_o_inp_ptr, buffer, _batch_size, _seq_len,
@@ -213,16 +199,19 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
       _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                       _batch_tokens, _stream);
     }
+
+    cublasLtMatmulAlgo_info ff1_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _intermediate_size, _hidden_size);
+    std::vector<LSLayout> ff1_layout = getLSLayout(ff1_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _ffn_dropout.get_mask(), _igemm_alpha_ptr,
-                       _ff1_inp_ptr, _inter_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
-
+                       _ff1_inp_ptr, _inter_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, ff1_layout[0]);
     launch_quantize<T>(qweight_ptr, _ffn_activation_dropout.get_mask(), nullptr,
-                       _inter_w_ptr, _inter_cmax_ptr + 1,
-                       _hidden_size * _intermediate_size, 4, _stream);
-
+                       _inter_w_ptr, _inter_cmax_ptr + 1, _intermediate_size,
+                       _hidden_size, 4, _stream, ff1_layout[1]);
     _ff1.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
-                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream);
+                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream,
+                 ff1_algo_info, _algo_map);
 
     i8_buffer_ptr = _shared_quant_mem_ptr;
     qin_ptr = i8_buffer_ptr;
@@ -240,7 +229,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
         _ff2_inp_ptr, _ffn_activation_dropout.get_mask(),
         _ffn_activation_dropout.get_mask(), _relu_inp_i8_ptr, _inter_b_ptr,
         _inter_cmax_ptr + 2, _output_cmax_ptr, _batch_tokens,
-        _intermediate_size, _activation_fn, _stream);
+        _intermediate_size, _activation_fn, _stream, ff1_layout[2] == kCol32);
 
     launch_fake_quantize<T>(_ffn_dropout.get_mask(), nullptr, fake_weight,
                             _output_w_ptr, _output_cmax_ptr + 1,

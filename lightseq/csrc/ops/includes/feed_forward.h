@@ -61,17 +61,17 @@ class FeedForward {
   void Forward(int bsz, const int8_t *qinput_ptr, const int8_t *qweight_ptr,
                const float *alpha_ptr, const float *beta_ptr, int8_t *qout_ptr,
                cublasLtHandle_t &cublasLt_handle, cudaStream_t &stream,
-               cublasLtMatmulAlgo_info &algo_info) {
+               cublasLtMatmulAlgo_info &algo_info, cublasAlgoMap &algo_map) {
     if (algo_info.dataOrder != "CUBLASLT_ORDER_COL") {
       cublasLtMM_withAlgo_i8IO(qout_ptr, 1, bsz, config_.outputSize,
                                config_.inputSize, 0, 0, 0, alpha_ptr, beta_ptr,
                                qinput_ptr, qweight_ptr, cublasLt_handle, stream,
-                               algo_info);
+                               algo_info, algo_map);
     } else {
-      cublaslt_igemm<int8_t, float>(qweight_ptr, qinput_ptr, qout_ptr, 1,
-                                    config_.outputSize, bsz, config_.inputSize,
-                                    0, 0, 0, alpha_ptr, beta_ptr,
-                                    cublasLt_handle, stream, algo_info);
+      cublaslt_igemm<int8_t, float>(
+          qweight_ptr, qinput_ptr, qout_ptr, 1, config_.outputSize, bsz,
+          config_.inputSize, 0, 0, 0, alpha_ptr, beta_ptr, cublasLt_handle,
+          stream, algo_info, algo_map);
     }
   }
 

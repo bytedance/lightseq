@@ -29,7 +29,10 @@ cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map)
     : _config_filename(algo_map._config_filename),
       _algo_map(algo_map._algo_map) {}
 
-cublasAlgoMap::~cublasAlgoMap() { _algo_map.clear(); }
+cublasAlgoMap::~cublasAlgoMap() {
+  _algo_map.clear();
+  CHECK_GPU_ERROR(cudaFree(_workspace));
+}
 
 void cublasAlgoMap::loadGemmConfig() {
   FILE* fd;
@@ -49,6 +52,7 @@ void cublasAlgoMap::loadGemmConfig() {
     printf("[ERROR] fgets fail at %s:%d \n", __FILE__, __LINE__);
     exit(-1);
   }
+  _workspace_size = 0;
   std::cout << "Load igemm config from " << _config_filename << std::endl;
   while (fscanf(fd, "%d %d %d %s | %d %d %d %d %d %d %d %d | %f %f %f %d\n", &m,
                 &n, &k, &data_order, &algoId, &tile, &splitK_val,
@@ -68,8 +72,13 @@ void cublasAlgoMap::loadGemmConfig() {
     _algo_map[mnk][dataOrder].fp16_time = fp16_time;
     _algo_map[mnk][dataOrder].int8_time = int8_time;
     _algo_map[mnk][dataOrder].speedup = speedup;
+    _workspace_size = std::max(_workspace_size, workspaceSize);
   }
   fclose(fd);
+  if (_workspace_size > 0) {
+    _workspace_size = sizeof(char*) * _workspace_size;
+    CHECK_GPU_ERROR(cudaMalloc((void**)&_workspace, _workspace_size));
+  }
 }
 
 bool cublasAlgoMap::isExist(int m, int n, int k) {
@@ -81,38 +90,55 @@ bool cublasAlgoMap::isExist(int m, int n, int k) {
   return _algo_map.find(mnk) != _algo_map.end();
 }
 
-cublasLtMatmulAlgo_info cublasAlgoMap::findBestAlgo(
-    std::map<std::string, cublasLtMatmulAlgo_info> mp) {
-  cublasLtMatmulAlgo_info best_algo = mp.begin()->second;
-  for (auto algo : mp) {
-    if (algo.second.int8_time < best_algo.int8_time) {
-      best_algo = algo.second;
-    }
-  }
-  return best_algo;
+cublasLtMatmulAlgo_info cublasAlgoMap::defaultAlgo() {
+  cublasLtMatmulAlgo_info default_algo;
+  default_algo.algoId = -1;
+  default_algo.customOption = -1;
+  default_algo.tile = -1;
+  default_algo.splitK_val = -1;
+  default_algo.swizzle = -1;
+  default_algo.reductionScheme = -1;
+  default_algo.workspaceSize = -1;
+  default_algo.stages = -1;
+  default_algo.dataOrder = "CUBLASLT_ORDER_COL";
+  return default_algo;
 }
 
-cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k) {
+cublasLtMatmulAlgo_info cublasAlgoMap::findBestAlgo(
+    std::map<std::string, cublasLtMatmulAlgo_info> mp, std::string data_order) {
+  if (data_order.size() > 0) {
+    if (mp.find(data_order) != mp.end()) {
+      return mp[data_order];
+    } else {
+      return defaultAlgo();
+    }
+  } else {
+    cublasLtMatmulAlgo_info best_algo = mp.begin()->second;
+    for (auto algo : mp) {
+      if (algo.second.int8_time < best_algo.int8_time) {
+        best_algo = algo.second;
+      }
+    }
+    return best_algo;
+  }
+}
+
+cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
+                                               std::string data_order) {
   std::vector<int> mnk = {m, n, k};
   if (_algo_map.find(mnk) != _algo_map.end()) {
-    return findBestAlgo(_algo_map[mnk]);
+    return findBestAlgo(_algo_map[mnk], data_order);
   }
 
   if (m >= BORDER) m = ((m + STRIDE - 1) / STRIDE) * STRIDE;
   mnk = {m, n, k};
   if (_algo_map.find(mnk) != _algo_map.end()) {
-    return findBestAlgo(_algo_map[mnk]);
+    return findBestAlgo(_algo_map[mnk], data_order);
   } else {
-    cublasLtMatmulAlgo_info tmp_algo;
-    tmp_algo.algoId = -1;
-    tmp_algo.customOption = -1;
-    tmp_algo.tile = -1;
-    tmp_algo.splitK_val = -1;
-    tmp_algo.swizzle = -1;
-    tmp_algo.reductionScheme = -1;
-    tmp_algo.workspaceSize = -1;
-    tmp_algo.stages = -1;
-    tmp_algo.dataOrder = "CUBLASLT_ORDER_COL";
-    return tmp_algo;
+    return defaultAlgo();
   }
 }
+
+char* cublasAlgoMap::get_workspace() { return _workspace; }
+
+int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
