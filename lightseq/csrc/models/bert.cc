@@ -8,6 +8,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
   Context::create_global_context();
+  _context_ptr = Context::global_instance();
 
   /* --- step.2 load model weights into GPU memory --- */
   // saved in custom proto file
@@ -84,6 +85,8 @@ void Bert::Infer() {
     iter->forward();
   }
   lyr_norm_layer->forward();
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }

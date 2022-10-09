@@ -19,6 +19,7 @@ namespace cuda {
 class Bert : public LSModel {
  private:
   BertWeight<OpType_> tw_;
+  std::shared_ptr<Context> _context_ptr;
 
   LaunchEncEmbLayerPtr<OpType_> launch_enc_emb_layer;
   std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
