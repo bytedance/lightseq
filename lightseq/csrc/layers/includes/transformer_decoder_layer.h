@@ -13,6 +13,7 @@
 #include "normalize_layer.h"
 #include "softmax.h"
 #include "strided_batch_gemm.h"
+#include "cublas_algo_map.h"
 
 template <typename T>
 class TransformerDecoderLayer {
@@ -387,6 +388,7 @@ class TransformerDecoderLayer {
   cublasHandle_t _cublasHandle;
   cublasLtHandle_t _cublasLtHandle;
   cudaStream_t _stream;
+  cublasAlgoMap _algo_map;
 
   // layers
   Normalize_Layer<T> _attn_ln, _encdec_attn_ln, _ffn_ln;

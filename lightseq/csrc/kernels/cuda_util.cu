@@ -300,6 +300,21 @@ int getSMVersion() {
   return props.major * 10 + props.minor;
 }
 
+std::string getGPUName() {
+  int device{-1};
+  CHECK_GPU_ERROR(cudaGetDevice(&device));
+  cudaDeviceProp props;
+  CHECK_GPU_ERROR(cudaGetDeviceProperties(&props, device));
+  std::string full_name = std::string(props.name);
+  std::vector<std::string> name_list = {"V100", "T4", "A100", "A30", "A10"};
+  for (auto name : name_list) {
+    if (full_name.find(name) != std::string::npos) {
+      return name;
+    }
+  }
+  throw std::runtime_error("Not support this kind of GPU!");
+}
+
 void print_time_duration(
     const std::chrono::high_resolution_clock::time_point &start,
     std::string duration_name, cudaStream_t stream) {

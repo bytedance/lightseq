@@ -58,7 +58,8 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
       _h_unfinished(1),
-      _is_benchmark(false) {
+      _is_benchmark(false),
+      _algo_map(cublasAlgoMap()) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
   }
@@ -163,7 +164,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei, _tw._hidden_size,
                   _tw._trg_vocab_size, _quant_range / _trg_emb_clip_max,
-                  _stream, _cublas_lt_handle);
+                  _stream, _cublas_lt_handle, kColMajor);
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_trg_emb_bottom_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
@@ -287,7 +288,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6], _tw._hidden_size,
                     _tw._hidden_size * 3,
                     _quant_range / _dec_clip_max[_layer_id * 19], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 4],
                     _int8_p_d_dec_wei[_layer_id * 6 + 1], _tw._hidden_size,
@@ -299,7 +300,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6 + 2], _tw._hidden_size,
                     _tw._hidden_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 2], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 10],
                     _int8_p_d_dec_wei[_layer_id * 6 + 3], _tw._hidden_size,
@@ -311,7 +312,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                     _int8_p_d_dec_wei[_layer_id * 6 + 4], _tw._hidden_size,
                     _tw._inner_size,
                     _quant_range / _dec_clip_max[_layer_id * 19 + 4], _stream,
-                    _cublas_lt_handle);
+                    _cublas_lt_handle, kColMajor);
 
     quantize_weight(_p_d_dec_wei[_weight_offset + 16],
                     _int8_p_d_dec_wei[_layer_id * 6 + 5], _tw._inner_size,
@@ -526,12 +527,11 @@ bool QuantDecoder<OpType_>::run_step() {
 
   // _step_token_num (beam_size * batch_size) must be 4x
 
-  cublasLtMM_withAlgo_i8IO(_int8_ffn_out_buf, 1, _step_token_num,
-                           _tw._trg_vocab_size, _tw._hidden_size, 0, 0, 0,
-                           _output_ln_clip_max * _trg_emb_clip_max /
-                               (_logits_clip_max * _quant_range),
-                           _int8_ffn_in_buf, _int8_p_d_trg_emb_wei,
-                           _cublas_lt_handle, _stream, use_ORDER_COL32_2R_4R4);
+  cublaslt_gemm(_int8_p_d_trg_emb_wei, _int8_ffn_in_buf, _int8_ffn_out_buf, 1,
+                _tw._trg_vocab_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
+                _output_ln_clip_max * _trg_emb_clip_max /
+                    (_logits_clip_max * _quant_range),
+                _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   for (int i = 0; i < _batch_size; i++) {       // batch_id
@@ -620,7 +620,7 @@ void QuantDecoder<OpType_>::self_attention() {
         _int8_ffn_in_buf, _p_device_wei[_weight_offset],
         _p_device_wei[_weight_offset + 1], _p_device_wei[_weight_offset + 5],
         _max_thread_per_block, _quant_range / _dec_clip_max[_layer_id * 19 + 6],
-        _tw._is_post_ln, true);
+        _tw._is_post_ln, false);
   }
 
 #ifdef DEBUG_RESULT
@@ -630,13 +630,12 @@ void QuantDecoder<OpType_>::self_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  cublasLtMM_withAlgo_i8IO(
-      _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size * 3,
-      _tw._hidden_size, 0, 0, 0,
+  cublaslt_gemm(
+      _int8_p_d_dec_wei[_layer_id * 6], _int8_ffn_in_buf, _int8_ffn_out_buf, 1,
+      _tw._hidden_size * 3, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19] * _dec_clip_max[_layer_id * 19 + 6] /
           (_dec_clip_max[_layer_id * 19 + 12] * _quant_range),
-      _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6], _cublas_lt_handle,
-      _stream, use_ORDER_COL32_2R_4R4);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "self qkv(head): ", 5);
@@ -652,7 +651,7 @@ void QuantDecoder<OpType_>::self_attention() {
       _p_d_self_k_cache1[_layer_id], _p_d_self_v_cache1[_layer_id],
       _tw._head_num, _tw._dim_per_head, _tw._max_step, _cur_step,
       _max_thread_per_block, _dec_clip_max[_layer_id * 19 + 12] / _quant_range,
-      _quant_range / _dec_clip_max[_layer_id * 19 + 18], true);
+      _quant_range / _dec_clip_max[_layer_id * 19 + 18], false);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_in_buf, "rearanged q(head): ", 5);
@@ -698,7 +697,7 @@ void QuantDecoder<OpType_>::self_attention() {
       1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 1] * _dec_clip_max[_layer_id * 19 + 7] /
           (_dec_clip_max[_layer_id * 19 + 13] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "self attn ffn out w/o bias(head): ", 40);
@@ -712,7 +711,7 @@ void QuantDecoder<OpType_>::self_attention() {
       _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
       _dec_clip_max[_layer_id * 19 + 13] / _quant_range,
       _quant_range / _dec_clip_max[_layer_id * 19 + 8], _max_thread_per_block,
-      _stream, _tw._is_post_ln, false, true);
+      _stream, _tw._is_post_ln, false, false);
 }
 
 /**
@@ -727,13 +726,12 @@ void QuantDecoder<OpType_>::encdec_attention() {
   CHECK_GPU_ERROR(cudaGetLastError());
 #endif
 
-  cublasLtMM_withAlgo_i8IO(
-      _int8_ffn_out_buf, 1, _step_token_num, _tw._hidden_size, _tw._hidden_size,
-      0, 0, 0,
+  cublaslt_gemm(
+      _int8_p_d_dec_wei[_layer_id * 6 + 2], _int8_ffn_in_buf, _int8_ffn_out_buf,
+      1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 2] * _dec_clip_max[_layer_id * 19 + 8] /
           (_dec_clip_max[_layer_id * 19 + 14] * _quant_range),
-      _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 2], _cublas_lt_handle,
-      _stream, use_ORDER_COL32_2R_4R4);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "encdec q(head): ", 5);
@@ -745,7 +743,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       _step_token_num, _tw._hidden_size, _stream, _int8_ffn_out_buf,
       _p_device_wei[_weight_offset + 9], _p_d_query_buf1, _tw._beam_size,
       _tw._dim_per_head, _tw._head_num, _max_thread_per_block,
-      _dec_clip_max[_layer_id * 19 + 14] / _quant_range, true);
+      _dec_clip_max[_layer_id * 19 + 14] / _quant_range, false);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_query_buf1, "rearanged q(head): ", 5);
@@ -802,7 +800,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       1, _tw._hidden_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 3] * _dec_clip_max[_layer_id * 19 + 9] /
           (_dec_clip_max[_layer_id * 19 + 15] * _quant_range),
-      _cublas_lt_handle, _stream);
+      _cublas_lt_handle, _stream, _algo_map);
 
 #ifdef DEBUG_RESULT
   print_vec(_int8_ffn_out_buf, "encdec attn ffn out w/o bias(head): ", 3);
@@ -816,7 +814,7 @@ void QuantDecoder<OpType_>::encdec_attention() {
       _int8_ffn_in_buf, _p_d_cur_step_query, _step_token_num, _tw._hidden_size,
       _dec_clip_max[_layer_id * 19 + 15] / _quant_range,
       _quant_range / _dec_clip_max[_layer_id * 19 + 10], _max_thread_per_block,
-      _stream, _tw._is_post_ln, false, true);
+      _stream, _tw._is_post_ln, false, false);
 
 #ifdef DEBUG_RESULT
   CHECK_GPU_ERROR(cudaGetLastError());
@@ -835,27 +833,26 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
             "ffn ln(tail): ", 5);
 #endif
 
-  cublasLtMM_withAlgo_i8IO(
-      _int8_ffn_out_buf, 1, _step_token_num, _tw._inner_size, _tw._hidden_size,
-      0, 0, 0,
+  cublaslt_gemm(
+      _int8_p_d_dec_wei[_layer_id * 6 + 4], _int8_ffn_in_buf, _int8_ffn_out_buf,
+      1, _tw._inner_size, _step_token_num, _tw._hidden_size, 0, 0, 0,
       _dec_clip_max[_layer_id * 19 + 4] * _dec_clip_max[_layer_id * 19 + 10] /
           (_dec_clip_max[_layer_id * 19 + 16] * _quant_range),
-      _int8_ffn_in_buf, _int8_p_d_dec_wei[_layer_id * 6 + 4], _cublas_lt_handle,
-      _stream, use_ORDER_COL32_2R_4R4);
+      _cublas_lt_handle, _stream, _algo_map);
 
   if (_tw._use_gelu) {
     ker_bias_gelu_i8I_i8O_launcher<_DataType>(
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
         _p_device_wei[_weight_offset + 15], _tw._inner_size,
         _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
-        _quant_range / _dec_clip_max[_layer_id * 19 + 11], true, false);
+        _quant_range / _dec_clip_max[_layer_id * 19 + 11], false, false);
   } else {
     ker_bias_relu_i8I_i8O_launcher<_DataType>(
         _step_token_num, _stream, _int8_ffn_out_buf, _int8_ffn_in_buf,
         _p_device_wei[_weight_offset + 15], _tw._inner_size,
         _dec_clip_max[_layer_id * 19 + 16] / _quant_range,
         _quant_range / _dec_clip_max[_layer_id * 19 + 11],
-        _dec_clip_max[_layer_id * 19 + 11], true, false, true);
+        _dec_clip_max[_layer_id * 19 + 11], false, false, true);
   }
 
 #ifdef DEBUG_RESULT
@@ -867,7 +864,8 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
 
   cublaslt_gemm(_int8_p_d_dec_wei[_layer_id * 6 + 5], _int8_ffn_in_buf,
                 _int32_ffn_out_buf, 1, _tw._hidden_size, _step_token_num,
-                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream);
+                _tw._inner_size, 0, 0, 0, 1, _cublas_lt_handle, _stream,
+                _algo_map);
 
   const _DataType *scale_ptr, *bias_ptr, *res_bias_ptr;
   float clip_max, dequant_scale;
@@ -897,7 +895,7 @@ void QuantDecoder<OpType_>::ffn_add_norm() {
       _int32_ffn_out_buf, scale_ptr, bias_ptr, res_bias_ptr, _int8_ffn_in_buf,
       _p_d_cur_step_query, _step_token_num, _tw._hidden_size, dequant_scale,
       _quant_range / clip_max, _max_thread_per_block, _stream, _tw._is_post_ln,
-      false, true, _scaled_ffn2_colsum[_layer_id]);
+      false, false, _scaled_ffn2_colsum[_layer_id]);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_cur_step_query, "ffn ln(head): ", 5);
@@ -921,14 +919,14 @@ bool QuantDecoder<OpType_>::sample() {
         _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
         _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
-        _logits_clip_max / _quant_range, true);
+        _logits_clip_max / _quant_range, false);
   } else {
     ker_topp_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
         _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
         _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
-        _logits_clip_max / _quant_range, true);
+        _logits_clip_max / _quant_range, false);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -1052,7 +1050,7 @@ void QuantDecoder<OpType_>::update_new_seq_probs() {
       _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
       _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
       _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-      _tw._end_id, true);
+      _tw._end_id, false);
 
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
@@ -1073,7 +1071,7 @@ bool QuantDecoder<OpType_>::topk_greedy_search() {
       _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
       _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
       _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
-      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, true);
+      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, false);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);

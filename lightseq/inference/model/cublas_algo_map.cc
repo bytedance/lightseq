@@ -4,6 +4,9 @@
 */
 #include "cublas_algo_map.h"
 
+namespace lightseq {
+namespace cuda {
+
 cublasAlgoMap::cublasAlgoMap(const std::string filename)
     : _config_filename(filename) {
   loadGemmConfig();
@@ -186,3 +189,6 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
 char* cublasAlgoMap::get_workspace() { return _workspace; }
 
 int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
+
+}  // namespace cuda
+}  // namespace lightseq

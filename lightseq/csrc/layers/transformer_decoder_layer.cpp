@@ -73,7 +73,8 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
       _ffn_dropout(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
           std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
-      _enable_quant(false) {
+      _enable_quant(false),
+      _algo_map(cublasAlgoMap()) {
   assert(_hidden_size % _heads == 0);
   allocate_buffer();
   _shared_nlayer += 1;
@@ -114,22 +115,28 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 
     const T *gemmQKV_inp_ptr =
         _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+
+    cublasLtMatmulAlgo_info qkv_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
+    std::vector<LSLayout> qkv_layout = getLSLayout(qkv_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _attn_prob_dropout.get_mask(), _igemm_alpha_ptr,
-                       gemmQKV_inp_ptr, _attn_qkv_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
+                       gemmQKV_inp_ptr, _attn_qkv_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, qkv_layout[0]);
 
     launch_quantize<T>(qweight_ptr, _attn_prob_dropout.get_mask(), nullptr,
-                       _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1,
-                       _hidden_size * 3 * _hidden_size, 4, _stream);
+                       _attn_qkvw_ptr, _attn_qkv_cmax_ptr + 1, 3 * _hidden_size,
+                       _hidden_size, 4, _stream, qkv_layout[1]);
     CHECK_GPU_ERROR(cudaGetLastError());
 
     _qkv_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
-                        _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream);
+                        _igemm_beta_ptr, qout_ptr, _cublasLtHandle, _stream,
+                        qkv_algo_info, _algo_map);
 
     launch_quant_bias_add_transform_20314(
         q_tf_ptr, _attn_prob_dropout.get_mask(), qout_ptr, _attn_qkvb_ptr,
         _attn_qkv_cmax_ptr + 2, batch_size, from_len, 3, _heads,
-        _hidden_size / _heads, _stream, _attn_qkv_cache_cmax_ptr);
+        _hidden_size / _heads, _stream, _attn_qkv_cache_cmax_ptr,
+        qkv_layout[2] == kCol32);
 
     CHECK_GPU_ERROR(cudaGetLastError());
 
@@ -183,21 +190,25 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     launch_transform4d_0213<T>(_attn_output_ptr, buffer, batch_size, from_len,
                                _hidden_size, _heads, 1, _stream);
 
+    cublasLtMatmulAlgo_info attn_out_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size, _hidden_size);
+    std::vector<LSLayout> attn_out_layout =
+        getLSLayout(attn_out_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _attn_dropout.get_mask(), _igemm_alpha_ptr,
-                       _attn_output_ptr, _attn_out_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
+                       _attn_output_ptr, _attn_out_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, attn_out_layout[0]);
 
     launch_quantize<T>(qweight_ptr, _attn_dropout.get_mask(), nullptr,
-                       _attn_ow_ptr, _attn_out_cmax_ptr + 1,
-                       _hidden_size * _hidden_size, 4, _stream);
+                       _attn_ow_ptr, _attn_out_cmax_ptr + 1, _hidden_size,
+                       _hidden_size, 4, _stream, attn_out_layout[1]);
 
-    _attn_out_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-                             _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
-                             _cublasLtHandle, _stream);
+    _attn_out_linear.Forward(
+        _batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr, _igemm_beta_ptr,
+        qout_ptr, _cublasLtHandle, _stream, attn_out_algo_info, _algo_map);
 
     _attn_dropout.quant_bias_dropout_residual(
         output_ptr, qout_ptr, _attn_out_cmax_ptr + 2, input_ptr, _attn_ob_ptr,
-        _batch_tokens, _hidden_size, _stream);
+        _batch_tokens, _hidden_size, _stream, attn_out_layout[2]);
 
   } else {
     // [b, nh, s, ad] -> [b, s, nh, ad]
@@ -278,22 +289,30 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
     }
     CHECK_GPU_ERROR(cudaGetLastError());
 
+    cublasLtMatmulAlgo_info encdec_q_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size, _hidden_size);
+    std::vector<LSLayout> encdec_q_layout =
+        getLSLayout(encdec_q_algo_info.dataOrder);
+
     launch_quantize<T>(qin_ptr, _encdec_attn_prob_dropout.get_mask(),
                        _igemm_alpha_ptr, _gemmQ_inp_ptr, _encdec_qkv_cmax_ptr,
-                       _batch_tokens * _hidden_size, 2, _stream);
+                       _batch_tokens, _hidden_size, 2, _stream,
+                       encdec_q_layout[0]);
     launch_quantize<T>(qweight_ptr, _encdec_attn_prob_dropout.get_mask(),
                        nullptr, _encdec_attn_qw_ptr, _encdec_qkv_cmax_ptr + 1,
-                       _hidden_size * _hidden_size, 4, _stream);
+                       _hidden_size, _hidden_size, 4, _stream,
+                       encdec_q_layout[1]);
     CHECK_GPU_ERROR(cudaGetLastError());
 
-    _encdec_q_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-                             _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
-                             _cublasLtHandle, _stream);
+    _encdec_q_linear.Forward(
+        _batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr, _igemm_beta_ptr,
+        qout_ptr, _cublasLtHandle, _stream, encdec_q_algo_info, _algo_map);
 
     launch_quant_bias_add_transform_20314<T>(
         _encdec_q_ptr, _encdec_attn_prob_dropout.get_mask(), qout_ptr,
         _encdec_attn_qb_ptr, _encdec_qkv_cmax_ptr + 2, _batch_size,
-        _trg_seq_len, 1, _heads, _hidden_size / _heads, _stream);
+        _trg_seq_len, 1, _heads, _hidden_size / _heads, _stream, nullptr,
+        encdec_q_layout[2] == kCol32);
 
     CHECK_GPU_ERROR(cudaGetLastError());
 
@@ -349,22 +368,28 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_fw(const T *input_ptr,
     launch_transform4d_0213<T>(_encdec_attn_output_ptr, buffer, _batch_size,
                                _trg_seq_len, _hidden_size, _heads, 1, _stream);
 
+    cublasLtMatmulAlgo_info encdec_attn_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _hidden_size, _hidden_size);
+    std::vector<LSLayout> encdec_attn_layout =
+        getLSLayout(encdec_attn_algo_info.dataOrder);
     launch_quantize<T>(qin_ptr, _encdec_attn_dropout.get_mask(),
                        _igemm_alpha_ptr, _encdec_attn_output_ptr,
-                       _encdec_out_cmax_ptr, _hidden_size * _batch_tokens, 2,
-                       _stream);
+                       _encdec_out_cmax_ptr, _batch_tokens, _hidden_size, 2,
+                       _stream, encdec_attn_layout[0]);
 
     launch_quantize<T>(qweight_ptr, _encdec_attn_dropout.get_mask(), nullptr,
                        _encdec_attn_ow_ptr, _encdec_out_cmax_ptr + 1,
-                       _hidden_size * _hidden_size, 4, _stream);
+                       _hidden_size, _hidden_size, 4, _stream,
+                       encdec_attn_layout[1]);
 
-    _encdec_attn_out_linear.Forward(_batch_tokens, qin_ptr, qweight_ptr,
-                                    _igemm_alpha_ptr, _igemm_beta_ptr, qout_ptr,
-                                    _cublasLtHandle, _stream);
+    _encdec_attn_out_linear.Forward(
+        _batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr, _igemm_beta_ptr,
+        qout_ptr, _cublasLtHandle, _stream, encdec_attn_algo_info, _algo_map);
 
     _encdec_attn_dropout.quant_bias_dropout_residual(
         output_ptr, qout_ptr, _encdec_out_cmax_ptr + 2, input_ptr,
-        _encdec_attn_ob_ptr, _batch_tokens, _hidden_size, _stream);
+        _encdec_attn_ob_ptr, _batch_tokens, _hidden_size, _stream,
+        encdec_attn_layout[2] == kCol32);
 
   } else {
     // [batch_size, nhead, trg_seq_len, head_dim] ->
@@ -403,22 +428,27 @@ void TransformerDecoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
                       _batch_tokens, _stream);
     }
 
+    cublasLtMatmulAlgo_info ff1_algo_info =
+        _algo_map.getAlgo(_batch_tokens, _intermediate_size, _hidden_size);
+    std::vector<LSLayout> ff1_layout = getLSLayout(ff1_algo_info.dataOrder);
+
     launch_quantize<T>(qin_ptr, _ffn_dropout.get_mask(), _igemm_alpha_ptr,
-                       _ff1_inp_ptr, _inter_cmax_ptr,
-                       _hidden_size * _batch_tokens, 2, _stream);
+                       _ff1_inp_ptr, _inter_cmax_ptr, _batch_tokens,
+                       _hidden_size, 2, _stream, ff1_layout[0]);
 
     launch_quantize<T>(qweight_ptr, _ffn_activation_dropout.get_mask(), nullptr,
-                       _inter_w_ptr, _inter_cmax_ptr + 1,
-                       _hidden_size * _intermediate_size, 4, _stream);
+                       _inter_w_ptr, _inter_cmax_ptr + 1, _intermediate_size,
+                       _hidden_size, 4, _stream, ff1_layout[1]);
 
     _ff1.Forward(_batch_tokens, qin_ptr, qweight_ptr, _igemm_alpha_ptr,
-                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream);
+                 _igemm_beta_ptr, _relu_inp_i8_ptr, _cublasLtHandle, _stream,
+                 ff1_algo_info, _algo_map);
 
     _ffn_activation_dropout.fakequant_bias_act_dropout(
         _ff2_inp_ptr, _ffn_activation_dropout.get_mask(),
         _ffn_activation_dropout.get_mask(), _relu_inp_i8_ptr, _inter_b_ptr,
         _inter_cmax_ptr + 2, _output_cmax_ptr, _batch_tokens,
-        _intermediate_size, _activation_fn, _stream);
+        _intermediate_size, _activation_fn, _stream, ff1_layout[2] == kCol32);
 
     i8_buffer_ptr = _shared_quant_mem_ptr;
     qin_ptr = i8_buffer_ptr;

@@ -13,8 +13,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublasLt.h>
-#include "kernels.h"
-#include "cuda_util.h"
+#include "util.h"
+
+namespace lightseq {
+namespace cuda {
 
 #define STRIDE 32
 #define BORDER 512
@@ -61,3 +63,6 @@ class cublasAlgoMap {
   char* get_workspace();
   int get_workspace_size();
 };
+
+}  // namespace cuda
+}  // namespace lightseq

@@ -45,10 +45,10 @@ def mkdir(path):
         os.mkdir(path)
 
 
-def sign(x):
-    if x > 0:
+def sign(x, y):
+    if x > y:
         return 1
-    elif x < 0:
+    elif x < y:
         return -1
     else:
         return 0
@@ -76,10 +76,8 @@ def extract(outputs):
                 col32_algo_info.fp16_time / col32_algo_info.int8_time
             )
             col_algo_info.speedup = col_algo_info.fp16_time / col_algo_info.int8_time
-            if col32_algo_info.int8_time < col_algo_info.int8_time:
-                best_gemm_algos.append(deepcopy(col32_algo_info))
-            else:
-                best_gemm_algos.append(deepcopy(col_algo_info))
+            best_gemm_algos.append(deepcopy(col32_algo_info))
+            best_gemm_algos.append(deepcopy(col_algo_info))
         elif line.startswith("m "):
             shape = tuple([int(s.split()[1]) for s in line.split(";")])
             col32_algo_info.shape = shape
@@ -117,10 +115,11 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
 
     best_gemm_algos = extract(all_outputs)
     for d in best_gemm_algos:
-        d_str = "{:>5d} {:>5d} {:>5d}   {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d}   {:.4f} {:.4f} {:.2f}   {:>2d} {}".format(
+        d_str = "{:>5d} {:>5d} {:>5d} {:>27} | {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>2d} {:>7d} | {:.4f} {:.4f} {:.2f} {:>2d}".format(
             d.shape[0],
             d.shape[1],
             d.shape[2],
+            d.data_order,
             d.algo_id,
             d.tile,
             d.splitk,
@@ -133,23 +132,24 @@ def search(mnk_set, output_cfg_file, output_cfg_str):
             d.int8_time,
             d.speedup,
             d.sm,
-            d.data_order,
         )
-        output_cfg_str.append((d.shape[0], d.shape[1], d.shape[2], d_str))
+        output_cfg_str.append((d.shape[0], d.shape[1], d.shape[2], d.data_order, d_str))
 
     def cmp(x, y):
         if x[2] != y[2]:
-            return sign(x[2] - y[2])
+            return sign(x[2], y[2])
         elif x[1] != y[1]:
-            return sign(x[1] - y[1])
+            return sign(x[1], y[1])
+        elif x[0] != y[0]:
+            return sign(x[0], y[0])
         else:
-            return sign(x[0] - y[0])
+            return sign(x[3], y[3])
 
     output_cfg_str.sort(key=functools.cmp_to_key(cmp))
 
     with open(output_cfg_file, "w") as fout:
         for s in output_cfg_str:
-            fout.write(s[3] + "\n")
+            fout.write(s[4] + "\n")
 
 
 def check_args(hidden_dim, inner_dim, vocab_size, min_bsz, max_bsz):
@@ -193,15 +193,17 @@ def gemm_test(
 
     # Existing (m, n, k).
     mkdir(dir_name)
-    output_cfg_file = "{}/igemm_sm{}.cfg".format(dir_name, sm)
+    gpu_name = cuda_module.get_gpu_name()
+    output_cfg_file = "{}/igemm_{}.cfg".format(dir_name, gpu_name)
     exist_mnk_set = set()
     output_cfg_str = []
     if os.path.exists(output_cfg_file):
         with open(output_cfg_file, "r") as fin:
             for line in fin:
                 m, n, k = [int(x) for x in line.split()[:3]]
+                data_order = line.split()[3]
                 exist_mnk_set.add((m, n, k))
-                output_cfg_str.append((m, n, k, line.rstrip()))
+                output_cfg_str.append((m, n, k, data_order, line.rstrip()))
 
     # (m, n, k) to be searched.
     mnk_set -= exist_mnk_set
