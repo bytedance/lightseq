@@ -37,11 +37,54 @@ cublasAlgoMap::~cublasAlgoMap() {
   CHECK_GPU_ERROR(cudaFree(_workspace));
 }
 
+bool cublasAlgoMap::fileExist(std::string path) {
+  if (fopen(path.c_str(), "r") == NULL) return false;
+  return true;
+}
+
+/* Priority:
+1. default dir
+2. given url
+3. default url
+4. default algo
+*/
+void cublasAlgoMap::getGemmConfig() {
+  if (fileExist(DEFAULT_DIR + _config_filename)) {
+    std::cout << "Get igemm config from " << DEFAULT_DIR + _config_filename
+              << std::endl;
+    return;
+  }
+
+  std::string command = "mkdir " + DEFAULT_DIR;
+  system(command.c_str());
+
+  const char* config_url_cstr = std::getenv("GEMM_CONFIG_URL");
+  std::string config_url = (config_url_cstr == nullptr ? "" : config_url_cstr);
+  if (config_url.size() > 0) {
+    command = "wget " + config_url + " -P " + DEFAULT_DIR;
+    system(command.c_str());
+    if (fileExist(DEFAULT_DIR + _config_filename)) {
+      std::cout << "Get igemm config from " << config_url << std::endl;
+      return;
+    }
+  }
+
+  command = "wget " + DEFAULT_URL + _config_filename + " -P " + DEFAULT_DIR;
+  system(command.c_str());
+
+  if (fileExist(DEFAULT_DIR + _config_filename)) {
+    std::cout << "Get igemm config from " << DEFAULT_URL << std::endl;
+    return;
+  }
+}
+
 void cublasAlgoMap::loadGemmConfig() {
+  getGemmConfig();
+
   FILE* fd;
-  fd = fopen(_config_filename.c_str(), "r");
+  fd = fopen((DEFAULT_DIR + _config_filename).c_str(), "r");
   if (fd == NULL) {
-    std::cout << "[WARNING] " << _config_filename
+    std::cout << "[WARNING] " << DEFAULT_DIR + _config_filename
               << " is not found; using default GEMM algo" << std::endl;
     return;
   }
@@ -56,7 +99,8 @@ void cublasAlgoMap::loadGemmConfig() {
     exit(-1);
   }
   _workspace_size = 0;
-  std::cout << "Load igemm config from " << _config_filename << std::endl;
+  std::cout << "Load igemm config from " << DEFAULT_DIR + _config_filename
+            << std::endl;
   while (fscanf(fd, "%d %d %d %s | %d %d %d %d %d %d %d %d | %f %f %f %d\n", &m,
                 &n, &k, &data_order, &algoId, &tile, &splitK_val,
                 &reductionScheme, &swizzle, &customOption, &stages,

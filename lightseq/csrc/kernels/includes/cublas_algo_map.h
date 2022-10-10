@@ -18,10 +18,13 @@
 
 #define STRIDE 32
 #define BORDER 512
-#define IGEMM_T4_CONFIG "/tmp/igemm_configs/igemm_T4.cfg"
-#define IGEMM_A100_CONFIG "/tmp/igemm_configs/igemm_A100.cfg"
-#define IGEMM_A30_CONFIG "/tmp/igemm_configs/igemm_A30.cfg"
-#define IGEMM_A10_CONFIG "/tmp/igemm_configs/igemm_A10.cfg"
+
+static std::string DEFAULT_URL = "https://zenodo.org/record/7176939/files/";
+static std::string DEFAULT_DIR = "/tmp/igemm_configs/";
+static std::string IGEMM_T4_CONFIG = "igemm_T4.cfg";
+static std::string IGEMM_A100_CONFIG = "igemm_A100.cfg";
+static std::string IGEMM_A30_CONFIG = "igemm_A30.cfg";
+static std::string IGEMM_A10_CONFIG = "igemm_A10.cfg";
 
 typedef struct {
   int algoId, customOption, tile, splitK_val, swizzle, reductionScheme,
@@ -44,6 +47,8 @@ class cublasAlgoMap {
   cublasAlgoMap(const cublasAlgoMap& map);
   ~cublasAlgoMap();
 
+  bool fileExist(std::string path);
+  void getGemmConfig();
   void loadGemmConfig();
   bool isExist(int m, int n, int k);
   cublasLtMatmulAlgo_info defaultAlgo();
