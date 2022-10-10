@@ -55,13 +55,13 @@ void cublasAlgoMap::getGemmConfig() {
     return;
   }
 
-  std::string command = "mkdir " + DEFAULT_DIR;
+  std::string command = "mkdir -p " + DEFAULT_DIR;
   system(command.c_str());
 
   const char* config_url_cstr = std::getenv("GEMM_CONFIG_URL");
   std::string config_url = (config_url_cstr == nullptr ? "" : config_url_cstr);
   if (config_url.size() > 0) {
-    command = "wget " + config_url + " -P " + DEFAULT_DIR;
+    command = "wget -nc " + config_url + " -P " + DEFAULT_DIR;
     system(command.c_str());
     if (fileExist(DEFAULT_DIR + _config_filename)) {
       std::cout << "Get igemm config from " << config_url << std::endl;
@@ -69,7 +69,7 @@ void cublasAlgoMap::getGemmConfig() {
     }
   }
 
-  command = "wget " + DEFAULT_URL + _config_filename + " -P " + DEFAULT_DIR;
+  command = "wget -nc " + DEFAULT_URL + _config_filename + " -P " + DEFAULT_DIR;
   system(command.c_str());
 
   if (fileExist(DEFAULT_DIR + _config_filename)) {

@@ -20,7 +20,8 @@
 #define BORDER 512
 
 static std::string DEFAULT_URL = "https://zenodo.org/record/7176939/files/";
-static std::string DEFAULT_DIR = "/tmp/igemm_configs/";
+static std::string DEFAULT_DIR =
+    std::string(std::getenv("HOME")) + "/.lightseq/igemm_configs/";
 static std::string IGEMM_T4_CONFIG = "igemm_T4.cfg";
 static std::string IGEMM_A100_CONFIG = "igemm_A100.cfg";
 static std::string IGEMM_A30_CONFIG = "igemm_A30.cfg";
