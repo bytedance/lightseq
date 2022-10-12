@@ -60,6 +60,7 @@ class QuantDecoder {
   cublasHandle_t _hd;
   cublasLtHandle_t _cublas_lt_handle;
   cublasAlgoMap _algo_map;
+  const bool _use_ORDER_COL32_2R_4R4;
 
   const int* _p_d_padding_mask;
   const _DataType* _p_d_encoder_output;
