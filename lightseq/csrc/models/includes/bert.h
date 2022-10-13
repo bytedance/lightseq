@@ -38,7 +38,7 @@ class Bert : public LSModel {
 
   int _max_batch_size;
 
-  int* pad_mask_ptr;
+  OpType_* pad_mask_ptr;
 
  public:
   Bert(const std::string weight_path, const int max_batch_size);

@@ -507,6 +507,8 @@ void transform_weight_layout(const int8_t* input, int8_t* output, int row,
   cublasLtMatrixLayout_t input_desc = NULL, output_desc = NULL;
   cublasLtOrder_t order_col = CUBLASLT_ORDER_COL;
   cublasLtOrder_t order_col32;
+
+  bool use_ORDER_COL32_2R_4R4 = (getSMVersion() >= 80 ? true : false);
   if (use_ORDER_COL32_2R_4R4)
     order_col32 = CUBLASLT_ORDER_COL32_2R_4R4;
   else

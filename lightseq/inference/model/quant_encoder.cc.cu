@@ -42,7 +42,8 @@ QuantEncoder<OpType_>::QuantEncoder(int max_batch_size, int *p_d_token_id,
       _atten_scaler((_DataType)sqrt(1.f / tw._dim_per_head)),
       _max_batch_dim(max_batch_size * tw._max_step * tw._hidden_size),
       _max_thread_per_block(1024),
-      _algo_map(cublasAlgoMap()) {
+      _algo_map(cublasAlgoMap()),
+      _use_ORDER_COL32_2R_4R4(getSMVersion() >= 80 ? true : false) {
   CHECK_GPU_ERROR(cublasLtCreate(&_cublas_lt_handle));
 }
 

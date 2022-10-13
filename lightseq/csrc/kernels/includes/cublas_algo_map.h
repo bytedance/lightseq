@@ -40,7 +40,7 @@ class cublasAlgoMap {
       _algo_map;
   std::string _config_filename;
   int _workspace_size;
-  char* _workspace = NULL;
+  void* _workspace = NULL;
 
  public:
   explicit cublasAlgoMap(const std::string filename);
@@ -58,6 +58,6 @@ class cublasAlgoMap {
       std::string data_order);
   cublasLtMatmulAlgo_info getAlgo(int m, int n, int k,
                                   std::string data_order = "");
-  char* get_workspace();
+  void* get_workspace();
   int get_workspace_size();
 };

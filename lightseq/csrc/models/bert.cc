@@ -21,7 +21,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
 
   /* --- step.3 initial input Variable node --- */
   inp_tokens = new Variable("inp_tokens");
-  pad_mask_ptr = cuda_malloc<int>(_max_batch_size * tw_._max_step);
+  pad_mask_ptr = cuda_malloc<OpType_>(_max_batch_size * tw_._max_step);
   pad_mask = new Variable("pad_mask", (char *)pad_mask_ptr);
 
   /* --- step.4 inital operator & layer --- */

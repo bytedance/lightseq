@@ -80,7 +80,7 @@ void cublasAlgoMap::loadGemmConfig() {
 
   FILE* fd;
   fd = fopen((DEFAULT_DIR + _config_filename).c_str(), "r");
-  if (fd == NULL) {
+  if (fd == NULL || _config_filename.size() == 0) {
     std::cout << "[WARNING] " << DEFAULT_DIR + _config_filename
               << " is not found; using default GEMM algo" << std::endl;
     return;
@@ -183,6 +183,6 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
   }
 }
 
-char* cublasAlgoMap::get_workspace() { return _workspace; }
+void* cublasAlgoMap::get_workspace() { return _workspace; }
 
 int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
