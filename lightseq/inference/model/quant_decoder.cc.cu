@@ -165,7 +165,7 @@ void QuantDecoder<OpType_>::init_buffer() {
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
   quantize_weight(_p_d_trg_emb_wei[0], _int8_p_d_trg_emb_wei, _tw._hidden_size,
                   _tw._trg_vocab_size, _quant_range / _trg_emb_clip_max,
-                  _stream, _cublas_lt_handle);
+                  _stream, _cublas_lt_handle, kColMajor);
   CHECK_GPU_ERROR(
       cudaMalloc(&_int8_p_d_trg_emb_bottom_wei,
                  _tw._trg_vocab_size * _tw._hidden_size * sizeof(int8_t)));
@@ -924,14 +924,14 @@ bool QuantDecoder<OpType_>::sample() {
         _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topk,
         _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
-        _logits_clip_max / _quant_range, true);
+        _logits_clip_max / _quant_range, false);
   } else {
     ker_topp_sample_i8I_launcher<_DataType>(
         _batch_size, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
         _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
         _p_d_alive_seq_buf, _tw._trg_vocab_size, _tw._topp,
         _p_d_sample_unfinished, _p_d_curandstate, _tw._end_id,
-        _logits_clip_max / _quant_range, true);
+        _logits_clip_max / _quant_range, false);
   }
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
@@ -1055,7 +1055,7 @@ void QuantDecoder<OpType_>::update_new_seq_probs() {
       _p_d_can_idx, _p_d_can_score, _p_d_can_num, _tw._trg_vocab_size,
       _tw._max_step, _h_length_norm[_cur_step], _cur_step, _step_token_num,
       _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-      _tw._end_id, true);
+      _tw._end_id, false);
 
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
@@ -1076,7 +1076,7 @@ bool QuantDecoder<OpType_>::topk_greedy_search() {
       _step_token_num, (_cur_step + 1), _tw._max_step, 1, _max_thread_per_block,
       _stream, _int8_ffn_out_buf, _p_device_emb[6], _p_d_alive_seq,
       _p_d_alive_seq_buf, _tw._trg_vocab_size, 1, _p_d_sample_unfinished,
-      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, true);
+      _p_d_curandstate, _tw._end_id, _logits_clip_max / _quant_range, false);
 
 #ifdef DEBUG_RESULT
   print_vec(_p_d_sample_unfinished, "unfinished flag", 1);
