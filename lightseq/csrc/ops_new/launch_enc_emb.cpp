@@ -24,7 +24,7 @@ void LaunchEncEmbOp<T>::forward() {
   int* inp_tokens = (int*)parent(0)->value();
   const T* token_emb = (const T*)parent(1)->value();
   const T* pos_emb = (const T* const)parent(2)->value();
-  int* pad_mask = (int*)parent(3)->value();
+  T* pad_mask = (T*)parent(3)->value();
   T* lang_emb = (T*)parent(4)->value();
   int* lang_id = (int*)parent(5)->value();
 

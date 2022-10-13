@@ -78,7 +78,7 @@ pad_id, the padding token id
 */
 template <typename T>
 __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
-                            const int *tokens, T *output, int *pad_mask,
+                            const int *tokens, T *output, T *pad_mask,
                             int pad_id, int batch_size, int seq_len,
                             int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -93,7 +93,7 @@ __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
 
   if (token == pad_id) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = CUDA_FLOAT_INF_NEG;
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -116,8 +116,8 @@ __global__ void ker_enc_emb(const T *token_emb, const T *pos_emb,
 template <>
 __global__ void ker_enc_emb<__half>(const __half *token_emb,
                                     const __half *pos_emb, const int *tokens,
-                                    __half *output, int *pad_mask, int pad_id,
-                                    int batch_size, int seq_len,
+                                    __half *output, __half *pad_mask,
+                                    int pad_id, int batch_size, int seq_len,
                                     int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
@@ -131,7 +131,7 @@ __global__ void ker_enc_emb<__half>(const __half *token_emb,
 
   if (token == pad_id) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = __float2half(CUDA_FLOAT_INF_NEG);
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -179,7 +179,7 @@ template <typename T>
 __global__ void ker_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
                                           const int *tokens, const T *lang_emb,
                                           const int *lang_id, T *output,
-                                          int *pad_mask, int pad_id,
+                                          T *pad_mask, int pad_id,
                                           int batch_size, int seq_len,
                                           int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -194,7 +194,7 @@ __global__ void ker_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
 
   if (token == pad_id) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = CUDA_FLOAT_INF_NEG;
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -225,8 +225,8 @@ __global__ void ker_enc_emb_multilg_token(const T *token_emb, const T *pos_emb,
 template <>
 __global__ void ker_enc_emb_multilg_token<__half>(
     const __half *token_emb, const __half *pos_emb, const int *tokens,
-    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
-    int pad_id, int batch_size, int seq_len, int hidden_dim) {
+    const __half *lang_emb, const int *lang_id, __half *output,
+    __half *pad_mask, int pad_id, int batch_size, int seq_len, int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -239,7 +239,7 @@ __global__ void ker_enc_emb_multilg_token<__half>(
 
   if (token == pad_id) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = __float2half(CUDA_FLOAT_INF_NEG);
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -291,7 +291,7 @@ pad_id, the padding token id
 template <typename T>
 __global__ void ker_enc_emb_multilg_sentence(
     const T *token_emb, const T *pos_emb, const int *tokens, const T *lang_emb,
-    const int *lang_id, T *output, int *pad_mask, int pad_id, int batch_size,
+    const int *lang_id, T *output, T *pad_mask, int pad_id, int batch_size,
     int seq_len, int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
@@ -315,7 +315,7 @@ __global__ void ker_enc_emb_multilg_sentence(
   int tokens_idx = batch_idx * seq_len + seq_idx;
   if (is_pad) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = CUDA_FLOAT_INF_NEG;
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -338,8 +338,8 @@ __global__ void ker_enc_emb_multilg_sentence(
 template <>
 __global__ void ker_enc_emb_multilg_sentence<__half>(
     const __half *token_emb, const __half *pos_emb, const int *tokens,
-    const __half *lang_emb, const int *lang_id, __half *output, int *pad_mask,
-    int pad_id, int batch_size, int seq_len, int hidden_dim) {
+    const __half *lang_emb, const int *lang_id, __half *output,
+    __half *pad_mask, int pad_id, int batch_size, int seq_len, int hidden_dim) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * seq_len * hidden_dim) {
     return;
@@ -362,7 +362,7 @@ __global__ void ker_enc_emb_multilg_sentence<__half>(
   int tokens_idx = batch_idx * seq_len + seq_idx;
   if (is_pad) {
     if (dim_idx == 0) {
-      pad_mask[tokens_idx] = 1;
+      pad_mask[tokens_idx] = __float2half(CUDA_FLOAT_INF_NEG);
     }
     value.x = 0.f;
     value.y = 0.f;
@@ -390,7 +390,7 @@ __global__ void ker_enc_emb_multilg_sentence<__half>(
 
 template <typename T>
 void launch_enc_emb(const T *token_emb, const T *pos_emb, const int *tokens,
-                    T *output, int *pad_mask, int pad_id, int batch_size,
+                    T *output, T *pad_mask, int pad_id, int batch_size,
                     int seq_len, int hidden_dim, cudaStream_t stream,
                     const T *lang_emb, const int *lang_id, int multilg_type) {
   if (hidden_dim % 4 != 0) {
@@ -416,7 +416,7 @@ void launch_enc_emb(const T *token_emb, const T *pos_emb, const int *tokens,
 
 template <>
 void launch_enc_emb<__half>(const __half *token_emb, const __half *pos_emb,
-                            const int *tokens, __half *output, int *pad_mask,
+                            const int *tokens, __half *output, __half *pad_mask,
                             int pad_id, int batch_size, int seq_len,
                             int hidden_dim, cudaStream_t stream,
                             const __half *lang_emb, const int *lang_id,
@@ -445,15 +445,15 @@ void launch_enc_emb<__half>(const __half *token_emb, const __half *pos_emb,
 
 template void launch_enc_emb<float>(const float *token_emb,
                                     const float *pos_emb, const int *tokens,
-                                    float *output, int *pad_mask, int pad_id,
+                                    float *output, float *pad_mask, int pad_id,
                                     int batch_size, int seq_len, int hidden_dim,
                                     cudaStream_t stream, const float *lang_emb,
                                     const int *lang_id, int multilg_type);
 
 template void launch_enc_emb<__half>(const __half *token_emb,
                                      const __half *pos_emb, const int *tokens,
-                                     __half *output, int *pad_mask, int pad_id,
-                                     int batch_size, int seq_len,
+                                     __half *output, __half *pad_mask,
+                                     int pad_id, int batch_size, int seq_len,
                                      int hidden_dim, cudaStream_t stream,
                                      const __half *lang_emb, const int *lang_id,
                                      int multilg_type);
