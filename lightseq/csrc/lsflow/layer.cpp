@@ -32,6 +32,22 @@ void Layer::backward() {
   }
 }
 
+Variable* Layer::input(int index) {
+  if(index >= _inp_var_vec.size()) {
+    printf("layer name: %s, input index: %d\n", _name.c_str(), index);
+    exit(-1);
+  }
+  return _inp_var_vec[index]; 
+}
+
+Variable* Layer::output(int index) {
+  if(index >= _out_var_vec.size()) {
+    printf("layer name: %s, output index: %d\n", _name.c_str(), index);
+    exit(-1);
+  }
+  return _out_var_vec[index];
+}
+
 void Layer::clear_fw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_fw_flag();

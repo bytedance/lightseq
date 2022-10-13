@@ -23,8 +23,6 @@ void MemoryManager::update_tensor_life_idx(int unique_id, int node_idx,
 void MemoryManager::remove_life_cycle(int unique_id) {
   if (tensor_usages_.find(unique_id) != tensor_usages_.end()) {
     tensor_usages_.erase(unique_id);
-  } else {
-    printf("Can't find tensor %d in tensor_usages_!\n", unique_id);
   }
 }
 
