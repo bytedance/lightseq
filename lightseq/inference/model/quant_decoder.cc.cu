@@ -59,7 +59,7 @@ QuantDecoder<OpType_>::QuantDecoder(int max_batch_size,
       _h_length_norm(tw._max_step, 1.f),
       _h_unfinished(1),
       _is_benchmark(false),
-      _algo_map(cublasAlgoMap()),
+      _algo_map(),
       _use_ORDER_COL32_2R_4R4(getSMVersion() >= 80 ? true : false) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;

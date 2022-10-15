@@ -7,11 +7,6 @@
 namespace lightseq {
 namespace cuda {
 
-cublasAlgoMap::cublasAlgoMap(const std::string filename)
-    : _config_filename(filename) {
-  loadGemmConfig();
-}
-
 cublasAlgoMap::cublasAlgoMap() {
   std::string gpu_name = getGPUName();
   if (gpu_name == "T4") {
@@ -27,10 +22,6 @@ cublasAlgoMap::cublasAlgoMap() {
   }
   loadGemmConfig();
 }
-
-cublasAlgoMap::cublasAlgoMap(const cublasAlgoMap& algo_map)
-    : _config_filename(algo_map._config_filename),
-      _algo_map(algo_map._algo_map) {}
 
 cublasAlgoMap::~cublasAlgoMap() {
   _algo_map.clear();
