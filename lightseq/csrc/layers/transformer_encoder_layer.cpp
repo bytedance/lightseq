@@ -51,7 +51,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)),
       _enable_quant(false),
       _mask_future_tokens(mask_future_tokens),
-      _algo_map(cublasAlgoMap()) {
+      _algo_map() {
   assert(_hidden_size % _heads == 0);
   allocate_mem_buffer();
 }

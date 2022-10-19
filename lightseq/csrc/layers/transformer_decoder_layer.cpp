@@ -74,7 +74,7 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename Dropout<T>::Config(hidden_output_dropout_ratio),
           std::max(_max_batch_tokens, _intermediate_size) * _hidden_size),
       _enable_quant(false),
-      _algo_map(cublasAlgoMap()) {
+      _algo_map() {
   assert(_hidden_size % _heads == 0);
   allocate_buffer();
   _shared_nlayer += 1;

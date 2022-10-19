@@ -21,7 +21,7 @@ namespace cuda {
 #define STRIDE 32
 #define BORDER 512
 
-static std::string DEFAULT_URL = "https://zenodo.org/record/7176939/files/";
+static std::string DEFAULT_URL = "https://zenodo.org/record/7219754/files/";
 static std::string DEFAULT_DIR =
     std::string(std::getenv("HOME")) + "/.lightseq/igemm_configs/";
 static std::string IGEMM_T4_CONFIG = "igemm_T4.cfg";
@@ -45,9 +45,7 @@ class cublasAlgoMap {
   void* _workspace = NULL;
 
  public:
-  explicit cublasAlgoMap(const std::string filename);
   cublasAlgoMap();
-  cublasAlgoMap(const cublasAlgoMap& map);
   ~cublasAlgoMap();
 
   bool fileExist(std::string path);
