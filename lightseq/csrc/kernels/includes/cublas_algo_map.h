@@ -43,9 +43,7 @@ class cublasAlgoMap {
   void* _workspace = NULL;
 
  public:
-  explicit cublasAlgoMap(const std::string filename);
   cublasAlgoMap();
-  cublasAlgoMap(const cublasAlgoMap& map);
   ~cublasAlgoMap();
 
   bool fileExist(std::string path);
