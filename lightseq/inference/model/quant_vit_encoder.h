@@ -46,7 +46,7 @@ class QuantVitEncoder {
   cudaStream_t _stream;
   cublasHandle_t _hd;
   cublasLtHandle_t _cublas_lt_handle;
-  const bool _use_ORDER_COL32_2R_4R4;
+  const bool _sm_gt_eq_80;
 
   const _DataType _fone;
   const _DataType _fzero;
