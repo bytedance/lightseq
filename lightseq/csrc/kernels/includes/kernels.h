@@ -153,7 +153,7 @@ void launch_ls_fakequant_dropout_act_bias(
     T *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const T *bias, const T *cmax_out, const T *cmax_in,
     int total_count, int dim, float ratio, cudaStream_t stream,
-    bool in_col32 = false);
+    bool in_col32 = false, bool symmetry = true);
 
 template <typename T>
 void launch_ls_quant_dropout_res_bias(T *out, uint8_t *mask,
