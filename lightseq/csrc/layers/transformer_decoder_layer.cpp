@@ -208,7 +208,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
 
     _attn_dropout.quant_bias_dropout_residual(
         output_ptr, qout_ptr, _attn_out_cmax_ptr + 2, input_ptr, _attn_ob_ptr,
-        _batch_tokens, _hidden_size, _stream, attn_out_layout[2]);
+        _batch_tokens, _hidden_size, _stream, attn_out_layout[2] == kCol32);
 
   } else {
     // [b, nh, s, ad] -> [b, s, nh, ad]

@@ -1078,7 +1078,7 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
     const int total_count, const float ratio, float *qout, uint8_t *cmask_out,
     uint8_t *cmask_in, uint8_t *dropout_mask, const int8_t *qin,
     const float *bias, const float *cmax_out, const float *cmax_in,
-    const int seed, const int hidden_size, bool in_col32) {
+    const int seed, const int hidden_size, bool in_col32, bool symmetry) {
   const float scale = 1.f / (1.f - ratio);
   int i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1127,19 +1127,19 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
   out.x = fake_quantize(activation_kernel<act_type, float>(
                             dequantize(qinput[0], output_clip_max) + b4.x) *
                             scale * m[0],
-                        input_clip_max, in_cmask[0], 2);
+                        input_clip_max, in_cmask[0], 2, symmetry);
   out.y = fake_quantize(activation_kernel<act_type, float>(
                             dequantize(qinput[1], output_clip_max) + b4.y) *
                             scale * m[1],
-                        input_clip_max, in_cmask[1], 2);
+                        input_clip_max, in_cmask[1], 2, symmetry);
   out.z = fake_quantize(activation_kernel<act_type, float>(
                             dequantize(qinput[2], output_clip_max) + b4.z) *
                             scale * m[2],
-                        input_clip_max, in_cmask[2], 2);
+                        input_clip_max, in_cmask[2], 2, symmetry);
   out.w = fake_quantize(activation_kernel<act_type, float>(
                             dequantize(qinput[3], output_clip_max) + b4.w) *
                             scale * m[3],
-                        input_clip_max, in_cmask[3], 2);
+                        input_clip_max, in_cmask[3], 2, symmetry);
 
   in_cmask4[i] |= reinterpret_cast<uint32_t *>(in_cmask)[0];
   out4[i] = out;
@@ -1150,7 +1150,7 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
     const int total_count, const float ratio, __half *qout, uint8_t *cmask_out,
     uint8_t *cmask_in, uint8_t *dropout_mask, const int8_t *qin,
     const __half *bias, const __half *cmax_out, const __half *cmax_in,
-    const int seed, const int hidden_size, bool in_col32) {
+    const int seed, const int hidden_size, bool in_col32, bool symmetry) {
   const float scale = 1.f / (1.f - ratio);
 
   int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1222,9 +1222,9 @@ __global__ void ls_fakequant_dropout_act_bias_kernel(
                 scale_mask[j]);
 
     out[j].x = __float2half(fake_quantize(__half2float(temp.x), input_clip_max,
-                                          in_cmask[j * 2], 2));
+                                          in_cmask[j * 2], 2, symmetry));
     out[j].y = __float2half(fake_quantize(__half2float(temp.y), input_clip_max,
-                                          in_cmask[j * 2 + 1], 2));
+                                          in_cmask[j * 2 + 1], 2, symmetry));
   }
 
   in_cmask8[i] |= reinterpret_cast<uint64_t *>(in_cmask)[0];
@@ -1236,7 +1236,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, float>(
     float *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const float *bias, const float *cmax_out,
     const float *cmax_in, int total_count, int dim, float ratio,
-    cudaStream_t stream, bool in_col32) {
+    cudaStream_t stream, bool in_col32, bool symmetry) {
   int grid_dim = total_count >> 10;
   ls_fakequant_dropout_act_bias_kernel<ActivationType::kGelu>
       <<<grid_dim + 1, 256, 0, stream>>>(
@@ -1245,7 +1245,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, float>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_col32);
+          dim, in_col32, symmetry);
 }
 
 template <>
@@ -1253,7 +1253,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, __half>(
     __half *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const __half *bias, const __half *cmax_out,
     const __half *cmax_in, int total_count, int dim, float ratio,
-    cudaStream_t stream, bool in_col32) {
+    cudaStream_t stream, bool in_col32, bool symmetry) {
   int grid_dim = total_count >> 11;
   ls_fakequant_dropout_act_bias_kernel<ActivationType::kGelu>
       <<<grid_dim + 1, 256, 0, stream>>>(
@@ -1262,7 +1262,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, __half>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_col32);
+          dim, in_col32, symmetry);
 }
 
 template <>
@@ -1270,7 +1270,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, float>(
     float *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const float *bias, const float *cmax_out,
     const float *cmax_in, int total_count, int dim, float ratio,
-    cudaStream_t stream, bool in_col32) {
+    cudaStream_t stream, bool in_col32, bool symmetry) {
   int grid_dim = total_count >> 10;
   ls_fakequant_dropout_act_bias_kernel<ActivationType::kRelu>
       <<<grid_dim + 1, 256, 0, stream>>>(
@@ -1279,7 +1279,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, float>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_col32);
+          dim, in_col32, symmetry);
 }
 
 template <>
@@ -1287,7 +1287,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, __half>(
     __half *out, uint8_t *cmask_out, uint8_t *cmask_in, uint8_t *dropout_mask,
     const int8_t *qinput, const __half *bias, const __half *cmax_out,
     const __half *cmax_in, int total_count, int dim, float ratio,
-    cudaStream_t stream, bool in_col32) {
+    cudaStream_t stream, bool in_col32, bool symmetry) {
   int grid_dim = total_count >> 11;
   ls_fakequant_dropout_act_bias_kernel<ActivationType::kRelu>
       <<<grid_dim + 1, 256, 0, stream>>>(
@@ -1296,7 +1296,7 @@ void launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, __half>(
           std::chrono::duration_cast<std::chrono::microseconds>(
               std::chrono::system_clock::now().time_since_epoch())
               .count(),
-          dim, in_col32);
+          dim, in_col32, symmetry);
 }
 
 /**

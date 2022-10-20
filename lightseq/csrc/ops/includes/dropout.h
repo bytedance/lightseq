@@ -118,7 +118,7 @@ class Dropout {
       launch_ls_fakequant_dropout_act_bias<ActivationType::kRelu, T>(
           output, clip_mask_out, clip_mask_in, _mask, qinput, bias,
           clip_max_out, clip_max_in, rows * cols, cols, _config.RATIO(), stream,
-          in_col32);
+          in_col32, false);
     } else if (activation_fn == "gelu") {
       launch_ls_fakequant_dropout_act_bias<ActivationType::kGelu, T>(
           output, clip_mask_out, clip_mask_in, _mask, qinput, bias,
