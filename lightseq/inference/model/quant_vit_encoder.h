@@ -15,6 +15,7 @@
 
 #include "../proto/quant_vit_weight.h"
 #include "../tools/util.h"
+#include "cublas_algo_map.h"
 
 /**
 @file
@@ -46,6 +47,7 @@ class QuantVitEncoder {
   cudaStream_t _stream;
   cublasHandle_t _hd;
   cublasLtHandle_t _cublas_lt_handle;
+  cublasAlgoMap _algo_map;
   const bool _sm_gt_eq_80;
 
   const _DataType _fone;

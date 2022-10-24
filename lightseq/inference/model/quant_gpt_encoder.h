@@ -16,6 +16,7 @@
 
 #include "../proto/quant_gpt_weight.h"
 #include "../tools/util.h"
+#include "cublas_algo_map.h"
 
 namespace lightseq {
 namespace cuda {
@@ -45,6 +46,7 @@ class QuantGptEncoder {
   cudaStream_t _cache_stream;
   cublasHandle_t _hd;
   cublasLtHandle_t _cublas_lt_handle;
+  cublasAlgoMap _algo_map;
   const bool _sm_gt_eq_80;
 
   const _DataType _fone;
@@ -110,6 +112,7 @@ class QuantGptEncoder {
 
   int _batch_size;
   int _batch_token_num;
+  int _batch_max_seq_len;
   int _layer_id;
   int _weight_offset;
   bool _is_benchmark;
