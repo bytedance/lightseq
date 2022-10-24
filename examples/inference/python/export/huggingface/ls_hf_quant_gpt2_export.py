@@ -45,6 +45,7 @@ def extract_gpt_weights(
     eos_id=50256,
     pad_id=50257,
     max_step=50,
+    extra_decode_length=0,
 ):
     # load var names
     with open(os.path.join(os.path.dirname(model_dir), "config.json")) as f:
@@ -121,6 +122,9 @@ def extract_gpt_weights(
     hdf5_file.create_dataset("model_conf/topp", data=topp, dtype="f4")
     hdf5_file.create_dataset("model_conf/topk", data=topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=eos_id, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/extra_decode_length", data=extra_decode_length, dtype="i4"
+    )
 
     hdf5_file.close()
     # read-in again to double check
@@ -150,6 +154,7 @@ if __name__ == "__main__":
     eos_id = 50256
     pad_id = 50257
     max_step = 50
+    extra_decode_length = 0  # use positive length to avtivate it
     extract_gpt_weights(
         hdf5_path,
         args.model,
@@ -159,4 +164,5 @@ if __name__ == "__main__":
         eos_id=eos_id,
         pad_id=pad_id,
         max_step=max_step,
+        extra_decode_length=extra_decode_length,
     )

@@ -275,6 +275,15 @@ void QuantGptWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file) {
     _sampling_method = _sampling_method_read;
   }
 
+  int _extra_decode_length_read;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
+                           H5T_NATIVE_INT, &_extra_decode_length_read);
+  if (_extra_decode_length_read > 0) {
+    _extra_decode_length = _extra_decode_length_read;
+  } else {
+    _extra_decode_length = _max_step;
+  }
+
   int _topk_read;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_INT,
                            &_topk_read);
