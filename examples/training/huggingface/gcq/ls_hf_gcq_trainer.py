@@ -28,7 +28,7 @@ class LSTrainer(Trainer):
         # Enable GCQ.
         if (
             isinstance(model, torch.nn.parallel.DistributedDataParallel)
-            and self.gcq_args.enable_GCQ
+            and getattr(self.gcq_args, "enable_GCQ", False)
         ):
             assert version.parse(torch.__version__) >= version.parse(
                 "1.10"
