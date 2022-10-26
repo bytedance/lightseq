@@ -46,6 +46,16 @@ void Node::recursive_forward() {
 
 #ifdef DEBUG_MODE
   auto start = std::chrono::high_resolution_clock::now();
+  if (node_type() == NodeType::Operator) {
+    printf("##### %s forward #####\n", name().c_str());
+    Operator* this_op = static_cast<Operator*>(this);
+    printf("_parents.size(): %zu\n", _parents.size());
+    for (int idx = 0; idx < _parents.size(); idx++) {
+      if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
+        print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(),
+                  this_op->parent(idx)->name() + ":value", 10);
+    }
+  }
 #endif
 
   forward();
@@ -55,14 +65,9 @@ void Node::recursive_forward() {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  printf("##### %s forward #####\n", name().c_str());
   print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
-  for (int idx = 0; idx < _parents.size(); idx++) {
-    if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
-      print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(),
-                this_op->parent(idx)->name() + ":value", 10);
-  }
+  printf("_children.size(): %zu\n", _children.size());
   for (int idx = 0; idx < _children.size(); idx++) {
     if (_children[idx] != nullptr && this_op->child(idx)->value() != nullptr)
       print_vec((TENSOR_TYPE*)this_op->child(idx)->value(),
@@ -82,6 +87,16 @@ void Node::recursive_backward() {
   _context_ptr->update_node_idx();
 
 #ifdef DEBUG_MODE
+  if (node_type() == NodeType::Operator) {
+    printf("##### %s backward #####\n", name().c_str());
+    Operator* this_op = static_cast<Operator*>(this);
+    printf("_children.size(): %zu\n", _children.size());
+    for (int idx = 0; idx < _children.size(); idx++) {
+      if (_children[idx] != nullptr && this_op->child(idx)->grad() != nullptr)
+        print_vec((TENSOR_TYPE*)this_op->child(idx)->grad(),
+                  this_op->child(idx)->name() + ":grad", 10);
+    }
+  }
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -92,18 +107,13 @@ void Node::recursive_backward() {
     return;
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  printf("##### %s backward #####\n", name().c_str());
   print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
+  printf("_parents.size(): %zu\n", _parents.size());
   for (int idx = 0; idx < _parents.size(); idx++) {
     if (_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)
       print_vec((TENSOR_TYPE*)this_op->parent(idx)->grad(),
                 this_op->parent(idx)->name() + ":grad", 10);
-  }
-  for (int idx = 0; idx < _children.size(); idx++) {
-    if (_children[idx] != nullptr && this_op->child(idx)->grad() != nullptr)
-      print_vec((TENSOR_TYPE*)this_op->child(idx)->grad(),
-                this_op->child(idx)->name() + ":grad", 10);
   }
   printf("\n");
 #endif
@@ -143,7 +153,26 @@ Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
   }
 }
 
+Variable::Variable(std::string name, Variable* parent_variable,
+                   size_t offset_value, size_t offset_grad)
+    : Node(name, parent_variable->node_type()),
+      is_descendants(true),
+      _parent_variable(parent_variable),
+      _offset_value(offset_value),
+      _offset_grad(offset_grad) {
+        parent_variable->has_descendants();
+      }
+
 void Variable::fixed_memory() {
+  if(is_descendants) {
+    if (children().size() == 0) {
+      _parent_variable->fixed_memory();
+    }
+    return ;
+  }
+  if(is_ancestor && parents().size() > 0) {
+    return ;
+  }
   if (parents().size() > 0 && children().size() > 0) {
     printf("ERROR! this node is not a IONode!\n");
     exit(-1);
@@ -173,10 +202,18 @@ void Variable::set_grad(char* grad_ptr) {
 }
 
 char* Variable::value(bool is_open_interval) {
+  if (is_descendants) {
+    return _parent_variable->value(is_open_interval) + _offset_value;
+  }
   return _value->tensor(is_open_interval);
 }
 
-char* Variable::grad() { return _grad->tensor(); }
+char* Variable::grad(bool is_open_interval) {
+  if (is_descendants) {
+    return _parent_variable->grad(is_open_interval) + _offset_grad;
+  }
+  return _grad->tensor(is_open_interval);
+}
 
 bool Variable::enable_override_grad() {
   if (this->_children.size() == 1) {
@@ -185,6 +222,19 @@ bool Variable::enable_override_grad() {
     return false;
   }
 }
+
+void Variable::has_descendants() { is_ancestor = true; }
+
+#ifdef DEBUG_MODE
+void Variable::debug_var() {
+  printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(), _value->memory_type().c_str(), _value_byte_size);
+  print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
+  if(_context_ptr->is_training()){
+    printf("node: %s, grad_byte_size: %zu\n", name().c_str(), _grad_byte_size);
+    print_vec((TENSOR_TYPE*)grad(), name() + ":grad", 10);
+  }
+}
+#endif
 
 Operator::Operator(std::string name) : Node(name, NodeType::Operator) {
   _context_ptr->add_op(this);

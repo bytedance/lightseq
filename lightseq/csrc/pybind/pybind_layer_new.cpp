@@ -194,6 +194,8 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
 
+  printf("Running! transformer_decoder_layer_fw\n");
+
   const char *dec_input_ptr = (const char *)dec_input.data_ptr();
   const char *enc_output_ptr = (const char *)enc_output.data_ptr();
   const char *enc_mask_ptr = (const char *)enc_mask.data_ptr();
@@ -209,7 +211,7 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   int trg_seq_len = dec_input.size(1);
   int src_seq_len = enc_output.size(1);
   int step = -1;
-  std::vector<char *> cache_ptr;
+  std::vector<char *> cache_ptr(5, nullptr);
   if (cache.size() > 0) {
     trg_seq_len = dec_input.size(0) / batch_size;  // beam_size
     step = cache[0].size(2) - 1;
@@ -221,25 +223,39 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
     }
   }
 
+  printf("Running! before set input ptr\n");
+
   Variable *inp_node = layer->input(0);
   inp_node->set_value(dec_input_ptr);
+
   Variable *enc_out_node = layer->input(1);
   enc_out_node->set_value(enc_output_ptr);
+
   Variable *enc_mask_node = layer->input(2);
   enc_mask_node->set_value(enc_mask_ptr);
+
   Variable *old_cache_k = layer->input(3);
   old_cache_k->set_value(cache_ptr[2]);
-  Variable *old_cache_v = layer->output(4);
+
+  Variable *old_cache_v = layer->input(4);
   old_cache_v->set_value(cache_ptr[3]);
+
 
   Variable *dec_out = layer->output(0);
   dec_out->set_value(dec_output_ptr);
+
+  print_vec((T1*)cache_ptr[0], "new_cache_k", 10);
   Variable *new_cache_k = layer->output(1);
   new_cache_k->set_value(cache_ptr[0]);
+
   Variable *new_cache_v = layer->output(2);
   new_cache_v->set_value(cache_ptr[1]);
 
+  printf("Running! before_forward\n");
+
   layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
+
+  printf("Running! forward\n");
 
   layer->forward();
 
@@ -260,6 +276,11 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
     std::shared_ptr<TransformerEncoderLayer<T1, T2>> layer =
         std::static_pointer_cast<TransformerEncoderLayer<T1, T2>>(
             Context::get_pybind_layer("TransformerEncoderLayer", layer_id));
+    layer->load_para_and_grad(wptr, gptr);
+  } else if (layer_name == "TransformerDecoderLayer") {
+    std::shared_ptr<TransformerDecoderLayer<T1, T2>> layer =
+        std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
+            Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
     layer->load_para_and_grad(wptr, gptr);
   } else {
     printf("Error! layer_name %s is unsupported!\n", layer_name.c_str());
@@ -310,6 +331,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("create_transformer_decoder_layer_new_fp16",
         &lightseq::create_transformer_decoder_layer<__half, __half>,
         "Create LightSeq Transformer Decoder Layer with fp16 (CUDA)");
+
+  m.def("transformer_decoder_layer_fw_fp32",
+        &lightseq::transformer_decoder_layer_fw<float, float>,
+        "LightSeq Transformer Decoder forward with fp32 (CUDA)");
+  m.def("transformer_decoder_layer_fw_fp16",
+        &lightseq::transformer_decoder_layer_fw<__half, __half>,
+        "LightSeq Transformer Decoder forward with fp16 (CUDA)");
 
   m.def("assign_layer_weight_grad_fp32",
         &lightseq::assign_layer_weight_grad<float, float>,

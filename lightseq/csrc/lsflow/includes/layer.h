@@ -29,8 +29,8 @@ class Layer {
   void set_inputs(std::vector<Variable*> inps) { _inp_var_vec = inps; }
   void set_outputs(std::vector<Variable*> outs) { _out_var_vec = outs; }
 
-  Variable* input(int idx) { return _inp_var_vec[idx]; }
-  Variable* output(int idx) { return _out_var_vec[idx]; }
+  Variable* input(int idx);
+  Variable* output(int idx);
 
   void clear_fw_flag();
 

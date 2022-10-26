@@ -20,9 +20,10 @@ class TransformerDecoderLayer : public Layer {
   int _max_batch_tokens;
   int _hidden_size;
   int _step;
+  int _batch_tokens;
 
-  static T1* _encdec_kv_buffer;
-  static T2* _grad_encdec_kv_buffer;
+  static Variable* total_enc_k;
+  static Variable* total_enc_v;
 
  public:
   TransformerDecoderLayer(int nshared_layer, int layer_id, int max_batch_tokens,
@@ -32,7 +33,7 @@ class TransformerDecoderLayer : public Layer {
                           float activation_dropout_ratio,
                           bool pre_or_postLayerNorm, std::string activation_fn);
 
-  virtual ~TransformerDecoderLayer() {}
+  virtual ~TransformerDecoderLayer();
 
   /*
     Inputs:
@@ -56,12 +57,6 @@ class TransformerDecoderLayer : public Layer {
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
-
-template <typename T1, typename T2>
-T1* TransformerDecoderLayer<T1, T2>::_encdec_kv_buffer = nullptr;
-
-template <typename T1, typename T2>
-T2* TransformerDecoderLayer<T1, T2>::_grad_encdec_kv_buffer = nullptr;
 
 template class TransformerDecoderLayer<float, float>;
 template class TransformerDecoderLayer<__half, __half>;

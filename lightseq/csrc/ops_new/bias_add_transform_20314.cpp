@@ -7,13 +7,13 @@ std::tuple<Variable*, Variable*, Variable*>
 BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
   size_t trans_size = _max_batch_tokens * _hidden_size;
   Variable* res0 =
-      new Variable("BiasAddTrans20314_res_0", trans_size * sizeof(T1),
+      new Variable("BiasAddTrans20314_res_fir", trans_size * sizeof(T1),
                    trans_size * sizeof(T2));
   Variable* res1 =
-      new Variable("BiasAddTrans20314_res_1", trans_size * sizeof(T1),
+      new Variable("BiasAddTrans20314_res_sec", trans_size * sizeof(T1),
                    trans_size * sizeof(T2));
   Variable* res2 =
-      new Variable("BiasAddTrans20314_res_2", trans_size * sizeof(T1),
+      new Variable("BiasAddTrans20314_res_thir", trans_size * sizeof(T1),
                    trans_size * sizeof(T2));
   this->set_parents({inp, bias});
   this->set_children({res0, res1, res2});
@@ -28,9 +28,8 @@ void BiasAddTrans20314<T1, T2>::forward() {
   T1* bias_ptr = (T1*)parent(1)->value();
 
   T1* q_ptr = (T1*)child(0)->value();
-  T1* k_ptr = (_trans_count <= 1) ? nullptr : (T1*)child(1)->value();
-  T1* v_ptr = (_trans_count <= 2) ? nullptr : (T1*)child(2)->value();
-
+  T1* k_ptr = (_trans_count < 2) ? nullptr : (T1*)child(1)->value();
+  T1* v_ptr = (_trans_count < 3) ? nullptr : (T1*)child(2)->value();
   launch_bias_add_transform_20314_new<T1>(
       q_ptr, k_ptr, v_ptr, inp_ptr, bias_ptr, _batch, _seq_len, _trans_count,
       _heads, _hidden_size / _heads, _stream);

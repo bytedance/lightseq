@@ -57,11 +57,21 @@ class Variable : public Node {
   size_t _grad_byte_size;
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
+  bool is_descendants = false;
+  bool is_ancestor = false;
+  size_t _offset_value;
+  size_t _offset_grad;
+  Variable* _parent_variable;
 
  public:
-  Variable(std::string name);
-  Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
-  Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
+  Variable(std::string name);  // for Fixed memory
+  Variable(std::string name, size_t value_byte_size,
+           size_t grad_byte_size = 0);  // for Shared memory
+  Variable(std::string name, const char* para_ptr,
+           char* grad_ptr = nullptr);  // for Fixed memory
+  Variable(std::string name, Variable* parent_variable, size_t offset_value,
+           size_t offset_grad = 0);  // for inherit Variable
+
   virtual ~Variable() {}
 
   void fixed_memory();  // Convert VariableNode to IONode
@@ -72,11 +82,19 @@ class Variable : public Node {
 
   void set_grad(char* grad_ptr);
 
+  /*
+    value() / grad() means get the value or grad of this node, when
+    is_open_interval is true, it doesn't update the lifecycle of the tensor.
+  */
   char* value(bool is_open_interval = false);
-
-  char* grad();
+  char* grad(bool is_open_interval = false);
 
   bool enable_override_grad();
+  void has_descendants();
+
+#ifdef DEBUG_MODE
+  void debug_var();
+#endif
 };
 
 class Operator : public Node {

@@ -67,4 +67,15 @@ void Tensor::reset_fixed() {
   _size = 0;
 }
 
+std::string Tensor::memory_type() {
+  if (_mtype == LSMemoryType::FixedMemory) {
+    return "FixedMemory";
+  }
+  else if (_mtype == LSMemoryType::SharedMemory) {
+    return "SharedMemory";
+  }
+
+  return "Undefined";
+}
+
 }  // namespace lightseq

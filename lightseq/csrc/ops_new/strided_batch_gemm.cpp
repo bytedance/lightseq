@@ -22,10 +22,6 @@ void StridedBatchGemmOp<T1, T2>::forward() {
   int stride_c = _m * _n;
 
   T1* _buffer_a = (T1*)parent(0)->value();
-  if (_dec_layer_id >= 0) {
-    _buffer_a += _dec_layer_id * _m * _k;
-  }
-
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
 
@@ -50,19 +46,11 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   cublasOperation_t op_b = (_op_B == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
 
   T1* _buffer_a = (T1*)parent(0)->value();
-  if (_dec_layer_id >= 0) {
-    _buffer_a += _dec_layer_id * _m * _k;
-  }
-
   T1* _buffer_b = (T1*)parent(1)->value();
 
   T2* d_output = (T2*)child(0)->grad();
 
   T2* inpGradA = (T2*)parent(0)->grad();
-  if (_dec_layer_id >= 0) {
-    inpGradA += _dec_layer_id * _m * _k;
-  }
-
   T2* inpGradB = (T2*)parent(1)->grad();
 
   // Calculate d_A.

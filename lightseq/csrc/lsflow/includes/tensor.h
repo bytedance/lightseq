@@ -36,6 +36,8 @@ class Tensor {
   void remove_life_cycle();
 
   void reset_fixed();
+  std::string memory_type();
+  friend class Variable;
 };
 
 }  // namespace lightseq

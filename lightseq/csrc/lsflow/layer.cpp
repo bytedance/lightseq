@@ -32,6 +32,24 @@ void Layer::backward() {
   }
 }
 
+Variable* Layer::input(int idx) {
+  if (idx >= _inp_var_vec.size()) {
+    printf("ERROR OCCURRED!\n");
+    printf("layer %s input idx is out of range!\n", name().c_str());
+    exit(0);
+  }
+  return _inp_var_vec[idx];
+}
+
+Variable* Layer::output(int idx) {
+  if (idx >= _out_var_vec.size()) {
+    printf("ERROR OCCURRED!\n");
+    printf("layer %s output idx is out of range!\n", name().c_str());
+    exit(0);
+  }
+  return _out_var_vec[idx];
+}
+
 void Layer::clear_fw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_fw_flag();
