@@ -22,8 +22,10 @@ class TransformerDecoderLayer : public Layer {
   int _step;
   int _batch_tokens;
 
-  static Variable* total_enc_k;
-  static Variable* total_enc_v;
+  static Variable* total_enc_kv;
+
+  Variable* enc_k;
+  Variable* enc_v;
 
  public:
   TransformerDecoderLayer(int nshared_layer, int layer_id, int max_batch_tokens,

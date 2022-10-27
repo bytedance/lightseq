@@ -94,6 +94,7 @@ class Variable : public Node {
   void remove_ancestor();
   void add_descendants();
   void remove_descendants();
+  void set_offset(size_t offset_value, size_t offset_grad);
 
 #ifdef DEBUG_MODE
   void debug_var();

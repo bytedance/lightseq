@@ -29,7 +29,7 @@ class EncDecKvLayer : public Layer {
 
   virtual ~EncDecKvLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* enc_out);
+  Variable* operator()(Variable* enc_out);
 
   void before_forward(int batch_size, int seq_len);
 

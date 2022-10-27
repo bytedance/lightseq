@@ -66,11 +66,11 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> transform_20314_out =
+  Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
-  Variable* q_out = std::get<0>(transform_20314_out);
-  Variable* k_out = std::get<1>(transform_20314_out);
-  Variable* v_out = std::get<2>(transform_20314_out);
+  q_out = new Variable("q_out", transform_20314_out);
+  k_out = new Variable("k_out", transform_20314_out);
+  v_out = new Variable("v_out", transform_20314_out);
 
   Variable* attn_score = (*_attn_scores)(k_out, q_out);
 
@@ -122,6 +122,10 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
                                _batch_heads);
+
+  q_out->set_offset(0, 0);
+  k_out->set_offset(_batch_dim * sizeof(T1), _batch_dim * sizeof(T2));
+  v_out->set_offset(2 * _batch_dim * sizeof(T1), 2 * _batch_dim * sizeof(T2));
 
   _softmax->before_forward(batch_size, seq_len, seq_len);
 

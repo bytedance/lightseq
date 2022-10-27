@@ -253,6 +253,11 @@ void Variable::remove_ancestor() {
   }
 }
 
+void Variable::set_offset(size_t offset_value, size_t offset_grad) {
+  _offset_value = offset_value;
+  _offset_grad = offset_grad;
+}
+
 
 #ifdef DEBUG_MODE
 void Variable::debug_var() {

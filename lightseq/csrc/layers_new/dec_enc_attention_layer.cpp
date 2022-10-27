@@ -67,11 +67,10 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
     q_linear_out = (*_q_linear)(inp, _attn_qw);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> transform_20314_out =
+  Variable* transform_20314_out =
       (*_bias_add_transform_20314_q)(q_linear_out, _attn_qb);
-  Variable* q_out = std::get<0>(transform_20314_out);
 
-  Variable* attn_score = (*_attn_scores)(enc_k, q_out);
+  Variable* attn_score = (*_attn_scores)(enc_k, transform_20314_out);
 
   Variable* soft_out = (*_softmax)(attn_score, enc_mask);
 

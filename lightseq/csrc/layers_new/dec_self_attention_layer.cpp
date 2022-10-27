@@ -70,11 +70,10 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> transform_20314_out =
-      (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
-  Variable* q_out = std::get<0>(transform_20314_out);
-  Variable* k_out = std::get<1>(transform_20314_out);
-  Variable* v_out = std::get<2>(transform_20314_out);
+  Variable* transform_20314_out = (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
+  q_out = new Variable("q_out", transform_20314_out);
+  k_out = new Variable("k_out", transform_20314_out);
+  v_out = new Variable("v_out", transform_20314_out);
 
   Variable* new_k_out = (*_deal_cache_k)(k_out, cache_k);
   Variable* new_v_out = (*_deal_cache_v)(v_out, cache_v);
@@ -133,6 +132,9 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   _qkv_linear->before_forward(_trg_batch_tokens);
 
   _bias_add_transform_20314->before_forward(batch_size, from_len);
+  q_out->set_offset(_batch_dim * sizeof(T1) * 0, _batch_dim * sizeof(T2) * 0);
+  k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
+  v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
   _deal_cache_k->before_forward(batch_size, from_len, steps == -1);
 
