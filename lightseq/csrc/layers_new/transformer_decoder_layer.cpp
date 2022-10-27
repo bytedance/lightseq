@@ -71,7 +71,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
   Variable* new_self_k = std::get<1>(self_attn_layer_product);
   Variable* new_self_v = std::get<2>(self_attn_layer_product);
 
-  Variable* enc_attn_out = (*_enc_attn_layer)(self_attn_out, enc_k, enc_v);
+  Variable* enc_attn_out = (*_enc_attn_layer)(self_attn_out, enc_mask, enc_k, enc_v);
 
   Variable* ffn_out = (*_ffn_layer)(enc_attn_out);
 

@@ -16,8 +16,7 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
   if (_is_skip) {
-    T1* inp_ptr = (T1*)parent(0)->value();
-    child(0)->set_value((char*)inp_ptr);
+    child(0)->set_ancestor(parent(0));
   }
   else {
     T1* inp_ptr = (T1*)parent(0)->value();

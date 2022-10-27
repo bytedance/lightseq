@@ -125,8 +125,8 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   _batch_dim = _trg_batch_tokens * _hidden_size;
   _step = (steps >= 0 ? steps : -1);
 
-  int from_len = _context_ptr->is_training() ? _trg_seq_len : 1;
-  int to_len = _context_ptr->is_training() ? _trg_seq_len : steps + 1;
+  int from_len = (_step == -1) ? _trg_seq_len : 1;
+  int to_len = (_step == -1) ? _trg_seq_len : steps + 1;
 
   _attn_ln->before_forward(_trg_batch_tokens);
 
@@ -134,12 +134,12 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _bias_add_transform_20314->before_forward(batch_size, from_len);
 
-  _deal_cache_k->before_forward(batch_size, from_len, steps);
+  _deal_cache_k->before_forward(batch_size, from_len, steps == -1);
 
-  _deal_cache_v->before_forward(batch_size, from_len, steps);
+  _deal_cache_v->before_forward(batch_size, from_len, steps == -1);
 
   _softmax->before_forward(batch_size, from_len, to_len,
-                           (!_context_ptr->is_training()) ? false : true);
+                           steps == -1);
 
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);
 
@@ -160,6 +160,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
     _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
                                   _trg_seq_len, _batch_heads);
   }
+
 }
 
 template <typename T1, typename T2>

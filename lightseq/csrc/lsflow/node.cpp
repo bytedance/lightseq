@@ -168,7 +168,7 @@ Variable::Variable(std::string name, Variable* parent_variable,
       _parent_variable(parent_variable),
       _offset_value(offset_value),
       _offset_grad(offset_grad) {
-        parent_variable->has_descendants();
+        parent_variable->add_descendants();
       }
 
 void Variable::fixed_memory() {
@@ -178,7 +178,7 @@ void Variable::fixed_memory() {
     }
     return ;
   }
-  if(is_ancestor && parents().size() > 0) {
+  if(_descendants_count && parents().size() > 0) {
     return ;
   }
   if (parents().size() > 0 && children().size() > 0) {
@@ -193,16 +193,19 @@ void Variable::fixed_memory() {
 }
 
 void Variable::set_value(char* value_ptr) {
+  remove_ancestor();
   _value->reset_fixed();
   _value->set_tensor(value_ptr);
 }
 
 void Variable::set_value(const char* value_ptr) {
+  remove_ancestor();
   _value->reset_fixed();
   _value->set_tensor(value_ptr);
 }
 
 void Variable::set_grad(char* grad_ptr) {
+  remove_ancestor();
   if (_context_ptr->is_training()) {
     _grad->reset_fixed();
     _grad->set_tensor(grad_ptr);
@@ -231,7 +234,25 @@ bool Variable::enable_override_grad() {
   }
 }
 
-void Variable::has_descendants() { is_ancestor = true; }
+void Variable::add_descendants() { _descendants_count ++; }
+void Variable::remove_descendants() { _descendants_count --; }  
+
+void Variable::set_ancestor(Variable* parent_variable, size_t offset_value, size_t offset_grad) {
+  is_descendants = true;
+  _parent_variable = parent_variable;
+  _offset_value = offset_value;
+  _offset_grad = offset_grad;
+  parent_variable->add_descendants();
+}
+
+void Variable::remove_ancestor() {
+  if(is_descendants){
+    is_descendants = false;
+    _parent_variable->remove_descendants();
+    _parent_variable = nullptr;
+  }
+}
+
 
 #ifdef DEBUG_MODE
 void Variable::debug_var() {

@@ -58,7 +58,7 @@ class Variable : public Node {
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
   bool is_descendants = false;
-  bool is_ancestor = false;
+  int _descendants_count = 0;
   size_t _offset_value;
   size_t _offset_grad;
   Variable* _parent_variable;
@@ -69,7 +69,7 @@ class Variable : public Node {
            size_t grad_byte_size = 0);  // for Shared memory
   Variable(std::string name, const char* para_ptr,
            char* grad_ptr = nullptr);  // for Fixed memory
-  Variable(std::string name, Variable* parent_variable, size_t offset_value,
+  Variable(std::string name, Variable* parent_variable, size_t offset_value = 0,
            size_t offset_grad = 0);  // for inherit Variable
 
   virtual ~Variable() {}
@@ -90,7 +90,10 @@ class Variable : public Node {
   char* grad(bool is_open_interval = false);
 
   bool enable_override_grad();
-  void has_descendants();
+  void set_ancestor(Variable* parent_variable, size_t offset_value = 0, size_t offset_grad = 0);
+  void remove_ancestor();
+  void add_descendants();
+  void remove_descendants();
 
 #ifdef DEBUG_MODE
   void debug_var();

@@ -228,7 +228,7 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         activation_fn="relu",
     )
     base_layer = LSFSTransformerDecoderLayer(
-        config,
+        base_config,
         initial_weights,
         initial_biases,
     )
@@ -279,7 +279,7 @@ for i in range(NUM_LAYERS):
     base_dec_layer_list.append(base_dec_layer)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
@@ -296,10 +296,11 @@ def test_decoder_layer_forward():
 
     def custom():
         res = hidden_states.clone()
+        enc_copy = encoder_out.clone()
         for i in range(NUM_LAYERS):
             res, _, _ = custom_dec_layer_list[i](
                 res,
-                encoder_out=encoder_out,
+                encoder_out=enc_copy,
                 encoder_padding_mask=encoder_padding_mask,
                 incremental_state=incremental_state,
             )
@@ -309,12 +310,12 @@ def test_decoder_layer_forward():
 
     def baseline():
         res = hidden_states.clone()
+        enc_copy = encoder_out.clone()
         for i in range(NUM_LAYERS):
-            res, _, _ = fairseq_dec_layer_list[i](
+            res, _, _ = base_dec_layer_list[i](
                 res,
-                encoder_out=encoder_out,
+                encoder_out=enc_copy,
                 encoder_padding_mask=encoder_padding_mask,
-                self_attn_mask=self_attn_mask,
                 incremental_state=incremental_state,
             )
         return [

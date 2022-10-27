@@ -53,12 +53,13 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
 }
 
 template <typename T1, typename T2>
-Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
+Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp, 
+                                                   Variable* enc_mask,
                                                    Variable* enc_k,
                                                    Variable* enc_v) {
   Variable* q_linear_out = nullptr;
   Variable* attn_ln_out = nullptr;
-  LAYER_PRE_INPUTS({inp, enc_k, enc_v});
+  LAYER_PRE_INPUTS({inp, enc_mask, enc_k, enc_v});
   if (_pre_or_postLayerNorm) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
@@ -72,7 +73,7 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_score = (*_attn_scores)(enc_k, q_out);
 
-  Variable* soft_out = (*_softmax)(attn_score);
+  Variable* soft_out = (*_softmax)(attn_score, enc_mask);
 
   Variable* attn_context = nullptr;
   if (_context_ptr->is_training()) {
