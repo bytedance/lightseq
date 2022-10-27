@@ -145,11 +145,11 @@ int DecEncAttentionLayer<T1, T2>::load_para_and_grad(
   int offset = 0;
   _attn_qw->set_value((char*)(para_ptr + offset));
   _attn_qw->set_grad((char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size * 3;
+  offset += _hidden_size * _hidden_size;
 
   _attn_qb->set_value((char*)(para_ptr + offset));
   _attn_qb->set_grad((char*)(grad_ptr + offset));
-  offset += _hidden_size * 3;
+  offset += _hidden_size;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));

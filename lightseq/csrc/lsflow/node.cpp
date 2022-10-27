@@ -54,6 +54,8 @@ void Node::recursive_forward() {
       if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
         print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(),
                   this_op->parent(idx)->name() + ":value", 10);
+      else
+        printf("nullptr!\n");
     }
   }
 #endif
@@ -72,6 +74,8 @@ void Node::recursive_forward() {
     if (_children[idx] != nullptr && this_op->child(idx)->value() != nullptr)
       print_vec((TENSOR_TYPE*)this_op->child(idx)->value(),
                 this_op->child(idx)->name() + ":value", 10);
+    else
+      printf("nullptr\n");
   }
   printf("\n");
 #endif
@@ -95,6 +99,8 @@ void Node::recursive_backward() {
       if (_children[idx] != nullptr && this_op->child(idx)->grad() != nullptr)
         print_vec((TENSOR_TYPE*)this_op->child(idx)->grad(),
                   this_op->child(idx)->name() + ":grad", 10);
+      else
+        printf("nullptr\n");
     }
   }
   auto start = std::chrono::high_resolution_clock::now();
@@ -114,6 +120,8 @@ void Node::recursive_backward() {
     if (_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)
       print_vec((TENSOR_TYPE*)this_op->parent(idx)->grad(),
                 this_op->parent(idx)->name() + ":grad", 10);
+    else
+      printf("nullptr\n");
   }
   printf("\n");
 #endif

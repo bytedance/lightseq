@@ -244,7 +244,6 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   Variable *dec_out = layer->output(0);
   dec_out->set_value(dec_output_ptr);
 
-  print_vec((T1*)cache_ptr[0], "new_cache_k", 10);
   Variable *new_cache_k = layer->output(1);
   new_cache_k->set_value(cache_ptr[0]);
 

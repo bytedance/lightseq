@@ -16,6 +16,7 @@ class LaunchConcat3Dim1 : public Operator {
   int _hidden_size;
   int _batchs;
   int _steps;
+  bool _is_skip;
 
  public:
   LaunchConcat3Dim1(int heads, int hidden_size)
@@ -27,8 +28,8 @@ class LaunchConcat3Dim1 : public Operator {
 
   Variable* operator()(Variable* inp, Variable* cache);
 
-  void before_forward(int batchs, int seq_len, int steps) {
-    _batchs = batchs, _seq_len = seq_len, _steps = steps;
+  void before_forward(int batchs, int seq_len, bool is_skip) {
+    _batchs = batchs, _seq_len = seq_len, _is_skip = is_skip;
   }
 
   void forward() override;

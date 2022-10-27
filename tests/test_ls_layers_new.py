@@ -309,14 +309,14 @@ def test_decoder_layer_forward():
 
     def baseline():
         res = hidden_states.clone()
-        # for i in range(NUM_LAYERS):
-        #     res, _, _ = fairseq_dec_layer_list[i](
-        #         res,
-        #         encoder_out=encoder_out,
-        #         encoder_padding_mask=encoder_padding_mask,
-        #         self_attn_mask=self_attn_mask,
-        #         incremental_state=incremental_state,
-        #     )
+        for i in range(NUM_LAYERS):
+            res, _, _ = fairseq_dec_layer_list[i](
+                res,
+                encoder_out=encoder_out,
+                encoder_padding_mask=encoder_padding_mask,
+                self_attn_mask=self_attn_mask,
+                incremental_state=incremental_state,
+            )
         return [
             res.contiguous().detach(),
         ]
