@@ -26,9 +26,8 @@ class LSTrainer(Trainer):
     def _wrap_model(self, model, training=True, dataloader=None):
         model = super()._wrap_model(model, training, dataloader)
         # Enable GCQ.
-        if (
-            isinstance(model, torch.nn.parallel.DistributedDataParallel)
-            and getattr(self.gcq_args, "enable_GCQ", False)
+        if isinstance(model, torch.nn.parallel.DistributedDataParallel) and getattr(
+            self.gcq_args, "enable_GCQ", False
         ):
             assert version.parse(torch.__version__) >= version.parse(
                 "1.10"
