@@ -31,11 +31,9 @@ template <typename T1, typename T2>
 void BiasAddTrans20314<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T2*)parent(0)->grad();
-  T2* q_grad = (T2*)child(0)->grad();
-  T2* k_grad = (_trans_count <= 1) ? nullptr : (T2*)child(1)->grad();
-  T2* v_grad = (_trans_count <= 2) ? nullptr : (T2*)child(2)->grad();
+  T2* res_grad = (T2*)child(0)->grad();
 
-  launch_transform_20314_bwd_new<T2>(inp_grad, q_grad, k_grad, v_grad, _batch,
+  launch_transform4d_0213<T2>(inp_grad, res_grad, _batch,
                                      _seq_len, _hidden_size, _heads,
                                      _trans_count, _stream);
 

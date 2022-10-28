@@ -17,9 +17,11 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
 
+#include "unordered_set"
+
 namespace lightseq {
 
-enum class NodeType { FixedVariable, SharedVariable, Operator };
+enum class NodeType { Variable, Operator };
 
 class Node;
 

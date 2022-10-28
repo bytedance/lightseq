@@ -40,6 +40,13 @@ void Node::recursive_forward() {
     iter->recursive_forward();
   }
 
+  if(node_type() == NodeType::Variable) {
+    Variable* this_var = static_cast<Variable*>(this);
+    if(this_var->_is_descendants){
+      this_var->_parent_variable->recursive_forward();
+    }
+  }
+
   _fw_flag = true;
 
   _context_ptr->update_node_idx();
@@ -85,6 +92,13 @@ void Node::recursive_backward() {
   if (_bw_flag) return;
   for (Node* iter : _children) {
     iter->recursive_backward();
+  }
+
+  if(node_type() == NodeType::Variable) {
+    Variable* this_var = static_cast<Variable*>(this);
+    for(Variable* iter: this_var->descendants()){
+      iter->recursive_backward();
+    }
   }
 
   _bw_flag = true;
@@ -136,7 +150,7 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name, NodeType::FixedVariable),
+    : Node(name, NodeType::Variable),
       _value_byte_size(0),
       _grad_byte_size(0) {
   _value.reset(new Tensor("value", 0));
@@ -145,7 +159,7 @@ Variable::Variable(std::string name)
 
 Variable::Variable(std::string name, size_t value_byte_size,
                    size_t grad_byte_size)
-    : Node(name, NodeType::SharedVariable),
+    : Node(name, NodeType::Variable),
       _value_byte_size(value_byte_size),
       _grad_byte_size(grad_byte_size) {
   _value.reset(new Tensor("value", _value_byte_size));
@@ -163,22 +177,22 @@ Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
 
 Variable::Variable(std::string name, Variable* parent_variable,
                    size_t offset_value, size_t offset_grad)
-    : Node(name, parent_variable->node_type()),
-      is_descendants(true),
+    : Node(name, NodeType::Variable),
+      _is_descendants(true),
       _parent_variable(parent_variable),
       _offset_value(offset_value),
       _offset_grad(offset_grad) {
-        parent_variable->add_descendants();
+        parent_variable->add_descendants(this);
       }
 
 void Variable::fixed_memory() {
-  if(is_descendants) {
+  if(_is_descendants) {
     if (children().size() == 0) {
       _parent_variable->fixed_memory();
     }
     return ;
   }
-  if(_descendants_count && parents().size() > 0) {
+  if(_children_variable.size() && parents().size() > 0) {
     return ;
   }
   if (parents().size() > 0 && children().size() > 0) {
@@ -213,14 +227,14 @@ void Variable::set_grad(char* grad_ptr) {
 }
 
 char* Variable::value(bool is_open_interval) {
-  if (is_descendants) {
+  if (_is_descendants) {
     return _parent_variable->value(is_open_interval) + _offset_value;
   }
   return _value->tensor(is_open_interval);
 }
 
 char* Variable::grad(bool is_open_interval) {
-  if (is_descendants) {
+  if (_is_descendants) {
     return _parent_variable->grad(is_open_interval) + _offset_grad;
   }
   return _grad->tensor(is_open_interval);
@@ -234,21 +248,21 @@ bool Variable::enable_override_grad() {
   }
 }
 
-void Variable::add_descendants() { _descendants_count ++; }
-void Variable::remove_descendants() { _descendants_count --; }  
+void Variable::add_descendants(Variable* var) { _children_variable.insert(var); }
+void Variable::remove_descendants(Variable* var) { _children_variable.erase(var); }  
 
 void Variable::set_ancestor(Variable* parent_variable, size_t offset_value, size_t offset_grad) {
-  is_descendants = true;
+  _is_descendants = true;
   _parent_variable = parent_variable;
   _offset_value = offset_value;
   _offset_grad = offset_grad;
-  parent_variable->add_descendants();
+  parent_variable->add_descendants(this);
 }
 
 void Variable::remove_ancestor() {
-  if(is_descendants){
-    is_descendants = false;
-    _parent_variable->remove_descendants();
+  if(_is_descendants){
+    _is_descendants = false;
+    _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
   }
 }

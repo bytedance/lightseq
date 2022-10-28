@@ -57,11 +57,11 @@ class Variable : public Node {
   size_t _grad_byte_size;
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
-  bool is_descendants = false;
-  int _descendants_count = 0;
+  bool _is_descendants = false;
   size_t _offset_value;
   size_t _offset_grad;
   Variable* _parent_variable;
+  std::unordered_set<Variable*> _children_variable;
 
  public:
   Variable(std::string name);  // for Fixed memory
@@ -90,11 +90,17 @@ class Variable : public Node {
   char* grad(bool is_open_interval = false);
 
   bool enable_override_grad();
+  bool is_descendants() { return _is_descendants; }
+  bool is_ancestor() { return _children_variable.size(); }
+  Variable* ancestor() { return _parent_variable; }
+  std::unordered_set<Variable*>& descendants() { return _children_variable; }
   void set_ancestor(Variable* parent_variable, size_t offset_value = 0, size_t offset_grad = 0);
-  void remove_ancestor();
-  void add_descendants();
-  void remove_descendants();
   void set_offset(size_t offset_value, size_t offset_grad);
+  void remove_ancestor();
+  void add_descendants(Variable* var);
+  void remove_descendants(Variable* var);
+
+  friend class Node;
 
 #ifdef DEBUG_MODE
   void debug_var();

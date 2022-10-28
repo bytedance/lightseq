@@ -54,6 +54,10 @@ void Layer::clear_fw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_fw_flag();
     for (Node* var : op->children()) {
+      Variable* this_var = static_cast<Variable*>(var);
+      for(Variable* iter: this_var->descendants()) {
+        iter->clear_fw_flag();
+      }
       var->clear_fw_flag();
     }
   }
@@ -63,6 +67,10 @@ void Layer::tag_fw_flag() {
   for (Operator* op : _op_vec) {
     op->tag_fw_flag();
     for (Node* var : op->children()) {
+      Variable* this_var = static_cast<Variable*>(var);
+      for(Variable* iter: this_var->descendants()) {
+        iter->tag_fw_flag();
+      }
       var->tag_fw_flag();
     }
   }
@@ -72,6 +80,9 @@ void Layer::clear_bw_flag() {
   for (Operator* op : _op_vec) {
     op->clear_bw_flag();
     for (Node* var : op->parents()) {
+      Variable* this_var = static_cast<Variable*>(var);
+      if(this_var->is_descendants())
+        this_var->ancestor()->clear_bw_flag();
       var->clear_bw_flag();
     }
   }
