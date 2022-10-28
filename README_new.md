@@ -6,17 +6,17 @@
 
 ## Table Of Contents
 <!-- toc -->
-- [Release Notes](#ReleaseNotes)
+- [Release Notes](#Release-Notes)
 - [Introduction](#Introduction)
-	- [Support Matrix](#SupportMatrix)
+	- [Support Matrix](#Support-Matrix)
 - [Installation](#Installation)
-	- [Install from PyPI](#InstallfromPyPI)
-	- [Build from source](#Buildfromsource)
-- [Getting Started](#GettingStarted)
+	- [Install from PyPI](#Install-from-PyPI)
+	- [Build from Source](#Build-from-Source)
+- [Getting Started](#Getting-Started)
 - [Performance](#Performance)
-- [Cite Us](#CiteUs)
+- [Cite Us](#Cite-Us)
 - [Contact](#Contact)
-- [We are Hiring!](#WeareHiring)
+- [We are Hiring!](#We-are-Hiring)
 
 <!-- tocstop -->
 
@@ -68,7 +68,7 @@ You can install LightSeq from PyPI, which only supports Python 3.6 to 3.8 on Lin
 pip install lightseq
 ```
 
-### Build from source
+### Build from Source
 You can also build from source:
 ```shell
 PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT_DIR
