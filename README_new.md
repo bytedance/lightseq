@@ -4,6 +4,22 @@
 
 ---
 
+## Table Of Contents
+<!-- toc -->
+- [Release Notes](#ReleaseNotes)
+- [Introduction](#Introduction)
+	- [Support Matrix](#SupportMatrix)
+- [Installation](#Installation)
+	- [Install from PyPI](#InstallfromPyPI)
+	- [Build from source](#Buildfromsource)
+- [Getting Started](#GettingStarted)
+- [Performance](#Performance)
+- [Cite Us](#CiteUs)
+- [Contact](#Contact)
+- [We are Hiring!](#WeareHiring)
+
+<!-- tocstop -->
+
 ## Release Notes
 **[2022.10.25]** LightSeq release v3.0.0 version, which supports int8 mixed-precision training and inference for Transformer-based models.
 
