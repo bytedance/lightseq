@@ -76,13 +76,8 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* soft_out = (*_softmax)(attn_score, inp_mask);
 
-  Variable* attn_context = nullptr;
-  if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-    attn_context = (*_attn_context)(v_out, prob_dropout);
-  } else {
-    attn_context = (*_attn_context)(v_out, soft_out);
-  }
+  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+  Variable* attn_context = (*_attn_context)(v_out, prob_dropout);
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
@@ -129,7 +124,7 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _softmax->before_forward(batch_size, seq_len, seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len);
+  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len, !_context_ptr->is_training());
 
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);

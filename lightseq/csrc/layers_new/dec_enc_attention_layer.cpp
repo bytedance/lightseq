@@ -74,13 +74,8 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* soft_out = (*_softmax)(attn_score, enc_mask);
 
-  Variable* attn_context = nullptr;
-  if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-    attn_context = (*_attn_context)(enc_v, prob_dropout);
-  } else {
-    attn_context = (*_attn_context)(enc_v, soft_out);
-  }
+  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+  Variable* attn_context = (*_attn_context)(enc_v, prob_dropout);
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
@@ -124,7 +119,7 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
+  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len, !_context_ptr->is_training());
 
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
                                 _batch_heads);

@@ -17,6 +17,10 @@ template <typename T1, typename T2>
 void LaunchConcat3Dim1<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
+  if(_is_skip) {
+    return ;
+  }
+
   T1* inp_ptr = (T1*)parent(0)->value();
   T1* cache_ptr = (T1*)parent(1)->value();
   T1* real_val = (T1*)child(0)->value();
@@ -29,6 +33,9 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
 template <typename T1, typename T2>
 void LaunchConcat3Dim1<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
+  if(_is_skip) {
+    return ;
+  }
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* val_grad = (T1*)child(0)->grad();
   if (inp_grad != val_grad) {

@@ -269,6 +269,7 @@ void Variable::remove_ancestor() {
     _is_descendants = false;
     _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
+    _offset_value = _offset_grad = 0;
   }
 }
 

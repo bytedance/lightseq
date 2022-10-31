@@ -77,26 +77,15 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   
   Variable* cal_k_out;
   Variable* cal_v_out;
-  if(_context_ptr->is_training()) {
-    cal_k_out = k_out;
-    cal_v_out = v_out;
-  }
-  else {
-    cal_k_out = (*_deal_cache_k)(k_out, cache_k);
-    cal_v_out = (*_deal_cache_v)(v_out, cache_v);
-  }
+  cal_k_out = (*_deal_cache_k)(k_out, cache_k);
+  cal_v_out = (*_deal_cache_v)(v_out, cache_v);
 
   Variable* attn_score = (*_attn_scores)(cal_k_out, q_out);
 
   Variable* soft_out = (*_softmax)(attn_score);
 
-  Variable* attn_context = nullptr;
-  if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-    attn_context = (*_attn_context)(cal_v_out, prob_dropout);
-  } else {
-    attn_context = (*_attn_context)(cal_v_out, soft_out);
-  }
+  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+  Variable* attn_context = (*_attn_context)(cal_v_out, prob_dropout);
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
@@ -144,14 +133,13 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
-  if(!_context_ptr->is_training()) {
-    _deal_cache_k->before_forward(batch_size, from_len);
-    _deal_cache_v->before_forward(batch_size, from_len);
-  }
+  _deal_cache_k->before_forward(batch_size, from_len, _context_ptr->is_training());
+  _deal_cache_v->before_forward(batch_size, from_len, _context_ptr->is_training());
+
   _softmax->before_forward(batch_size, from_len, to_len,
                            steps == -1);
 
-  _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);
+  _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len, !_context_ptr->is_training());
 
   _transform_0213->before_forward(batch_size, from_len);
 
