@@ -11,26 +11,19 @@ Variable* LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
   return new_cache;
 }
 
+
+
 template <typename T1, typename T2>
 void LaunchConcat3Dim1<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
-  if (_is_skip) {
-    child(0)->set_ancestor(parent(0));
-  }
-  else {
-    T1* inp_ptr = (T1*)parent(0)->value();
-    T1* cache_ptr = (T1*)parent(1)->value();
-    T1* real_val = (T1*)child(0)->value();
+  T1* inp_ptr = (T1*)parent(0)->value();
+  T1* cache_ptr = (T1*)parent(1)->value();
+  T1* real_val = (T1*)child(0)->value();
+                      
+  launch_concat3_dim1(real_val, inp_ptr, cache_ptr, _batchs * _heads,
+                      _hidden_size / _heads, _steps, 1, _stream);
 
-    CHECK_GPU_ERROR(
-        cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
-                        _batchs * _hidden_size * _seq_len * sizeof(T1),
-                        cudaMemcpyDefault, _stream));
-                        
-    launch_concat3_dim1(real_val, inp_ptr, cache_ptr, _batchs * _heads,
-                        _hidden_size / _heads, _steps, 1, _stream);
-  }
 }
 
 template <typename T1, typename T2>

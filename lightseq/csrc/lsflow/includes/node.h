@@ -21,6 +21,7 @@ class Node {
 
   std::vector<Node*> _parents{};
   std::vector<Node*> _children{};
+  int _fw_node_idx, _bw_node_idx;
 
  public:
   Node(std::string name, NodeType nt_);

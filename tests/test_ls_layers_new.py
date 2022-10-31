@@ -105,7 +105,7 @@ for _ in range(NUM_LAYERS):
     custom_enc_layers.append(custom_enc)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=1)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -132,7 +132,7 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=5)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -259,7 +259,7 @@ for _ in range(NUM_LAYERS):
 _initial_encdec_attn_kvw = torch.cat(_initial_encdec_attn_kvw_list, dim=0)
 _initial_encdec_attn_kvb = torch.cat(_initial_encdec_attn_kvb_list, dim=0)
 
-dec_context_id = layer_cuda_module.create_global_context(False)
+dec_context_id = layer_cuda_module.create_global_context(True)
 
 for i in range(NUM_LAYERS):
     _initial_dec_weights_list[i].pop(7)
@@ -279,10 +279,11 @@ for i in range(NUM_LAYERS):
     base_dec_layer_list.append(base_dec_layer)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=0)
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
+    batch_size, enc_seq_len, dec_seq_len = 11, 428, 563
     print(
         f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
         f" {dec_seq_len})"

@@ -92,4 +92,5 @@ class LayerBuilder(CUDAOpBuilder):
             "-Wno-reorder",
             "-DPYBIND_LAYER",
             # "-DDEBUG_MODE",
+            # "-DFP16_MODE",
         ]

@@ -48,13 +48,15 @@ void Node::recursive_forward() {
   }
 
   _fw_flag = true;
-
   _context_ptr->update_node_idx();
+  if(!_context_ptr->is_built()) {
+    _fw_node_idx = _context_ptr->node_idx();
+  }
 
 #ifdef DEBUG_MODE
   auto start = std::chrono::high_resolution_clock::now();
   if (node_type() == NodeType::Operator) {
-    printf("##### %s forward #####\n", name().c_str());
+    printf("##### %s forward ##### fw node idx: %d\n", name().c_str(), _fw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_parents.size(): %zu\n", _parents.size());
     for (int idx = 0; idx < _parents.size(); idx++) {
@@ -103,10 +105,13 @@ void Node::recursive_backward() {
 
   _bw_flag = true;
   _context_ptr->update_node_idx();
+  if(!_context_ptr->is_built()) {
+    _bw_node_idx = _context_ptr->node_idx();
+  }
 
 #ifdef DEBUG_MODE
   if (node_type() == NodeType::Operator) {
-    printf("##### %s backward #####\n", name().c_str());
+    printf("##### %s backward ##### bw node idx: %d\n", name().c_str(), _bw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_children.size(): %zu\n", _children.size());
     for (int idx = 0; idx < _children.size(); idx++) {

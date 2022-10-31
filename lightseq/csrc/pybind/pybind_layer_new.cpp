@@ -194,8 +194,6 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
 
-  printf("Running! transformer_decoder_layer_fw\n");
-
   const char *dec_input_ptr = (const char *)dec_input.data_ptr();
   const char *enc_output_ptr = (const char *)enc_output.data_ptr();
   const char *enc_mask_ptr = (const char *)enc_mask.data_ptr();
@@ -223,8 +221,6 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
     }
   }
 
-  printf("Running! before set input ptr\n");
-
   Variable *inp_node = layer->input(0);
   inp_node->set_value(dec_input_ptr);
 
@@ -244,17 +240,14 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   Variable *dec_out = layer->output(0);
   dec_out->set_value(dec_output_ptr);
 
-  Variable *new_cache_k = layer->output(1);
-  new_cache_k->set_value(cache_ptr[0]);
-
-  Variable *new_cache_v = layer->output(2);
-  new_cache_v->set_value(cache_ptr[1]);
-
-  printf("Running! before_forward\n");
+  if(cache.size() > 0){
+    Variable *new_cache_k = layer->output(1);
+    new_cache_k->set_value(cache_ptr[0]);
+    Variable *new_cache_v = layer->output(2);
+    new_cache_v->set_value(cache_ptr[1]);
+  }
 
   layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
-
-  printf("Running! forward\n");
 
   layer->forward();
 

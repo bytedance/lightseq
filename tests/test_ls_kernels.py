@@ -111,61 +111,6 @@ def test_launch_bias_add_transform_20314_new():
     return custom, baseline
 
 
-@kt.case(ntest=5, dtypes=[torch.float32])
-def test_launch_transform_20314_bwd_new():
-    batch_size, seq_len = kt.bs_sl()
-    hidden_dim = kt.hidden_dim
-    nhead = kt.nhead
-    head_dim = int(hidden_dim / nhead)
-    trans_count = random.randint(1, 3)
-    print(
-        "(batch_size, seq_len, hidden_dim, nhead, trans_count): "
-        f"({batch_size}, {seq_len}, {hidden_dim}, {nhead}, {trans_count})"
-    )
-
-    q_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
-    k_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
-    v_inp = kt.rand((batch_size, nhead, seq_len, head_dim))
-    vals = torch.cat((q_inp.clone(), k_inp.clone(), v_inp.clone()), dim=0)
-    custom_res = kt.rand((batch_size, seq_len, trans_count, nhead, head_dim))
-    base_res = kt.rand((batch_size, seq_len, trans_count, nhead, head_dim))
-
-    if kt.dtype == torch.float:
-        base_func = cuda_module.torch_launch_transform4d_0213_fp32
-    else:
-        base_func = cuda_module.torch_launch_transform4d_0213_fp16
-
-    if kt.dtype == torch.float:
-        cust_func = cuda_module.torch_launch_transform_20314_bwd_new_fp32
-    else:
-        cust_func = cuda_module.torch_launch_transform_20314_bwd_new_fp16
-
-    # [trans_count, batch_size, nhead, seq_len, head_dim] ->
-    # [batch_size, seq_len, trans_count, nhead, head_dim]
-
-    def custom():
-        cust_func(
-            custom_res,
-            q_inp,
-            k_inp,
-            v_inp,
-            batch_size,
-            seq_len,
-            hidden_dim,
-            nhead,
-            trans_count,
-        )
-        return [
-            custom_res.contiguous(),
-        ]
-
-    def baseline():
-        base_func(base_res, vals, batch_size, seq_len, hidden_dim, nhead, trans_count)
-        return [
-            base_res.contiguous(),
-        ]
-
-    return custom, baseline
 
 
 @kt.case()
@@ -1709,7 +1654,6 @@ if __name__ == "__main__":
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
         # "test_launch_bias_add_transform_20314_new",
-        # "test_launch_transform_20314_bwd_new",
         # "test_launch_fused_add2",
         # "test_launch_ffn_bias_bwd",
         # "test_launch_attn_softmax",
