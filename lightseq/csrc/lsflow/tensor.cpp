@@ -70,8 +70,7 @@ void Tensor::reset_fixed() {
 std::string Tensor::memory_type() {
   if (_mtype == LSMemoryType::FixedMemory) {
     return "FixedMemory";
-  }
-  else if (_mtype == LSMemoryType::SharedMemory) {
+  } else if (_mtype == LSMemoryType::SharedMemory) {
     return "SharedMemory";
   }
 

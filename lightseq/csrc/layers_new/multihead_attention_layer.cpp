@@ -124,7 +124,8 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _softmax->before_forward(batch_size, seq_len, seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len, !_context_ptr->is_training());
+  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len,
+                                     !_context_ptr->is_training());
 
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);

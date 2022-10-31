@@ -441,7 +441,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_bias_add_transform_20314_new_fp16",
         &torch_launch_bias_add_transform_20314_new<__half>,
         "Test kernel wrapper");
-        
+
   m.def("torch_launch_fused_add2_fp32", &torch_launch_fused_add2<float>,
         "Test kernel wrapper");
   m.def("torch_launch_fused_add2_fp16", &torch_launch_fused_add2<__half>,

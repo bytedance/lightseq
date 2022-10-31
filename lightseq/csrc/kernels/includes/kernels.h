@@ -96,7 +96,6 @@ void launch_transform4d_0213(T *output, const T *vals, int batch_size,
                              int seq_len, int hidden_dim, int nhead,
                              int trans_count, cudaStream_t stream);
 
-
 template <typename T>
 void launch_quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
                                    const T *vals, const T *clip_max,

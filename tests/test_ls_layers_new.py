@@ -279,7 +279,7 @@ for i in range(NUM_LAYERS):
     base_dec_layer_list.append(base_dec_layer)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=0)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)

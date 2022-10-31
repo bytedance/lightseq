@@ -28,14 +28,13 @@ class DropoutOp : public Operator {
 
   Variable* operator()(Variable* inp);
 
-  void before_forward(int count, bool is_skip = false) { 
-    if(is_skip) {
+  void before_forward(int count, bool is_skip = false) {
+    if (is_skip) {
       child(0)->set_ancestor(parent(0));
-    }
-    else {
+    } else {
       child(0)->remove_ancestor();
     }
-    _count = count, _is_skip = is_skip; 
+    _count = count, _is_skip = is_skip;
   }
 
   void forward() override;

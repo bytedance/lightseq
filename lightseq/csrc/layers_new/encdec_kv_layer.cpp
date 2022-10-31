@@ -12,9 +12,8 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int max_batch_tokens,
       _hidden_size(hidden_size),
       _heads(num_heads),
       // operators
-      _kv_linear(new LinearOp<T1, T2>(max_batch_tokens,
-                                      nshared_layer * 2 * hidden_size,
-                                      hidden_size)),
+      _kv_linear(new LinearOp<T1, T2>(
+          max_batch_tokens, nshared_layer * 2 * hidden_size, hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 2 * nshared_layer)) {
   // parameters
@@ -25,8 +24,7 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int max_batch_tokens,
 }
 
 template <typename T1, typename T2>
-Variable* EncDecKvLayer<T1, T2>::operator()(
-    Variable* enc_out) {
+Variable* EncDecKvLayer<T1, T2>::operator()(Variable* enc_out) {
   LAYER_PRE_INPUTS({enc_out});
 
   Variable* kv_out = (*_kv_linear)(enc_out, _enc_kvw);

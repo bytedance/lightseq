@@ -40,23 +40,24 @@ void Node::recursive_forward() {
     iter->recursive_forward();
   }
 
-  if(node_type() == NodeType::Variable) {
+  if (node_type() == NodeType::Variable) {
     Variable* this_var = static_cast<Variable*>(this);
-    if(this_var->_is_descendants){
+    if (this_var->_is_descendants) {
       this_var->_parent_variable->recursive_forward();
     }
   }
 
   _fw_flag = true;
   _context_ptr->update_node_idx();
-  if(!_context_ptr->is_built()) {
+  if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
   }
 
 #ifdef DEBUG_MODE
   auto start = std::chrono::high_resolution_clock::now();
   if (node_type() == NodeType::Operator) {
-    printf("##### %s forward ##### fw node idx: %d\n", name().c_str(), _fw_node_idx);
+    printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
+           _fw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_parents.size(): %zu\n", _parents.size());
     for (int idx = 0; idx < _parents.size(); idx++) {
@@ -96,22 +97,23 @@ void Node::recursive_backward() {
     iter->recursive_backward();
   }
 
-  if(node_type() == NodeType::Variable) {
+  if (node_type() == NodeType::Variable) {
     Variable* this_var = static_cast<Variable*>(this);
-    for(Variable* iter: this_var->descendants()){
+    for (Variable* iter : this_var->descendants()) {
       iter->recursive_backward();
     }
   }
 
   _bw_flag = true;
   _context_ptr->update_node_idx();
-  if(!_context_ptr->is_built()) {
+  if (!_context_ptr->is_built()) {
     _bw_node_idx = _context_ptr->node_idx();
   }
 
 #ifdef DEBUG_MODE
   if (node_type() == NodeType::Operator) {
-    printf("##### %s backward ##### bw node idx: %d\n", name().c_str(), _bw_node_idx);
+    printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
+           _bw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_children.size(): %zu\n", _children.size());
     for (int idx = 0; idx < _children.size(); idx++) {
@@ -155,9 +157,7 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name, NodeType::Variable),
-      _value_byte_size(0),
-      _grad_byte_size(0) {
+    : Node(name, NodeType::Variable), _value_byte_size(0), _grad_byte_size(0) {
   _value.reset(new Tensor("value", 0));
   if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", 0));
 }
@@ -187,18 +187,18 @@ Variable::Variable(std::string name, Variable* parent_variable,
       _parent_variable(parent_variable),
       _offset_value(offset_value),
       _offset_grad(offset_grad) {
-        parent_variable->add_descendants(this);
-      }
+  parent_variable->add_descendants(this);
+}
 
 void Variable::fixed_memory() {
-  if(_is_descendants) {
+  if (_is_descendants) {
     if (children().size() == 0) {
       _parent_variable->fixed_memory();
     }
-    return ;
+    return;
   }
-  if(_children_variable.size() && parents().size() > 0) {
-    return ;
+  if (_children_variable.size() && parents().size() > 0) {
+    return;
   }
   if (parents().size() > 0 && children().size() > 0) {
     printf("ERROR! this node is not a IONode!\n");
@@ -253,10 +253,15 @@ bool Variable::enable_override_grad() {
   }
 }
 
-void Variable::add_descendants(Variable* var) { _children_variable.insert(var); }
-void Variable::remove_descendants(Variable* var) { _children_variable.erase(var); }  
+void Variable::add_descendants(Variable* var) {
+  _children_variable.insert(var);
+}
+void Variable::remove_descendants(Variable* var) {
+  _children_variable.erase(var);
+}
 
-void Variable::set_ancestor(Variable* parent_variable, size_t offset_value, size_t offset_grad) {
+void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
+                            size_t offset_grad) {
   _is_descendants = true;
   _parent_variable = parent_variable;
   _offset_value = offset_value;
@@ -265,7 +270,7 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value, size
 }
 
 void Variable::remove_ancestor() {
-  if(_is_descendants){
+  if (_is_descendants) {
     _is_descendants = false;
     _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
@@ -278,12 +283,12 @@ void Variable::set_offset(size_t offset_value, size_t offset_grad) {
   _offset_grad = offset_grad;
 }
 
-
 #ifdef DEBUG_MODE
 void Variable::debug_var() {
-  printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(), _value->memory_type().c_str(), _value_byte_size);
+  printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(),
+         _value->memory_type().c_str(), _value_byte_size);
   print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
-  if(_context_ptr->is_training()){
+  if (_context_ptr->is_training()) {
     printf("node: %s, grad_byte_size: %zu\n", name().c_str(), _grad_byte_size);
     print_vec((TENSOR_TYPE*)grad(), name() + ":grad", 10);
   }

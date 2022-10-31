@@ -59,7 +59,8 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
   Variable* new_self_k = std::get<1>(self_attn_layer_product);
   Variable* new_self_v = std::get<2>(self_attn_layer_product);
 
-  Variable* enc_attn_out = (*_enc_attn_layer)(self_attn_out, enc_mask, enc_k, enc_v);
+  Variable* enc_attn_out =
+      (*_enc_attn_layer)(self_attn_out, enc_mask, enc_k, enc_v);
 
   Variable* ffn_out = (*_ffn_layer)(enc_attn_out);
 
@@ -88,11 +89,14 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
   _step = step;
   _batch_tokens = batch_size * trg_seq_len;
 
-  enc_k->set_offset(2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T1), 
-                    2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T2));
+  enc_k->set_offset(
+      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T1),
+      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T2));
 
-  enc_v->set_offset((2 * _layer_id + 1) * _hidden_size * batch_size * src_seq_len * sizeof(T1), 
-                    (2 * _layer_id + 1) * _hidden_size * batch_size * src_seq_len * sizeof(T2));
+  enc_v->set_offset((2 * _layer_id + 1) * _hidden_size * batch_size *
+                        src_seq_len * sizeof(T1),
+                    (2 * _layer_id + 1) * _hidden_size * batch_size *
+                        src_seq_len * sizeof(T2));
 
   if (_layer_id == 0 && step <= 0) {
     _enc_kv_layer->before_forward(batch_size, src_seq_len);

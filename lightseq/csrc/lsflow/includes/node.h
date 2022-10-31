@@ -95,7 +95,8 @@ class Variable : public Node {
   bool is_ancestor() { return _children_variable.size(); }
   Variable* ancestor() { return _parent_variable; }
   std::unordered_set<Variable*>& descendants() { return _children_variable; }
-  void set_ancestor(Variable* parent_variable, size_t offset_value = 0, size_t offset_grad = 0);
+  void set_ancestor(Variable* parent_variable, size_t offset_value = 0,
+                    size_t offset_grad = 0);
   void set_offset(size_t offset_value, size_t offset_grad);
   void remove_ancestor();
   void add_descendants(Variable* var);

@@ -111,8 +111,6 @@ def test_launch_bias_add_transform_20314_new():
     return custom, baseline
 
 
-
-
 @kt.case()
 def test_launch_transform_0213():
     batch_size, seq_len = kt.bs_sl()

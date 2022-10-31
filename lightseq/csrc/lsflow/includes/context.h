@@ -20,6 +20,7 @@ const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 class Context {  // model only
  private:
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+  std::unordered_map<std::string, std::shared_ptr<void>> resources;
 
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};

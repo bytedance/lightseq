@@ -15,8 +15,8 @@ template <typename T1, typename T2>
 void DropoutOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
-  if(_is_skip) {
-    return ;
+  if (_is_skip) {
+    return;
   }
 
   T1* input = (T1*)parent(0)->value();
@@ -31,8 +31,8 @@ template <typename T1, typename T2>
 void DropoutOp<T1, T2>::backward() {
   cudaStream_t stream = _context_ptr->get_stream();
 
-  if(_is_skip) {
-    return ;
+  if (_is_skip) {
+    return;
   }
 
   T2* input_grad = (T2*)parent(0)->grad();

@@ -70,11 +70,12 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  Variable* transform_20314_out = (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
+  Variable* transform_20314_out =
+      (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
   q_out = new Variable("q_out", transform_20314_out);
   k_out = new Variable("k_out", transform_20314_out);
   v_out = new Variable("v_out", transform_20314_out);
-  
+
   Variable* cal_k_out;
   Variable* cal_v_out;
   cal_k_out = (*_deal_cache_k)(k_out, cache_k);
@@ -133,13 +134,15 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
-  _deal_cache_k->before_forward(batch_size, from_len, _context_ptr->is_training());
-  _deal_cache_v->before_forward(batch_size, from_len, _context_ptr->is_training());
+  _deal_cache_k->before_forward(batch_size, from_len,
+                                _context_ptr->is_training());
+  _deal_cache_v->before_forward(batch_size, from_len,
+                                _context_ptr->is_training());
 
-  _softmax->before_forward(batch_size, from_len, to_len,
-                           steps == -1);
+  _softmax->before_forward(batch_size, from_len, to_len, steps == -1);
 
-  _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len, !_context_ptr->is_training());
+  _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len,
+                                     !_context_ptr->is_training());
 
   _transform_0213->before_forward(batch_size, from_len);
 
@@ -158,7 +161,6 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
     _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
                                   _trg_seq_len, _batch_heads);
   }
-
 }
 
 template <typename T1, typename T2>

@@ -29,10 +29,9 @@ class LaunchConcat3Dim1 : public Operator {
   Variable* operator()(Variable* inp, Variable* cache);
 
   void before_forward(int batchs, int seq_len, bool is_skip = false) {
-    if(is_skip) {
+    if (is_skip) {
       child(0)->set_ancestor(parent(0));
-    }
-    else {
+    } else {
       child(0)->remove_ancestor();
     }
     _batchs = batchs, _seq_len = seq_len, _is_skip = is_skip;
