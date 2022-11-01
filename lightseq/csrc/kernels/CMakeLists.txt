@@ -1,7 +1,6 @@
 find_package(CUDAToolkit)
 cmake_minimum_required(VERSION 3.18)
 
-
 set(cuda_kernel_files
     cross_entropy.cu
     cublas_wrappers.cu
