@@ -5,20 +5,21 @@
 ---
 
 ## Table Of Contents
-<!-- toc -->
-- [Release Notes](#Release-Notes)
-- [Introduction](#Introduction)
-	- [Support Matrix](#Support-Matrix)
-- [Installation](#Installation)
-	- [Install from PyPI](#Install-from-PyPI)
-	- [Build from Source](#Build-from-Source)
-- [Getting Started](#Getting-Started)
-- [Performance](#Performance)
-- [Cite Us](#Cite-Us)
-- [Contact](#Contact)
-- [We are Hiring!](#We-are-Hiring)
-
-<!-- tocstop -->
+- [Release Notes](#release-notes)
+- [Introduction](#introduction)
+    - [Support Matrix](#support-matrix)
+- [Installation](#installation)
+    - [Install from PyPI](#install-from-pypi)
+    - [Build from Source](#build-from-source)
+- [Getting Started](#getting-started)
+    - [Fast training from Fairseq](#fast-training-from-fairseq)
+    - [Fast inference from Fairseq](#fast-inference-from-fairseq)
+    - [Fast inference from Hugging Face BERT](#fast-inference-from-hugging-face-bert)
+    - [Fast deployment using inference server](#fast-deployment-using-inference-server)
+- [Performance](#performance)
+- [Cite Us](#cite-us)
+- [Contact](#contact)
+- [We are Hiring!](#we-are-hiring)
 
 ## Release Notes
 **[2022.10.25]** LightSeq release v3.0.0 version, which supports int8 mixed-precision training and inference for Transformer-based models.
@@ -77,6 +78,77 @@ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT
 Detailed building introduction is available [here](docs/inference/build.md).
 
 ## Getting Started
+We provide several samples here to show the usage of LightSeq. Complete user guide is available [here](docs/guide.md).
+
+### Fast training from Fairseq
+LightSeq integrates all the fast and lightning modules into Fairseq.
+
+Firstly install the two following requirements:
+```shell
+pip install fairseq==0.10.2 sacremoses
+```
+
+You can train a fp16 mix-precision translation task on wmt14 en2de dataset by:
+```shell
+sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
+```
+
+(Optional) Then you can start int8 mix-precision training on the basis of fp16 pre-training models by:
+```shell
+sh examples/training/fairseq/ls_fairseq_quant_wmt14en2de.sh
+```
+
+More usage is available [here](./lightseq/training/README.md).
+
+### Fast inference from Fairseq
+After training using above scripts, you can fastly infer the models using LightSeq.
+
+You should transform the fp16 PyTorch weights to LightSeq protobuf or HDF5:
+```shell
+python export/fairseq/ls_fs_transformer_export.py
+```
+
+(Optional) You can also transform the int8 PyTorch weights to LightSeq protobuf or HDF5:
+```shell
+python export/fairseq/ls_fs_quant_transformer_export.py
+```
+
+Once obtaining the LightSeq weights, you can fastly infer them using the following code:
+```python
+import lightseq.inference as lsi
+model = lsi.Transformer(MODEL_PATH, MAX_BATCH_SIZE)
+results = model.infer([[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1]])
+```
+Here MODEL_PATH is the path of your LightSeq weights and MAX_BATCH_SIZE is the maximal batch size of your input sentences.
+
+You can also fastly infer the int8 LightSeq weights by replacing the `lsi.Transformer` with `lsi.QuantTransformer`.
+
+More usage is available [here](./lightseq/inference/README.md).
+
+### Fast inference from Hugging Face BERT
+We provide an end2end bert-base example to see how fast Lightseq is compared to original Hugging Face.
+
+First you should install the requirements and locate to the specified directory:
+```shell
+pip install transformers
+cd examples/inference/python
+```
+
+Then you can check the performance by simply running following commands. `hf_bert_export.py` is used to transform PyTorch weights to LightSeq protobuf or HDF5.
+```shell
+python export/huggingface/hf_bert_export.py
+python test/ls_bert.py
+```
+
+More usage is available [here](./lightseq/inference/README.md).
+
+### Fast deployment using inference server
+We provide a docker image which contains tritonserver and LightSeq's dynamic link library, and you can deploy a inference server by simply replacing the model file with your own model file.
+```shell
+sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
+```
+
+More usage is available [here](./examples/triton_backend/README.md).
 
 ## Performance
 
