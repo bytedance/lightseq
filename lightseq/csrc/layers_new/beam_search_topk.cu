@@ -3,26 +3,25 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkOp<T>::operator()(
+std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkLayer<T>::operator()(
     Variable* logits, Variable* logit_bias, Variable* seq_probs,
     Variable* seq_score, Variable* alive_seq) {
+  set_inputs({logits, logit_bias, seq_probs, seq_score, alive_seq});
+
   Variable* can_idx = new Variable(
       "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int));
-
   Variable* can_score =
       new Variable("can_score", _max_batch_size * _beam_size * _trg_vocab_size *
                                     sizeof(float));
-
   Variable* num_beam_can = new Variable(
       "num_beam_can", (_max_batch_size * _beam_size + 1) * sizeof(int));
 
-  this->set_parents({logits, logit_bias, seq_probs, seq_score, alive_seq});
-  this->set_children({can_idx, can_score, num_beam_can});
+  set_outputs({can_idx, can_score, num_beam_can});
   return std::make_tuple(can_idx, can_score, num_beam_can);
 }
 
 template <typename T>
-void BeamSearchTopkOp<T>::forward() {
+void BeamSearchTopkLayer<T>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)parent(0)->value();
   T* logits_bias_ptr = (T*)parent(1)->value();
@@ -79,7 +78,7 @@ void BeamSearchTopkOp<T>::forward() {
                       thrust::greater<float>());
 }
 
-template class BeamSearchTopkOp<float>;
-template class BeamSearchTopkOp<__half>;
+template class BeamSearchTopkLayer<float>;
+template class BeamSearchTopkLayer<__half>;
 
 }  // namespace lightseq

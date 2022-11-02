@@ -10,7 +10,7 @@ Variable* LaunchEncEmbOp<T>::operator()(Variable* inp_tokens,
   size_t max_size = _max_batch_tokens * _hidden_dim;
   Variable* result =
       new Variable("LaunchEncEmbOp_out", max_size * sizeof(T), 0);
-  this->set_parents(
+  set_parents(
       {inp_tokens, token_emb, pos_emb, pad_mask, lang_emb, lang_id});
   this->set_children({result});
   return result;

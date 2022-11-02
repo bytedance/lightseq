@@ -8,9 +8,9 @@ Variable* SoftmaxOp<T1, T2>::operator()(Variable* inp, Variable* mask) {
   Variable* result = new Variable("SoftmaxOp_out", inp);
 
   if (mask != nullptr)
-    this->set_parents({inp, mask});
+    set_parents({inp, mask});
   else
-    this->set_parents({inp});
+    set_parents({inp});
 
   this->set_children({result});
   return result;

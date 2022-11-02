@@ -32,6 +32,18 @@ void Layer::backward() {
   }
 }
 
+void Layer::set_inputs(std::vector<Variable*> inps) { 
+  _inp_var_vec = inps; 
+  _context_ptr->enter_layer(this, false); 
+  macro_inputs_check = true; 
+}
+
+void Layer::set_outputs(std::vector<Variable*> outs) { 
+  _out_var_vec = outs;
+  _context_ptr->exit_layer();
+  macro_outputs_check = true; 
+}
+
 Variable* Layer::input(int idx) {
   if (idx >= _inp_var_vec.size()) {
     printf("ERROR OCCURRED!\n");

@@ -8,7 +8,7 @@ Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
   Variable* result =
       new Variable("StridedBatchGemmOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
-  this->set_parents({inpA, inpB});
+  set_parents({inpA, inpB});
   this->set_children({result});
   return result;
 }

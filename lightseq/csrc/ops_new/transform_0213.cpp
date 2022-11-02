@@ -7,7 +7,7 @@ Variable* Transform0213<T1, T2>::operator()(Variable* inp) {
   size_t trans_size = _max_batch_tokens * _hidden_size;
   Variable* res = new Variable("Transform0213_res", trans_size * sizeof(T1),
                                trans_size * sizeof(T2));
-  this->set_parents({inp});
+  set_parents({inp});
   this->set_children({res});
   return res;
 }

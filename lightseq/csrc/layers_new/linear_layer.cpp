@@ -19,10 +19,10 @@ LinearLayer<T1, T2>::LinearLayer(int max_batch_tokens, int input_size,
 
 template <typename T1, typename T2>
 Variable* LinearLayer<T1, T2>::operator()(Variable* inp) {
-  LAYER_PRE_INPUTS({inp});
+  set_inputs({inp});
   Variable* linear_out = (*_linear)(inp, _linear_w);
 
-  LAYER_POST_OUTPUTS({linear_out});
+  set_outputs({linear_out});
   return linear_out;
 }
 

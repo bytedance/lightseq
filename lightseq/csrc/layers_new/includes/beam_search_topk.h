@@ -1,12 +1,12 @@
 #pragma once
 #include "declaration.h"
-#include "node.h"
+#include "layer.h"
 #include "transformerKernels.h"
 
 namespace lightseq {
 
 template <typename T>
-class BeamSearchTopkOp : public Operator {
+class BeamSearchTopkLayer : public Layer {
  private:
   int _max_batch_size;
   int _max_step;
@@ -23,10 +23,10 @@ class BeamSearchTopkOp : public Operator {
   int _host_can_num_batch;
 
  public:
-  BeamSearchTopkOp(int max_batch_size, int max_step, int trg_vocab_size,
+  BeamSearchTopkLayer(int max_batch_size, int max_step, int trg_vocab_size,
                    int max_thread_per_block, int beam_size, int diverse_lambda,
                    int end_id)
-      : Operator("BeamSearchTopkOp"),
+      : Layer("BeamSearchTopkLayer"),
         _max_batch_size(max_batch_size),
         _max_step(max_step),
         _trg_vocab_size(trg_vocab_size),
@@ -37,7 +37,7 @@ class BeamSearchTopkOp : public Operator {
         _cub_sort_buffer_bytes(max_batch_size * beam_size * trg_vocab_size *
                                sizeof(T)) {}
 
-  ~BeamSearchTopkOp() {}
+  ~BeamSearchTopkLayer() {}
 
   std::tuple<Variable*, Variable*, Variable*> operator()(Variable* logits,
                                                          Variable* logit_bias,

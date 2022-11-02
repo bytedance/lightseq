@@ -44,7 +44,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
                                             Variable* enc_mask,
                                             Variable* cache_self_k,
                                             Variable* cache_self_v) {
-  LAYER_PRE_INPUTS({inp, enc_out, enc_mask, cache_self_k, cache_self_v});
+  set_inputs({inp, enc_out, enc_mask, cache_self_k, cache_self_v});
 
   if (_layer_id == 0) {
     total_enc_kv = (*_enc_kv_layer)(enc_out);
@@ -64,7 +64,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
 
   Variable* ffn_out = (*_ffn_layer)(enc_attn_out);
 
-  LAYER_POST_OUTPUTS({ffn_out, new_self_k, new_self_v});
+  set_outputs({ffn_out, new_self_k, new_self_v});
 
   return std::make_tuple(ffn_out, new_self_k, new_self_v);
 }

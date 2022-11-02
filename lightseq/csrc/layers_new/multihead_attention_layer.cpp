@@ -58,7 +58,7 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
-  LAYER_PRE_INPUTS({inp, inp_mask});
+  set_inputs({inp, inp_mask});
   if (_pre_or_postLayerNorm) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
@@ -94,10 +94,10 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
   if (!_pre_or_postLayerNorm) {
     Variable* attn_ln_out =
         (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-    LAYER_POST_OUTPUTS({attn_ln_out});
+    set_outputs({attn_ln_out});
     return attn_ln_out;
   } else {
-    LAYER_POST_OUTPUTS({attn_dropout_residual});
+    set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 }

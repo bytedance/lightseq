@@ -34,12 +34,12 @@ class LaunchEncEmbLayer : public Layer {
   virtual ~LaunchEncEmbLayer() {}
 
   Variable* operator()(Variable* inp, Variable* pad_mask) {
-    LAYER_PRE_INPUTS({inp, pad_mask});
+    set_inputs({inp, pad_mask});
 
     Variable* out = (*_launch_enc_op)(inp, _token_emb, _pos_emb, pad_mask,
                                       _lang_emb, _lang_id);
 
-    LAYER_POST_OUTPUTS({out});
+    set_outputs({out});
     return out;
   }
 

@@ -26,8 +26,8 @@ class Layer {
   virtual void forward();
   virtual void backward();
 
-  void set_inputs(std::vector<Variable*> inps) { _inp_var_vec = inps; }
-  void set_outputs(std::vector<Variable*> outs) { _out_var_vec = outs; }
+  void set_inputs(std::vector<Variable*> inps);
+  void set_outputs(std::vector<Variable*> outs);
 
   Variable* input(int idx);
   Variable* output(int idx);
@@ -47,13 +47,5 @@ class Layer {
   bool macro_inputs_check = false;
   bool macro_outputs_check = false;
 };
-
-#define LAYER_PRE_INPUTS(...)                                        \
-  set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), \
-      macro_inputs_check = true
-
-#define LAYER_POST_OUTPUTS(...)                           \
-  set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), \
-      macro_outputs_check = true
 
 }  // namespace lightseq

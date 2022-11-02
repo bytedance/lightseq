@@ -19,7 +19,7 @@ Variable* CRFOP<T>::operator()(Variable* start_transition,
                                Variable* bias) {
   Variable* best_tags =
       new Variable("best_tags", _max_batch_tokens * sizeof(int));
-  this->set_parents(
+  set_parents(
       {start_transition, end_transition, transition, emission, mask, bias});
   if (!_output_decode_score) {
     this->set_children({best_tags});

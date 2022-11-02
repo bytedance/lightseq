@@ -7,7 +7,7 @@ Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
   size_t max_size = _max_batch_tokens * _output_size;
   Variable* result = new Variable("LinearOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
-  this->set_parents({inp, weight});
+  set_parents({inp, weight});
   this->set_children({result});
   return result;
 }

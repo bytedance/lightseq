@@ -7,7 +7,7 @@ Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
   Variable* result =
       new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
-  this->set_parents({inp, bias});
+  set_parents({inp, bias});
   this->set_children({result});
   return result;
 }

@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
                                                 Variable* cache) {
   Variable* new_cache = new Variable("LaunchConcat3Dim1_new_cache");
-  this->set_parents({inp, cache});
+  set_parents({inp, cache});
   this->set_children({new_cache});
   return new_cache;
 }

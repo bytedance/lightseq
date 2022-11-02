@@ -58,7 +58,7 @@ template <typename T1, typename T2>
 std::tuple<Variable*, Variable*, Variable*>
 DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
                                           Variable* cache_v) {
-  LAYER_PRE_INPUTS({inp, cache_k, cache_v});
+  set_inputs({inp, cache_k, cache_v});
 
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
@@ -103,10 +103,10 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   if (!_pre_or_postLayerNorm) {
     Variable* attn_ln_out =
         (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-    LAYER_POST_OUTPUTS({attn_ln_out, cal_k_out, cal_v_out});
+    set_outputs({attn_ln_out, cal_k_out, cal_v_out});
     return std::make_tuple(attn_ln_out, cal_k_out, cal_v_out);
   } else {
-    LAYER_POST_OUTPUTS({attn_dropout_residual, cal_k_out, cal_v_out});
+    set_outputs({attn_dropout_residual, cal_k_out, cal_v_out});
     return std::make_tuple(attn_dropout_residual, cal_k_out, cal_v_out);
   }
 }

@@ -8,7 +8,7 @@ Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
   Variable* res = new Variable("BiasAddTrans20314_res",
                                _trans_count * trans_size * sizeof(T1),
                                _trans_count * trans_size * sizeof(T2));
-  this->set_parents({inp, bias});
+  set_parents({inp, bias});
   this->set_children({res});
   return res;
 }

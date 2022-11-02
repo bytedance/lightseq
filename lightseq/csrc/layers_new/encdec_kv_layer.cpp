@@ -25,14 +25,14 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int max_batch_tokens,
 
 template <typename T1, typename T2>
 Variable* EncDecKvLayer<T1, T2>::operator()(Variable* enc_out) {
-  LAYER_PRE_INPUTS({enc_out});
+  set_inputs({enc_out});
 
   Variable* kv_out = (*_kv_linear)(enc_out, _enc_kvw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(kv_out, _enc_kvb);
 
-  LAYER_POST_OUTPUTS({transform_20314_out});
+  set_outputs({transform_20314_out});
 
   return transform_20314_out;
 }

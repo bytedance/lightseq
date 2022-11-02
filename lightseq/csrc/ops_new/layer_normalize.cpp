@@ -11,7 +11,7 @@ Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
   size_t max_size = _max_batch_tokens * _hidden_dim;
   Variable* result = new Variable("LayerNormalizeOp_out", max_size * sizeof(T1),
                                   max_size * sizeof(T2));
-  this->set_parents({inp, gamma, betta});
+  set_parents({inp, gamma, betta});
   this->set_children({result});
   return result;
 }
