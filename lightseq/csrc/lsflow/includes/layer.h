@@ -18,13 +18,19 @@ class Layer {
   std::vector<Variable*> _inp_var_vec = {};
   std::vector<Variable*> _out_var_vec = {};
 
+  bool _defined_forward_process = true;
+  bool _defined_backward_process = true;
+
  public:
   Layer(std::string name);
   virtual ~Layer();
   std::string name() { return _name; }
 
-  virtual void forward();
-  virtual void backward();
+  virtual void forward() final;
+  virtual void backward() final;
+
+  virtual void forward_process() {  }
+  virtual void backward_process() { }
 
   void set_inputs(std::vector<Variable*> inps);
   void set_outputs(std::vector<Variable*> outs);

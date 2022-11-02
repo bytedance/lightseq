@@ -19,6 +19,9 @@ Layer::~Layer() {}
 void Layer::forward() {
   _context_ptr->build();
   clear_fw_flag();
+  _context_ptr->update_node_idx();
+
+  forward_process();
   for (Variable* var : _out_var_vec) {
     var->recursive_forward();
   }
@@ -27,6 +30,9 @@ void Layer::forward() {
 void Layer::backward() {
   _context_ptr->build();
   clear_bw_flag();
+  _context_ptr->update_node_idx();
+
+  backward_process();
   for (Variable* var : _inp_var_vec) {
     var->recursive_backward();
   }

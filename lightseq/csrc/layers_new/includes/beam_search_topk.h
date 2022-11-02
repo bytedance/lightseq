@@ -45,14 +45,14 @@ class BeamSearchTopkLayer : public Layer {
                                                          Variable* seq_score,
                                                          Variable* alive_seq);
 
-  void forward() override;
+  void forward_process() override;
 
   void before_forward(int length_norm, int cur_step, int step_token_num) {
     _length_norm = length_norm, _cur_step = cur_step,
     _step_token_num = step_token_num;
   }
 
-  void backward() override {}
+  void backward_process() override {}
 
   void before_backward() {}
 

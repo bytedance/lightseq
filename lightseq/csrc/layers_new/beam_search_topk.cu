@@ -21,7 +21,7 @@ std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkLayer<T>::operator()(
 }
 
 template <typename T>
-void BeamSearchTopkLayer<T>::forward() {
+void BeamSearchTopkLayer<T>::forward_process() {
   cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)input(0)->value();
   T* logits_bias_ptr = (T*)input(1)->value();

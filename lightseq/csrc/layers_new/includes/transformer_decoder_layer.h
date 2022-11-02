@@ -51,9 +51,9 @@ class TransformerDecoderLayer : public Layer {
 
   void before_backward() { return; }
 
-  void forward() override;
+  void forward_process() override;
 
-  void backward() override;
+  void backward_process() override;
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 

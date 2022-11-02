@@ -70,7 +70,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayer<T1, T2>::forward() {
+void TransformerDecoderLayer<T1, T2>::forward_process() {
   if (_layer_id == 0 && _step <= 0) {
     _enc_kv_layer->forward();
   } else if (_layer_id == 0 && _step > 0) {
@@ -110,7 +110,7 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayer<T1, T2>::backward() {
+void TransformerDecoderLayer<T1, T2>::backward_process() {
   _ffn_layer->backward();
   _enc_attn_layer->backward();
   _self_attn_layer->backward();
