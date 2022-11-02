@@ -102,7 +102,7 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
 
   int max_size =
       std::max(_hidden_size * _hidden_size * 3, _hidden_size * _inner_size);
-  float *temp_buffer = (float *)malloc(max_size);
+  std::vector<float> temp_buffer(max_size);
 
   for (auto enc_layer : bert.encoder_stack()) {
     offset.push_back(idx);
@@ -123,6 +123,8 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
       return "wrong multihead_project_kernel_qkv_size !";
     for (float ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(ele);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                          3 * _hidden_size);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -138,6 +140,8 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
       return "wrong multihead_project_kernel_output_size !";
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                        _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -163,6 +167,8 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
     if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
+                          _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -175,6 +181,8 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
     if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
       return "wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
+    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
+                          _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -185,7 +193,7 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
 
   }  // for
 
-  free(temp_buffer);
+  temp_buffer.clear();
 
   std::vector<T> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));

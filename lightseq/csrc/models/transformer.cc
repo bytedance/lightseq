@@ -1,9 +1,9 @@
-#include "bert.h"
+#include "transformer.h"
 
 namespace lightseq {
 namespace cuda {
 
-Bert::Bert(const std::string weight_path, const int max_batch_size)
+Transformer::Transformer(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
@@ -21,7 +21,6 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
 
   /* --- step.3 initial input Variable node --- */
   inp_tokens = new Variable("inp_tokens");
-
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
@@ -52,29 +51,32 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
       max_batch_tokens, tw_._hidden_size));
   lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
+  // initial 
+
+
   /* --- step.5 construct network --- */
-  std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens);
-  Variable *enc_emb = std::get<0>(enc_emb_outs);
-  Variable *pad_mask = std::get<1>(enc_emb_outs);
-  for (auto iter : enc_layer_vec) {
-    enc_emb = (*iter)(enc_emb, pad_mask);
-  }
-  bert_out = (*lyr_norm_layer)(enc_emb);
+  // std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens);
+  // Variable *enc_emb = std::get<0>(enc_emb_outs);
+  // Variable *pad_mask = std::get<1>(enc_emb_outs);
+  // for (auto iter : enc_layer_vec) {
+  //   enc_emb = (*iter)(enc_emb, pad_mask);
+  // }
+  // bert_out = (*lyr_norm_layer)(enc_emb);
 }
 
-Bert::~Bert() {  }
+Transformer::~Transformer() {  }
 
-void Bert::before_forward(int batch_size, int seq_len) {
-  launch_enc_emb_layer->before_forward(batch_size, seq_len);
+void Transformer::before_forward(int batch_size, int seq_len) {
+  // launch_enc_emb_layer->before_forward(batch_size, seq_len);
 
-  for (auto iter : enc_layer_vec) {
-    iter->before_forward(batch_size, seq_len);
-  }
+  // for (auto iter : enc_layer_vec) {
+  //   iter->before_forward(batch_size, seq_len);
+  // }
 
-  lyr_norm_layer->before_forward(batch_size * seq_len);
+  // lyr_norm_layer->before_forward(batch_size * seq_len);
 }
 
-void Bert::Infer() {
+void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
   before_forward(batch_size, seq_len);
@@ -91,7 +93,7 @@ void Bert::Infer() {
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 
-void Bert::set_input_ptr(int index, void *input_ptr) {
+void Transformer::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
       inp_tokens->set_value((char *)input_ptr);
@@ -103,7 +105,7 @@ void Bert::set_input_ptr(int index, void *input_ptr) {
   }
 }
 
-void Bert::set_output_ptr(int index, void *output_ptr) {
+void Transformer::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
       bert_out->set_value((char *)output_ptr);
@@ -115,7 +117,7 @@ void Bert::set_output_ptr(int index, void *output_ptr) {
   }
 }
 
-const void *Bert::get_output_ptr(int index) {
+const void *Transformer::get_output_ptr(int index) {
   switch (index) {
     case 0:
       return static_cast<void *>(bert_out->value());
@@ -125,7 +127,7 @@ const void *Bert::get_output_ptr(int index) {
   }
 }
 
-std::vector<int> Bert::get_input_max_shape(int index) {
+std::vector<int> Transformer::get_input_max_shape(int index) {
   switch (index) {
     case 0:
       return {_max_batch_size, tw_._max_step};
@@ -135,7 +137,7 @@ std::vector<int> Bert::get_input_max_shape(int index) {
       break;
   }
 }
-std::vector<int> Bert::get_output_max_shape(int index) {
+std::vector<int> Transformer::get_output_max_shape(int index) {
   switch (index) {
     case 0:
       return {_max_batch_size, tw_._max_step, tw_._hidden_size};
@@ -146,7 +148,7 @@ std::vector<int> Bert::get_output_max_shape(int index) {
   }
 }
 
-DataType Bert::get_input_dtype(int index) {
+DataType Transformer::get_input_dtype(int index) {
   switch (index) {
     case 0:
       return DataType::kInt32;
@@ -158,7 +160,7 @@ DataType Bert::get_input_dtype(int index) {
   }
 }
 
-DataType Bert::get_output_dtype(int index) {
+DataType Transformer::get_output_dtype(int index) {
   switch (index) {
     case 0:
 #ifdef FP16_MODE

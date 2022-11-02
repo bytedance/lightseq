@@ -7,7 +7,8 @@ Context::Context(StatusType status_type, int device_id)
       _device_id(device_id),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
-  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  if(device_id >= 0)
+    CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));

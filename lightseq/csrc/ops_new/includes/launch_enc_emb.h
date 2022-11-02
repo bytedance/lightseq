@@ -29,9 +29,8 @@ class LaunchEncEmbOp : public Operator {
 
   virtual ~LaunchEncEmbOp() {}
 
-  Variable* operator()(Variable* inp_tokens, Variable* token_emb,
-                       Variable* pos_emb, Variable* pad_mask,
-                       Variable* lang_emb, Variable* lang_id);
+  std::tuple<Variable*, Variable*> operator()(Variable* inp_tokens, Variable* token_emb,
+                       Variable* pos_emb, Variable* lang_emb, Variable* lang_id);
 
   void before_forward(int batch_size, int seq_len) {
     _batch_size = batch_size, _seq_len = seq_len;

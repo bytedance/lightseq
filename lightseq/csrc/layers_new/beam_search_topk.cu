@@ -23,15 +23,15 @@ std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkLayer<T>::operator()(
 template <typename T>
 void BeamSearchTopkLayer<T>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
-  T* logits_ptr = (T*)parent(0)->value();
-  T* logits_bias_ptr = (T*)parent(1)->value();
-  float* seq_probs_ptr = (float*)parent(2)->value();
-  float* seq_score_ptr = (float*)parent(3)->value();
-  int* alive_seq_ptr = (int*)parent(4)->value();
+  T* logits_ptr = (T*)input(0)->value();
+  T* logits_bias_ptr = (T*)input(1)->value();
+  float* seq_probs_ptr = (float*)input(2)->value();
+  float* seq_score_ptr = (float*)input(3)->value();
+  int* alive_seq_ptr = (int*)input(4)->value();
 
-  int* can_idx_ptr = (int*)child(0)->value();
-  float* can_score_ptr = (float*)child(1)->value();
-  int* num_beam_can_ptr = (int*)child(2)->value();
+  int* can_idx_ptr = (int*)output(0)->value();
+  float* can_score_ptr = (float*)output(1)->value();
+  int* num_beam_can_ptr = (int*)output(2)->value();
 
   /*
     step 1. logits bias and softmax,
