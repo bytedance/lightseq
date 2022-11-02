@@ -312,7 +312,7 @@ std::string getGPUName() {
       return name;
     }
   }
-  throw std::runtime_error("Not support this kind of GPU!");
+  return "";
 }
 
 void print_time_duration(

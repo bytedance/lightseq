@@ -366,7 +366,7 @@ std::string getGPUName() {
       return name;
     }
   }
-  throw std::runtime_error("Not support this kind of GPU!");
+  return "";
 }
 
 }  // namespace cuda
