@@ -3,3 +3,4 @@ from .ls_label_smoothed_cross_entropy import LSLabelSmoothedCrossEntropyCriterio
 from .ls_transformer import LSTransformerModel
 from .ls_bart import LSBARTModel
 from .ls_translation import LSTranslationTask
+from .grammar_correction import GrammarCorrectionTask
