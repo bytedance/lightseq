@@ -141,7 +141,7 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
     transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                        _hidden_size);
+                          _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);

@@ -3,15 +3,14 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(Variable* inp_tokens,
-                                        Variable* token_emb, Variable* pos_emb,
-                                        Variable* lang_emb, Variable* lang_id) {
+std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(
+    Variable* inp_tokens, Variable* token_emb, Variable* pos_emb,
+    Variable* lang_emb, Variable* lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
-  Variable* result =
-      new Variable("LaunchEncEmbOp_out", max_size * sizeof(T));
-  Variable* pad_mask = new Variable("pad_mask", _max_batch_tokens * sizeof(int));
-  set_parents(
-      {inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
+  Variable* result = new Variable("LaunchEncEmbOp_out", max_size * sizeof(T));
+  Variable* pad_mask =
+      new Variable("pad_mask", _max_batch_tokens * sizeof(int));
+  set_parents({inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
   this->set_children({result, pad_mask});
   return std::make_tuple(result, pad_mask);
 }

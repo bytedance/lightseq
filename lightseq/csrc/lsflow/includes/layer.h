@@ -29,8 +29,8 @@ class Layer {
   virtual void forward() final;
   virtual void backward() final;
 
-  virtual void forward_process() {  }
-  virtual void backward_process() { }
+  virtual void forward_process() {}
+  virtual void backward_process() {}
 
   void set_inputs(std::vector<Variable*> inps);
   void set_outputs(std::vector<Variable*> outs);

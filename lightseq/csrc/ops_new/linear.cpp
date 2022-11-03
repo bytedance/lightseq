@@ -22,7 +22,7 @@ void LinearOp<T1, T2>::forward() {
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
-  cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, _output_size,
+  cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size,
                  _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
                  out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
 }
@@ -43,6 +43,8 @@ void LinearOp<T1, T2>::backward() {
   }
 
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
+
+  // Q: how to adpat _opA & _opB
 
   // calculate weights_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,

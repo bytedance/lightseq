@@ -14,13 +14,17 @@ class LinearOp : public Operator {
   int _max_batch_tokens;
   int _batch_tokens;
   std::array<int, 3> _gemm_algos;
+  cublasOperation_t _opA;
+  cublasOperation_t _opB;
 
  public:
-  LinearOp(int max_batch_tokens, int output_size, int input_size)
+  LinearOp(int max_batch_tokens, int output_size, int input_size, cublasOperation_t opA = CUBLAS_OP_T, cublasOperation_t opB = CUBLAS_OP_N)
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),
         _input_size(input_size),
+        _opA(opA),
+        _opB(opB),
         _gemm_algos(std::array<int, 3>({99, 99, 99})) {}
 
   ~LinearOp() {}

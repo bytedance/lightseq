@@ -24,8 +24,8 @@ class BeamSearchTopkLayer : public Layer {
 
  public:
   BeamSearchTopkLayer(int max_batch_size, int max_step, int trg_vocab_size,
-                   int max_thread_per_block, int beam_size, int diverse_lambda,
-                   int end_id)
+                      int max_thread_per_block, int beam_size,
+                      int diverse_lambda, int end_id)
       : Layer("BeamSearchTopkLayer"),
         _max_batch_size(max_batch_size),
         _max_step(max_step),

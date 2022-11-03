@@ -21,8 +21,8 @@ class LaunchDecEmbOp : public Operator {
   int _cur_step;
 
  public:
-  LaunchDecEmbOp(int max_batch_tokens, int beam_size, int hidden_size, int trg_vocab_size, int max_step,
-                 int multilg_type)
+  LaunchDecEmbOp(int max_batch_tokens, int beam_size, int hidden_size,
+                 int trg_vocab_size, int max_step, int multilg_type)
       : Operator("LaunchDecEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _beam_size(beam_size),
@@ -34,7 +34,8 @@ class LaunchDecEmbOp : public Operator {
   virtual ~LaunchDecEmbOp() {}
 
   Variable* operator()(Variable* inp_tokens, Variable* token_emb,
-                       Variable* pos_emb, Variable* lang_emb, Variable* lang_id);
+                       Variable* pos_emb, Variable* lang_emb,
+                       Variable* lang_id);
 
   void before_forward(int batch_size, int cur_step) {
     _batch_size = batch_size, _cur_step = cur_step;

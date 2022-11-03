@@ -37,7 +37,6 @@ class Bert : public LSModel {
 
   int _max_batch_size;
 
-
  public:
   Bert(const std::string weight_path, const int max_batch_size);
   ~Bert();

@@ -8,14 +8,12 @@ Variable* LaunchDecEmbOp<T>::operator()(Variable* inp_tokens,
                                         Variable* lang_emb, Variable* lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_size;
 
-  Variable* result =
-      new Variable("LaunchDecEmbOp_out", max_size * sizeof(T));
-  
-  set_parents(
-      {inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
-  
+  Variable* result = new Variable("LaunchDecEmbOp_out", max_size * sizeof(T));
+
+  set_parents({inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
+
   this->set_children({result});
-  
+
   return result;
 }
 
@@ -32,9 +30,9 @@ void LaunchDecEmbOp<T>::forward() {
   T* output_ptr = (T*)child(0)->value();
 
   cuda::launch_dec_emb<T>(token_emb, pos_emb, inp_tokens, lang_emb, lang_id,
-                    output_ptr, _batch_size, _beam_size, _hidden_size, 
-                    _trg_vocab_size, _cur_step, _max_step, _multilg_type, 
-                    _stream);
+                          output_ptr, _batch_size, _beam_size, _hidden_size,
+                          _trg_vocab_size, _cur_step, _max_step, _multilg_type,
+                          _stream);
 }
 
 template class LaunchDecEmbOp<float>;

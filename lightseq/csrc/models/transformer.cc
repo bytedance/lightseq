@@ -3,11 +3,12 @@
 namespace lightseq {
 namespace cuda {
 
-Transformer::Transformer(const std::string weight_path, const int max_batch_size)
+Transformer::Transformer(const std::string weight_path,
+                         const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
-  Context::create_global_context();
+  Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
 
   /* --- step.2 load model weights into GPU memory --- */
@@ -47,24 +48,58 @@ Transformer::Transformer(const std::string weight_path, const int max_batch_size
   }
 
   // initial LayerNormalize layer
-  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+  enc_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
       max_batch_tokens, tw_._hidden_size));
-  lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  enc_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
-  // initial 
+  // initial LaunchDecEmb layer
+  launch_dec_emb_layer.reset(new LaunchDecEmbLayer<OpType_>(
+    max_batch_tokens, tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size, tw_._max_step, tw_._multilg_type));
+
+  // initial TransformerDecoder layers
+  int dec_wei_offset = 0;
+  for (int idx = 0; idx < tw_._n_dec_layer; idx ++) {
+    TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
+      new TransformerDecoderLayer<OpType_, OpType_>(
+        tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step, tw_._hidden_size, 
+        tw_._head_num, tw_._inner_size, 0, 0, 0, true, tw_._use_gelu ? "gelu" : "relu"));
+    dec_wei_offset +=
+        dec_layer_->load_params(tw_.get_dec_wei(), dec_wei_offset);
+    dec_layer_vec.push_back(dec_layer_);
+  }
+
+  // initial LayerNormalize layer
+  dec_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size));
+  dec_norm_layer->load_params(tw_.get_dec_wei(), 2);
+
+  // intial Project hidden states to vocab logits
+  linear_layer.reset(new LinearLayer<OpType_, OpType_>(
+    max_batch_tokens, tw_._hidden_size, tw_._trg_vocab_size, CUBLAS_OP_N, CUBLAS_OP_N));
 
 
   /* --- step.5 construct network --- */
-  // std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens);
-  // Variable *enc_emb = std::get<0>(enc_emb_outs);
-  // Variable *pad_mask = std::get<1>(enc_emb_outs);
-  // for (auto iter : enc_layer_vec) {
-  //   enc_emb = (*iter)(enc_emb, pad_mask);
-  // }
-  // bert_out = (*lyr_norm_layer)(enc_emb);
+  std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens); 
+  Variable *enc_emb = std::get<0>(enc_emb_outs); 
+  Variable *pad_mask = std::get<1>(enc_emb_outs);
+  for (auto iter : enc_layer_vec) {
+    enc_emb = (*iter)(enc_emb, pad_mask);
+  }
+  Variable* enc_out = (*enc_norm_layer)(enc_emb);
+  Variable* dec_emb = (*launch_dec_emb_layer)(inp_tokens);
+  for (auto iter: dec_layer_vec) {
+    Variable* cache_k = new Variable("cache_k"); cache_k_vec.push_back(cache_k);
+    Variable* cache_v = new Variable("cache_v"); cache_v_vec.push_back(cache_v);
+    std::tuple<Variable*, Variable*, Variable*> dec_outs = (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
+    dec_emb = std::get<0>(dec_outs);
+    new_k_vec.push_back(std::get<1>(dec_outs));
+    new_v_vec.push_back(std::get<2>(dec_outs));
+  }
+
+
 }
 
-Transformer::~Transformer() {  }
+Transformer::~Transformer() {}
 
 void Transformer::before_forward(int batch_size, int seq_len) {
   // launch_enc_emb_layer->before_forward(batch_size, seq_len);
@@ -73,7 +108,7 @@ void Transformer::before_forward(int batch_size, int seq_len) {
   //   iter->before_forward(batch_size, seq_len);
   // }
 
-  // lyr_norm_layer->before_forward(batch_size * seq_len);
+  // enc_norm_layer->before_forward(batch_size * seq_len);
 }
 
 void Transformer::Infer() {
@@ -86,7 +121,7 @@ void Transformer::Infer() {
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
-  lyr_norm_layer->forward();
+  enc_norm_layer->forward();
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 

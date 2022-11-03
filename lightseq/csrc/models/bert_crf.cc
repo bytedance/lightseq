@@ -7,7 +7,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
-  Context::create_global_context();
+  Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
 
   /* --- step.2 load model weights into GPU memory --- */
@@ -63,7 +63,8 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
   crf_layer->load_params(tw_.get_src_emb_wei(), 5);
 
   /* --- step.5 construct network --- */
-  std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens);
+  std::tuple<Variable *, Variable *> enc_emb_outs =
+      (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
   Variable *pad_mask = std::get<1>(enc_emb_outs);
   for (auto iter : enc_layer_vec) {
@@ -74,7 +75,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
   bert_out = (*crf_layer)(enc_emb, pad_mask);
 }
 
-BertCrf::~BertCrf() {  }
+BertCrf::~BertCrf() {}
 
 void BertCrf::before_forward(int batch_size, int seq_len) {
   launch_enc_emb_layer->before_forward(batch_size, seq_len);

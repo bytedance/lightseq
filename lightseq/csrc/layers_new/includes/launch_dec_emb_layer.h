@@ -1,15 +1,15 @@
 #pragma once
 #include "layer_normalize.h"
-#include "launch_enc_emb.h"
+#include "launch_dec_emb_op.h"
 #include "layer.h"
 
 namespace lightseq {
 
 template <typename T>
-class LaunchEncEmbLayer : public Layer {
+class LaunchDecEmbLayer : public Layer {
  private:
   // operators
-  LaunchEncEmbOp<T>* _launch_enc_op = nullptr;
+  LaunchDecEmbOp<T>* _launch_dec_op = nullptr;
 
   // parameters
   Variable* _token_emb;
@@ -18,11 +18,12 @@ class LaunchEncEmbLayer : public Layer {
   Variable* _lang_id;
 
  public:
-  LaunchEncEmbLayer(int max_batch_tokens, int pad_id, int hidden_dim,
-                    int multilg_type)
-      : Layer("LaunchEncEmbLayer"),
-        _launch_enc_op(new LaunchEncEmbOp<T>(max_batch_tokens, pad_id,
-                                             hidden_dim, multilg_type)) {
+  LaunchDecEmbLayer(int max_batch_tokens, int beam_size, int hidden_size,
+                    int trg_vocab_size, int max_step, int multilg_type)
+      : Layer("LaunchDecEmbLayer"),
+        _launch_dec_op(new LaunchDecEmbOp<T>(max_batch_tokens, beam_size,
+                                             hidden_size, trg_vocab_size,
+                                             max_step, multilg_type)) {
     _token_emb = new Variable("token_emb");
     _pos_emb = new Variable("pos_emb");
     _lang_emb = new Variable("lang_emb");
@@ -31,20 +32,19 @@ class LaunchEncEmbLayer : public Layer {
     this->_context_ptr->exit_layer();  // necessary
   }
 
-  virtual ~LaunchEncEmbLayer() {}
+  virtual ~LaunchDecEmbLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* inp) {
+  Variable* operator()(Variable* inp) {
     set_inputs({inp});
 
-    std::tuple<Variable*, Variable*> out = (*_launch_enc_op)(inp, _token_emb, _pos_emb,
-                                      _lang_emb, _lang_id);
+    Variable* out = (*_launch_dec_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
 
-    set_outputs({std::get<0>(out), std::get<1>(out)});
+    set_outputs({out});
     return out;
   }
 
-  void before_forward(int batch_size, int seq_len) {
-    _launch_enc_op->before_forward(batch_size, seq_len);
+  void before_forward(int batch_size, int cur_step) {
+    _launch_dec_op->before_forward(batch_size, cur_step);
   }
 
   void before_backward() {}
@@ -57,10 +57,10 @@ class LaunchEncEmbLayer : public Layer {
   }
 };
 
-template class LaunchEncEmbLayer<__half>;
-template class LaunchEncEmbLayer<float>;
+template class LaunchDecEmbLayer<__half>;
+template class LaunchDecEmbLayer<float>;
 
 template <class T>
-using LaunchEncEmbLayerPtr = std::shared_ptr<LaunchEncEmbLayer<T>>;
+using LaunchDecEmbLayerPtr = std::shared_ptr<LaunchDecEmbLayer<T>>;
 
 }  // namespace lightseq

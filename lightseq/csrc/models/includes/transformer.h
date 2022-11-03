@@ -4,7 +4,9 @@
 #include "transformer_weight.h"
 
 #include "launch_enc_emb_layer.h"
+#include "launch_dec_emb_layer.h"
 #include "transformer_encoder_layer.h"
+#include "transformer_decoder_layer.h"
 #include "lyr_normalize_layer.h"
 
 #ifdef FP16_MODE
@@ -22,8 +24,13 @@ class Transformer : public LSModel {
   std::shared_ptr<Context> _context_ptr;
 
   LaunchEncEmbLayerPtr<OpType_> launch_enc_emb_layer;
-  std::vector<TransformerEncoderLayerPtr<OpType_, OpType_> > enc_layer_vec;
-  LyrNormalizeLayerPtr<OpType_, OpType_> lyr_norm_layer;
+  std::vector<TransformerEncoderLayerPtr<OpType_, OpType_>> enc_layer_vec;
+  LyrNormalizeLayerPtr<OpType_, OpType_> enc_norm_layer;
+
+  LaunchDecEmbLayerPtr<OpType_> launch_dec_emb_layer;
+  std::vector<TransformerDecoderLayerPtr<OpType_, OpType_>> dec_layer_vec;
+  LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
+  LinearLayerPtr<OpType_, OpType_> linear_layer;
 
   ContextPtr context_ptr;
 
@@ -33,7 +40,10 @@ class Transformer : public LSModel {
   Variable* lang_emb;
   Variable* lang_id;
 
-  Variable* bert_out;
+  std::vector<Variable*> cache_k_vec;
+  std::vector<Variable*> new_k_vec;
+  std::vector<Variable*> cache_v_vec;
+  std::vector<Variable*> new_v_vec;
 
   int _max_batch_size;
 

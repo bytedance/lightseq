@@ -139,10 +139,8 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
       return "Wrong encode_output_project_kernel_kv_size !";
     for (float ele : layer.encode_output_project_kernel_kv())
       value.push_back(ele);
-
     transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
                           2 * _n_dec_layer * _hidden_size);
-
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
@@ -205,7 +203,6 @@ std::string TransformerWeight<T>::proto_parse_enc_wei(
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
-
 
   int max_size =
       std::max(_hidden_size * _hidden_size * 3, _hidden_size * _inner_size);
@@ -328,7 +325,7 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
   std::vector<float> value;
   int idx = 0;
 
-  int max_size = 
+  int max_size =
       std::max(_hidden_size * _hidden_size * 3, _hidden_size * _inner_size);
   std::vector<float> temp_buffer(max_size);
 
@@ -477,7 +474,7 @@ Read model config stored in custom hdf5 file.
 */
 template <typename T>
 void TransformerWeight<T>::hdf5_get_model_config(hid_t hdf5_file,
-                                                       bool only_decoder) {
+                                                 bool only_decoder) {
   _hidden_size = get_hdf5_dataset_size(hdf5_file, "trg_embedding/norm_scale");
 
   _inner_size =
@@ -585,7 +582,7 @@ Compared with the encoder, the decoder has more
 */
 template <typename T>
 void TransformerWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file,
-                                                    std::string source) {
+                                              std::string source) {
   int vocab_size = (source == "src") ? _src_vocab_size : _trg_vocab_size;
 
   std::string dataset_prefix =
@@ -601,7 +598,7 @@ void TransformerWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file,
   std::vector<float> value(value_size);  // preallocate vector for performance
   std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
-  
+
   int max_size = _hidden_size * _hidden_size * 2 * _n_dec_layer;
   std::vector<float> temp_buffer(max_size);
 
@@ -727,7 +724,8 @@ void TransformerWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   std::vector<float> value(value_size);
   std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
-  std::vector<float> temp_buffer(std::max(_hidden_size * 3 * _hidden_size, _hidden_size * _inner_size));
+  std::vector<float> temp_buffer(
+      std::max(_hidden_size * 3 * _hidden_size, _hidden_size * _inner_size));
 
   int idx = 0;
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
@@ -861,7 +859,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
   std::vector<float> value(value_size);
   std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
             << " MB of decoder weight." << std::endl;
-  std::vector<float> temp_buffer(std::max(3 * _hidden_size * _hidden_size, _hidden_size * _inner_size));
+  std::vector<float> temp_buffer(
+      std::max(3 * _hidden_size * _hidden_size, _hidden_size * _inner_size));
   int idx = 0;
 
   for (int layer_id = 0; layer_id < _n_dec_layer; ++layer_id) {
@@ -1030,7 +1029,7 @@ Load the proto file into CPU memory and parse it.
 */
 template <typename T>
 std::string TransformerWeight<T>::initializing(std::string weight_path,
-                                                     bool only_decoder) {
+                                               bool only_decoder) {
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".pb")) {
     std::cout << "Parsing protobuf: " << weight_path << std::endl;
