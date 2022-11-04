@@ -27,11 +27,11 @@
 - [We are Hiring!](#we-are-hiring)
 
 ## Release Notes
-**[2022.10.25]** LightSeq release v3.0.0 version, which supports int8 mixed-precision training and inference for Transformer-based models.
+**[2022.10.25]** LightSeq release v3.0.0 version, which supports int8 mixed-precision training and inference for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docx/doxcnZloQZmLgAVU7z1QFlcRPuO)]
 
-**[2021.06.18]** LightSeq release v2.0.0 version, which supports fp16 mixed-precision training for Transformer-based models.
+**[2021.06.18]** LightSeq release v2.0.0 version, which supports fp16 mixed-precision training for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)]
 
-**[2019.12.06]** LightSeq release v1.0.0 version, which supports fp16 mixed-precision inference for Transformer-based models.
+**[2019.12.06]** LightSeq release v1.0.0 version, which supports fp16 mixed-precision inference for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0)]
 
 ## Introduction
 LightSeq is a high performance training and inference library for sequence processing and generation implemented in CUDA.
@@ -70,7 +70,7 @@ LightSeq supports multiple features, including
 ## Performance
 We test the speedup of LightSeq training and inference using both fp16 and int8 mix-precision on Transformer and BERT models. The baseline is PyTorch fp16 mix-precision. Training experiments are tested on one A100 GPU and inference experiments are tested on eight A100 GPUs.
 
-More performance results are available [here](./lightseq/inference/performance).
+More performance results are available [here](./docs/inference/performance).
 
 ### Speedup of Transformer training
 | batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |

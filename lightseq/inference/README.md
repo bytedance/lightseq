@@ -2,7 +2,7 @@
 
 ![logo](../../docs/inference/images/logo.png)
 
-[推理模块中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0#)
+[推理模块中文版本介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0)
 
 LightSeq provides a high performance inference library for sequence processing and generation implemented
 in CUDA.
