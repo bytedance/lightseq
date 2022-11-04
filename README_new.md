@@ -9,40 +9,46 @@
 - [Introduction](#introduction)
     - [Support Matrix](#support-matrix)
 - [Performance](#performance)
-    - [Speedup of Transformer training](#speedup-of-transformer-training)
-    - [Speedup of Transformer inference](#speedup-of-transformer-inference)
-    - [Speedup of BERT training](#speedup-of-bert-training)
-    - [Speedup of BERT inference](#speedup-of-bert-inference)
+    - [Speedup of Transformer Training](#speedup-of-transformer-training)
+    - [Speedup of BERT Training](#speedup-of-bert-training)
+    - [Speedup of Transformer Inference](#speedup-of-transformer-inference)
+    - [Speedup of BERT Inference](#speedup-of-bert-inference)
 - [Installation](#installation)
     - [Install from PyPI](#install-from-pypi)
     - [Build from Source](#build-from-source)
 - [Getting Started](#getting-started)
-    - [LightSeq training from scratch](#lightseq-training-from-scratch)
-    - [LightSeq training from Fairseq](#lightseq-training-from-fairseq)
-    - [LightSeq inference from Fairseq](#lightseq-inference-from-fairseq)
-    - [LightSeq inference from Hugging Face BERT](#lightseq-inference-from-hugging-face-bert)
-    - [LightSeq deployment using inference server](#lightseq-deployment-using-inference-server)
+    - [LightSeq Training from Scratch](#lightseq-training-from-scratch)
+    - [LightSeq Training from Fairseq](#lightseq-training-from-fairseq)
+    - [LightSeq Training from Hugging Face BERT](#lightseq-training-from-hugging-face-bert)
+    - [LightSeq Inference from Fairseq](#lightseq-inference-from-fairseq)
+    - [LightSeq Inference from Hugging Face BERT](#lightseq-inference-from-hugging-face-bert)
+    - [LightSeq Deployment Using Inference Server](#lightseq-deployment-using-inference-server)
 - [Cite Us](#cite-us)
 - [Contact](#contact)
 - [We are Hiring!](#we-are-hiring)
 
 ## Release Notes
-**[2022.10.25]** LightSeq release v3.0.0 version, which supports int8 mixed-precision training and inference for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docx/doxcnZloQZmLgAVU7z1QFlcRPuO)]
+**[2022.10.25]** Release v3.0.0 version, which supports int8 mixed-precision training and inference. [[中文介绍](https://bytedance.feishu.cn/docx/doxcnZloQZmLgAVU7z1QFlcRPuO)]
 
-**[2021.06.18]** LightSeq release v2.0.0 version, which supports fp16 mixed-precision training for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)]
+**[2021.06.18]** Release v2.0.0 version, which supports fp16 mixed-precision training. [[中文介绍](https://bytedance.feishu.cn/docs/doccn9w7UdOYcEOD99FjFVpdFzf)]
 
-**[2019.12.06]** LightSeq release v1.0.0 version, which supports fp16 mixed-precision inference for Transformer-based models. [[中文介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0)]
+**[2019.12.06]** Release v1.0.0 version, which supports fp16 mixed-precision inference. [[中文介绍](https://bytedance.feishu.cn/docs/doccnUJ5X9WWEdQxXwzbPJ581J0)]
 
 ## Introduction
 LightSeq is a high performance training and inference library for sequence processing and generation implemented in CUDA.
-It enables highly efficient computation of modern NLP models such as *BERT*, *GPT*, *Transformer*, etc.
-It is therefore best useful for *Machine Translation*, *Text Generation*, *Dialog*, *Language Modeling*, *Sentiment Analysis*, and other related tasks with sequence data.
+It enables highly efficient computation of modern NLP and CV models such as BERT, GPT, Transformer, etc.
+It is therefore best useful for machine translation, text generation, image classification, and other sequence related tasks.
+
+LightSeq training and inference is very fast. Below is the overall performance:
+* LightSeq fp16 training achieves a speedup of up to **3x**, compared to PyTorch fp16 training.
+* LightSeq int8 training achieves a speedup of up to **5x**, compared to PyTorch QAT (i.e., quantization aware training).
+* LightSeq fp16 and int8 inference achieves a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, repectively.
 
 The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and
 custom kernel functions which are specially fused and optimized for Transformer model family. In
-addition to model components, the inference library also provide easy-to deploy model management and serving backend based on
+addition to model components, the inference library also provide easy-to-deploy model management and serving backend based on
 [TensorRT Inference
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html).
 With LightSeq, one can easily develop modified Transformer architecture with little additional code.
@@ -72,7 +78,7 @@ We test the speedup of LightSeq training and inference using both fp16 and int8 
 
 More performance results are available [here](./docs/inference/performance).
 
-### Speedup of Transformer training
+### Speedup of Transformer Training
 | batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
 | ---------------- | ----------- | ------------- | ------------- |
 | 512              | 0.36        | 1.99          | 1.86          |
@@ -82,7 +88,17 @@ More performance results are available [here](./docs/inference/performance).
 | 8192             | 0.41        | 1.44          | 1.44          |
 | 15000            | 0.43        | 1.44          | 1.44          |
 
-### Speedup of Transformer inference
+### Speedup of BERT Training
+| batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
+| ---------------- | ----------- | ------------- | ------------- |
+| 8                | 0.45        | 2.12          | 1.99          |
+| 16               | 0.44        | 1.92          | 1.80          |
+| 32               | 0.42        | 1.59          | 1.52          |
+| 64               | 0.46        | 1.62          | 1.58          |
+| 128              | 0.46        | 1.74          | 1.70          |
+| 256              | 0.46        | 1.68          | 1.73          |
+
+### Speedup of Transformer Inference
 | batch size | sequence length | LightSeq fp16 | LightSeq int8 |
 |------------|-----------------|---------------|---------------|
 | 1          | 8               | 8.00          | 9.33          |
@@ -95,17 +111,7 @@ More performance results are available [here](./docs/inference/performance).
 | 32         | 32              | 9.68          | 11.15         |
 | 32         | 128             | 6.68          | 7.74          |
 
-### Speedup of BERT training
-| batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
-| ---------------- | ----------- | ------------- | ------------- |
-| 8                | 0.45        | 2.12          | 1.99          |
-| 16               | 0.44        | 1.92          | 1.80          |
-| 32               | 0.42        | 1.59          | 1.52          |
-| 64               | 0.46        | 1.62          | 1.58          |
-| 128              | 0.46        | 1.74          | 1.70          |
-| 256              | 0.46        | 1.68          | 1.73          |
-
-### Speedup of BERT inference
+### Speedup of BERT Inference
 | batch size | sequence length | LightSeq fp16 | LightSeq int8 |
 | ---------- | --------------- | ------------- | ------------- |
 | 1          | 8               | 9.22          | 9.87          |
@@ -136,7 +142,7 @@ Detailed building introduction is available [here](docs/inference/build.md).
 ## Getting Started
 We provide several samples here to show the usage of LightSeq. Complete user guide is available [here](docs/guide.md).
 
-### LightSeq training from scratch
+### LightSeq Training from Scratch
 You can use the modules provided by LightSeq to build your own models. The following is an example of building a Transformer encoder layer.
 
 First, import LightSeq Transformer encoder module:
@@ -165,10 +171,10 @@ layer = LSTransformerEncoderLayer(config)
 
 In addition to encoder layers, the other modules can be created using similar methods, and then be trained as normal PyTorch models.
 
-### LightSeq training from Fairseq
+### LightSeq Training from Fairseq
 LightSeq integrates all the fast and lightning modules into Fairseq.
 
-Firstly install the two following requirements:
+First install the two following requirements:
 ```shell
 pip install fairseq==0.10.2 sacremoses
 ```
@@ -185,7 +191,33 @@ sh examples/training/fairseq/ls_fairseq_quant_wmt14en2de.sh
 
 More usage is available [here](./lightseq/training/README.md).
 
-### LightSeq inference from Fairseq
+### LightSeq Training from Hugging Face BERT
+LightSeq replaces the encoder layers of Hugging Face BERT with LightSeq fast layers.
+
+First you should install these requirements:
+
+```shell
+pip install transformers seqeval datasets
+```
+
+Before doing next training, you need to switch to the following directory:
+```shell
+cd examples/training/huggingface/bert
+```
+
+Then you can easily fine-tunes BERT on different tasks. Taking named entity recognition task as an example, you can train the BERT with fp16 mixed-precision using:
+```shell
+python task_ner/run_ner.sh
+```
+
+(Optional) You can also start int8 mix-precision training on the basis of fp16 pre-training models by:
+```shell
+python task_ner/run_quant_ner.sh
+```
+
+More usage is available [here](./lightseq/training/README.md).
+
+### LightSeq Inference from Fairseq
 After training using above scripts, you can fastly infer the models using LightSeq.
 
 You should transform the fp16 PyTorch weights to LightSeq protobuf or HDF5:
@@ -210,7 +242,7 @@ You can also fastly infer the int8 LightSeq weights by replacing the `lsi.Transf
 
 More usage is available [here](./lightseq/inference/README.md).
 
-### LightSeq inference from Hugging Face BERT
+### LightSeq Inference from Hugging Face BERT
 We provide an end2end bert-base example to see how fast Lightseq is compared to original Hugging Face.
 
 First you should install the requirements and locate to the specified directory:
@@ -227,7 +259,7 @@ python test/ls_bert.py
 
 More usage is available [here](./lightseq/inference/README.md).
 
-### LightSeq deployment using inference server
+### LightSeq Deployment Using Inference Server
 We provide a docker image which contains tritonserver and LightSeq's dynamic link library, and you can deploy a inference server by simply replacing the model file with your own model file.
 ```shell
 sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
