@@ -22,6 +22,10 @@ void BiasActDropoutOp<T1, T2>::forward() {
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
         output, input, mask_ptr, bias, _rows * _cols, _cols, RATIO(), stream);
@@ -45,6 +49,10 @@ void BiasActDropoutOp<T1, T2>::backward() {
   T2* grad_out = (T2*)child(0)->grad();
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+
+  if(!_context_ptr->is_built()){
+    return ;
+  }
 
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(

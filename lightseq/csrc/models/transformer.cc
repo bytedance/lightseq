@@ -54,15 +54,21 @@ Transformer::Transformer(const std::string weight_path,
 
   // initial LaunchDecEmb layer
   launch_dec_emb_layer.reset(new LaunchDecEmbLayer<OpType_>(
-    max_batch_tokens, tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size, tw_._max_step, tw_._multilg_type));
+      max_batch_tokens, tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
+      tw_._max_step, tw_._multilg_type));
+  launch_dec_emb_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
   // initial TransformerDecoder layers
   int dec_wei_offset = 0;
-  for (int idx = 0; idx < tw_._n_dec_layer; idx ++) {
+  for (int idx = 0; idx < tw_._n_dec_layer; idx++) {
     TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
-      new TransformerDecoderLayer<OpType_, OpType_>(
-        tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step, tw_._hidden_size, 
-        tw_._head_num, tw_._inner_size, 0, 0, 0, true, tw_._use_gelu ? "gelu" : "relu"));
+        new TransformerDecoderLayer<OpType_, OpType_>(
+            tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step,
+            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0, true,
+            tw_._use_gelu ? "gelu" : "relu"));
+    if(idx == 0) {
+      dec_layer_->load_params(tw_.get_trg_emb_wei(), 4, true);
+    }
     dec_wei_offset +=
         dec_layer_->load_params(tw_.get_dec_wei(), dec_wei_offset);
     dec_layer_vec.push_back(dec_layer_);
@@ -75,25 +81,35 @@ Transformer::Transformer(const std::string weight_path,
 
   // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
-    max_batch_tokens, tw_._hidden_size, tw_._trg_vocab_size, CUBLAS_OP_N, CUBLAS_OP_N));
-
+      max_batch_tokens, tw_._hidden_size, tw_._trg_vocab_size, CUBLAS_OP_N,
+      CUBLAS_OP_N));
+  linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
   /* --- step.5 construct network --- */
-  std::tuple<Variable*, Variable*> enc_emb_outs = (*launch_enc_emb_layer)(inp_tokens); 
-  Variable *enc_emb = std::get<0>(enc_emb_outs); 
+  std::tuple<Variable *, Variable *> enc_emb_outs =
+      (*launch_enc_emb_layer)(inp_tokens);
+  Variable *enc_emb = std::get<0>(enc_emb_outs);
   Variable *pad_mask = std::get<1>(enc_emb_outs);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
-  Variable* enc_out = (*enc_norm_layer)(enc_emb);
-  Variable* dec_emb = (*launch_dec_emb_layer)(inp_tokens);
-  for (auto iter: dec_layer_vec) {
-    Variable* cache_k = new Variable("cache_k"); cache_k_vec.push_back(cache_k);
-    Variable* cache_v = new Variable("cache_v"); cache_v_vec.push_back(cache_v);
-    std::tuple<Variable*, Variable*, Variable*> dec_outs = (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
+  Variable *enc_out = (*enc_norm_layer)(enc_emb);
+  Variable *dec_emb = (*launch_dec_emb_layer)(inp_tokens);
+  for (auto iter : dec_layer_vec) {
+    Variable *cache_k = new Variable("cache_k");
+    cache_k_vec.push_back(cache_k);
+    Variable *cache_v = new Variable("cache_v");
+    cache_v_vec.push_back(cache_v);
+    std::tuple<Variable *, Variable *, Variable *> dec_outs =
+        (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
     new_k_vec.push_back(std::get<1>(dec_outs));
     new_v_vec.push_back(std::get<2>(dec_outs));
+    
+    cache_k->malloc_memory(max_batch_size * tw_._max_step);
+    cache_v->malloc_memory(max_batch_size * tw_._max_step);
+    std::get<1>(dec_outs)->malloc_memory(max_batch_size * tw_._max_step);
+    std::get<2>(dec_outs)->malloc_memory(max_batch_size * tw_._max_step);
   }
 
 
@@ -101,20 +117,25 @@ Transformer::Transformer(const std::string weight_path,
 
 Transformer::~Transformer() {}
 
-void Transformer::before_forward(int batch_size, int seq_len) {
-  // launch_enc_emb_layer->before_forward(batch_size, seq_len);
-
-  // for (auto iter : enc_layer_vec) {
-  //   iter->before_forward(batch_size, seq_len);
-  // }
-
-  // enc_norm_layer->before_forward(batch_size * seq_len);
+void Transformer::before_forward(int batch_size, int seq_len, int cur_step) {
+  launch_enc_emb_layer->before_forward(batch_size, seq_len);
+  for (auto iter : enc_layer_vec) {
+    iter->before_forward(batch_size, seq_len);
+  }
+  enc_norm_layer->before_forward(batch_size * seq_len);
+  
+  launch_dec_emb_layer->before_forward(batch_size, (cur_step + 1));
+  for (auto iter: dec_layer_vec) {
+    iter->before_forward(batch_size, seq_len, seq_len, cur_step);
+  }
+  dec_norm_layer->before_forward(batch_size * (cur_step + 1));
+  linear_layer->before_forward(batch_size, (cur_step + 1));
 }
 
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
-  before_forward(batch_size, seq_len);
+  before_forward(batch_size, seq_len, 0);
 
   /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
@@ -142,9 +163,9 @@ void Transformer::set_input_ptr(int index, void *input_ptr) {
 
 void Transformer::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
-    case 0:
-      bert_out->set_value((char *)output_ptr);
-      break;
+    // case 0:
+    //   bert_out->set_value((char *)output_ptr);
+    //   break;
 
     default:
       throw std::runtime_error("invalid output index");
@@ -154,8 +175,8 @@ void Transformer::set_output_ptr(int index, void *output_ptr) {
 
 const void *Transformer::get_output_ptr(int index) {
   switch (index) {
-    case 0:
-      return static_cast<void *>(bert_out->value());
+    // case 0:
+    //   return static_cast<void *>(bert_out->value());
     default:
       throw std::runtime_error("invalid output index");
       break;

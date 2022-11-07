@@ -157,7 +157,8 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name, NodeType::Variable), _value_byte_size(0), _grad_byte_size(0) {
+    : Node(name, NodeType::Variable), _value_byte_size(0), _grad_byte_size(0),
+    _variable_type(VariableType::FixedVariable) {
   _value.reset(new Tensor("value", 0));
   if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", 0));
 }
@@ -166,14 +167,15 @@ Variable::Variable(std::string name, size_t value_byte_size,
                    size_t grad_byte_size)
     : Node(name, NodeType::Variable),
       _value_byte_size(value_byte_size),
-      _grad_byte_size(grad_byte_size) {
+      _grad_byte_size(grad_byte_size),
+      _variable_type(VariableType::SharedVariable) {
   _value.reset(new Tensor("value", _value_byte_size));
   if (_context_ptr->is_training())
     _grad.reset(new Tensor("grad", _grad_byte_size));
 }
 
 Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
-    : Variable(name, (size_t)0, (size_t)0) {
+    : Variable(name, (size_t)0, (size_t)0){
   _value->set_tensor(para_ptr);
   if (_grad) {
     _grad->set_tensor(grad_ptr);
@@ -186,7 +188,8 @@ Variable::Variable(std::string name, Variable* parent_variable,
       _is_descendants(true),
       _parent_variable(parent_variable),
       _offset_value(offset_value),
-      _offset_grad(offset_grad) {
+      _offset_grad(offset_grad),
+      _variable_type(VariableType::DescendantsVariable) {
   parent_variable->add_descendants(this);
 }
 
@@ -227,6 +230,18 @@ void Variable::set_grad(char* grad_ptr) {
   remove_ancestor();
   if (_context_ptr->is_training()) {
     _grad->reset_fixed();
+    _grad->set_tensor(grad_ptr);
+  }
+}
+
+void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
+  _value_byte_size = value_byte_size;
+  _grad_byte_size = grad_byte_size;
+  _variable_type = VariableType::FixedVariable;
+  char* value_ptr = cuda_malloc<char>(value_byte_size);
+  _value->set_tensor(value_ptr);
+  if(_context_ptr->is_training() && grad_byte_size) {
+    char* grad_ptr = cuda_malloc<char>(grad_byte_size);
     _grad->set_tensor(grad_ptr);
   }
 }

@@ -23,7 +23,6 @@ class Tensor {
   virtual ~Tensor() {}
 
   void set_tensor(char* inp);
-
   void set_tensor(const char* inp);
 
   char* tensor(bool is_open_interval = false, bool just_view = false);

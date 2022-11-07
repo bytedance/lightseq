@@ -23,6 +23,10 @@ void DropoutOp<T1, T2>::forward() {
   T1* output = (T1*)child(0)->value();
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
 }
@@ -39,6 +43,10 @@ void DropoutOp<T1, T2>::backward() {
   T2* output_grad = (T2*)child(0)->grad();
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+  
   launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count, RATIO(),
                         stream, true);
 }

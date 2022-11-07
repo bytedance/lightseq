@@ -37,6 +37,7 @@ class Node {
 
   const std::vector<Node*>& parents() { return _parents; }
   const std::vector<Node*>& children() { return _children; }
+  // std::string node_type_str() { return NodeTypeString[_node_type]; }
 
   void recursive_forward();
 
@@ -54,6 +55,7 @@ class Node {
 
 class Variable : public Node {
  private:
+  VariableType _variable_type;
   size_t _value_byte_size;
   size_t _grad_byte_size;
   TensorPtr _value = nullptr;
@@ -82,6 +84,9 @@ class Variable : public Node {
   void set_value(const char* value_ptr);
 
   void set_grad(char* grad_ptr);
+
+  void malloc_memory(size_t value_byte_size, size_t grad_byte_size = 0);
+  std::string variable_type_str() { return VariableTypeString[_variable_type]; }
 
   /*
     value() / grad() means get the value or grad of this node, when

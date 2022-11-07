@@ -23,6 +23,10 @@ void BiasDropoutResOp<T1, T2>::forward() {
   T1* output = (T1*)child(0)->value();
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
 }
@@ -40,6 +44,10 @@ void BiasDropoutResOp<T1, T2>::backward() {
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
   bool is_res_cover = parent(2)->is_cover();
+  
+  if(!_context_ptr->is_built()){
+    return ;
+  }
 
   launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad, mask_ptr,
                                  _rows, _cols, RATIO(), stream);

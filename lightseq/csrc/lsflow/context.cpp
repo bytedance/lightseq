@@ -123,7 +123,7 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    rl->gather_root_leaf_var();
+    // rl->gather_root_leaf_var();
 #ifdef DEBUG_MODE
     printf("\n########## Context build layer %s forward ##########\n",
            rl->name().c_str());
@@ -146,6 +146,8 @@ void Context::build() {
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
 
 #ifdef DEBUG_MODE
   draw_all_context();

@@ -6,7 +6,7 @@ template <typename T>
 Variable* LaunchDecEmbOp<T>::operator()(Variable* inp_tokens,
                                         Variable* token_emb, Variable* pos_emb,
                                         Variable* lang_emb, Variable* lang_id) {
-  size_t max_size = _max_batch_tokens * _hidden_size;
+  size_t max_size = _max_batch_tokens * _hidden_size * _beam_size; 
 
   Variable* result = new Variable("LaunchDecEmbOp_out", max_size * sizeof(T));
 
@@ -28,7 +28,7 @@ void LaunchDecEmbOp<T>::forward() {
   int* lang_id = (int*)parent(4)->value();
 
   T* output_ptr = (T*)child(0)->value();
-
+  
   cuda::launch_dec_emb<T>(token_emb, pos_emb, inp_tokens, lang_emb, lang_id,
                           output_ptr, _batch_size, _beam_size, _hidden_size,
                           _trg_vocab_size, _cur_step, _max_step, _multilg_type,

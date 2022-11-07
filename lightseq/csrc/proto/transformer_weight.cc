@@ -100,7 +100,6 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
   std::vector<float> temp_buffer(max_size);
 
   offset.push_back(idx);
-
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (float ele : layer.token_embedding()) value.push_back(ele);

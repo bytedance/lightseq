@@ -21,10 +21,14 @@ void LinearOp<T1, T2>::forward() {
   T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
+  
+  if(!_context_ptr->is_built()){
+    return ;
+  }
 
-  cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size,
-                 _batch_tokens, _input_size, &alpha, &beta, weights, input_ptr,
-                 out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
+  cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
+                 _input_size, &alpha, &beta, weights, input_ptr, out_ptr,
+                 cublasGemmAlgo_t(_gemm_algos[0]));
 }
 
 template <typename T1, typename T2>
@@ -40,6 +44,10 @@ void LinearOp<T1, T2>::backward() {
 
   if (!parent(0)->is_cover()) {
     inp_beta = (float)1.0;
+  }
+
+  if(!_context_ptr->is_built()){
+    return ;
   }
 
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();

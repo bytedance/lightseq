@@ -8,6 +8,7 @@
 #include "transformer_encoder_layer.h"
 #include "transformer_decoder_layer.h"
 #include "lyr_normalize_layer.h"
+#include "linear_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -51,7 +52,7 @@ class Transformer : public LSModel {
   Transformer(const std::string weight_path, const int max_batch_size);
   ~Transformer();
 
-  void before_forward(int batch_size, int seq_len);
+  void before_forward(int batch_size, int seq_len, int cur_step);
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

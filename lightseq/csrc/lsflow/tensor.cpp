@@ -18,8 +18,9 @@ Tensor::Tensor(std::string name, size_t size)
 
 void Tensor::set_tensor(char* inp) {
   if (_mtype == LSMemoryType::SharedMemory) {
-    printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
-    exit(-1);
+    // printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
+    // exit(-1);
+    _mtype = LSMemoryType::FixedMemory;
   }
   _ptr = inp;
 }

@@ -37,7 +37,8 @@ class LaunchDecEmbLayer : public Layer {
   Variable* operator()(Variable* inp) {
     set_inputs({inp});
 
-    Variable* out = (*_launch_dec_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
+    Variable* out =
+        (*_launch_dec_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
 
     set_outputs({out});
     return out;

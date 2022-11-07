@@ -25,6 +25,10 @@ void StridedBatchGemmOp<T1, T2>::forward() {
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+
   cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
                               _buffer_b, output, _op_A, _op_B, stride_a,
                               stride_b, stride_c, _batch_heads,
@@ -52,6 +56,10 @@ void StridedBatchGemmOp<T1, T2>::backward() {
 
   T2* inpGradA = (T2*)parent(0)->grad();
   T2* inpGradB = (T2*)parent(1)->grad();
+
+  if(!_context_ptr->is_built()){
+    return ;
+  }  
 
   // Calculate d_A.
   cublas_strided_batched_gemm(handle, mb, kb, _n, &_alpha, &_beta,

@@ -134,9 +134,9 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
-  _deal_cache_k->before_forward(batch_size, from_len,
+  _deal_cache_k->before_forward(batch_size, from_len, _step,
                                 _context_ptr->is_training());
-  _deal_cache_v->before_forward(batch_size, from_len,
+  _deal_cache_v->before_forward(batch_size, from_len, _step,
                                 _context_ptr->is_training());
 
   _softmax->before_forward(batch_size, from_len, to_len, steps == -1);

@@ -18,7 +18,9 @@ class LinearOp : public Operator {
   cublasOperation_t _opB;
 
  public:
-  LinearOp(int max_batch_tokens, int output_size, int input_size, cublasOperation_t opA = CUBLAS_OP_T, cublasOperation_t opB = CUBLAS_OP_N)
+  LinearOp(int max_batch_tokens, int output_size, int input_size,
+           cublasOperation_t opA = CUBLAS_OP_T,
+           cublasOperation_t opB = CUBLAS_OP_N)
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),

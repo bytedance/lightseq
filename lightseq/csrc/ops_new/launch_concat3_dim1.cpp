@@ -23,6 +23,10 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
   T1* cache_ptr = (T1*)parent(1)->value();
   T1* real_val = (T1*)child(0)->value();
 
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+  
   launch_concat3_dim1(real_val, inp_ptr, cache_ptr, _batchs * _heads,
                       _hidden_size / _heads, _steps, 1, _stream);
 }
@@ -35,6 +39,11 @@ void LaunchConcat3Dim1<T1, T2>::backward() {
   }
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* val_grad = (T1*)child(0)->grad();
+
+  if(!_context_ptr->is_built()){
+    return ;
+  }
+  
   if (inp_grad != val_grad) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,
