@@ -39,11 +39,6 @@ LightSeq is a high performance training and inference library for sequence proce
 It enables highly efficient computation of modern NLP and CV models such as BERT, GPT, Transformer, etc.
 It is therefore best useful for machine translation, text generation, image classification, and other sequence related tasks.
 
-LightSeq training and inference is very fast. Below is the overall performance:
-* LightSeq fp16 training achieves a speedup of up to **3x**, compared to PyTorch fp16 training.
-* LightSeq int8 training achieves a speedup of up to **5x**, compared to PyTorch QAT (i.e., quantization aware training).
-* LightSeq fp16 and int8 inference achieve a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, respectively.
-
 The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
 [Thrust](https://docs.nvidia.com/cuda/thrust/index.html), [CUB](http://nvlabs.github.io/cub/)) and
@@ -54,10 +49,16 @@ Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tenso
 With LightSeq, one can easily develop modified Transformer architecture with little additional code.
 
 LightSeq supports multiple features, including
+* training and inference with fp32, fp16 and int8 precision.
 * training and inference of multiple Transformer-based models, such as Transformer, BERT, GPT2, etc.
 * training of multiple modules, such as embedding, Transformer encoder, Transformer decoder, criterion and optimizer.
 * multiple decoding methods, such as beam search, diverse beam search and sampling.
 * deep integration with multiple training codebases, such as Fairseq, Hugging Face and DeepSpeed.
+
+LightSeq training and inference is very fast. Below is the overall performance:
+* LightSeq fp16 training achieves a speedup of up to **3x**, compared to PyTorch fp16 training.
+* LightSeq int8 training achieves a speedup of up to **5x**, compared to PyTorch QAT (i.e., quantization aware training).
+* LightSeq fp16 and int8 inference achieve a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, respectively.
 
 ### Support Matrix
 |    Models    | fp16 Training | fp16 Inference | int8 Training | int8 Inference |
