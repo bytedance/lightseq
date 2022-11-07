@@ -54,6 +54,7 @@ void Node::recursive_forward() {
   }
 
 #ifdef DEBUG_MODE
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
   auto start = std::chrono::high_resolution_clock::now();
   if (node_type() == NodeType::Operator) {
     printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
@@ -61,13 +62,16 @@ void Node::recursive_forward() {
     Operator* this_op = static_cast<Operator*>(this);
     printf("_parents.size(): %zu\n", _parents.size());
     for (int idx = 0; idx < _parents.size(); idx++) {
-      if (_parents[idx] != nullptr && this_op->parent(idx)->value() != nullptr)
+      if (_parents[idx] == nullptr ||
+          this_op->parent(idx)->value() == nullptr) {
+        printf("nullptr!\n");
+      } else {
         print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(),
                   this_op->parent(idx)->name() + ":value", 10);
-      else
-        printf("nullptr!\n");
+      }
     }
   }
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 #endif
 
   forward();
@@ -88,6 +92,7 @@ void Node::recursive_forward() {
       printf("nullptr\n");
   }
   printf("\n");
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 #endif
 }
 
@@ -157,8 +162,10 @@ bool Node::is_cover() {  // true means assign, false means accumulate
 }
 
 Variable::Variable(std::string name)
-    : Node(name, NodeType::Variable), _value_byte_size(0), _grad_byte_size(0),
-    _variable_type(VariableType::FixedVariable) {
+    : Node(name, NodeType::Variable),
+      _value_byte_size(0),
+      _grad_byte_size(0),
+      _variable_type(VariableType::FixedVariable) {
   _value.reset(new Tensor("value", 0));
   if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", 0));
 }
@@ -175,7 +182,7 @@ Variable::Variable(std::string name, size_t value_byte_size,
 }
 
 Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
-    : Variable(name, (size_t)0, (size_t)0){
+    : Variable(name, (size_t)0, (size_t)0) {
   _value->set_tensor(para_ptr);
   if (_grad) {
     _grad->set_tensor(grad_ptr);
@@ -214,6 +221,12 @@ void Variable::fixed_memory() {
   return;
 }
 
+void Variable::swap_pointer(Variable* var_a, Variable* var_b,
+                            bool is_training) {
+  Tensor::swap_pointer(var_a->_value, var_b->_value);
+  if (is_training) Tensor::swap_pointer(var_a->_grad, var_b->_grad);
+}
+
 void Variable::set_value(char* value_ptr) {
   remove_ancestor();
   _value->reset_fixed();
@@ -240,7 +253,7 @@ void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
   _variable_type = VariableType::FixedVariable;
   char* value_ptr = cuda_malloc<char>(value_byte_size);
   _value->set_tensor(value_ptr);
-  if(_context_ptr->is_training() && grad_byte_size) {
+  if (_context_ptr->is_training() && grad_byte_size) {
     char* grad_ptr = cuda_malloc<char>(grad_byte_size);
     _grad->set_tensor(grad_ptr);
   }
@@ -300,6 +313,7 @@ void Variable::set_offset(size_t offset_value, size_t offset_grad) {
 
 #ifdef DEBUG_MODE
 void Variable::debug_var() {
+  printf("variable type: %s\n", variable_type_str().c_str());
   printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(),
          _value->memory_type().c_str(), _value_byte_size);
   print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);

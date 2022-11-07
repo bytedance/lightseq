@@ -16,6 +16,11 @@ Tensor::Tensor(std::string name, size_t size)
   }
 }
 
+void swap_pointer(std::shared_ptr<Tensor> tensor_a,
+                  std::shared_ptr<Tensor> tensor_b) {
+  std::swap(tensor_a->_ptr, tensor_b->_ptr);
+}
+
 void Tensor::set_tensor(char* inp) {
   if (_mtype == LSMemoryType::SharedMemory) {
     // printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());

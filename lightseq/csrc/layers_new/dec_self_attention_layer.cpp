@@ -124,27 +124,29 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   int from_len = (_step == -1) ? _trg_seq_len : 1;
   int to_len = (_step == -1) ? _trg_seq_len : steps + 1;
+  int _batch_size = (steps >= 0) ? batch_size * _trg_seq_len : batch_size;
+  _batch_heads = (steps >= 0) ? _batch_heads * _trg_seq_len : _batch_heads;
 
   _attn_ln->before_forward(_trg_batch_tokens);
 
   _qkv_linear->before_forward(_trg_batch_tokens);
 
-  _bias_add_transform_20314->before_forward(batch_size, from_len);
+  _bias_add_transform_20314->before_forward(_batch_size, from_len);
   q_out->set_offset(_batch_dim * sizeof(T1) * 0, _batch_dim * sizeof(T2) * 0);
   k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
-  _deal_cache_k->before_forward(batch_size, from_len, _step,
+  _deal_cache_k->before_forward(_batch_size, from_len, _step,
                                 _context_ptr->is_training());
-  _deal_cache_v->before_forward(batch_size, from_len, _step,
+  _deal_cache_v->before_forward(_batch_size, from_len, _step,
                                 _context_ptr->is_training());
 
-  _softmax->before_forward(batch_size, from_len, to_len, steps == -1);
+  _softmax->before_forward(_batch_size, from_len, to_len, steps == -1);
 
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len,
                                      !_context_ptr->is_training());
 
-  _transform_0213->before_forward(batch_size, from_len);
+  _transform_0213->before_forward(_batch_size, from_len);
 
   _attn_out_linear->before_forward(_trg_batch_tokens);
 

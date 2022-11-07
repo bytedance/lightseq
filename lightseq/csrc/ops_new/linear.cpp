@@ -14,26 +14,26 @@ Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
 
 template <typename T1, typename T2>
 void LinearOp<T1, T2>::forward() {
-  float alpha = float(1.);
   float beta = float(0.);
 
   T1* input_ptr = (T1*)parent(0)->value();
   T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-  
-  if(!_context_ptr->is_built()){
-    return ;
+
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
-                 _input_size, &alpha, &beta, weights, input_ptr, out_ptr,
+                 _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                  cublasGemmAlgo_t(_gemm_algos[0]));
 }
 
 template <typename T1, typename T2>
 void LinearOp<T1, T2>::backward() {
-  float alpha = (float)1.0, w_beta = (float)0.0, inp_beta = (float)0.0;
+  float bw_alpha = 1. / _alpha;
+  float w_beta = (float)0.0, inp_beta = (float)0.0;
 
   T2* out_grad = (T2*)child(0)->grad();
   T1* input_ptr = (T1*)parent(0)->value();
@@ -46,8 +46,8 @@ void LinearOp<T1, T2>::backward() {
     inp_beta = (float)1.0;
   }
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
@@ -56,12 +56,12 @@ void LinearOp<T1, T2>::backward() {
 
   // calculate weights_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                 _output_size, _batch_tokens, &alpha, &w_beta, input_ptr,
+                 _output_size, _batch_tokens, &bw_alpha, &w_beta, input_ptr,
                  out_grad, weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
 
   // calculate inp_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
-                 _batch_tokens, _output_size, &alpha, &inp_beta, weights,
+                 _batch_tokens, _output_size, &bw_alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
 }
 

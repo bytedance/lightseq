@@ -3,10 +3,31 @@
 namespace lightseq {
 
 template <typename T>
-std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkLayer<T>::operator()(
+
+BeamSearchTopOp<T>::BeamSearchTopOp(int max_batch_size, int max_step, int trg_vocab_size,
+                      int max_thread_per_block, int beam_size,
+                      int diverse_lambda, int end_id)
+: Operator("BeamSearchTopOp"),
+  _max_batch_size(max_batch_size),
+  _max_step(max_step),
+  _trg_vocab_size(trg_vocab_size),
+  _max_thread_per_block(max_thread_per_block),
+  _beam_size(beam_size),
+  _diverse_lambda(diverse_lambda),
+  _end_id(end_id),
+  _cub_sort_buffer_bytes(max_batch_size * beam_size * trg_vocab_size * sizeof(T)) {
+    
+    alive_seq.reset(new Variable("alive_seq"));
+    alive_seq->malloc_memory(max_batch_size * beam_size * sizeof(T));
+    alive_seq_buf.reset(new Variable("alive_seq_buf"));
+    alive_seq_buf->malloc_memory(max_batch_size * beam_size * sizeof(T));
+}
+
+template <typename T>
+std::tuple<Variable*, Variable*, Variable*> BeamSearchTopOp<T>::operator()(
     Variable* logits, Variable* logit_bias, Variable* seq_probs,
     Variable* seq_score, Variable* alive_seq) {
-  set_inputs({logits, logit_bias, seq_probs, seq_score, alive_seq});
+  set_parents({logits, logit_bias, seq_probs, seq_score, alive_seq});
 
   Variable* can_idx = new Variable(
       "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int));
@@ -16,12 +37,12 @@ std::tuple<Variable*, Variable*, Variable*> BeamSearchTopkLayer<T>::operator()(
   Variable* num_beam_can = new Variable(
       "num_beam_can", (_max_batch_size * _beam_size + 1) * sizeof(int));
 
-  set_outputs({can_idx, can_score, num_beam_can});
+  set_children({can_idx, can_score, num_beam_can});
   return std::make_tuple(can_idx, can_score, num_beam_can);
 }
 
 template <typename T>
-void BeamSearchTopkLayer<T>::forward_process() {
+void BeamSearchTopOp<T>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)input(0)->value();
   T* logits_bias_ptr = (T*)input(1)->value();
@@ -78,7 +99,7 @@ void BeamSearchTopkLayer<T>::forward_process() {
                       thrust::greater<float>());
 }
 
-template class BeamSearchTopkLayer<float>;
-template class BeamSearchTopkLayer<__half>;
+template class BeamSearchTopOp<float>;
+template class BeamSearchTopOp<__half>;
 
 }  // namespace lightseq

@@ -22,8 +22,8 @@ void BiasActDropoutOp<T1, T2>::forward() {
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   if (_activation_fn == "relu") {
@@ -50,8 +50,8 @@ void BiasActDropoutOp<T1, T2>::backward() {
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   if (_activation_fn == "relu") {

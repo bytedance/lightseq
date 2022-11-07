@@ -11,7 +11,8 @@ set(operator_files
     linear.cpp
     softmax.cpp
     strided_batch_gemm.cpp
-    transform_0213.cpp)
+    transform_0213.cpp
+    beam_search_topk.cu)
 
 add_library(lightseq_operators STATIC ${operator_files})
 target_link_libraries(lightseq_operators PUBLIC cuda_kernels -lcublas lsflow)

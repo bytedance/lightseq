@@ -66,6 +66,7 @@ template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
   std::cout << outn << " address: " << outv << std::endl;
   std::vector<T> hout(num_output_ele, (T)0);
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(T),
                              cudaMemcpyDeviceToHost));
   printf("value: ");
@@ -80,6 +81,7 @@ void print_vec<__half>(const __half *outv, std::string outn,
                        int num_output_ele) {
   std::cout << outn << " address: " << outv << std::endl;
   std::vector<__half> hout(num_output_ele, (__half)0.f);
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   CHECK_GPU_ERROR(cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(__half),
                              cudaMemcpyDeviceToHost));
   printf("value: ");
@@ -94,6 +96,7 @@ void print_vec<int8_t>(const int8_t *outv, std::string outn,
                        int num_output_ele) {
   std::cout << outn << " address: " << outv << std::endl;
   std::vector<int8_t> hout(num_output_ele, 0);
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(int8_t),
              cudaMemcpyDeviceToHost);
   printf("value: ");
@@ -108,6 +111,7 @@ void print_vec<uint8_t>(const uint8_t *outv, std::string outn,
                         int num_output_ele) {
   std::cout << outn << " address: " << outv << std::endl;
   std::vector<uint8_t> hout(num_output_ele, 0);
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   cudaMemcpy(hout.data(), outv, num_output_ele * sizeof(uint8_t),
              cudaMemcpyDeviceToHost);
   printf("value: ");

@@ -22,6 +22,9 @@ class Tensor {
 
   virtual ~Tensor() {}
 
+  static void swap_pointer(std::shared_ptr<Tensor> tensor_a,
+                           std::shared_ptr<Tensor> tensor_b);
+
   void set_tensor(char* inp);
   void set_tensor(const char* inp);
 

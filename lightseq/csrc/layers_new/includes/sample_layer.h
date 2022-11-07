@@ -1,30 +1,25 @@
 #pragma once
 
-#include "linear.h"
+#include "beam_search_topk.h"
 #include "layer.h"
 
 namespace lightseq {
 
-template <class T1, class T2>
-class LinearLayer : public Layer {
+template <class T>
+class SampleLayer : public Layer {
  private:
   // operators
-  LinearOp<T1, T2>* _linear = nullptr;
+  BeamSearchTopOp<T>* beam_search = nullptr;
 
   // parameters
-  Variable* _linear_w;
 
-  // shape related
-  int _max_batch_tokens;
-  int _input_size;
-  int _output_size;
+  
+public:
+  SampleLayer(int max_batch_size, int max_step, int trg_vocab_size,
+              int max_thread_per_block, int beam_size,
+              int diverse_lambda, int end_id); // for beam_search
 
- public:
-  LinearLayer(int max_batch_tokens, int input_size, int output_size,
-              cublasOperation_t opA = CUBLAS_OP_T,
-              cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.));
-
-  virtual ~LinearLayer() {}
+  virtual ~SampleLayer() {}
 
   Variable* operator()(Variable* inp);
 

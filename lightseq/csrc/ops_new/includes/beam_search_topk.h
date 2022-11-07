@@ -1,12 +1,12 @@
 #pragma once
 #include "declaration.h"
-#include "layer.h"
+#include "node.h"
 #include "transformerKernels.h"
 
 namespace lightseq {
 
 template <typename T>
-class BeamSearchTopkLayer : public Layer {
+class BeamSearchTopOp : public Operator {
  private:
   int _max_batch_size;
   int _max_step;
@@ -22,22 +22,15 @@ class BeamSearchTopkLayer : public Layer {
   size_t _cub_sort_buffer_bytes;
   int _host_can_num_batch;
 
- public:
-  BeamSearchTopkLayer(int max_batch_size, int max_step, int trg_vocab_size,
-                      int max_thread_per_block, int beam_size,
-                      int diverse_lambda, int end_id)
-      : Layer("BeamSearchTopkLayer"),
-        _max_batch_size(max_batch_size),
-        _max_step(max_step),
-        _trg_vocab_size(trg_vocab_size),
-        _max_thread_per_block(max_thread_per_block),
-        _beam_size(beam_size),
-        _diverse_lambda(diverse_lambda),
-        _end_id(end_id),
-        _cub_sort_buffer_bytes(max_batch_size * beam_size * trg_vocab_size *
-                               sizeof(T)) {}
+  Variable* alive_seq;
+  Variable* alive_seq_buf;
 
-  ~BeamSearchTopkLayer() {}
+ public:
+  BeamSearchTopOp(int max_batch_size, int max_step, int trg_vocab_size,
+                      int max_thread_per_block, int beam_size,
+                      int diverse_lambda, int end_id);
+
+  ~BeamSearchTopOp() {}
 
   std::tuple<Variable*, Variable*, Variable*> operator()(Variable* logits,
                                                          Variable* logit_bias,
@@ -45,14 +38,14 @@ class BeamSearchTopkLayer : public Layer {
                                                          Variable* seq_score,
                                                          Variable* alive_seq);
 
-  void forward_process() override;
+  void forward() override;
 
   void before_forward(int length_norm, int cur_step, int step_token_num) {
     _length_norm = length_norm, _cur_step = cur_step,
     _step_token_num = step_token_num;
   }
 
-  void backward_process() override {}
+  void backward() override {}
 
   void before_backward() {}
 

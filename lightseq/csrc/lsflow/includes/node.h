@@ -78,6 +78,8 @@ class Variable : public Node {
   virtual ~Variable() {}
 
   void fixed_memory();  // Convert VariableNode to IONode
+  static void swap_pointer(Variable* var_a, Variable* var_b,
+                           bool is_training = false);
 
   void set_value(char* value_ptr);
 

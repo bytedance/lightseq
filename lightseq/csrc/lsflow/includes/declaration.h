@@ -27,8 +27,9 @@ namespace lightseq {
 
 enum class NodeType { Variable, Operator };
 // const std::string NodeTypeString[] = {"Variable", "Operator"};
-enum VariableType { FixedVariable, SharedVariable, DescendantsVariable};
-const std::string VariableTypeString[] = { "FixedVariable", "SharedVariable", "DescendantsVariable"};
+enum VariableType { FixedVariable, SharedVariable, DescendantsVariable };
+const std::string VariableTypeString[] = {"FixedVariable", "SharedVariable",
+                                          "DescendantsVariable"};
 
 class Node;
 

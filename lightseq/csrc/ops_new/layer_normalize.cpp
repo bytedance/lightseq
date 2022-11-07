@@ -31,8 +31,8 @@ void LayerNormalizeOp<T1, T2>::forward() {
   T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
   cudaStream_t stream = _context_ptr->get_stream();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
@@ -61,14 +61,14 @@ void LayerNormalizeOp<T1, T2>::backward() {
                              _context_ptr->get_stream()};
 
   T1* means_val = _use_mean ? (T1*)means_->tensor() : nullptr;
-  
+
   bool is_res_cover = parent(0)->is_cover();
   if (!is_res_cover) {
     residual_grad = inp_grad;
   }
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,

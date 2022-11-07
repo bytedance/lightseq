@@ -36,15 +36,14 @@ class Transformer : public LSModel {
   ContextPtr context_ptr;
 
   Variable* inp_tokens;  // need to allocate
-  Variable* token_emb;
-  Variable* pos_emb;
-  Variable* lang_emb;
-  Variable* lang_id;
 
   std::vector<Variable*> cache_k_vec;
   std::vector<Variable*> new_k_vec;
   std::vector<Variable*> cache_v_vec;
   std::vector<Variable*> new_v_vec;
+
+  Variable* dec_tokens;
+  Variable* dec_tokens_buf;
 
   int _max_batch_size;
 
@@ -52,7 +51,8 @@ class Transformer : public LSModel {
   Transformer(const std::string weight_path, const int max_batch_size);
   ~Transformer();
 
-  void before_forward(int batch_size, int seq_len, int cur_step);
+  void encoder_before_forward(int batch_size, int seq_len);
+  void decoder_before_forward(int batch_size, int seq_len, int cur_step);
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

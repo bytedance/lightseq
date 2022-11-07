@@ -57,7 +57,8 @@ class TransformerDecoderLayer : public Layer {
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
-  int load_params(const std::vector<const T1*>& para_vec, int offset, bool is_total_kv = false);
+  int load_params(const std::vector<const T1*>& para_vec, int offset,
+                  bool is_total_kv = false);
 };
 
 template class TransformerDecoderLayer<float, float>;

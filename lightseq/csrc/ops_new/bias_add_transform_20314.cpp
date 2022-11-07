@@ -22,8 +22,8 @@ void BiasAddTrans20314<T1, T2>::forward() {
 
   T1* res_ptr = (T1*)child(0)->value();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   launch_bias_add_transform_20314<T1>(res_ptr, inp_ptr, bias_ptr, _batch,
@@ -38,8 +38,8 @@ void BiasAddTrans20314<T1, T2>::backward() {
   T2* res_grad = (T2*)child(0)->grad();
   T2* qkv_bias_grad = (T2*)parent(1)->grad();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
 
   launch_transform4d_0213<T2>(inp_grad, res_grad, _batch, _seq_len,

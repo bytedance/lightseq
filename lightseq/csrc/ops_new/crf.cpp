@@ -64,10 +64,9 @@ void CRFOP<T>::forward() {
   int* history = (int*)_history->tensor();
   int* best_tags = (int*)child(0)->value();
 
-  if(!_context_ptr->is_built()){
-    return ;
+  if (!_context_ptr->is_built()) {
+    return;
   }
-  
 
   launch_viterbi<T>(start_transition, end_transition, transition, emission,
                     mask, best_score, history, best_tags, _num_tags, _seq_len,

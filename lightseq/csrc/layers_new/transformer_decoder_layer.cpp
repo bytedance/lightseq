@@ -144,13 +144,13 @@ int TransformerDecoderLayer<T1, T2>::load_para_and_grad(
 
 template <typename T1, typename T2>
 int TransformerDecoderLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset, bool is_total_kv) {  // for inference
+    const std::vector<const T1*>& para_vec, int offset,
+    bool is_total_kv) {  // for inference
   int size = 0;
 
-  if(is_total_kv) {
+  if (is_total_kv) {
     size += _enc_kv_layer->load_params(para_vec, offset + size);
-  }
-  else {
+  } else {
     size += _self_attn_layer->load_params(para_vec, offset + size);
     size += _enc_attn_layer->load_params(para_vec, offset + size);
     size += _ffn_layer->load_params(para_vec, offset + size);
