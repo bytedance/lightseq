@@ -20,5 +20,5 @@ First export the models training by Fairseq, Hugging Face or LightSeq to protobu
 
 Refer to [here](../examples/inference/python/README.md) for more details.
 
-## Depoly using Tritonbackend
+## Deploy using Tritonbackend
 Refer to [here](../examples/triton_backend/README.md) for more details.
