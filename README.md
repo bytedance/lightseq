@@ -77,7 +77,7 @@ LightSeq training and inference is very fast. Below is the overall performance:
 ## Performance
 We test the speedup of LightSeq training and inference using both fp16 and int8 mix-precision on Transformer and BERT models. The baseline is PyTorch fp16 mix-precision. Training experiments are tested on one A100 GPU and inference experiments are tested on eight A100 GPUs.
 
-More performance results are available [here](./docs/performance).
+More performance results are available [here](./docs/performance.md).
 
 ### Speedup of Transformer Training
 | batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
