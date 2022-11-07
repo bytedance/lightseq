@@ -1,4 +1,20 @@
 # A Guide of LightSeq Training and Inference
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Training](#training)
+    - [Custom integration](#custom-integration)
+    - [Hugging Face](#hugging-face)
+    - [Fairseq](#fairseq)
+    - [DeepSpeed](#deepspeed)
+- [Inference](#inference)
+    - [Export](#export)
+        - [Fairseq](#fairseq)
+        - [Hugging Face](#hugging-face)
+        - [LightSeq Transformer](#lightseq-transformer)
+        - [Custom models](#custom-models)
+    - [Inference in three lines of codes!](#inference-in-three-lines-of-codes)
+
 ## Introduction
 This document mainly introduces the detailed process of LightSeq training and inference. In short, the process can be divided into the following three steps:
 1. Train models integrated with LightSeq training modules, and save the checkpoints.

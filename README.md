@@ -42,7 +42,7 @@ It is therefore best useful for machine translation, text generation, image clas
 LightSeq training and inference is very fast. Below is the overall performance:
 * LightSeq fp16 training achieves a speedup of up to **3x**, compared to PyTorch fp16 training.
 * LightSeq int8 training achieves a speedup of up to **5x**, compared to PyTorch QAT (i.e., quantization aware training).
-* LightSeq fp16 and int8 inference achieves a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, repectively.
+* LightSeq fp16 and int8 inference achieve a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, respectively.
 
 The library is built on top of CUDA official
 library([cuBLAS](https://docs.nvidia.com/cuda/cublas/index.html),
@@ -205,7 +205,7 @@ Before doing next training, you need to switch to the following directory:
 cd examples/training/huggingface/bert
 ```
 
-Then you can easily fine-tunes BERT on different tasks. Taking named entity recognition task as an example, you can train the BERT with fp16 mixed-precision using:
+Then you can easily fine-tune BERT for different tasks. Taking named entity recognition task as an example, you can train the BERT with fp16 mixed-precision using:
 ```shell
 python task_ner/run_ner.sh
 ```
@@ -218,7 +218,7 @@ python task_ner/run_quant_ner.sh
 More usage is available [here](./lightseq/training/README.md).
 
 ### LightSeq Inference from Fairseq
-After training using above scripts, you can fastly infer the models using LightSeq.
+After training using the above scripts, you can quickly infer the models using LightSeq.
 
 You should transform the fp16 PyTorch weights to LightSeq protobuf or HDF5:
 ```shell
@@ -230,7 +230,7 @@ python export/fairseq/ls_fs_transformer_export.py
 python export/fairseq/ls_fs_quant_transformer_export.py
 ```
 
-Once obtaining the LightSeq weights, you can fastly infer them using the following code:
+Once obtaining the LightSeq weights, you can quickly infer them using the following code:
 ```python
 import lightseq.inference as lsi
 model = lsi.Transformer(MODEL_PATH, MAX_BATCH_SIZE)
@@ -238,7 +238,7 @@ results = model.infer([[63, 47, 65, 1507, 88, 74, 10, 2057, 362, 9, 284, 6, 2, 1
 ```
 Here MODEL_PATH is the path of your LightSeq weights and MAX_BATCH_SIZE is the maximal batch size of your input sentences.
 
-You can also fastly infer the int8 LightSeq weights by replacing the `lsi.Transformer` with `lsi.QuantTransformer`.
+You can also quickly infer the int8 LightSeq weights by replacing the `lsi.Transformer` with `lsi.QuantTransformer`.
 
 More usage is available [here](./lightseq/inference/README.md).
 
@@ -251,7 +251,7 @@ pip install transformers
 cd examples/inference/python
 ```
 
-Then you can check the performance by simply running following commands. `hf_bert_export.py` is used to transform PyTorch weights to LightSeq protobuf or HDF5.
+Then you can check the performance by simply running the following commands. `hf_bert_export.py` is used to transform PyTorch weights to LightSeq protobuf or HDF5.
 ```shell
 python export/huggingface/hf_bert_export.py
 python test/ls_bert.py
@@ -260,7 +260,7 @@ python test/ls_bert.py
 More usage is available [here](./lightseq/inference/README.md).
 
 ### LightSeq Deployment Using Inference Server
-We provide a docker image which contains tritonserver and LightSeq's dynamic link library, and you can deploy a inference server by simply replacing the model file with your own model file.
+We provide a docker image which contains tritonserver and LightSeq's dynamic link library, and you can deploy an inference server by simply replacing the model file with your own model file.
 ```shell
 sudo docker pull hexisyztem/tritonserver_lightseq:22.01-1
 ```
