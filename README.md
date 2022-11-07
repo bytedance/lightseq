@@ -141,7 +141,7 @@ PATH=/usr/local/hdf5/:$PATH ENABLE_FP32=0 ENABLE_DEBUG=0 pip install -e $PROJECT
 Detailed building introduction is available [here](docs/build.md).
 
 ## Getting Started
-We provide several samples here to show the usage of LightSeq. Complete user guide is available [here](docs/guide.md).
+We provide several samples here to show the usage of LightSeq. Refer to the complete [user guide](./docs/guide.md) and [examples](./docs/examples.md) for more details.
 
 ### LightSeq Training from Scratch
 You can use the modules provided by LightSeq to build your own models. The following is an example of building a Transformer encoder layer.
@@ -172,6 +172,8 @@ layer = LSTransformerEncoderLayer(config)
 
 In addition to encoder layers, the other modules can be created using similar methods, and then be trained as normal PyTorch models.
 
+More usage is available [here](./examples/training/custom/README.md).
+
 ### LightSeq Training from Fairseq
 LightSeq integrates all the fast and lightning modules into Fairseq.
 
@@ -190,7 +192,7 @@ sh examples/training/fairseq/ls_fairseq_wmt14en2de.sh
 sh examples/training/fairseq/ls_fairseq_quant_wmt14en2de.sh
 ```
 
-More usage is available [here](./lightseq/training/README.md).
+More usage is available [here](./examples/training/fairseq/README.md).
 
 ### LightSeq Training from Hugging Face BERT
 LightSeq replaces the encoder layers of Hugging Face BERT with LightSeq fast layers.
@@ -216,7 +218,7 @@ python task_ner/run_ner.sh
 python task_ner/run_quant_ner.sh
 ```
 
-More usage is available [here](./lightseq/training/README.md).
+More usage is available [here](./examples/training/huggingface/README.md).
 
 ### LightSeq Inference from Fairseq
 After training using the above scripts, you can quickly infer the models using LightSeq.
@@ -241,7 +243,7 @@ Here MODEL_PATH is the path of your LightSeq weights and MAX_BATCH_SIZE is the m
 
 You can also quickly infer the int8 LightSeq weights by replacing the `lsi.Transformer` with `lsi.QuantTransformer`.
 
-More usage is available [here](./lightseq/inference/README.md).
+More usage is available [here](./examples/inference/python/README.md).
 
 ### LightSeq Inference from Hugging Face BERT
 We provide an end2end bert-base example to see how fast Lightseq is compared to original Hugging Face.
@@ -258,7 +260,7 @@ python export/huggingface/hf_bert_export.py
 python test/ls_bert.py
 ```
 
-More usage is available [here](./lightseq/inference/README.md).
+More usage is available [here](./examples/inference/python/README.md).
 
 ### LightSeq Deployment Using Inference Server
 We provide a docker image which contains tritonserver and LightSeq's dynamic link library, and you can deploy an inference server by simply replacing the model file with your own model file.
