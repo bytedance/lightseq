@@ -62,7 +62,7 @@ LightSeq supports multiple features, which is shown in the table below.
 | Precision          | fp32, fp16, int8                                                     |
 | Mode               | training, inference                                                  |
 | Compatibility      | Fairseq, Hugging Face, DeepSpeed                                     |
-| Decoding Algorithm | beam search, diverse beam search, sampling                           |
+| Decoding Algorithm | beam search, diverse beam search, sampling, CRF                      |
 | Others             | gradient communication quantization, auto-tune GEMM algorithm        |
 
 The table below shows the running modes and precisions currently supported by different models.
