@@ -48,19 +48,24 @@ addition to model components, the inference library also provide easy-to-deploy 
 Server](https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/tensorrt_inference_server_120/tensorrt-inference-server-guide/docs/quickstart.html).
 With LightSeq, one can easily develop modified Transformer architecture with little additional code.
 
-LightSeq supports multiple features, including
-* training and inference with fp32, fp16 and int8 precision.
-* training and inference of multiple Transformer-based models, such as Transformer, BERT, GPT2, etc.
-* training of multiple modules, such as embedding, Transformer encoder, Transformer decoder, criterion and optimizer.
-* multiple decoding methods, such as beam search, diverse beam search and sampling.
-* deep integration with multiple training codebases, such as Fairseq, Hugging Face and DeepSpeed.
-
 LightSeq training and inference is very fast. Below is the overall performance:
 * LightSeq fp16 training achieves a speedup of up to **3x**, compared to PyTorch fp16 training.
 * LightSeq int8 training achieves a speedup of up to **5x**, compared to PyTorch QAT (i.e., quantization aware training).
 * LightSeq fp16 and int8 inference achieve a speedup of up to **12x** and **15x**, compared to PyTorch fp16 inference, respectively.
 
 ### Support Matrix
+LightSeq supports multiple features, which is shown in the table below.
+|      Features      |                             Support List                             |
+| ------------------ | -------------------------------------------------------------------- |
+| Model              | Transformer, BERT, BART, GPT2, ViT, T5, MT5, XGLM, VAE, Multilingual |
+| Layer              | embedding, encoder, decoder, criterion, optimizer                    |
+| Precision          | fp32, fp16, int8                                                     |
+| Mode               | training, inference                                                  |
+| Compatibility      | Fairseq, Hugging Face, DeepSpeed                                     |
+| Decoding Algorithm | beam search, diverse beam search, sampling                           |
+| Others             | gradient communication quantization, auto-tune GEMM algorithm        |
+
+The table below shows the running modes and precisions currently supported by different models.
 |    Models    | fp16 Training | fp16 Inference | int8 Training | int8 Inference |
 | ------------ | ------------- | -------------- | ------------- | -------------- |
 | Transformer  | Yes           | Yes            | Yes           | Yes            |
