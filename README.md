@@ -57,7 +57,7 @@ LightSeq training and inference is very fast. Below is the overall performance:
 LightSeq supports multiple features, which is shown in the table below.
 |      Features      |                             Support List                             |
 | ------------------ | -------------------------------------------------------------------- |
-| Model              | Transformer, BERT, BART, GPT2, ViT, T5, MT5, XGLM, VAE, Multilingual |
+| Model              | Transformer, BERT, BART, GPT2, ViT, T5, MT5, XGLM, VAE, Multilingual, MoE |
 | Layer              | embedding, encoder, decoder, criterion, optimizer                    |
 | Precision          | fp32, fp16, int8                                                     |
 | Mode               | training, inference                                                  |
@@ -65,7 +65,7 @@ LightSeq supports multiple features, which is shown in the table below.
 | Decoding Algorithm | beam search, diverse beam search, sampling, CRF                      |
 | Others             | gradient communication quantization, auto-tune GEMM algorithm        |
 
-The table below shows the running modes and precisions currently supported by different models.
+The table below shows the running modes and precision currently supported by different models.
 |    Models    | fp16 Training | fp16 Inference | int8 Training | int8 Inference |
 | ------------ | ------------- | -------------- | ------------- | -------------- |
 | Transformer  | Yes           | Yes            | Yes           | Yes            |
@@ -78,6 +78,7 @@ The table below shows the running modes and precisions currently supported by di
 | ViT          | Yes           | Yes            | Yes           | Yes            |
 | VAE          | -             | Yes            | -             | -              |
 | Multilingual | -             | Yes            | -             | Yes            |
+| MoE          | -             | Yes            | -             | -              |
 
 ## Performance
 We test the speedup of LightSeq training and inference using both fp16 and int8 mix-precision on Transformer and BERT models. The baseline is PyTorch fp16 mix-precision. Training experiments are tested on one A100 GPU and inference experiments are tested on eight A100 GPUs.
