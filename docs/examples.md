@@ -1,3 +1,12 @@
+# LightSeq Examples
+
+## Table of Contents
+- [Cpp Examples](#cpp-examples)
+- [Python Examples](#python-examples)
+    - [Train the models](#train-the-models)
+    - [Export and infer the models](#export-and-infer-the-models)
+- [Deploy using Tritonbackend](#deploy-using-tritonbackend)
+
 ## Cpp Examples
 We provide multiple cpp examples of LightSeq inference.
 
