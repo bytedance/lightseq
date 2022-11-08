@@ -24,7 +24,6 @@
     - [LightSeq Inference from Hugging Face BERT](#lightseq-inference-from-hugging-face-bert)
     - [LightSeq Deployment Using Inference Server](#lightseq-deployment-using-inference-server)
 - [Cite Us](#cite-us)
-- [Contact](#contact)
 - [We are Hiring!](#we-are-hiring)
 
 ## Release Notes
@@ -297,10 +296,6 @@ If you use LightSeq in your research, please cite the following papers.
   year={2021}
 }
 ```
-
-## Contact
-Any questions or suggestions, please feel free to contact us at
-wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com, weiyang.god@bytedance.com, zhangzhexi@bytedance.com, zhoubofan@bytedance.com, qian.xian@bytedance.com, wangmingxuan.89@bytedance.com, lilei@cs.ucsb.edu
 
 ## We are Hiring!
 The LightSeq team is hiring Interns and FTEs with backgrounds in *deep learning system, natural language processing, computer vision, speech, etc*.
