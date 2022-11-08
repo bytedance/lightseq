@@ -80,7 +80,7 @@ We test the speedup of LightSeq training and inference using both fp16 and int8 
 More performance results are available [here](./docs/performance.md).
 
 ### Speedup of Transformer Training
-| batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
+| Batch Token Size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
 | ---------------- | ----------- | ------------- | ------------- |
 | 512              | 0.36        | 1.99          | 1.86          |
 | 1024             | 0.37        | 1.78          | 1.69          |
@@ -90,7 +90,7 @@ More performance results are available [here](./docs/performance.md).
 | 15000            | 0.43        | 1.44          | 1.44          |
 
 ### Speedup of BERT Training
-| batch token size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
+| Batch Token Size | PyTorch QAT | LightSeq fp16 | LightSeq int8 |
 | ---------------- | ----------- | ------------- | ------------- |
 | 8                | 0.45        | 2.12          | 1.99          |
 | 16               | 0.44        | 1.92          | 1.80          |
@@ -100,7 +100,7 @@ More performance results are available [here](./docs/performance.md).
 | 256              | 0.46        | 1.68          | 1.73          |
 
 ### Speedup of Transformer Inference
-| batch size | sequence length | LightSeq fp16 | LightSeq int8 |
+| Batch Size | Sequence Length | LightSeq fp16 | LightSeq int8 |
 |------------|-----------------|---------------|---------------|
 | 1          | 8               | 8.00          | 9.33          |
 | 1          | 32              | 6.48          | 7.38          |
@@ -113,7 +113,7 @@ More performance results are available [here](./docs/performance.md).
 | 32         | 128             | 6.68          | 7.74          |
 
 ### Speedup of BERT Inference
-| batch size | sequence length | LightSeq fp16 | LightSeq int8 |
+| Batch Size | Sequence Length | LightSeq fp16 | LightSeq int8 |
 | ---------- | --------------- | ------------- | ------------- |
 | 1          | 8               | 9.22          | 9.87          |
 | 1          | 32              | 10.51         | 11.30         |
