@@ -66,8 +66,9 @@ class Variable : public Node {
 
  public:
   Variable(std::string name);  // for Fixed memory
-  Variable(std::string name, size_t value_byte_size,
-           size_t grad_byte_size = 0, LSMemoryType mmtype = LSMemoryType::SharedMemory);  // for Shared memory
+  Variable(
+      std::string name, size_t value_byte_size, size_t grad_byte_size = 0,
+      LSMemoryType mmtype = LSMemoryType::SharedMemory);  // for Shared memory
   Variable(std::string name, const char* para_ptr,
            char* grad_ptr = nullptr);  // for Fixed memory
   Variable(std::string name, Variable* parent_variable, size_t offset_value = 0,

@@ -3,7 +3,7 @@
 namespace lightseq {
 int Tensor::global_tensor_id = 0;
 Tensor::Tensor(std::string name, size_t size)
-    : _id(global_tensor_id ++), _ctx_ptr(Context::global_instance().get()) {
+    : _id(global_tensor_id++), _ctx_ptr(Context::global_instance().get()) {
   std::string prefix_name =
       _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
 
@@ -17,11 +17,11 @@ Tensor::Tensor(std::string name, size_t size)
 }
 
 Tensor::Tensor(std::string name, TensorPtr ori_tensor, size_t offset)
-    : Tensor(name, 0){
-      _original_tensor = ori_tensor;
-      _offset = offset;
-      _mtype = LSMemoryType::OffsetMemory;
-    }
+    : Tensor(name, 0) {
+  _original_tensor = ori_tensor;
+  _offset = offset;
+  _mtype = LSMemoryType::OffsetMemory;
+}
 
 void Tensor::set_tensor(char* inp) {
   if (_mtype == LSMemoryType::SharedMemory) {
@@ -39,12 +39,14 @@ void Tensor::set_offset(TensorPtr ori_tensor, size_t offset) {
   _mtype = LSMemoryType::OffsetMemory;
 }
 void Tensor::set_offset(size_t offset) {
-  if(_original_tensor == nullptr) {
-    printf("Error! tensor %s set_offset without original tensor", _name.c_str());
+  if (_original_tensor == nullptr) {
+    printf("Error! tensor %s set_offset without original tensor",
+           _name.c_str());
     exit(-1);
   }
-  if(_mtype != LSMemoryType::OffsetMemory) {
-    printf("Error! tensor %s set_offset without original tensor", _name.c_str());
+  if (_mtype != LSMemoryType::OffsetMemory) {
+    printf("Error! tensor %s set_offset without original tensor",
+           _name.c_str());
     exit(-1);
   }
   _offset = offset;
@@ -66,7 +68,7 @@ char* Tensor::tensor(bool is_open_interval) {
     }
     return _ptr;
   }
-  if(_mtype == LSMemoryType::SharedMemory) {
+  if (_mtype == LSMemoryType::SharedMemory) {
     if (_ptr == nullptr) {
       if (!_ctx_ptr->is_built()) {
         update_life_idx(_ctx_ptr->node_idx() - is_open_interval);
@@ -110,8 +112,7 @@ std::string Tensor::memory_type() {
     return "FixedMemory";
   } else if (_mtype == LSMemoryType::SharedMemory) {
     return "SharedMemory";
-  }
-  else if (_mtype == LSMemoryType::OffsetMemory) {
+  } else if (_mtype == LSMemoryType::OffsetMemory) {
     return "OffsetMemory";
   }
 

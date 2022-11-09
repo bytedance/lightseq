@@ -182,14 +182,12 @@ Variable::Variable(std::string name, size_t value_byte_size,
   _value.reset(new Tensor("value", _value_byte_size));
   if (_context_ptr->is_training())
     _grad.reset(new Tensor("grad", _grad_byte_size));
-  if(mmtype == LSMemoryType::SharedMemory) {
+  if (mmtype == LSMemoryType::SharedMemory) {
     _variable_type = VariableType::SharedVariable;
-  }
-  else if (mmtype == LSMemoryType::FixedMemory) {
+  } else if (mmtype == LSMemoryType::FixedMemory) {
     _variable_type = VariableType::FixedVariable;
     malloc_memory(_value_byte_size, _grad_byte_size);
-  }
-  else {
+  } else {
     printf("Error! var %s useless mmtype %d\n", _name.c_str(), mmtype);
     exit(-1);
   }
@@ -209,17 +207,16 @@ Variable::Variable(std::string name, Variable* parent_variable,
       _is_descendants(true),
       _parent_variable(parent_variable),
       _variable_type(VariableType::OffsetVariable) {
-  
   _value.reset(new Tensor("value", parent_variable->_value, offset_value));
-  if(_context_ptr->is_training()) {
+  if (_context_ptr->is_training()) {
     _grad.reset(new Tensor("grad", parent_variable->_grad, offset_grad));
   }
   parent_variable->add_descendants(this);
 }
 
 void Variable::fixed_memory() {
-  if(_variable_type == VariableType::OffsetVariable) {
-    return ;
+  if (_variable_type == VariableType::OffsetVariable) {
+    return;
   }
   if (_children_variable.size() && parents().size() > 0) {
     return;
@@ -299,7 +296,7 @@ void Variable::remove_descendants(Variable* var) {
 
 void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
                             size_t offset_grad) {
-  if(_parent_variable != nullptr && _parent_variable != parent_variable) {
+  if (_parent_variable != nullptr && _parent_variable != parent_variable) {
     printf("error! var %s with two ancestor!\n", name().c_str());
     printf("new parent_variable: %s\n", parent_variable->_name.c_str());
     printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
@@ -309,7 +306,7 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
   _parent_variable = parent_variable;
   _variable_type = VariableType::OffsetVariable;
   _value->set_offset(parent_variable->_value, offset_value);
-  if(_context_ptr->is_training()) {
+  if (_context_ptr->is_training()) {
     _grad->set_offset(parent_variable->_grad, offset_grad);
   }
   parent_variable->add_descendants(this);
@@ -321,7 +318,7 @@ void Variable::remove_ancestor() {
     _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
     _value->remove_offset();
-    if(_grad) {
+    if (_grad) {
       _grad->remove_offset();
     }
   }
@@ -329,7 +326,7 @@ void Variable::remove_ancestor() {
 
 void Variable::set_offset(size_t offset_value, size_t offset_grad) {
   _value->set_offset(offset_value);
-  if(_grad != nullptr) {
+  if (_grad != nullptr) {
     _grad->set_offset(offset_grad);
   }
 }
@@ -340,10 +337,9 @@ void Variable::debug_var() {
   printf("variable type: %s\n", variable_type_str().c_str());
   printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(),
          _value->memory_type().c_str(), _value_byte_size);
-  if(value() == nullptr){
+  if (value() == nullptr) {
     printf("value address is nullptr\n");
-  }
-  else 
+  } else
     print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
   if (_context_ptr->is_training()) {
     printf("node: %s, grad_byte_size: %zu\n", name().c_str(), _grad_byte_size);

@@ -23,7 +23,7 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-  
+
   if (_is_skip && real_val != inp_ptr) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
