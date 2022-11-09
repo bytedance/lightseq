@@ -19,7 +19,7 @@ Variable* CRFOP<T>::operator()(Variable* start_transition,
                                Variable* bias) {
   Variable* best_tags =
       new Variable("best_tags", _max_batch_tokens * sizeof(int));
-  this->set_parents(
+  set_parents(
       {start_transition, end_transition, transition, emission, mask, bias});
   if (!_output_decode_score) {
     this->set_children({best_tags});
@@ -64,11 +64,13 @@ void CRFOP<T>::forward() {
   int* history = (int*)_history->tensor();
   int* best_tags = (int*)child(0)->value();
 
-  if (_context_ptr->is_built()) {
-    launch_viterbi<T>(start_transition, end_transition, transition, emission,
-                      mask, best_score, history, best_tags, _num_tags, _seq_len,
-                      _batch_size, stream, bias);
+  if (!_context_ptr->is_built()) {
+    return;
   }
+
+  launch_viterbi<T>(start_transition, end_transition, transition, emission,
+                    mask, best_score, history, best_tags, _num_tags, _seq_len,
+                    _batch_size, stream, bias);
 }
 
 template <typename T>

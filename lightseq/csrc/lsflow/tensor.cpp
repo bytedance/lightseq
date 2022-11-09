@@ -16,10 +16,16 @@ Tensor::Tensor(std::string name, size_t size)
   }
 }
 
+void swap_pointer(std::shared_ptr<Tensor> tensor_a,
+                  std::shared_ptr<Tensor> tensor_b) {
+  std::swap(tensor_a->_ptr, tensor_b->_ptr);
+}
+
 void Tensor::set_tensor(char* inp) {
   if (_mtype == LSMemoryType::SharedMemory) {
-    printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
-    exit(-1);
+    // printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
+    // exit(-1);
+    _mtype = LSMemoryType::FixedMemory;
   }
   _ptr = inp;
 }
@@ -65,6 +71,16 @@ void Tensor::reset_fixed() {
   // *this = Tensor(this->_name, 0, true);
   _mtype = LSMemoryType::FixedMemory;
   _size = 0;
+}
+
+std::string Tensor::memory_type() {
+  if (_mtype == LSMemoryType::FixedMemory) {
+    return "FixedMemory";
+  } else if (_mtype == LSMemoryType::SharedMemory) {
+    return "SharedMemory";
+  }
+
+  return "Undefined";
 }
 
 }  // namespace lightseq

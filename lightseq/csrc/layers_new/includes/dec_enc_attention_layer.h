@@ -57,7 +57,8 @@ class DecEncAttentionLayer : public Layer {
 
   virtual ~DecEncAttentionLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* enc_k, Variable* enc_v);
+  Variable* operator()(Variable* inp, Variable* enc_mask, Variable* enc_k,
+                       Variable* enc_v);
 
   void before_forward(int batch_size, int src_seq_len, int trg_seq_len);
 

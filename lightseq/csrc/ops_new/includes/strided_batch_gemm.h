@@ -37,11 +37,9 @@ class StridedBatchGemmOp : public Operator {
 
   Variable* operator()(Variable* inpA, Variable* inpB);
 
-  void before_forward(int mm, int nn, int kk, int batch_heads,
-                      int dec_layer_id = -1) {
+  void before_forward(int mm, int nn, int kk, int batch_heads) {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
-    _dec_layer_id = dec_layer_id;
   }
 
   void forward() override;

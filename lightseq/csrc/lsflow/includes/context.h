@@ -20,6 +20,7 @@ const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 class Context {  // model only
  private:
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+  std::unordered_map<std::string, std::shared_ptr<void>> resources;
 
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
@@ -59,7 +60,7 @@ class Context {  // model only
   void convert_into_eval();
 
   static int create_global_context(
-      StatusType status_type = StatusType::Inference, int device_id = 0);
+      StatusType status_type = StatusType::Inference, int device_id = -1);
   static void set_global_context(int context_id);
   static std::shared_ptr<Context> global_instance();
 

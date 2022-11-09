@@ -7,7 +7,7 @@ Context::Context(StatusType status_type, int device_id)
       _device_id(device_id),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
-  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -123,7 +123,7 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    rl->gather_root_leaf_var();
+    // rl->gather_root_leaf_var();
 #ifdef DEBUG_MODE
     printf("\n########## Context build layer %s forward ##########\n",
            rl->name().c_str());
@@ -146,6 +146,8 @@ void Context::build() {
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
 
 #ifdef DEBUG_MODE
   draw_all_context();

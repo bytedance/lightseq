@@ -30,15 +30,12 @@ class Bert : public LSModel {
   Variable* inp_tokens;  // need to allocate
   Variable* token_emb;
   Variable* pos_emb;
-  Variable* pad_mask;  // need to allocate
   Variable* lang_emb;
   Variable* lang_id;
 
   Variable* bert_out;
 
   int _max_batch_size;
-
-  OpType_* pad_mask_ptr;
 
  public:
   Bert(const std::string weight_path, const int max_batch_size);

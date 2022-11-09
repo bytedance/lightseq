@@ -26,13 +26,13 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
 template <typename T1, typename T2>
 Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
-  LAYER_PRE_INPUTS({inp, inp_mask});
+  set_inputs({inp, inp_mask});
 
   Variable* attn_out = (*_attn_layer)(inp, inp_mask);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 
-  LAYER_POST_OUTPUTS({ffn_out});
+  set_outputs({ffn_out});
   return ffn_out;
 }
 

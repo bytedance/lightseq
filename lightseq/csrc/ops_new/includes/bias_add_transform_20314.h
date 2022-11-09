@@ -28,8 +28,7 @@ class BiasAddTrans20314 : public Operator {
 
   virtual ~BiasAddTrans20314() {}
 
-  std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp,
-                                                         Variable* bias);
+  Variable* operator()(Variable* inp, Variable* bias);
 
   void before_forward(int batch, int seq_len) {
     _batch = batch, _seq_len = seq_len;

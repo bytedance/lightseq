@@ -7,7 +7,7 @@ Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
   Variable* result =
       new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
-  this->set_parents({inp, bias});
+  set_parents({inp, bias});
   this->set_children({result});
   return result;
 }
@@ -21,6 +21,10 @@ void BiasActDropoutOp<T1, T2>::forward() {
   T1* output = (T1*)child(0)->value();
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+
+  if (!_context_ptr->is_built()) {
+    return;
+  }
 
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
@@ -45,6 +49,10 @@ void BiasActDropoutOp<T1, T2>::backward() {
   T2* grad_out = (T2*)child(0)->grad();
 
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+
+  if (!_context_ptr->is_built()) {
+    return;
+  }
 
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(
