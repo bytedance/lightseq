@@ -54,7 +54,7 @@ void Node::recursive_forward() {
   }
 
 #ifdef DEBUG_MODE
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   auto start = std::chrono::high_resolution_clock::now();
   if (node_type() == NodeType::Operator) {
     printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
@@ -71,16 +71,16 @@ void Node::recursive_forward() {
       }
     }
   }
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
 #endif
 
   forward();
 
 #ifdef DEBUG_MODE
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() != NodeType::Operator) {
     return;
   }
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
   print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   printf("_children.size(): %zu\n", _children.size());
@@ -92,7 +92,7 @@ void Node::recursive_forward() {
       printf("nullptr\n");
   }
   printf("\n");
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
 #endif
 }
 
@@ -116,6 +116,7 @@ void Node::recursive_backward() {
   }
 
 #ifdef DEBUG_MODE
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() == NodeType::Operator) {
     printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
            _bw_node_idx);
@@ -129,16 +130,18 @@ void Node::recursive_backward() {
         printf("nullptr\n");
     }
   }
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
   backward();
 
 #ifdef DEBUG_MODE
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
   if (node_type() != NodeType::Operator) {
     return;
   }
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
   print_time_duration(start, "time cost", 0);
   Operator* this_op = static_cast<Operator*>(this);
   printf("_parents.size(): %zu\n", _parents.size());
@@ -150,6 +153,7 @@ void Node::recursive_backward() {
       printf("nullptr\n");
   }
   printf("\n");
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
 #endif
 }
 
@@ -171,14 +175,22 @@ Variable::Variable(std::string name)
 }
 
 Variable::Variable(std::string name, size_t value_byte_size,
-                   size_t grad_byte_size)
+                   size_t grad_byte_size, LSMemoryType mmtype)
     : Node(name, NodeType::Variable),
       _value_byte_size(value_byte_size),
-      _grad_byte_size(grad_byte_size),
-      _variable_type(VariableType::SharedVariable) {
+      _grad_byte_size(grad_byte_size) {
   _value.reset(new Tensor("value", _value_byte_size));
   if (_context_ptr->is_training())
     _grad.reset(new Tensor("grad", _grad_byte_size));
+  if (mmtype == LSMemoryType::SharedMemory) {
+    _variable_type = VariableType::SharedVariable;
+  } else if (mmtype == LSMemoryType::FixedMemory) {
+    _variable_type = VariableType::FixedVariable;
+    malloc_memory(_value_byte_size, _grad_byte_size);
+  } else {
+    printf("Error! var %s useless mmtype %d\n", _name.c_str(), mmtype);
+    exit(-1);
+  }
 }
 
 Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
@@ -194,17 +206,16 @@ Variable::Variable(std::string name, Variable* parent_variable,
     : Node(name, NodeType::Variable),
       _is_descendants(true),
       _parent_variable(parent_variable),
-      _offset_value(offset_value),
-      _offset_grad(offset_grad),
-      _variable_type(VariableType::DescendantsVariable) {
+      _variable_type(VariableType::OffsetVariable) {
+  _value.reset(new Tensor("value", parent_variable->_value, offset_value));
+  if (_context_ptr->is_training()) {
+    _grad.reset(new Tensor("grad", parent_variable->_grad, offset_grad));
+  }
   parent_variable->add_descendants(this);
 }
 
 void Variable::fixed_memory() {
-  if (_is_descendants) {
-    if (children().size() == 0) {
-      _parent_variable->fixed_memory();
-    }
+  if (_variable_type == VariableType::OffsetVariable) {
     return;
   }
   if (_children_variable.size() && parents().size() > 0) {
@@ -221,10 +232,9 @@ void Variable::fixed_memory() {
   return;
 }
 
-void Variable::swap_pointer(Variable* var_a, Variable* var_b,
-                            bool is_training) {
-  Tensor::swap_pointer(var_a->_value, var_b->_value);
-  if (is_training) Tensor::swap_pointer(var_a->_grad, var_b->_grad);
+void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
+  std::swap(var_a->_value, var_b->_value);
+  if (var_a->_grad && var_b->_grad) std::swap(var_a->_grad, var_b->_grad);
 }
 
 void Variable::set_value(char* value_ptr) {
@@ -252,24 +262,20 @@ void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
   _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
   char* value_ptr = cuda_malloc<char>(value_byte_size);
+  _value->remove_life_cycle();
   _value->set_tensor(value_ptr);
   if (_context_ptr->is_training() && grad_byte_size) {
     char* grad_ptr = cuda_malloc<char>(grad_byte_size);
+    _grad->remove_life_cycle();
     _grad->set_tensor(grad_ptr);
   }
 }
 
 char* Variable::value(bool is_open_interval) {
-  if (_is_descendants) {
-    return _parent_variable->value(is_open_interval) + _offset_value;
-  }
   return _value->tensor(is_open_interval);
 }
 
 char* Variable::grad(bool is_open_interval) {
-  if (_is_descendants) {
-    return _parent_variable->grad(is_open_interval) + _offset_grad;
-  }
   return _grad->tensor(is_open_interval);
 }
 
@@ -290,10 +296,19 @@ void Variable::remove_descendants(Variable* var) {
 
 void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
                             size_t offset_grad) {
+  if (_parent_variable != nullptr && _parent_variable != parent_variable) {
+    printf("error! var %s with two ancestor!\n", name().c_str());
+    printf("new parent_variable: %s\n", parent_variable->_name.c_str());
+    printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
+    exit(-1);
+  }
   _is_descendants = true;
   _parent_variable = parent_variable;
-  _offset_value = offset_value;
-  _offset_grad = offset_grad;
+  _variable_type = VariableType::OffsetVariable;
+  _value->set_offset(parent_variable->_value, offset_value);
+  if (_context_ptr->is_training()) {
+    _grad->set_offset(parent_variable->_grad, offset_grad);
+  }
   parent_variable->add_descendants(this);
 }
 
@@ -302,25 +317,35 @@ void Variable::remove_ancestor() {
     _is_descendants = false;
     _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
-    _offset_value = _offset_grad = 0;
+    _value->remove_offset();
+    if (_grad) {
+      _grad->remove_offset();
+    }
   }
 }
 
 void Variable::set_offset(size_t offset_value, size_t offset_grad) {
-  _offset_value = offset_value;
-  _offset_grad = offset_grad;
+  _value->set_offset(offset_value);
+  if (_grad != nullptr) {
+    _grad->set_offset(offset_grad);
+  }
 }
 
 #ifdef DEBUG_MODE
 void Variable::debug_var() {
+  printf("++++++++++ debug var %s ++++++++++\n", name().c_str());
   printf("variable type: %s\n", variable_type_str().c_str());
   printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(),
          _value->memory_type().c_str(), _value_byte_size);
-  print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
+  if (value() == nullptr) {
+    printf("value address is nullptr\n");
+  } else
+    print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
   if (_context_ptr->is_training()) {
     printf("node: %s, grad_byte_size: %zu\n", name().c_str(), _grad_byte_size);
     print_vec((TENSOR_TYPE*)grad(), name() + ":grad", 10);
   }
+  printf("\n");
 }
 #endif
 

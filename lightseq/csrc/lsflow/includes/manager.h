@@ -10,7 +10,7 @@
 #include "declaration.h"
 
 namespace lightseq {
-enum LSMemoryType { FixedMemory, SharedMemory };
+enum LSMemoryType { FixedMemory, SharedMemory, OffsetMemory };
 
 class TensorUsage {
  public:
