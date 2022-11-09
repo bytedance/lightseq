@@ -194,9 +194,12 @@ Variable::Variable(std::string name, Variable* parent_variable,
     : Node(name, NodeType::Variable),
       _is_descendants(true),
       _parent_variable(parent_variable),
-      _offset_value(offset_value),
-      _offset_grad(offset_grad),
       _variable_type(VariableType::DescendantsVariable) {
+  
+  _value.reset(new Tensor("value", parent_variable->_value, offset_value));
+  if(_context_ptr->is_training()) {
+    _grad.reset(new Tensor("grad", parent_variable->_grad, offset_grad));
+  }
   parent_variable->add_descendants(this);
 }
 
@@ -221,10 +224,9 @@ void Variable::fixed_memory() {
   return;
 }
 
-void Variable::swap_pointer(Variable* var_a, Variable* var_b,
-                            bool is_training) {
-  Tensor::swap_pointer(var_a->_value, var_b->_value);
-  if (is_training) Tensor::swap_pointer(var_a->_grad, var_b->_grad);
+void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
+  std::swap(var_a->_value, var_b->_value);
+  if (var_a->_grad && var_b->_grad) std::swap(var_a->_grad, var_b->_grad);
 }
 
 void Variable::set_value(char* value_ptr) {
@@ -252,24 +254,20 @@ void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
   _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
   char* value_ptr = cuda_malloc<char>(value_byte_size);
+  _value->remove_life_cycle();
   _value->set_tensor(value_ptr);
   if (_context_ptr->is_training() && grad_byte_size) {
     char* grad_ptr = cuda_malloc<char>(grad_byte_size);
+    _grad->remove_life_cycle();
     _grad->set_tensor(grad_ptr);
   }
 }
 
 char* Variable::value(bool is_open_interval) {
-  if (_is_descendants) {
-    return _parent_variable->value(is_open_interval) + _offset_value;
-  }
   return _value->tensor(is_open_interval);
 }
 
 char* Variable::grad(bool is_open_interval) {
-  if (_is_descendants) {
-    return _parent_variable->grad(is_open_interval) + _offset_grad;
-  }
   return _grad->tensor(is_open_interval);
 }
 
@@ -292,8 +290,10 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
                             size_t offset_grad) {
   _is_descendants = true;
   _parent_variable = parent_variable;
-  _offset_value = offset_value;
-  _offset_grad = offset_grad;
+  _value->set_offset(parent_variable->_value, offset_value);
+  if(_context_ptr->is_training()) {
+    _grad->set_offset(parent_variable->_grad, offset_grad);
+  }
   parent_variable->add_descendants(this);
 }
 
@@ -302,13 +302,18 @@ void Variable::remove_ancestor() {
     _is_descendants = false;
     _parent_variable->remove_descendants(this);
     _parent_variable = nullptr;
-    _offset_value = _offset_grad = 0;
+    _value->remove_offset();
+    if(_grad) {
+      _grad->remove_offset();
+    }
   }
 }
 
 void Variable::set_offset(size_t offset_value, size_t offset_grad) {
-  _offset_value = offset_value;
-  _offset_grad = offset_grad;
+  _value->set_offset(offset_value);
+  if(_grad != nullptr) {
+    _grad->set_offset(offset_grad);
+  }
 }
 
 #ifdef DEBUG_MODE

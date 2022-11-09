@@ -9,26 +9,29 @@ class Tensor {
  private:
   LSMemoryType _mtype;
   char* _ptr = nullptr;
-  int _id = -1;
+  const int _id = -1;
   std::string _name;
   size_t _size;
   MemoryManagerPtr _mm_ptr = nullptr;
   Context* _ctx_ptr;
 
   static int global_tensor_id;
+  TensorPtr _original_tensor;
+  size_t _offset;
 
  public:
   Tensor(std::string name, size_t size);
+  Tensor(std::string name, TensorPtr ori_tensor, size_t offset);
 
   virtual ~Tensor() {}
 
-  static void swap_pointer(std::shared_ptr<Tensor> tensor_a,
-                           std::shared_ptr<Tensor> tensor_b);
-
   void set_tensor(char* inp);
   void set_tensor(const char* inp);
+  void set_offset(size_t offset);
+  void set_offset(TensorPtr ori_tensor, size_t offset);
+  void remove_offset();
 
-  char* tensor(bool is_open_interval = false, bool just_view = false);
+  char* tensor(bool is_open_interval = false);
 
   size_t size() { return _size; }
   int unique_id() { return _id; }

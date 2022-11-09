@@ -21,13 +21,12 @@ Transformer::Transformer(const std::string weight_path,
   tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
+  int max_batch_tokens = tw_._max_step * _max_batch_size;
   inp_tokens = new Variable("inp_tokens");
   dec_tokens = new Variable("dec_tokens");
   dec_tokens_buf = new Variable("dec_tokens_buf");
   dec_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step *
                             sizeof(int));
-  dec_tokens_buf->malloc_memory(_max_batch_size * tw_._beam_size *
-                                tw_._max_step * sizeof(int));
   std::vector<int> start_id_vec(
       _max_batch_size * tw_._beam_size * tw_._max_step, tw_._start_id);
 
@@ -35,13 +34,8 @@ Transformer::Transformer(const std::string weight_path,
                                   sizeof(int) * start_id_vec.size(),
                                   cudaMemcpyHostToDevice,
                                   _context_ptr->get_stream()));
-  CHECK_GPU_ERROR(cudaMemcpyAsync(dec_tokens_buf->value(), start_id_vec.data(),
-                                  sizeof(int) * start_id_vec.size(),
-                                  cudaMemcpyHostToDevice,
-                                  _context_ptr->get_stream()));
 
   /* --- step.4 inital operator & layer --- */
-  int max_batch_tokens = tw_._max_step * _max_batch_size;
 
   // initial LaunchEncEmb layer
   launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(
@@ -124,16 +118,16 @@ Transformer::Transformer(const std::string weight_path,
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
         (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
-    new_k_vec.push_back(std::get<1>(dec_outs));
-    new_v_vec.push_back(std::get<2>(dec_outs));
+    Variable* cache_k_buf = std::get<1>(dec_outs);
+    Variable* cache_v_buf = std::get<2>(dec_outs);
 
     cache_k->malloc_memory(max_batch_size * tw_._max_step * sizeof(OpType_) *
                            tw_._hidden_size);
     cache_v->malloc_memory(max_batch_size * tw_._max_step * sizeof(OpType_) *
                            tw_._hidden_size);
-    std::get<1>(dec_outs)->malloc_memory(max_batch_size * tw_._max_step *
+    cache_k_buf->malloc_memory(max_batch_size * tw_._max_step *
                                          sizeof(OpType_) * tw_._hidden_size);
-    std::get<2>(dec_outs)->malloc_memory(max_batch_size * tw_._max_step *
+    cache_v_buf->malloc_memory(max_batch_size * tw_._max_step *
                                          sizeof(OpType_) * tw_._hidden_size);
   }
 

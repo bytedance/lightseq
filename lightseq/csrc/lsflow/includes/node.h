@@ -61,8 +61,6 @@ class Variable : public Node {
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
   bool _is_descendants = false;
-  size_t _offset_value;
-  size_t _offset_grad;
   Variable* _parent_variable;
   std::unordered_set<Variable*> _children_variable;
 
@@ -78,8 +76,7 @@ class Variable : public Node {
   virtual ~Variable() {}
 
   void fixed_memory();  // Convert VariableNode to IONode
-  static void swap_pointer(Variable* var_a, Variable* var_b,
-                           bool is_training = false);
+  static void swap_tensor(Variable* var_a, Variable* var_b);
 
   void set_value(char* value_ptr);
 
