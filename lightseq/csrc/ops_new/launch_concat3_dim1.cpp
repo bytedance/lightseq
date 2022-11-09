@@ -13,17 +13,22 @@ Variable* LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
 
 template <typename T1, typename T2>
 void LaunchConcat3Dim1<T1, T2>::forward() {
+  printf("Running LaunchConcat3Dim1: %s\n", name().c_str());
   cudaStream_t _stream = _context_ptr->get_stream();
-
-  if (_is_skip) {
-    return;
-  }
 
   T1* inp_ptr = (T1*)parent(0)->value();
   T1* cache_ptr = (T1*)parent(1)->value();
   T1* real_val = (T1*)child(0)->value();
 
   if (!_context_ptr->is_built()) {
+    return;
+  }
+  
+  if (_is_skip && real_val != inp_ptr) {
+    CHECK_GPU_ERROR(
+        cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
+                        _batchs * _hidden_size * _seq_len * sizeof(T1),
+                        cudaMemcpyDefault, _stream));
     return;
   }
 
@@ -34,9 +39,6 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
 template <typename T1, typename T2>
 void LaunchConcat3Dim1<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
-  if (_is_skip) {
-    return;
-  }
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* val_grad = (T1*)child(0)->grad();
 

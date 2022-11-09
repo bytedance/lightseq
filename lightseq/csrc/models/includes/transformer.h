@@ -41,10 +41,17 @@ class Transformer : public LSModel {
   std::vector<Variable*> new_k_vec;
   std::vector<Variable*> cache_v_vec;
   std::vector<Variable*> new_v_vec;
+  Variable* total_cache_k;
+  Variable* total_cache_v;
+  Variable* total_cache_k_buf;
+  Variable* total_cache_v_buf;
 
   Variable* dec_tokens;
   Variable* dec_tokens_buf;
+  std::vector<std::pair<Variable*, Variable*>> cache_k_pairs;
+  std::vector<std::pair<Variable*, Variable*>> cache_v_pairs;
 
+  int cache_size;
   int _max_batch_size;
 
  public:

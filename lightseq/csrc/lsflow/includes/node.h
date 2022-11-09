@@ -61,13 +61,13 @@ class Variable : public Node {
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
   bool _is_descendants = false;
-  Variable* _parent_variable;
+  Variable* _parent_variable = nullptr;
   std::unordered_set<Variable*> _children_variable;
 
  public:
   Variable(std::string name);  // for Fixed memory
   Variable(std::string name, size_t value_byte_size,
-           size_t grad_byte_size = 0);  // for Shared memory
+           size_t grad_byte_size = 0, LSMemoryType mmtype = LSMemoryType::SharedMemory);  // for Shared memory
   Variable(std::string name, const char* para_ptr,
            char* grad_ptr = nullptr);  // for Fixed memory
   Variable(std::string name, Variable* parent_variable, size_t offset_value = 0,

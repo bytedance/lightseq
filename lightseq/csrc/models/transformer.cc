@@ -23,10 +23,8 @@ Transformer::Transformer(const std::string weight_path,
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
   inp_tokens = new Variable("inp_tokens");
-  dec_tokens = new Variable("dec_tokens");
-  dec_tokens_buf = new Variable("dec_tokens_buf");
-  dec_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step *
-                            sizeof(int));
+  dec_tokens = new Variable("dec_tokens", max_batch_tokens * tw_._beam_size *
+                            sizeof(int), 0, LSMemoryType::FixedMemory);
   std::vector<int> start_id_vec(
       _max_batch_size * tw_._beam_size * tw_._max_step, tw_._start_id);
 
@@ -34,6 +32,12 @@ Transformer::Transformer(const std::string weight_path,
                                   sizeof(int) * start_id_vec.size(),
                                   cudaMemcpyHostToDevice,
                                   _context_ptr->get_stream()));
+
+  cache_size = max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
+  total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer, 0, LSMemoryType::FixedMemory);
+  total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer, 0, LSMemoryType::FixedMemory);
+  total_cache_k_buf = new Variable("total_cache_k_buf", cache_size * tw_._n_dec_layer, 0, LSMemoryType::FixedMemory);
+  total_cache_v_buf = new Variable("total_cache_v_buf", cache_size * tw_._n_dec_layer, 0, LSMemoryType::FixedMemory);
 
   /* --- step.4 inital operator & layer --- */
 
@@ -110,6 +114,7 @@ Transformer::Transformer(const std::string weight_path,
 
   Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
 
+  int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
     Variable *cache_k = new Variable("cache_k");
     cache_k_vec.push_back(cache_k);
@@ -121,14 +126,13 @@ Transformer::Transformer(const std::string weight_path,
     Variable* cache_k_buf = std::get<1>(dec_outs);
     Variable* cache_v_buf = std::get<2>(dec_outs);
 
-    cache_k->malloc_memory(max_batch_size * tw_._max_step * sizeof(OpType_) *
-                           tw_._hidden_size);
-    cache_v->malloc_memory(max_batch_size * tw_._max_step * sizeof(OpType_) *
-                           tw_._hidden_size);
-    cache_k_buf->malloc_memory(max_batch_size * tw_._max_step *
-                                         sizeof(OpType_) * tw_._hidden_size);
-    cache_v_buf->malloc_memory(max_batch_size * tw_._max_step *
-                                         sizeof(OpType_) * tw_._hidden_size);
+
+    cache_k->set_ancestor(total_cache_k, cache_size * dec_layer_idx);
+    cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
+    cache_k_buf->set_ancestor(total_cache_k_buf, cache_size * dec_layer_idx);
+    cache_v_buf->set_ancestor(total_cache_v_buf, cache_size * dec_layer_idx);
+
+    dec_layer_idx ++;
   }
 
   Variable *dec_out = (*dec_norm_layer)(dec_emb);
@@ -140,8 +144,10 @@ Transformer::~Transformer() {}
 
 void Transformer::encoder_before_forward(int batch_size, int seq_len) {
   launch_enc_emb_layer->before_forward(batch_size, seq_len);
+  int dec_layer_idx = 0;
   for (auto iter : enc_layer_vec) {
     iter->before_forward(batch_size, seq_len);
+    dec_layer_idx ++;
   }
   enc_norm_layer->before_forward(batch_size * seq_len);
 }

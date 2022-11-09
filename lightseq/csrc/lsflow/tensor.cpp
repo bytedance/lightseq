@@ -51,6 +51,7 @@ void Tensor::set_offset(size_t offset) {
 }
 
 void Tensor::remove_offset() {
+  printf("remove offset %s\n", _name.c_str());
   _mtype = LSMemoryType::FixedMemory;
   _ptr = nullptr;
 }
@@ -90,6 +91,7 @@ void Tensor::update_life_idx(int node_idx) {
 }
 
 void Tensor::remove_life_cycle() {
+  _mtype = LSMemoryType::FixedMemory;
   if (_mm_ptr) _mm_ptr->remove_life_cycle(_id);
 }
 
@@ -98,7 +100,7 @@ void Tensor::reset_fixed() {
     return;
   }
   this->remove_life_cycle();
-  // *this = Tensor(this->_name, 0, true);
+  printf("reset fixed %s\n", _name.c_str());
   _mtype = LSMemoryType::FixedMemory;
   _size = 0;
 }
@@ -108,6 +110,9 @@ std::string Tensor::memory_type() {
     return "FixedMemory";
   } else if (_mtype == LSMemoryType::SharedMemory) {
     return "SharedMemory";
+  }
+  else if (_mtype == LSMemoryType::OffsetMemory) {
+    return "OffsetMemory";
   }
 
   return "Undefined";

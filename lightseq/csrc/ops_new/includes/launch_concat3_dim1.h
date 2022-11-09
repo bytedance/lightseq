@@ -30,11 +30,11 @@ class LaunchConcat3Dim1 : public Operator {
 
   void before_forward(int batchs, int seq_len, int steps,
                       bool is_skip = false) {
-    if (is_skip) {
-      child(0)->set_ancestor(parent(0));
-    } else {
-      child(0)->remove_ancestor();
-    }
+    // if (is_skip) {
+    //   child(0)->set_ancestor(parent(0));
+    // } else {
+    //   child(0)->remove_ancestor();
+    // }
     _batchs = batchs, _seq_len = seq_len, _steps = steps, _is_skip = is_skip;
   }
 
