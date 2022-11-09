@@ -12,7 +12,7 @@ set(operator_files
     softmax.cpp
     strided_batch_gemm.cpp
     transform_0213.cpp
-    # beam_search_topk.cu
+    beam_search_topk.cu
 )
 
 add_library(lightseq_operators STATIC ${operator_files})
