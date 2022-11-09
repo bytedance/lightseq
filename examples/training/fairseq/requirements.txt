@@ -1,6 +1,6 @@
 numpy==1.19.5
 sacrebleu==1.5.1
 sacremoses
-fairseq
+fairseq==0.10.2
 lightseq
 ninja

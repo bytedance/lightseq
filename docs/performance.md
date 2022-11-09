@@ -111,7 +111,7 @@ and FP16 models are tested on Tesla T4.
 The following table is a comparison between Hugging Face BERT-base model and LightSeq model on Tesla T4 using FP16.
 
 | batch_size | seq_len | Hugging Face(ms) | lightseq(ms) | lightseq speedup |
-|------------|---------|------------------|--------------|------------------|
+| ---------- | ------- | ---------------- | ------------ | ---------------- |
 | 1          | 16      | 15.23            | 2.19         | 6.95             |
 | 1          | 32      | 16.24            | 1.99         | 8.16             |
 | 1          | 64      | 19.32            | 2.35         | 8.22             |
