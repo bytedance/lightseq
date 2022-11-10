@@ -7,6 +7,7 @@
 #include "util.h"
 
 #include "bert.h"
+#include "quant_bert.h"
 #include "bert_crf.h"
 
 namespace py = pybind11;
