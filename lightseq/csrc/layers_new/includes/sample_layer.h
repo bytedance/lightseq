@@ -9,33 +9,35 @@ template <class T>
 class SampleLayer : public Layer {
  private:
   // operators
-  BeamSearchTopOp<T>* beam_search = nullptr;
+  BeamSearchTopOp<T>* _beam_search = nullptr;
 
   // parameters
+  Variable* _logit_bias;
 
-  
-public:
-  SampleLayer(int max_batch_size, int max_step, int trg_vocab_size,
-              int max_thread_per_block, int beam_size,
-              int diverse_lambda, int end_id); // for beam_search
+ public:
+  SampleLayer(int nshared_dec_layer, int max_batch_size, int max_step,
+              int trg_vocab_size, int hidden_size, int max_thread_per_block,
+              int beam_size, int diverse_lambda, int dim_per_head, int end_id,
+              int head_num, float length_penalty);  // for beam_search
 
   virtual ~SampleLayer() {}
 
-  Variable* operator()(Variable* inp);
+  std::tuple<Variable*, Variable*> operator()(
+      Variable* logits, Variable* alive_seq,
+      Variable* caches_k, Variable* caches_k_buf, Variable* caches_v,
+      Variable* caches_v_buf);
 
-  void before_forward(int batch_size, int seq_len);
+  void before_forward(int batch_size, int cur_step);
 
   void before_backward();
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
-
-  int load_params(const std::vector<const T1*>& para_vec, int offset);
+  int load_params(const std::vector<const T*>& para_vec, int offset);
 };
 
-template class LinearLayer<__half, __half>;
-template class LinearLayer<float, float>;
+template class SampleLayer<__half>;
+template class SampleLayer<float>;
 
-template <class T1, class T2>
-using LinearLayerPtr = std::shared_ptr<LinearLayer<T1, T2>>;
+template <typename T>
+using SampleLayerPtr = std::shared_ptr<SampleLayer<T>>;
 
 }  // namespace lightseq

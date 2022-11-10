@@ -9,6 +9,7 @@
 #include "transformer_decoder_layer.h"
 #include "lyr_normalize_layer.h"
 #include "linear_layer.h"
+#include "sample_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -33,14 +34,12 @@ class Transformer : public LSModel {
   LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
   LinearLayerPtr<OpType_, OpType_> linear_layer;
 
+  SampleLayerPtr<OpType_> sample_layer;
+
   ContextPtr context_ptr;
 
   Variable* inp_tokens;  // need to allocate
 
-  std::vector<Variable*> cache_k_vec;
-  std::vector<Variable*> new_k_vec;
-  std::vector<Variable*> cache_v_vec;
-  std::vector<Variable*> new_v_vec;
   Variable* total_cache_k;
   Variable* total_cache_v;
   Variable* total_cache_k_buf;
@@ -48,6 +47,7 @@ class Transformer : public LSModel {
 
   Variable* dec_tokens;
   Variable* dec_tokens_buf;
+  Variable* seq_score;
   std::vector<std::pair<Variable*, Variable*>> cache_k_pairs;
   std::vector<std::pair<Variable*, Variable*>> cache_v_pairs;
 

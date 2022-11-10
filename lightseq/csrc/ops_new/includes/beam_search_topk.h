@@ -8,7 +8,7 @@ namespace lightseq {
 template <typename T>
 class BeamSearchTopOp : public Operator {
  private:
- // inital
+  // inital
   int _max_batch_size;
   int _max_step;
   int _trg_vocab_size;
@@ -27,35 +27,35 @@ class BeamSearchTopOp : public Operator {
   int _end_id;
   int _dim_per_head;
   int _head_num;
+  std::vector<float> _host_alive_seq_probs;
+  std::vector<float> _host_length_norm;
 
-  Variable* alive_seq;
-  Variable* alive_seq_buf;
+  Variable* num_beam_can;
+  Variable* can_idx;
+  Variable* can_score;
+  Variable* seq_prob;
+  Variable* seq_score;
 
  public:
-  BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
-                                    int max_step, int trg_vocab_size,
-                                    int hidden_size, int max_thread_per_block,
-                                    int beam_size, int diverse_lambda,
-                                    int dim_per_head, int end_id, int head_num);
+  BeamSearchTopOp(int nshared_dec_layer, int max_batch_size, int max_step,
+                  int trg_vocab_size, int hidden_size, int max_thread_per_block,
+                  int beam_size, int diverse_lambda, int dim_per_head,
+                  int end_id, int head_num, float length_penalty);
 
   ~BeamSearchTopOp() {}
 
   // output:
-  std::tuple<Variable*, Variable*, Variable*, Variable*> operator()(
+  std::tuple<Variable*, Variable*> operator()(
       Variable* logits, Variable* logit_bias,
-                               Variable* seq_probs, Variable* seq_score,
-                               Variable* alive_seq, Variable* caches_k,
-                               Variable* caches_k_buf, Variable* caches_v,
-                               Variable* caches_v_buf);
+      Variable* alive_seq, Variable* caches_k, Variable* caches_k_buf,
+      Variable* caches_v, Variable* caches_v_buf);
 
   void forward() override;
 
-  void before_forward(int batch_size, int length_norm, int cur_step,
-                      int step_token_num) {
+  void before_forward(int batch_size, int cur_step) {
     _batch_size = batch_size;
-    _length_norm = length_norm;
     _cur_step = cur_step;
-    _step_token_num = step_token_num;
+    _step_token_num = batch_size * _beam_size;
   }
 
   void backward() override {}
