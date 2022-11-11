@@ -17,6 +17,7 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 
 ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
+ENABLE_INT8 = int(os.environ.get("ENABLE_INT8", 0))
 ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
 ENABLE_NEW_ARCH = int(os.environ.get("ENABLE_NEW_ARCH", 0))
 
@@ -72,6 +73,7 @@ class CMakeBuild(build_ext):
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
             cmake_args += ["-DFP16_MODE=OFF"] if ENABLE_FP32 else ["-DFP16_MODE=ON"]
+            cmake_args += ["-DINT8_MODE=OFF"] if ENABLE_INT8 else ["-DINT8_MODE=ON"]
             cmake_args += ["-DDEBUG_MODE=ON"] if ENABLE_DEBUG else ["-DDEBUG_MODE=OFF"]
             cmake_args += (
                 ["-DUSE_NEW_ARCH=ON"] if ENABLE_NEW_ARCH else ["-DUSE_NEW_ARCH=OFF"]
