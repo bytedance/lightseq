@@ -1,19 +1,19 @@
-#include "launch_concat3_dim1.h"
+#include "concat3_dim1.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* LaunchConcat3Dim1<T1, T2>::operator()(Variable* inp,
+Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp,
                                                 Variable* cache) {
-  Variable* new_cache = new Variable("LaunchConcat3Dim1_new_cache");
+  Variable* new_cache = new Variable("Concat3Dim1_new_cache");
   set_parents({inp, cache});
   this->set_children({new_cache});
   return new_cache;
 }
 
 template <typename T1, typename T2>
-void LaunchConcat3Dim1<T1, T2>::forward() {
-  printf("Running LaunchConcat3Dim1: %s\n", name().c_str());
+void Concat3Dim1<T1, T2>::forward() {
+  printf("Running Concat3Dim1: %s\n", name().c_str());
   cudaStream_t _stream = _context_ptr->get_stream();
 
   T1* inp_ptr = (T1*)parent(0)->value();
@@ -24,7 +24,9 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
     return;
   }
 
-  if (_is_skip && real_val != inp_ptr) {
+  printf("is_skip: %d, parameters: %d %d %d\n", _is_skip, _batchs * _heads, _hidden_size / _heads, _steps);
+
+  if (_is_skip) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
                         _batchs * _hidden_size * _seq_len * sizeof(T1),
@@ -37,7 +39,7 @@ void LaunchConcat3Dim1<T1, T2>::forward() {
 }
 
 template <typename T1, typename T2>
-void LaunchConcat3Dim1<T1, T2>::backward() {
+void Concat3Dim1<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* val_grad = (T1*)child(0)->grad();
@@ -54,7 +56,7 @@ void LaunchConcat3Dim1<T1, T2>::backward() {
   }
 }
 
-template class LaunchConcat3Dim1<float, float>;
-template class LaunchConcat3Dim1<__half, __half>;
+template class Concat3Dim1<float, float>;
+template class Concat3Dim1<__half, __half>;
 
 }  // namespace lightseq

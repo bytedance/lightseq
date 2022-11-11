@@ -48,6 +48,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
 
   if (_layer_id == 0) {
     total_enc_kv = (*_enc_kv_layer)(enc_out);
+    total_enc_kv->malloc_memory(_nshared_layer * _max_batch_tokens * _hidden_size * 2 * sizeof(T1));
   }
 
   enc_k = new Variable("enc_k", total_enc_kv);
@@ -102,7 +103,7 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
     _enc_kv_layer->before_forward(batch_size, src_seq_len);
   }
 
-  _self_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
+  _self_attn_layer->before_forward(batch_size, trg_seq_len, step);
 
   _enc_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len);
 

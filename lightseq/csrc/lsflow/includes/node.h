@@ -58,11 +58,12 @@ class Variable : public Node {
   VariableType _variable_type;
   size_t _value_byte_size;
   size_t _grad_byte_size;
-  TensorPtr _value = nullptr;
-  TensorPtr _grad = nullptr;
   bool _is_descendants = false;
   Variable* _parent_variable = nullptr;
   std::unordered_set<Variable*> _children_variable;
+protected:
+  TensorPtr _value = nullptr;
+  TensorPtr _grad = nullptr;
 
  public:
   Variable(std::string name);  // for Fixed memory

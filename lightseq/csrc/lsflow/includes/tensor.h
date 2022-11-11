@@ -9,7 +9,7 @@ class Tensor {
  private:
   LSMemoryType _mtype;
   char* _ptr = nullptr;
-  const int _id = -1;
+  int _id = -1;
   std::string _name;
   size_t _size;
   MemoryManagerPtr _mm_ptr = nullptr;

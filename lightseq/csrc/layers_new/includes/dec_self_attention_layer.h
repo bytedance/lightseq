@@ -8,7 +8,7 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "transform_0213.h"
-#include "launch_concat3_dim1.h"
+#include "concat3_dim1.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -27,8 +27,8 @@ class DecSelfAttentionLayer : public Layer {
   Transform0213<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
-  LaunchConcat3Dim1<T1, T2>* _deal_cache_k = nullptr;
-  LaunchConcat3Dim1<T1, T2>* _deal_cache_v = nullptr;
+  Concat3Dim1<T1, T2>* _concat_cache_k = nullptr;
+  Concat3Dim1<T1, T2>* _concat_cache_v = nullptr;
 
   // parameters
   Variable* _attn_qkvw;
@@ -72,7 +72,7 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_k,
                                                          Variable* cache_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
+  void before_forward(int batch_size, int trg_seq_len,
                       int steps);
 
   void before_backward();

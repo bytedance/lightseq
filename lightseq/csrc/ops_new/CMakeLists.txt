@@ -4,7 +4,7 @@ set(operator_files
     bias_dropout_residual.cpp
     crf.cpp
     dropout.cpp
-    launch_concat3_dim1.cpp
+    concat3_dim1.cpp
     launch_enc_emb.cpp
     launch_dec_emb_op.cpp
     layer_normalize.cpp

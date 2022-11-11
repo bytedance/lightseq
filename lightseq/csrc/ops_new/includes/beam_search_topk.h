@@ -62,7 +62,7 @@ class BeamSearchTopOp : public Operator {
 
   void before_backward() {}
 
-  int can_num_batch() { return _host_can_num_batch; }
+  int is_stop() { return _host_can_num_batch == _step_token_num; }
 };
 
 }  // namespace lightseq

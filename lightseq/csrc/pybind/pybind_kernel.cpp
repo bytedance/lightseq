@@ -292,7 +292,7 @@ void torch_launch_concat3_dim1(const torch::Tensor &inp1,
                                const torch::Tensor &inp2, torch::Tensor &output,
                                int sz0, int sz2, int sz1_1, int sz1_2) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_concat3_dim1(rptr<T>(inp1), rptr<T>(inp2), rptr<T>(output), sz0, sz2,
+  concat3_dim1(rptr<T>(inp1), rptr<T>(inp2), rptr<T>(output), sz0, sz2,
                       sz1_1, sz1_2, stream);
   // cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());

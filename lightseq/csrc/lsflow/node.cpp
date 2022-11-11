@@ -233,8 +233,14 @@ void Variable::fixed_memory() {
 }
 
 void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
-  std::swap(var_a->_value, var_b->_value);
-  if (var_a->_grad && var_b->_grad) std::swap(var_a->_grad, var_b->_grad);
+  Tensor temp = *(var_a->_value.get());
+  *(var_a->_value.get()) = *(var_b->_value.get());
+  *(var_b->_value.get()) = temp;
+  if (var_a->_grad && var_b->_grad) {
+    Tensor temp = *(var_a->_grad.get());
+    *(var_a->_grad.get()) = *(var_b->_grad.get());
+    *(var_b->_grad.get()) = temp;
+  }
 }
 
 void Variable::set_value(char* value_ptr) {

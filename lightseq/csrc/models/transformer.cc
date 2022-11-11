@@ -115,12 +115,6 @@ Transformer::Transformer(const std::string weight_path,
     tw_._hidden_size, 1024, tw_._beam_size, tw_._diverse_lambda, tw_._dim_per_head,
     tw_._end_id, tw_._head_num, tw_._length_penalty));
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
-  /*
-  int nshared_dec_layer, int max_batch_size, int max_step,
-                  int trg_vocab_size, int hidden_size, int max_thread_per_block,
-                  int beam_size, int diverse_lambda, int dim_per_head,
-                  int end_id, int head_num, float length_penalty
-                  */
 
   /* --- step.5 construct network --- */
   std::tuple<Variable *, Variable *> enc_emb_outs =
@@ -148,7 +142,6 @@ Transformer::Transformer(const std::string weight_path,
     cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
     cache_k_buf->set_ancestor(total_cache_k_buf, cache_size * dec_layer_idx);
     cache_v_buf->set_ancestor(total_cache_v_buf, cache_size * dec_layer_idx);
-
     dec_layer_idx++;
   }
 
@@ -159,6 +152,8 @@ Transformer::Transformer(const std::string weight_path,
   std::tuple<Variable*, Variable*> sample_outs = (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_k_buf, total_cache_v, total_cache_v_buf);
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
+  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size * sizeof(int));
+
 }
 
 Transformer::~Transformer() {}
@@ -201,7 +196,8 @@ void Transformer::Infer() {
   enc_norm_layer->forward();
 
   for(int step = 0; step < tw_._max_step; step ++){
-    decoder_before_forward(batch_size, seq_len, 0);
+    decoder_before_forward(batch_size, seq_len, step);
+
     launch_dec_emb_layer->forward();
     for (auto iter : dec_layer_vec) {
       iter->forward();
@@ -209,7 +205,10 @@ void Transformer::Infer() {
     dec_norm_layer->forward();
     linear_layer->forward();
     sample_layer->forward();
-    // break;
+    if(sample_layer->is_stop()) {
+      break;
+    }
+
     Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
 

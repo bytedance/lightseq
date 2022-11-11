@@ -8,7 +8,7 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "transform_0213.h"
-#include "launch_concat3_dim1.h"
+#include "concat3_dim1.h"
 #include "layer.h"
 
 namespace lightseq {
