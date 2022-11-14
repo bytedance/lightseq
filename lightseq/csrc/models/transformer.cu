@@ -179,6 +179,8 @@ void Transformer::decoder_before_forward(int batch_size, int seq_len,
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
+  printf("Running! batch_size: %d, seq_len: %d\n", batch_size, seq_len);
+
   if (tw_._sampling_method == "topk" || tw_._sampling_method == "topp") {
     _output_topk = false;
   }
@@ -227,9 +229,6 @@ void Transformer::Infer() {
 
 
   if (_output_topk || _is_sampling) {
-    if (step == _batch_max_decode_length) {
-      step -= 1;
-    }
     ker_write_topk_result<<<batch_size * tw_._beam_size, step + 1, 0,
                             _context_ptr->get_stream()>>>(
         (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._trg_vocab_size,
@@ -251,13 +250,19 @@ void Transformer::Infer() {
   /* ---step3. output the decoding result--- */
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-  set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
+
+  // print_vec((int*)transformer_out->value(), "transformer decoder tokens", 10);
+
+  
+  
+  set_output_shape(0, {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
+  set_output_shape(1, {batch_size,  _output_topk ? tw_._beam_size : 1});
 }
 
 void Transformer::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
-      inp_tokens->set_value((char *)input_ptr);
+      inp_tokens->set_value(static_cast<char *>(input_ptr));
       break;
 
     default:
@@ -269,23 +274,26 @@ void Transformer::set_input_ptr(int index, void *input_ptr) {
 void Transformer::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      transformer_out->set_value((char *)output_ptr);
+      transformer_out->set_value(static_cast<char *>(output_ptr));
       break;
+
     case 1:
-      seq_score->set_value((char *)output_ptr);
+      seq_score->set_value(static_cast<char *>(output_ptr));
       break;
+
     default:
-      throw std::runtime_error("invalid output index");
+      throw std::runtime_error("invalid input index");
       break;
   }
 }
-
 const void *Transformer::get_output_ptr(int index) {
   switch (index) {
     case 0:
       return static_cast<void *>(transformer_out->value());
+
     case 1:
       return static_cast<void *>(seq_score->value());
+
     default:
       throw std::runtime_error("invalid output index");
       break;
@@ -296,12 +304,14 @@ std::vector<int> Transformer::get_input_max_shape(int index) {
   switch (index) {
     case 0:
       return {_max_batch_size, tw_._max_step};
+      break;
 
     default:
       throw std::runtime_error("invalid input index");
       break;
   }
 }
+
 std::vector<int> Transformer::get_output_max_shape(int index) {
   switch (index) {
     case 0:
@@ -311,7 +321,7 @@ std::vector<int> Transformer::get_output_max_shape(int index) {
     case 1:
       return {_max_batch_size, tw_._beam_size};
       break;
-      
+
     default:
       throw std::runtime_error("invalid output index");
       break;
@@ -338,8 +348,6 @@ DataType Transformer::get_output_dtype(int index) {
 
     case 1:
       return DataType::kFloat32;
-      break;
-
       break;
 
     default:

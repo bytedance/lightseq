@@ -93,7 +93,6 @@ void BeamSearchTopOp<T>::forward() {
   int* alive_seq_out = (int*)child(0)->value();
   float* seq_score_ptr = (float*)child(1)->value();
 
-  // float* seq_score_ptr = (float*)seq_score->value();
   float* seq_probs_ptr = (float*)seq_prob->value();
   int* can_idx_ptr = (int*)can_idx->value();
   float* can_score_ptr = (float*)can_score->value();

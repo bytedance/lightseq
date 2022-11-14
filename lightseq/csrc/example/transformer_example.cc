@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
   std::vector<int> example_input{};
 
-  int max_batch_size = 1;
+  int max_batch_size = 4;
   int batch_seq_len = 32;
   int rand_seed = 772002;
 
