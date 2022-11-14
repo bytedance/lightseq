@@ -31,7 +31,6 @@ class Concat3Dim1 : public Operator {
 
   void before_forward(int batchs, int seq_len, int steps,
                       bool is_skip = false) {
-
     _batchs = batchs, _seq_len = seq_len, _steps = steps, _is_skip = is_skip;
   }
 

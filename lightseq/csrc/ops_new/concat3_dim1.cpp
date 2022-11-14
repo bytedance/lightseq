@@ -3,8 +3,7 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp,
-                                                Variable* cache) {
+Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
 #ifdef MODEL_INFER
   Variable* new_cache = new Variable("Concat3Dim1_new", cache);
 #else
@@ -26,7 +25,7 @@ void Concat3Dim1<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-  
+
   if (_is_skip) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
@@ -36,7 +35,8 @@ void Concat3Dim1<T1, T2>::forward() {
   }
 
 #ifdef MODEL_INFER
-  launch_filling_concat3_dim1(cache_ptr, inp_ptr, _batchs * _heads, _max_steps, _hidden_size / _heads, _steps, 1, _stream);
+  launch_filling_concat3_dim1(cache_ptr, inp_ptr, _batchs * _heads, _max_steps,
+                              _hidden_size / _heads, _steps, 1, _stream);
 #else
   launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _batchs * _heads,
                       _hidden_size / _heads, _steps, 1, _stream);

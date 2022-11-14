@@ -61,7 +61,8 @@ class Variable : public Node {
   bool _is_descendants = false;
   Variable* _parent_variable = nullptr;
   std::unordered_set<Variable*> _children_variable;
-protected:
+
+ protected:
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
 

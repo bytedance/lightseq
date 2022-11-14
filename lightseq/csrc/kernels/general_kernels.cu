@@ -261,11 +261,11 @@ void launch_filling_concat3_dim1<float>(float *output, const float *inp,
       output, inp, sz0, mx_sz1, sz2, sz1_0, sz1_1);
 }
 
-
 template <>
 void launch_filling_concat3_dim1<__half>(__half *output, const __half *inp,
-                                        int sz0, int mx_sz1, int sz2, int sz1_0,
-                                        int sz1_1, cudaStream_t stream) {
+                                         int sz0, int mx_sz1, int sz2,
+                                         int sz1_0, int sz1_1,
+                                         cudaStream_t stream) {
   sz2 >>= 3;
   int nele = sz0 * sz2 * sz1_1;
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;

@@ -87,7 +87,6 @@ void BeamSearchTopOp<T>::forward() {
   Variable* caches_v_buf = parent(6);
   T* caches_v_buf_ptr = (T*)caches_v_buf->value();
 
-
   int* alive_seq_out = (int*)child(0)->value();
   float* seq_score_ptr = (float*)child(1)->value();
 
@@ -100,7 +99,6 @@ void BeamSearchTopOp<T>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-
 
   if (_cur_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(
@@ -189,20 +187,18 @@ void BeamSearchTopOp<T>::forward() {
     return;
   }
 
-
   /* ---step 4. refresh cache: k, v for decoder self attention--- */
   if (_cur_step > 0) {
     ker_refresh_cache_launcher<T>(
         _nshared_dec_layer * (_cur_step + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
-        (T*)caches_k->value(), (T*)caches_v->value(),
-        (T*)caches_k_buf->value(), (T*)caches_v_buf->value(), _cache_size, _beam_size,
-        _dim_per_head, _head_num, _trg_vocab_size, _cur_step, _max_step,
-        _diverse_lambda != 0, _end_id);
+        (T*)caches_k->value(), (T*)caches_v->value(), (T*)caches_k_buf->value(),
+        (T*)caches_v_buf->value(), _cache_size, _beam_size, _dim_per_head,
+        _head_num, _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0,
+        _end_id);
     Variable::swap_tensor(caches_k, caches_k_buf);
     Variable::swap_tensor(caches_v, caches_v_buf);
   }
-
 }
 
 template class BeamSearchTopOp<float>;
