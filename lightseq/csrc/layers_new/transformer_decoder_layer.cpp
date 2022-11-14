@@ -16,7 +16,7 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       _hidden_size(hidden_size) {
   if (_layer_id == 0) {
     _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(
-        nshared_layer, layer_id, max_batch_tokens, hidden_size, num_heads));
+        nshared_layer, max_batch_tokens, hidden_size, num_heads));
   }
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
@@ -32,17 +32,11 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, activation_fn));
 
-  if (_encdec_kv_buffer == nullptr) {
-    _encdec_kv_buffer =
-        cuda_malloc<T1>(max_batch_tokens * 2 * hidden_size * nshared_layer);
-    if (_context_ptr->is_training()) {
-      _grad_encdec_kv_buffer =
-          cuda_malloc<T2>(max_batch_tokens * 2 * hidden_size * nshared_layer);
-    }
-  }
-
   this->_context_ptr->exit_layer();  // necessary
 }
+
+template <typename T1, typename T2>
+TransformerDecoderLayer<T1, T2>::~TransformerDecoderLayer() {}
 
 template <typename T1, typename T2>
 std::tuple<Variable*, Variable*, Variable*>
@@ -50,29 +44,20 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
                                             Variable* enc_mask,
                                             Variable* cache_self_k,
                                             Variable* cache_self_v) {
-  LAYER_PRE_INPUTS({inp, enc_out, enc_mask, cache_self_k, cache_self_v});
-
-  Variable* enc_k;
-  Variable* enc_v;
+  set_inputs({inp, enc_out, enc_mask, cache_self_k, cache_self_v});
 
   if (_layer_id == 0) {
-    std::tuple<Variable*, Variable*> enc_kv = (*_enc_kv_layer)(enc_out);
-    enc_k = std::get<0>(enc_kv);
-    enc_v = std::get<1>(enc_kv);
-  } else {
-    enc_k = new Variable("enc_k");
-    enc_v = new Variable("enc_v");
+    total_enc_kv = (*_enc_kv_layer)(enc_out);
+    total_enc_kv->malloc_memory(_nshared_layer * _max_batch_tokens *
+                                _hidden_size * 2 * sizeof(T1));
+    _context_ptr->register_object("total_enc_kv", total_enc_kv);
+  }
+  else {
+    total_enc_kv = static_cast<Variable*>(_context_ptr->get_object("total_enc_kv"));
   }
 
-  enc_k->set_value((char*)_encdec_kv_buffer);
-  _encdec_kv_buffer += _nshared_layer * _hidden_size * _max_batch_tokens;
-  enc_v->set_value((char*)_encdec_kv_buffer);
-
-  if (_context_ptr->is_training()) {
-    enc_k->set_grad((char*)_grad_encdec_kv_buffer);
-    _grad_encdec_kv_buffer += _nshared_layer * _hidden_size * _max_batch_tokens;
-    enc_v->set_grad((char*)_grad_encdec_kv_buffer);
-  }
+  enc_k = new Variable("enc_k", total_enc_kv);
+  enc_v = new Variable("enc_v", total_enc_kv);
 
   std::tuple<Variable*, Variable*, Variable*> self_attn_layer_product =
       (*_self_attn_layer)(inp, cache_self_k, cache_self_v);
@@ -80,17 +65,18 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
   Variable* new_self_k = std::get<1>(self_attn_layer_product);
   Variable* new_self_v = std::get<2>(self_attn_layer_product);
 
-  Variable* enc_attn_out = (*_enc_attn_layer)(self_attn_out, enc_k, enc_v);
+  Variable* enc_attn_out =
+      (*_enc_attn_layer)(self_attn_out, enc_mask, enc_k, enc_v);
 
   Variable* ffn_out = (*_ffn_layer)(enc_attn_out);
 
-  LAYER_POST_OUTPUTS({ffn_out, new_self_k, new_self_v});
+  set_outputs({ffn_out, new_self_k, new_self_v});
 
   return std::make_tuple(ffn_out, new_self_k, new_self_v);
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayer<T1, T2>::forward() {
+void TransformerDecoderLayer<T1, T2>::forward_process() {
   if (_layer_id == 0 && _step <= 0) {
     _enc_kv_layer->forward();
   } else if (_layer_id == 0 && _step > 0) {
@@ -107,12 +93,22 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
                                                      int src_seq_len,
                                                      int step) {
   _step = step;
+  _batch_tokens = batch_size * trg_seq_len;
+
+  enc_k->set_offset(
+      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T1),
+      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T2));
+
+  enc_v->set_offset((2 * _layer_id + 1) * _hidden_size * batch_size *
+                        src_seq_len * sizeof(T1),
+                    (2 * _layer_id + 1) * _hidden_size * batch_size *
+                        src_seq_len * sizeof(T2));
 
   if (_layer_id == 0 && step <= 0) {
     _enc_kv_layer->before_forward(batch_size, src_seq_len);
   }
 
-  _self_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
+  _self_attn_layer->before_forward(batch_size, trg_seq_len, step);
 
   _enc_attn_layer->before_forward(batch_size, trg_seq_len, src_seq_len);
 
@@ -120,7 +116,7 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayer<T1, T2>::backward() {
+void TransformerDecoderLayer<T1, T2>::backward_process() {
   _ffn_layer->backward();
   _enc_attn_layer->backward();
   _self_attn_layer->backward();
@@ -142,19 +138,34 @@ int TransformerDecoderLayer<T1, T2>::load_para_and_grad(
   offset +=
       _ffn_layer->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
 
+  offset += 24;  // for quant decoder
+
+  if (_layer_id == 0) {
+    offset +=
+        _enc_kv_layer->load_para_and_grad(para_ptr + offset, grad_ptr + offset);
+  }
+
   return offset;
 }
 
 template <typename T1, typename T2>
 int TransformerDecoderLayer<T1, T2>::load_params(
-    const std::vector<const T1*>& para_vec, int offset) {  // for inference
+    const std::vector<const T1*>& para_vec, int offset,
+    bool is_total_kv) {  // for inference
   int size = 0;
 
-  // size += _attn_layer->load_params(para_vec, offset + size);
-
-  // size += _ffn_layer->load_params(para_vec, offset + size);
+  if (is_total_kv) {
+    size += _enc_kv_layer->load_params(para_vec, offset + size);
+  } else {
+    size += _self_attn_layer->load_params(para_vec, offset + size);
+    size += _enc_attn_layer->load_params(para_vec, offset + size);
+    size += _ffn_layer->load_params(para_vec, offset + size);
+  }
 
   return size;
 }
+
+template <typename T1, typename T2>
+Variable* TransformerDecoderLayer<T1, T2>::total_enc_kv = nullptr;
 
 }  // namespace lightseq

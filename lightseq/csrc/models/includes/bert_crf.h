@@ -32,12 +32,9 @@ class BertCrf : public LSModel {
   ContextPtr context_ptr;
 
   Variable* inp_tokens;  // need to allocate
-  Variable* pad_mask;    // need to allocate
   Variable* bert_out;
 
   int _max_batch_size;
-
-  OpType_* pad_mask_ptr;
 
  public:
   BertCrf(const std::string weight_path, const int max_batch_size);

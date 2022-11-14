@@ -9,16 +9,26 @@ include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
-protobuf_generate_cpp(BERT_CRF_PROTO_SRC BERT_CRF_PROTO_HEADER bert_crf.proto)
-
 add_library(bert_weight STATIC bert_weight.cc ${BERT_PROTO_SRC}
                                ${BERT_PROTO_HEADER})
 target_link_libraries(bert_weight PUBLIC utils ${Protobuf_LIBRARIES})
 target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
+protobuf_generate_cpp(BERT_CRF_PROTO_SRC BERT_CRF_PROTO_HEADER bert_crf.proto)
 add_library(bert_crf_weight STATIC bert_crf_weight.cc ${BERT_CRF_PROTO_SRC}
                                    ${BERT_CRF_PROTO_HEADER})
 target_link_libraries(bert_crf_weight PUBLIC utils ${Protobuf_LIBRARIES})
 target_include_directories(bert_crf_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(bert_crf_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
+                      transformer.proto)
+add_library(
+  transformer_weight STATIC transformer_weight.cc ${TRANSFORMER_PROTO_SRC}
+                            ${TRANSFORMER_PROTO_HEADER})
+target_link_libraries(transformer_weight PUBLIC utils ${Protobuf_LIBRARIES})
+target_include_directories(transformer_weight
+                           PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(transformer_weight
+                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR})

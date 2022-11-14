@@ -18,19 +18,25 @@ class Layer {
   std::vector<Variable*> _inp_var_vec = {};
   std::vector<Variable*> _out_var_vec = {};
 
+  bool _defined_forward_process = true;
+  bool _defined_backward_process = true;
+
  public:
   Layer(std::string name);
   virtual ~Layer();
   std::string name() { return _name; }
 
-  virtual void forward();
-  virtual void backward();
+  virtual void forward() final;
+  virtual void backward() final;
 
-  void set_inputs(std::vector<Variable*> inps) { _inp_var_vec = inps; }
-  void set_outputs(std::vector<Variable*> outs) { _out_var_vec = outs; }
+  virtual void forward_process() {}
+  virtual void backward_process() {}
 
-  Variable* input(int idx) { return _inp_var_vec[idx]; }
-  Variable* output(int idx) { return _out_var_vec[idx]; }
+  void set_inputs(std::vector<Variable*> inps);
+  void set_outputs(std::vector<Variable*> outs);
+
+  Variable* input(int idx);
+  Variable* output(int idx);
 
   void clear_fw_flag();
 
@@ -47,13 +53,5 @@ class Layer {
   bool macro_inputs_check = false;
   bool macro_outputs_check = false;
 };
-
-#define LAYER_PRE_INPUTS(...)                                        \
-  set_inputs({__VA_ARGS__}), _context_ptr->enter_layer(this, false), \
-      macro_inputs_check = true
-
-#define LAYER_POST_OUTPUTS(...)                           \
-  set_outputs({__VA_ARGS__}), _context_ptr->exit_layer(), \
-      macro_outputs_check = true
 
 }  // namespace lightseq

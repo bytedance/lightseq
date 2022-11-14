@@ -1,4 +1,5 @@
 find_package(CUDAToolkit)
+cmake_minimum_required(VERSION 3.18)
 
 set(cuda_kernel_files
     cross_entropy.cu
@@ -14,7 +15,8 @@ set(cuda_kernel_files
     softmax_kernels_new.cu
     transform_kernels.cu
     transform_kernels_new.cu
-    crf.cu)
+    crf.cu
+    transformerKernels.cc.cu)
 
 add_library(cuda_kernels STATIC ${cuda_kernel_files})
 target_include_directories(cuda_kernels INTERFACE includes)

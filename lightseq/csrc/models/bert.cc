@@ -21,8 +21,6 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
 
   /* --- step.3 initial input Variable node --- */
   inp_tokens = new Variable("inp_tokens");
-  pad_mask_ptr = cuda_malloc<OpType_>(_max_batch_size * tw_._max_step);
-  pad_mask = new Variable("pad_mask", (char *)pad_mask_ptr);
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -55,14 +53,17 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   /* --- step.5 construct network --- */
-  Variable *enc_emb = (*launch_enc_emb_layer)(inp_tokens, pad_mask);
+  std::tuple<Variable *, Variable *> enc_emb_outs =
+      (*launch_enc_emb_layer)(inp_tokens);
+  Variable *enc_emb = std::get<0>(enc_emb_outs);
+  Variable *pad_mask = std::get<1>(enc_emb_outs);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
   bert_out = (*lyr_norm_layer)(enc_emb);
 }
 
-Bert::~Bert() { cuda_free(pad_mask_ptr); }
+Bert::~Bert() {}
 
 void Bert::before_forward(int batch_size, int seq_len) {
   launch_enc_emb_layer->before_forward(batch_size, seq_len);

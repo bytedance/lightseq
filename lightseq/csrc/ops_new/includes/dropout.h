@@ -12,6 +12,7 @@ class DropoutOp : public Operator {
   float ratio;
   size_t _max_ele_num;
   int _count;
+  bool _is_skip;
 
   TensorPtr _mask;
 
@@ -27,7 +28,14 @@ class DropoutOp : public Operator {
 
   Variable* operator()(Variable* inp);
 
-  void before_forward(int count) { _count = count; }
+  void before_forward(int count, bool is_skip = false) {
+    if (is_skip) {
+      child(0)->set_ancestor(parent(0));
+    } else {
+      child(0)->remove_ancestor();
+    }
+    _count = count, _is_skip = is_skip;
+  }
 
   void forward() override;
 

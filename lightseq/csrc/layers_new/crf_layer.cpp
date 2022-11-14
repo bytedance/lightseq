@@ -21,10 +21,10 @@ CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
 
 template <typename T>
 Variable* CRFLayer<T>::operator()(Variable* emission, Variable* mask) {
-  LAYER_PRE_INPUTS({emission, mask});
+  set_inputs({emission, mask});
   Variable* crf_out = (*_crf_op)(_start_transition, _end_transition,
                                  _transition, emission, mask, _linear_b);
-  LAYER_POST_OUTPUTS({crf_out});
+  set_outputs({crf_out});
   return crf_out;
 }
 

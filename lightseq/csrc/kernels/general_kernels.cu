@@ -230,3 +230,45 @@ void launch_concat3_dim1<__half>(const __half *inp1, const __half *inp2,
   kernel_concat3_dim1<<<nblock, MAX_THREADS, 0, stream>>>(
       inp1, inp2, output, sz0, sz2, sz1_1, sz1_2);
 }
+
+template <typename T>
+__global__ void kernel_filling_concat3_dim1(T *output, const T *inp, int sz0,
+                                            int mx_sz1, int sz2, int sz1_0,
+                                            int sz1_1) {
+  int nele = sz0 * sz2 * sz1_1;
+  int idx = flat_2dim(blockIdx.x, threadIdx.x, blockDim.x);
+  if (idx >= nele) {
+    return;
+  }
+  int idx2 = idx % sz2;
+  int tmp_idx = idx / sz2;
+  int idx1 = tmp_idx % sz1_1;
+  int idx0 = tmp_idx / sz1_1;
+  int dst_offset = idx2 + (sz1_0 + idx1) * sz2 + idx0 * mx_sz1 * sz2;
+  float4 *dst_ptr = (float4 *)output + dst_offset;
+  float4 *src_ptr = (float4 *)inp + idx;
+  dst_ptr[0] = src_ptr[0];
+}
+
+template <>
+void launch_filling_concat3_dim1<float>(float *output, const float *inp,
+                                        int sz0, int mx_sz1, int sz2, int sz1_0,
+                                        int sz1_1, cudaStream_t stream) {
+  sz2 >>= 2;
+  int nele = sz0 * sz2 * sz1_1;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_filling_concat3_dim1<<<nblock, MAX_THREADS, 0, stream>>>(
+      output, inp, sz0, mx_sz1, sz2, sz1_0, sz1_1);
+}
+
+template <>
+void launch_filling_concat3_dim1<__half>(__half *output, const __half *inp,
+                                         int sz0, int mx_sz1, int sz2,
+                                         int sz1_0, int sz1_1,
+                                         cudaStream_t stream) {
+  sz2 >>= 3;
+  int nele = sz0 * sz2 * sz1_1;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_filling_concat3_dim1<<<nblock, MAX_THREADS, 0, stream>>>(
+      output, inp, sz0, mx_sz1, sz2, sz1_0, sz1_1);
+}
