@@ -50,10 +50,12 @@ class Transformer : public LSModel {
   Variable* seq_score;
   std::vector<std::pair<Variable*, Variable*>> cache_k_pairs;
   std::vector<std::pair<Variable*, Variable*>> cache_v_pairs;
+  Variable* transformer_out;
 
   int cache_size;
   int _max_batch_size;
   int _output_topk;
+  bool _is_sampling;
 
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
                                                   "topk_greedy"};
