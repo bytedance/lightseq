@@ -15,6 +15,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
       _max_batch_size(max_batch_size),
       _max_step(max_step),
       _trg_vocab_size(trg_vocab_size),
+      _hidden_size(hidden_size),
       _max_thread_per_block(max_thread_per_block),
       _beam_size(beam_size),
       _diverse_lambda(diverse_lambda),
@@ -55,17 +56,17 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
 template <typename T>
 std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
     Variable* logits, Variable* logit_bias, Variable* alive_seq,
-    Variable* caches_k, Variable* caches_k_buf,
-    Variable* caches_v, Variable* caches_v_buf) {
-  set_parents({logits, logit_bias, alive_seq, caches_k, caches_k_buf,
-               caches_v, caches_v_buf});
+    Variable* caches_k, Variable* caches_k_buf, Variable* caches_v,
+    Variable* caches_v_buf) {
+  set_parents({logits, logit_bias, alive_seq, caches_k, caches_k_buf, caches_v,
+               caches_v_buf});
 
   Variable* alive_seq_out = new Variable(
       "alive_seq_out", _max_batch_size * _beam_size * _max_step * sizeof(int));
 
-  seq_score =
-      new Variable("seq_score",
-                   _max_batch_size * _beam_size * _max_step * sizeof(float), 0, LSMemoryType::FixedMemory);
+  seq_score = new Variable(
+      "seq_score", _max_batch_size * _beam_size * _max_step * sizeof(float), 0,
+      LSMemoryType::FixedMemory);
 
   set_children({alive_seq_out, seq_score});
   return std::make_tuple(alive_seq_out, seq_score);
@@ -73,8 +74,6 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
 
 template <typename T>
 void BeamSearchTopOp<T>::forward() {
-
-  printf("Running BeamSearchTopOp, Step.0!\n");
   cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)parent(0)->value();
   T* logits_bias_ptr = (T*)parent(1)->value();
@@ -102,14 +101,11 @@ void BeamSearchTopOp<T>::forward() {
     return;
   }
 
-  printf("Running BeamSearchTopOp, Step.1!\n");
 
   if (_cur_step == 0) {
-    printf("address: %p %p\n", seq_probs_ptr, _host_alive_seq_probs.data());
-    printf("memcpy size: %zu, %d %d\n", sizeof(float) * _batch_size * _beam_size, _batch_size, _beam_size);
-    CHECK_GPU_ERROR(cudaMemcpyAsync((void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
-                                    sizeof(float) * _batch_size * _beam_size,
-                                    cudaMemcpyDefault, stream));
+    CHECK_GPU_ERROR(cudaMemcpyAsync(
+        (void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
+        sizeof(float) * _batch_size * _beam_size, cudaMemcpyDefault, stream));
   }
 
   /*
@@ -120,24 +116,15 @@ void BeamSearchTopOp<T>::forward() {
 
   cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream);
 
-  printf("Running BeamSearchTopOp, Step.1.1!\n");
-
   select_beam_rough_topk_launcher(
       logits_ptr, logits_bias_ptr, seq_probs_ptr, seq_score_ptr, alive_seq_ptr,
       can_idx_ptr, can_score_ptr, num_beam_can_ptr, _trg_vocab_size, _max_step,
       _host_length_norm[_cur_step], _cur_step, _step_token_num,
       _max_thread_per_block, stream, _beam_size, _diverse_lambda, _end_id);
 
-
-  printf("Running BeamSearchTopOp, Step.2!\n");
-
   thrust::exclusive_scan(thrust::cuda::par.on(stream), num_beam_can_ptr + 1,
                          num_beam_can_ptr + 1 + _step_token_num,
                          num_beam_can_ptr + 1);
-
-
-
-  printf("Running BeamSearchTopOp, Step.3!\n");
 
   /* ---step 2. sort the candidate with their probability--- */
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_host_can_num_batch, num_beam_can_ptr,
@@ -161,16 +148,10 @@ void BeamSearchTopOp<T>::forward() {
                                      _diverse_lambda, _trg_vocab_size);
   }
 
-
-  printf("Running BeamSearchTopOp, Step.4!\n");
-
   thrust::sort_by_key(thrust::cuda::par.on(stream), can_score_ptr,
                       can_score_ptr + _host_can_num_batch, can_idx_ptr,
                       thrust::greater<float>());
 
-
-
-  printf("Running BeamSearchTopOp, Step.5!\n");
   /*
     step 3. refresh alive_seq, seq_probs, seq_score, num_finish_beam
       based on sorted candidate.
@@ -183,8 +164,6 @@ void BeamSearchTopOp<T>::forward() {
       _trg_vocab_size, _cur_step, _host_length_norm[_cur_step], _diverse_lambda,
       _end_id);
 
-
-  printf("Running BeamSearchTopOp, Step.6!\n");
   // swap alive_seq
   // Variable::swap_tensor(parent(4), child(3));
   // don't swap alive_seq with alive_seq_buf in this function
@@ -193,47 +172,37 @@ void BeamSearchTopOp<T>::forward() {
                                   sizeof(int), cudaMemcpyDefault, stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
 
-
-  printf("Running BeamSearchTopOp, Step.7!\n");
-
-  #ifdef DEBUG_MODE
-    for (int ii = 0; ii < _batch_size; ii++) {
-      printf("++++++ _batch_size: %d ++++++\n", ii);
-      for (int jj = 0; jj < _beam_size; jj++) {
+#ifdef DEBUG_MODE
+  for (int ii = 0; ii < _batch_size; ii++) {
+    printf("++++++ _batch_size: %d ++++++\n", ii);
+    for (int jj = 0; jj < _beam_size; jj++) {
       printf("++++++ _beam_size: %d ++++++\n", jj);
-        print_vec(alive_seq_out + (ii * _beam_size + jj) * _max_step,
-                  "Batch token ids", _cur_step + 2);
-        print_vec(seq_probs_ptr + ii * _beam_size + jj,
-                  "Batch probs", 1);
-        print_vec(seq_score_ptr + ii * _beam_size + jj,
-                  "Batch scores", 1);
-      }
+      print_vec(alive_seq_out + (ii * _beam_size + jj) * _max_step,
+                "Batch token ids", _cur_step + 2);
+      print_vec(seq_probs_ptr + ii * _beam_size + jj, "Batch probs", 1);
+      print_vec(seq_score_ptr + ii * _beam_size + jj, "Batch scores", 1);
     }
-  #endif
+  }
+#endif
 
-
-  printf("Running BeamSearchTopOp, Step.8!\n");
   if (_host_can_num_batch == _step_token_num) {
     return;
   }
 
-
-  printf("Running BeamSearchTopOp, Step.9!\n");
 
   /* ---step 4. refresh cache: k, v for decoder self attention--- */
   if (_cur_step > 0) {
     ker_refresh_cache_launcher<T>(
         _nshared_dec_layer * (_cur_step + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
-        (T*)caches_k->value(), (T*)caches_v->value(), (T*)caches_k_buf->value(),
-        (T*)caches_v_buf->value(), _cache_size, _beam_size, _dim_per_head,
-        _head_num, _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0,
-        _end_id);
+        (T*)caches_k->value(), (T*)caches_v->value(),
+        (T*)caches_k_buf->value(), (T*)caches_v_buf->value(), _cache_size, _beam_size,
+        _dim_per_head, _head_num, _trg_vocab_size, _cur_step, _max_step,
+        _diverse_lambda != 0, _end_id);
     Variable::swap_tensor(caches_k, caches_k_buf);
     Variable::swap_tensor(caches_v, caches_v_buf);
   }
 
-  printf("Running BeamSearchTopOp, Step.10!\n");
 }
 
 template class BeamSearchTopOp<float>;

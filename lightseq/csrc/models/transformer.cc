@@ -111,9 +111,9 @@ Transformer::Transformer(const std::string weight_path,
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
   sample_layer.reset(new SampleLayer<OpType_>(
-    tw_._n_dec_layer, max_batch_size, tw_._max_step, tw_._trg_vocab_size,
-    tw_._hidden_size, 1024, tw_._beam_size, tw_._diverse_lambda, tw_._dim_per_head,
-    tw_._end_id, tw_._head_num, tw_._length_penalty));
+      tw_._n_dec_layer, max_batch_size, tw_._max_step, tw_._trg_vocab_size,
+      tw_._hidden_size, 1024, tw_._beam_size, tw_._diverse_lambda,
+      tw_._dim_per_head, tw_._end_id, tw_._head_num, tw_._length_penalty));
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
@@ -135,13 +135,11 @@ Transformer::Transformer(const std::string weight_path,
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
         (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
-    Variable *cache_k_buf = std::get<1>(dec_outs);
-    Variable *cache_v_buf = std::get<2>(dec_outs);
+    Variable *cache_k_out = std::get<1>(dec_outs);
+    Variable *cache_v_out = std::get<2>(dec_outs);
 
     cache_k->set_ancestor(total_cache_k, cache_size * dec_layer_idx);
     cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
-    cache_k_buf->set_ancestor(total_cache_k_buf, cache_size * dec_layer_idx);
-    cache_v_buf->set_ancestor(total_cache_v_buf, cache_size * dec_layer_idx);
     dec_layer_idx++;
   }
 
@@ -149,11 +147,13 @@ Transformer::Transformer(const std::string weight_path,
 
   dec_out = (*linear_layer)(dec_out);
 
-  std::tuple<Variable*, Variable*> sample_outs = (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_k_buf, total_cache_v, total_cache_v_buf);
+  std::tuple<Variable *, Variable *> sample_outs =
+      (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_k_buf,
+                      total_cache_v, total_cache_v_buf);
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
-  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size * sizeof(int));
-
+  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
+                                sizeof(int));
 }
 
 Transformer::~Transformer() {}
@@ -195,7 +195,10 @@ void Transformer::Infer() {
   }
   enc_norm_layer->forward();
 
-  for(int step = 0; step < tw_._max_step; step ++){
+  int _batch_max_decode_length =
+      std::min(tw_._max_step, seq_len + tw_._extra_decode_length) - 1;
+
+  for (int step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);
 
     launch_dec_emb_layer->forward();
@@ -205,7 +208,7 @@ void Transformer::Infer() {
     dec_norm_layer->forward();
     linear_layer->forward();
     sample_layer->forward();
-    if(sample_layer->is_stop()) {
+    if (sample_layer->is_stop()) {
       break;
     }
 
@@ -214,7 +217,7 @@ void Transformer::Infer() {
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 
-  print_vec((int*)dec_tokens->value(), "dec_tokens", 10);
+  print_vec((int *)dec_tokens->value(), "dec_tokens", 10);
 
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }

@@ -19,6 +19,7 @@ class StridedBatchGemmOp : public Operator {
   cublasOperation_t _op_A;
   cublasOperation_t _op_B;
   std::array<int, 3> _gemm_algos;
+  int _max_seq;
 
   int _dec_layer_id;
 
@@ -40,6 +41,13 @@ class StridedBatchGemmOp : public Operator {
   void before_forward(int mm, int nn, int kk, int batch_heads) {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
+    _max_seq = -1;
+  }
+
+  void before_forward(int mm, int nn, int kk, int batch_heads, int max_seq) {
+    _m = mm, _n = nn, _k = kk;
+    _batch_heads = batch_heads;
+    _max_seq = max_seq;
   }
 
   void forward() override;

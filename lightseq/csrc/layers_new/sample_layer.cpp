@@ -20,10 +20,9 @@ SampleLayer<T>::SampleLayer(int nshared_dec_layer, int max_batch_size,
 
 template <typename T>
 std::tuple<Variable*, Variable*> SampleLayer<T>::operator()(
-    Variable* logits, Variable* alive_seq,
-    Variable* total_cache_k, Variable* total_cache_k_buf,
-    Variable* total_cache_v, Variable* total_cache_v_buf) {
-
+    Variable* logits, Variable* alive_seq, Variable* total_cache_k,
+    Variable* total_cache_k_buf, Variable* total_cache_v,
+    Variable* total_cache_v_buf) {
   set_inputs({logits, alive_seq, total_cache_k, total_cache_k_buf,
               total_cache_v, total_cache_v_buf});
 

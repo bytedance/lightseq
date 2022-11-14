@@ -19,9 +19,10 @@ class Concat3Dim1 : public Operator {
   bool _is_skip;
 
  public:
-  Concat3Dim1(int heads, int hidden_size)
+  Concat3Dim1(int heads, int hidden_size, int max_steps = 0)
       : Operator("Concat3Dim1"),
         _heads(heads),
+        _max_steps(max_steps),
         _hidden_size(hidden_size) {}
 
   virtual ~Concat3Dim1() {}
@@ -30,11 +31,7 @@ class Concat3Dim1 : public Operator {
 
   void before_forward(int batchs, int seq_len, int steps,
                       bool is_skip = false) {
-    // if (is_skip) {
-    //   child(0)->set_ancestor(parent(0));
-    // } else {
-    //   child(0)->remove_ancestor();
-    // }
+
     _batchs = batchs, _seq_len = seq_len, _steps = steps, _is_skip = is_skip;
   }
 

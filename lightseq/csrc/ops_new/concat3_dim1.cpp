@@ -5,7 +5,11 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp,
                                                 Variable* cache) {
-  Variable* new_cache = new Variable("Concat3Dim1_new_cache");
+#ifdef MODEL_INFER
+  Variable* new_cache = new Variable("Concat3Dim1_new", cache);
+#else
+  Variable* new_cache = new Variable("Concat3Dim1_new");
+#endif
   set_parents({inp, cache});
   this->set_children({new_cache});
   return new_cache;
@@ -13,7 +17,6 @@ Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp,
 
 template <typename T1, typename T2>
 void Concat3Dim1<T1, T2>::forward() {
-  printf("Running Concat3Dim1: %s\n", name().c_str());
   cudaStream_t _stream = _context_ptr->get_stream();
 
   T1* inp_ptr = (T1*)parent(0)->value();
@@ -23,9 +26,7 @@ void Concat3Dim1<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-
-  printf("is_skip: %d, parameters: %d %d %d\n", _is_skip, _batchs * _heads, _hidden_size / _heads, _steps);
-
+  
   if (_is_skip) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
@@ -34,8 +35,12 @@ void Concat3Dim1<T1, T2>::forward() {
     return;
   }
 
+#ifdef MODEL_INFER
+  launch_filling_concat3_dim1(cache_ptr, inp_ptr, _batchs * _heads, _max_steps, _hidden_size / _heads, _steps, 1, _stream);
+#else
   launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _batchs * _heads,
                       _hidden_size / _heads, _steps, 1, _stream);
+#endif
 }
 
 template <typename T1, typename T2>
@@ -48,12 +53,16 @@ void Concat3Dim1<T1, T2>::backward() {
     return;
   }
 
+#ifdef MODEL_INFER
+  printf("Model infer does not have backward() function\n");
+#else
   if (inp_grad != val_grad) {
     CHECK_GPU_ERROR(
         cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,
                         _batchs * _hidden_size * _seq_len * sizeof(T2),
                         cudaMemcpyDefault, _stream));
   }
+#endif
 }
 
 template class Concat3Dim1<float, float>;

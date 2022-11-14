@@ -23,8 +23,8 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
           new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size)),
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 3)),
-      _concat_cache_k(new Concat3Dim1<T1, T2>(num_heads, hidden_size)),
-      _concat_cache_v(new Concat3Dim1<T1, T2>(num_heads, hidden_size)),
+      _concat_cache_k(new Concat3Dim1<T1, T2>(num_heads, hidden_size, max_seq_len)),
+      _concat_cache_v(new Concat3Dim1<T1, T2>(num_heads, hidden_size, max_seq_len)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
@@ -76,17 +76,17 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   k_out = new Variable("k_out", transform_20314_out);
   v_out = new Variable("v_out", transform_20314_out);
 
-  Variable* cache_k_buf;
-  Variable* cache_v_buf;
-  cache_k_buf = (*_concat_cache_k)(k_out, cache_k);
-  cache_v_buf = (*_concat_cache_v)(v_out, cache_v);
+  Variable* cache_k_out;
+  Variable* cache_v_out;
+  cache_k_out = (*_concat_cache_k)(k_out, cache_k);
+  cache_v_out = (*_concat_cache_v)(v_out, cache_v);
 
-  Variable* attn_score = (*_attn_scores)(cache_k_buf, q_out);
+  Variable* attn_score = (*_attn_scores)(cache_k_out, q_out);
 
   Variable* soft_out = (*_softmax)(attn_score);
 
   Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-  Variable* attn_context = (*_attn_context)(cache_v_buf, prob_dropout);
+  Variable* attn_context = (*_attn_context)(cache_v_out, prob_dropout);
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
@@ -103,11 +103,11 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   if (!_pre_or_postLayerNorm) {
     Variable* attn_ln_out =
         (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-    set_outputs({attn_ln_out, cache_k_buf, cache_v_buf});
-    return std::make_tuple(attn_ln_out, cache_k_buf, cache_v_buf);
+    set_outputs({attn_ln_out, cache_k_out, cache_v_out});
+    return std::make_tuple(attn_ln_out, cache_k_out, cache_v_out);
   } else {
-    set_outputs({attn_dropout_residual, cache_k_buf, cache_v_buf});
-    return std::make_tuple(attn_dropout_residual, cache_k_buf, cache_v_buf);
+    set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
+    return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }
 }
 
@@ -135,9 +135,9 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
   _concat_cache_k->before_forward(_batch_size, from_len, _step,
-                                _context_ptr->is_training());
+                                  _context_ptr->is_training());
   _concat_cache_v->before_forward(_batch_size, from_len, _step,
-                                _context_ptr->is_training());
+                                  _context_ptr->is_training());
 
   _softmax->before_forward(_batch_size, from_len, to_len, steps == -1);
 
@@ -150,6 +150,11 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_dropout->before_forward(_trg_batch_tokens, _hidden_size);
 
+#ifdef MODEL_INFER
+  _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads, _batch_heads, _max_seq_len);
+  _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
+                                _batch_heads, _max_seq_len);
+#else
   if (_step >= 0) {
     _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
                                  _batch_heads);
@@ -161,6 +166,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
     _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
                                   _trg_seq_len, _batch_heads);
   }
+#endif 
 }
 
 template <typename T1, typename T2>

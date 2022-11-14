@@ -24,6 +24,7 @@ class BeamSearchTopOp : public Operator {
   int _host_can_num_batch;
   int _batch_size;
   int _cache_size;
+  int _hidden_size;
   int _end_id;
   int _dim_per_head;
   int _head_num;
@@ -46,9 +47,9 @@ class BeamSearchTopOp : public Operator {
 
   // output:
   std::tuple<Variable*, Variable*> operator()(
-      Variable* logits, Variable* logit_bias,
-      Variable* alive_seq, Variable* caches_k, Variable* caches_k_buf,
-      Variable* caches_v, Variable* caches_v_buf);
+      Variable* logits, Variable* logit_bias, Variable* alive_seq,
+      Variable* caches_k, Variable* caches_k_buf, Variable* caches_v,
+      Variable* caches_v_buf);
 
   void forward() override;
 

@@ -29,10 +29,21 @@ void StridedBatchGemmOp<T1, T2>::forward() {
     return;
   }
 
-  cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
-                              _buffer_b, output, _op_A, _op_B, stride_a,
-                              stride_b, stride_c, _batch_heads,
-                              cublasGemmAlgo_t(_gemm_algos[0]));
+  if(_max_seq > 0){
+    CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
+        handle, _op_A, _op_B, _m, _n, _k,
+        &_alpha, _buffer_a, CUDA_R_32F, (_op_A == CUBLAS_OP_N) ? _m : _k,
+        _max_seq * ((_op_A == CUBLAS_OP_N) ? _m : _k), _buffer_b, CUDA_R_32F, (_op_B == CUBLAS_OP_N) ? _k : _n,
+        _k * _n, &_beta, output, CUDA_R_32F, _m,
+        _m * _n, _batch_heads, CUDA_R_32F,
+        cublasGemmAlgo_t(_gemm_algos[0])));
+  }
+  else {
+    cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
+                                _buffer_b, output, _op_A, _op_B, stride_a,
+                                stride_b, stride_c, _batch_heads,
+                                cublasGemmAlgo_t(_gemm_algos[0]));
+  }
 }
 
 template <typename T1, typename T2>
