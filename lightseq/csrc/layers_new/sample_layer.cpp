@@ -21,14 +21,11 @@ SampleLayer<T>::SampleLayer(int nshared_dec_layer, int max_batch_size,
 template <typename T>
 std::tuple<Variable*, Variable*> SampleLayer<T>::operator()(
     Variable* logits, Variable* alive_seq, Variable* total_cache_k,
-    Variable* total_cache_k_buf, Variable* total_cache_v,
-    Variable* total_cache_v_buf) {
-  set_inputs({logits, alive_seq, total_cache_k, total_cache_k_buf,
-              total_cache_v, total_cache_v_buf});
+    Variable* total_cache_v) {
+  set_inputs({logits, alive_seq, total_cache_k, total_cache_v});
 
   std::tuple<Variable*, Variable*> beam_search_outs =
-      (*_beam_search)(logits, _logit_bias, alive_seq, total_cache_k,
-                      total_cache_k_buf, total_cache_v, total_cache_v_buf);
+      (*_beam_search)(logits, _logit_bias, alive_seq, total_cache_k, total_cache_v);
   Variable* alive_seq_out = std::get<0>(beam_search_outs);
   Variable* seq_score = std::get<1>(beam_search_outs);
 

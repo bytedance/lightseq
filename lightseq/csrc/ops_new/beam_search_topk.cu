@@ -42,6 +42,15 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
       new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
                    LSMemoryType::FixedMemory);
 
+  int cache_size = 
+      max_batch_size * max_step * beam_size * hidden_size * sizeof(T);
+  caches_k_buf =
+      new Variable("caches_k_buf", cache_size * nshared_dec_layer, 0,
+                   LSMemoryType::FixedMemory);
+  caches_v_buf =
+      new Variable("caches_v_buf", cache_size * nshared_dec_layer, 0,
+                   LSMemoryType::FixedMemory);
+
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;
   }
@@ -56,10 +65,8 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
 template <typename T>
 std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
     Variable* logits, Variable* logit_bias, Variable* alive_seq,
-    Variable* caches_k, Variable* caches_k_buf, Variable* caches_v,
-    Variable* caches_v_buf) {
-  set_parents({logits, logit_bias, alive_seq, caches_k, caches_k_buf, caches_v,
-               caches_v_buf});
+    Variable* caches_k, Variable* caches_v) {
+  set_parents({logits, logit_bias, alive_seq, caches_k, caches_v});
 
   Variable* alive_seq_out = new Variable(
       "alive_seq_out", _max_batch_size * _beam_size * _max_step * sizeof(int));
@@ -80,12 +87,8 @@ void BeamSearchTopOp<T>::forward() {
   int* alive_seq_ptr = (int*)parent(2)->value();
   Variable* caches_k = parent(3);
   T* caches_k_ptr = (T*)caches_k->value();
-  Variable* caches_k_buf = parent(4);
-  T* caches_k_buf_ptr = (T*)caches_k_buf->value();
-  Variable* caches_v = parent(5);
+  Variable* caches_v = parent(4);
   T* caches_v_ptr = (T*)caches_v->value();
-  Variable* caches_v_buf = parent(6);
-  T* caches_v_buf_ptr = (T*)caches_v_buf->value();
 
   int* alive_seq_out = (int*)child(0)->value();
   float* seq_score_ptr = (float*)child(1)->value();

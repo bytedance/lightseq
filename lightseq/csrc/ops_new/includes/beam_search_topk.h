@@ -36,6 +36,8 @@ class BeamSearchTopOp : public Operator {
   Variable* can_score;
   Variable* seq_prob;
   Variable* seq_score;
+  Variable* caches_k_buf;
+  Variable* caches_v_buf;
 
  public:
   BeamSearchTopOp(int nshared_dec_layer, int max_batch_size, int max_step,
@@ -48,8 +50,7 @@ class BeamSearchTopOp : public Operator {
   // output:
   std::tuple<Variable*, Variable*> operator()(
       Variable* logits, Variable* logit_bias, Variable* alive_seq,
-      Variable* caches_k, Variable* caches_k_buf, Variable* caches_v,
-      Variable* caches_v_buf);
+      Variable* caches_k, Variable* caches_v);
 
   void forward() override;
 

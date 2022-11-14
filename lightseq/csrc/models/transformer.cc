@@ -40,12 +40,6 @@ Transformer::Transformer(const std::string weight_path,
                                0, LSMemoryType::FixedMemory);
   total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
                                0, LSMemoryType::FixedMemory);
-  total_cache_k_buf =
-      new Variable("total_cache_k_buf", cache_size * tw_._n_dec_layer, 0,
-                   LSMemoryType::FixedMemory);
-  total_cache_v_buf =
-      new Variable("total_cache_v_buf", cache_size * tw_._n_dec_layer, 0,
-                   LSMemoryType::FixedMemory);
 
   /* --- step.4 inital operator & layer --- */
 
@@ -148,8 +142,7 @@ Transformer::Transformer(const std::string weight_path,
   dec_out = (*linear_layer)(dec_out);
 
   std::tuple<Variable *, Variable *> sample_outs =
-      (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_k_buf,
-                      total_cache_v, total_cache_v_buf);
+      (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
@@ -198,7 +191,8 @@ void Transformer::Infer() {
   int _batch_max_decode_length =
       std::min(tw_._max_step, seq_len + tw_._extra_decode_length) - 1;
 
-  for (int step = 0; step < _batch_max_decode_length - 1; step++) {
+  int step = 0;
+  for (step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);
 
     launch_dec_emb_layer->forward();
@@ -211,14 +205,12 @@ void Transformer::Infer() {
     if (sample_layer->is_stop()) {
       break;
     }
-
     Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
 
+
+
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-
-  print_vec((int *)dec_tokens->value(), "dec_tokens", 10);
-
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 

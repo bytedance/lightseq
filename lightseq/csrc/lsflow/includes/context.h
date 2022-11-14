@@ -20,7 +20,7 @@ const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 class Context {  // model only
  private:
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
-  std::unordered_map<std::string, std::shared_ptr<void>> resources;
+  std::unordered_map<std::string, void*> _resources_pool;
 
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
@@ -101,10 +101,16 @@ class Context {  // model only
 
   std::string status_type_str() { return StatusTypeString[_status_type]; }
 
+  void register_object(std::string object_name, void* object);
+  void* get_object(std::string object_name);
+
   static void regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr);
   static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
                                                 int layer_id);
 };
+
+#define REGISTER_OBJECT(objname) register_object_func(#objname, objname)
+#define GET_OBJECT(objname) get_object_func(#objname)
 
 }  // namespace lightseq

@@ -24,7 +24,7 @@ class SampleLayer : public Layer {
 
   std::tuple<Variable*, Variable*> operator()(
       Variable* logits, Variable* alive_seq, Variable* caches_k,
-      Variable* caches_k_buf, Variable* caches_v, Variable* caches_v_buf);
+      Variable* caches_v);
 
   void before_forward(int batch_size, int cur_step);
 

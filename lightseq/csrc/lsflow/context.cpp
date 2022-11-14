@@ -194,6 +194,24 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
   pybind_layers.emplace(full_name, layer_ptr);
 }
 
+
+void Context::register_object(std::string object_name, void* object) {
+  if(_resources_pool.find(object_name) != _resources_pool.end()) {
+    printf("Error! register same name(%s) twice!\n", object_name.c_str());
+    exit(-1);
+  }
+  _resources_pool.emplace(object_name, object);
+}
+
+void* Context::get_object(std::string object_name) { 
+  auto iter = _resources_pool.find(object_name);
+  if(iter == _resources_pool.end()) {
+    printf("Error! can't get %s\n", object_name.c_str());
+    exit(-1);
+  }
+  return iter->second; 
+}
+
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,
                                                 int layer_id) {
   std::string full_name = layer_name + std::to_string(layer_id);
