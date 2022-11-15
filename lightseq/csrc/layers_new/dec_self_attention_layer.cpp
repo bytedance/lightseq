@@ -152,24 +152,26 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_dropout->before_forward(_trg_batch_tokens, _hidden_size);
 
-#ifdef MODEL_INFER
-  _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
-                               _batch_heads, _max_seq_len);
-  _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
-                                _batch_heads, _max_seq_len);
-#else
-  if (_step >= 0) {
+  if(_context_ptr->entrance() == EntranceType::ModelEntrance){
     _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
-                                 _batch_heads);
+                                _batch_heads, _max_seq_len);
     _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
-                                  _batch_heads);
-  } else {
-    _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
-                                 _hidden_size / _heads, _batch_heads);
-    _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
-                                  _trg_seq_len, _batch_heads);
+                                  _batch_heads, _max_seq_len);
   }
-#endif
+  else {
+    if (_step >= 0) {
+      _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
+                                  _batch_heads);
+      _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
+                                    _batch_heads);
+    } else {
+      _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
+                                  _hidden_size / _heads, _batch_heads);
+      _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
+                                    _trg_seq_len, _batch_heads);
+    }
+  }
+
 }
 
 template <typename T1, typename T2>

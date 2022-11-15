@@ -38,7 +38,7 @@ class Context {  // model only
 
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
-
+  const EntranceType _entrance;
   static std::shared_ptr<Context> _global_context_ptr;
 
   bool check_validate();
@@ -47,7 +47,7 @@ class Context {  // model only
   static int global_context_id;
 
  public:
-  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
+  Context(StatusType status_type = StatusType::Inference, EntranceType entrance = EntranceType::ModelEntrance, int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
@@ -59,8 +59,10 @@ class Context {  // model only
   void convert_into_train();
   void convert_into_eval();
 
+  EntranceType entrance() { return _entrance; }
+
   static int create_global_context(
-      StatusType status_type = StatusType::Inference, int device_id = -1);
+      StatusType status_type = StatusType::Inference, EntranceType entrance = EntranceType::ModelEntrance, int device_id = -1);
   static void set_global_context(int context_id);
   static std::shared_ptr<Context> global_instance();
 

@@ -2,9 +2,10 @@
 
 namespace lightseq {
 
-Context::Context(StatusType status_type, int device_id)
+Context::Context(StatusType status_type, EntranceType entrance, int device_id)
     : _mm_ptr(new MemoryManager()),
       _device_id(device_id),
+      _entrance(entrance),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
   if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
@@ -31,10 +32,10 @@ void Context::convert_into_eval() {
     _status_type = StatusType::Evaluation;
 }
 
-int Context::create_global_context(StatusType status_type, int device_id) {
+int Context::create_global_context(StatusType status_type, EntranceType entrance, int device_id) {
   global_context_id++;
   std::shared_ptr<Context> new_context =
-      std::make_shared<Context>(status_type, device_id);
+      std::make_shared<Context>(status_type, entrance, device_id);
   _global_context_ptr = new_context;
   global_contexts_map.emplace(global_context_id, new_context);
   return global_context_id;

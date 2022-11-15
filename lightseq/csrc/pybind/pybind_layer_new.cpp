@@ -32,9 +32,9 @@ int create_global_context(bool is_training = true) {
 
   int context_id;
   if (is_training)
-    context_id = Context::create_global_context(StatusType::Training);
+    context_id = Context::create_global_context(StatusType::Training, EntranceType::LayerEntrance);
   else
-    context_id = Context::create_global_context(StatusType::Inference);
+    context_id = Context::create_global_context(StatusType::Inference, EntranceType::LayerEntrance);
 
   Context::global_instance()->set_stream(stream);
   return context_id;
@@ -287,7 +287,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   // create default context
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  lightseq::Context::create_global_context(lightseq::StatusType::Training);
+  lightseq::Context::create_global_context(lightseq::StatusType::Training, lightseq::EntranceType::LayerEntrance);
   lightseq::Context::global_instance()->set_stream(stream);
 
   m.def("create_global_context", &lightseq::create_global_context,

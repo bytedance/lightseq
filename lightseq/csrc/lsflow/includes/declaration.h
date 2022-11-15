@@ -30,6 +30,7 @@ enum class NodeType { Variable, Operator };
 enum VariableType { FixedVariable, SharedVariable, OffsetVariable };
 const std::string VariableTypeString[] = {"FixedVariable", "SharedVariable",
                                           "OffsetVariable"};
+enum EntranceType { ModelEntrance, LayerEntrance };
 
 class Node;
 
