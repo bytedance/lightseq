@@ -207,7 +207,6 @@ void Transformer::Infer() {
   }
   enc_norm_layer->forward();
 
-
   int step = 0;
   for (step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);
@@ -225,36 +224,33 @@ void Transformer::Infer() {
     Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
 
-
   if (_output_topk || _is_sampling) {
     ker_write_topk_result<<<batch_size * tw_._beam_size, step + 1, 0,
                             _context_ptr->get_stream()>>>(
-        (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._trg_vocab_size,
-        tw_._max_step, tw_._beam_size, tw_._end_id);
-  }
-  else {
+        (int *)dec_tokens->value(), (float *)seq_score->value(),
+        (int *)transformer_out->value(), tw_._trg_vocab_size, tw_._max_step,
+        tw_._beam_size, tw_._end_id);
+  } else {
     if (tw_._length_penalty >= 0.f || step == _batch_max_decode_length) {
       ker_write_trg_tokenid_pos_penalty<<<batch_size, step + 1, 0,
                                           _context_ptr->get_stream()>>>(
-          (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._max_step,
-          tw_._beam_size);
+          (int *)dec_tokens->value(), (float *)seq_score->value(),
+          (int *)transformer_out->value(), tw_._max_step, tw_._beam_size);
     } else {
       ker_write_trg_tokenid_neg_penalty<<<batch_size, step + 1, 0,
                                           _context_ptr->get_stream()>>>(
-          (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._max_step,
-          tw_._beam_size, tw_._trg_vocab_size, tw_._end_id);
+          (int *)dec_tokens->value(), (float *)seq_score->value(),
+          (int *)transformer_out->value(), tw_._max_step, tw_._beam_size,
+          tw_._trg_vocab_size, tw_._end_id);
     }
   }
   /* ---step3. output the decoding result--- */
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 
-  // print_vec((int*)transformer_out->value(), "transformer decoder tokens", 10);
-
-
-
-  set_output_shape(0, {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
-  set_output_shape(1, {batch_size,  _output_topk ? tw_._beam_size : 1});
+  set_output_shape(0,
+                   {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
+  set_output_shape(1, {batch_size, _output_topk ? tw_._beam_size : 1});
 }
 
 void Transformer::set_input_ptr(int index, void *input_ptr) {

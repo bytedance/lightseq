@@ -283,7 +283,6 @@ for i in range(NUM_LAYERS):
 def test_decoder_layer_forward():
     batch_size, enc_seq_len = kt.bs_sl()
     _, dec_seq_len = kt.bs_sl(batch_size)
-    batch_size, enc_seq_len, dec_seq_len = 11, 428, 563
     print(
         f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
         f" {dec_seq_len})"
@@ -331,8 +330,8 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_encoder_layer_forward",
-            "test_encoder_layer_backward",
+            # "test_encoder_layer_forward",
+            # "test_encoder_layer_backward",
             "test_decoder_layer_forward",
         ]
     )

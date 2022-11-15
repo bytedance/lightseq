@@ -308,6 +308,9 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
     printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
     exit(-1);
   }
+  else if(_parent_variable == parent_variable){
+    return ;
+  }
   _is_descendants = true;
   _parent_variable = parent_variable;
   _variable_type = VariableType::OffsetVariable;

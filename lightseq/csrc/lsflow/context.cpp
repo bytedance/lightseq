@@ -32,7 +32,8 @@ void Context::convert_into_eval() {
     _status_type = StatusType::Evaluation;
 }
 
-int Context::create_global_context(StatusType status_type, EntranceType entrance, int device_id) {
+int Context::create_global_context(StatusType status_type,
+                                   EntranceType entrance, int device_id) {
   global_context_id++;
   std::shared_ptr<Context> new_context =
       std::make_shared<Context>(status_type, entrance, device_id);
@@ -195,9 +196,8 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
   pybind_layers.emplace(full_name, layer_ptr);
 }
 
-
 void Context::register_object(std::string object_name, void* object) {
-  if(_resources_pool.find(object_name) != _resources_pool.end()) {
+  if (_resources_pool.find(object_name) != _resources_pool.end()) {
     printf("Error! register same name(%s) twice!\n", object_name.c_str());
     exit(-1);
   }
@@ -206,7 +206,7 @@ void Context::register_object(std::string object_name, void* object) {
 
 void* Context::get_object(std::string object_name) {
   auto iter = _resources_pool.find(object_name);
-  if(iter == _resources_pool.end()) {
+  if (iter == _resources_pool.end()) {
     printf("Error! can't get %s\n", object_name.c_str());
     exit(-1);
   }

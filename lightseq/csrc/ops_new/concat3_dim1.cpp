@@ -5,10 +5,12 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
   Variable* new_cache;
-  if(_context_ptr->entrance() == EntranceType::ModelEntrance)
-    new_cache = new Variable("Concat3Dim1_new", cache);
-  else
-    new_cache = new Variable("Concat3Dim1_new");
+  if (_context_ptr->entrance() == EntranceType::ModelEntrance){
+    new_cache = new Variable("cache_out", cache);
+  }
+  else{
+    new_cache = new Variable("cache_out");
+  }
 
   set_parents({inp, cache});
   this->set_children({new_cache});
@@ -18,6 +20,10 @@ Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
 template <typename T1, typename T2>
 void Concat3Dim1<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
+
+  if (!_context_ptr->is_built() && _is_skip) {
+    child(0)->set_ancestor(parent(0));
+  }
 
   T1* inp_ptr = (T1*)parent(0)->value();
   T1* cache_ptr = (T1*)parent(1)->value();
@@ -35,13 +41,14 @@ void Concat3Dim1<T1, T2>::forward() {
     return;
   }
 
-  if(_context_ptr->entrance() == EntranceType::ModelEntrance)
-    launch_filling_concat3_dim1(cache_ptr, inp_ptr, _batchs * _heads, _max_steps,
-                                _hidden_size / _heads, _steps, 1, _stream);
-  else 
+
+  if (_context_ptr->entrance() == EntranceType::ModelEntrance)
+    launch_filling_concat3_dim1(cache_ptr, inp_ptr, _batchs * _heads,
+                                _max_steps, _hidden_size / _heads, _steps, 1,
+                                _stream);
+  else
     launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _batchs * _heads,
                         _hidden_size / _heads, _steps, 1, _stream);
-
 }
 
 template <typename T1, typename T2>
@@ -54,9 +61,9 @@ void Concat3Dim1<T1, T2>::backward() {
     return;
   }
 
-  if(_context_ptr->entrance() == EntranceType::ModelEntrance)
+  if (_context_ptr->entrance() == EntranceType::ModelEntrance)
     printf("Model infer does not have backward() function\n");
-  else{
+  else {
     if (inp_grad != val_grad) {
       CHECK_GPU_ERROR(
           cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,

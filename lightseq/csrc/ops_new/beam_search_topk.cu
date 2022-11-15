@@ -44,12 +44,10 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
 
   int cache_size =
       max_batch_size * max_step * beam_size * hidden_size * sizeof(T);
-  caches_k_buf =
-      new Variable("caches_k_buf", cache_size * nshared_dec_layer, 0,
-                   LSMemoryType::FixedMemory);
-  caches_v_buf =
-      new Variable("caches_v_buf", cache_size * nshared_dec_layer, 0,
-                   LSMemoryType::FixedMemory);
+  caches_k_buf = new Variable("caches_k_buf", cache_size * nshared_dec_layer, 0,
+                              LSMemoryType::FixedMemory);
+  caches_v_buf = new Variable("caches_v_buf", cache_size * nshared_dec_layer, 0,
+                              LSMemoryType::FixedMemory);
 
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;

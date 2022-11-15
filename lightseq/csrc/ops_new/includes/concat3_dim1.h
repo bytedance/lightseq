@@ -9,7 +9,7 @@ namespace lightseq {
 template <typename T1, typename T2>
 class Concat3Dim1 : public Operator {
  private:
-  int _max_batchs;
+  int _max_tokens;
   int _max_steps;
   int _seq_len;
   int _heads;
@@ -19,11 +19,12 @@ class Concat3Dim1 : public Operator {
   bool _is_skip;
 
  public:
-  Concat3Dim1(int heads, int hidden_size, int max_steps = 0)
+  Concat3Dim1(int max_tokens, int heads, int hidden_size, int max_steps)
       : Operator("Concat3Dim1"),
+        _max_tokens(max_tokens),
         _heads(heads),
-        _max_steps(max_steps),
-        _hidden_size(hidden_size) {}
+        _hidden_size(hidden_size),
+        _max_steps(max_steps) {}
 
   virtual ~Concat3Dim1() {}
 
