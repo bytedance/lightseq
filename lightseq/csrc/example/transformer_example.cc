@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
       std::cout << shape[j] << " ";
     }
     std::cout << std::endl;
-    
+
   }
 
   return 0;

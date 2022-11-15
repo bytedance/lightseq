@@ -203,13 +203,13 @@ void Context::register_object(std::string object_name, void* object) {
   _resources_pool.emplace(object_name, object);
 }
 
-void* Context::get_object(std::string object_name) { 
+void* Context::get_object(std::string object_name) {
   auto iter = _resources_pool.find(object_name);
   if(iter == _resources_pool.end()) {
     printf("Error! can't get %s\n", object_name.c_str());
     exit(-1);
   }
-  return iter->second; 
+  return iter->second;
 }
 
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,

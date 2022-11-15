@@ -251,8 +251,8 @@ void Transformer::Infer() {
 
   // print_vec((int*)transformer_out->value(), "transformer decoder tokens", 10);
 
-  
-  
+
+
   set_output_shape(0, {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
   set_output_shape(1, {batch_size,  _output_topk ? tw_._beam_size : 1});
 }
