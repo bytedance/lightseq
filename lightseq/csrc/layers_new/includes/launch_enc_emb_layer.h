@@ -33,13 +33,13 @@ class LaunchEncEmbLayer : public Layer {
 
   virtual ~LaunchEncEmbLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* pad_mask) {
-    LAYER_PRE_INPUTS({inp, pad_mask});
+  std::tuple<Variable*, Variable*> operator()(Variable* inp) {
+    set_inputs({inp});
 
-    Variable* out = (*_launch_enc_op)(inp, _token_emb, _pos_emb, pad_mask,
-                                      _lang_emb, _lang_id);
+    std::tuple<Variable*, Variable*> out =
+        (*_launch_enc_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
 
-    LAYER_POST_OUTPUTS({out});
+    set_outputs({std::get<0>(out), std::get<1>(out)});
     return out;
   }
 

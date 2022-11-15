@@ -7,7 +7,7 @@ Context::Context(StatusType status_type, int device_id)
       _device_id(device_id),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
-  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -123,7 +123,7 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    rl->gather_root_leaf_var();
+    // rl->gather_root_leaf_var();
 #ifdef DEBUG_MODE
     printf("\n########## Context build layer %s forward ##########\n",
            rl->name().c_str());
@@ -146,6 +146,8 @@ void Context::build() {
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
+
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
 
 #ifdef DEBUG_MODE
   draw_all_context();
@@ -190,6 +192,24 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
   printf("regist_pybind_layer %s\n", full_name.c_str());
 #endif
   pybind_layers.emplace(full_name, layer_ptr);
+}
+
+
+void Context::register_object(std::string object_name, void* object) {
+  if(_resources_pool.find(object_name) != _resources_pool.end()) {
+    printf("Error! register same name(%s) twice!\n", object_name.c_str());
+    exit(-1);
+  }
+  _resources_pool.emplace(object_name, object);
+}
+
+void* Context::get_object(std::string object_name) { 
+  auto iter = _resources_pool.find(object_name);
+  if(iter == _resources_pool.end()) {
+    printf("Error! can't get %s\n", object_name.c_str());
+    exit(-1);
+  }
+  return iter->second; 
 }
 
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,

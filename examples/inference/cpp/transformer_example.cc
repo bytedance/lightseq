@@ -80,10 +80,6 @@ int main(int argc, char* argv[]) {
     }
     std::cout << std::endl;
 
-    if (!i)
-      lightseq::cuda::print_vec((int*)d_output, "output", batch_size);
-    else
-      lightseq::cuda::print_vec((float*)d_output, "output", batch_size);
   }
 
   // const int* res = model.get_result_ptr();

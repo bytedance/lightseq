@@ -97,12 +97,6 @@ void launch_transform4d_0213(T *output, const T *vals, int batch_size,
                              int trans_count, cudaStream_t stream);
 
 template <typename T>
-void launch_transform_20314_bwd_new(T *output, const T *q_inp, const T *k_inp,
-                                    const T *v_inp, int batch_size, int seq_len,
-                                    int hidden_dim, int nhead, int trans_count,
-                                    cudaStream_t stream);
-
-template <typename T>
 void launch_quant_transform4d_0213(int8_t *output, uint8_t *clip_mask,
                                    const T *vals, const T *clip_max,
                                    int batch_size, int seq_len, int hidden_dim,
@@ -188,6 +182,10 @@ void launch_param_update(const float *input, __half *output, int size,
 template <typename T>
 void launch_concat3_dim1(const T *inp1, const T *inp2, T *output, int sz0,
                          int sz2, int sz1_1, int sz1_2, cudaStream_t stream);
+template <typename T>
+void launch_filling_concat3_dim1(T *output, const T *inp, int sz0, int mx_sz1,
+                                 int sz2, int sz1_0, int sz1_1,
+                                 cudaStream_t stream);
 
 template <typename T>
 void launch_fused_add2(T *out, const T *inp1, const T *inp2, int batch_size,

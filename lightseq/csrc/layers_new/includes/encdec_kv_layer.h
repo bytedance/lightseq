@@ -24,12 +24,12 @@ class EncDecKvLayer : public Layer {
   int _heads;
 
  public:
-  EncDecKvLayer(int nshared_layer, int layer_id, int max_batch_tokens,
-                int hidden_size, int num_heads);
+  EncDecKvLayer(int nshared_layer, int max_batch_tokens, int hidden_size,
+                int num_heads);
 
   virtual ~EncDecKvLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* enc_out);
+  Variable* operator()(Variable* enc_out);
 
   void before_forward(int batch_size, int seq_len);
 

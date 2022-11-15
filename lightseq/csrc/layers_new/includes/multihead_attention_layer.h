@@ -47,6 +47,11 @@ class MultiheadAttentionLayer : public Layer {
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 
+  // tensor slice
+  Variable* q_out;
+  Variable* k_out;
+  Variable* v_out;
+
  public:
   MultiheadAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads,

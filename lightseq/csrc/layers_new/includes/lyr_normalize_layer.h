@@ -33,11 +33,11 @@ class LyrNormalizeLayer : public Layer {
   virtual ~LyrNormalizeLayer() {}
 
   Variable* operator()(Variable* inp) {
-    LAYER_PRE_INPUTS({inp});
+    set_inputs({inp});
 
     Variable* out = (*_lyr_norm_op)(inp, _norm_gamma, _norm_betta);
 
-    LAYER_POST_OUTPUTS({out});
+    set_outputs({out});
     return out;
   }
 

@@ -26,8 +26,9 @@ from lightseq.training.ops.pytorch.transformer_encoder_layer import (
 )
 from lightseq.training.ops.pytorch import layer_cuda_module
 
-from lightseq.training.ops.pytorch.transformer_decoder_layer_new import (
-    LSTransformerDecoderLayer,
+from lightseq.training.cli.fs_modules.ls_fs_transformer_decoder_layer import (
+    LSFSTransformerDecoderLayerNew,
+    LSFSTransformerDecoderLayer,
 )
 
 kt = TestDecorator()
@@ -104,7 +105,7 @@ for _ in range(NUM_LAYERS):
     custom_enc_layers.append(custom_enc)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=1)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -131,7 +132,7 @@ def test_encoder_layer_forward():
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=5)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_backward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -189,7 +190,7 @@ def test_encoder_layer_backward():
 
 
 def generate_dec_layer(initial_weights=None, initial_biases=None):
-    config = LSTransformerDecoderLayer.get_config(
+    config = LSFSTransformerDecoderLayerNew.get_config(
         max_batch_tokens=max_batch_tokens,
         max_seq_len=max_seq_len,
         hidden_size=1024,
@@ -204,15 +205,38 @@ def generate_dec_layer(initial_weights=None, initial_biases=None):
         nlayer=NUM_LAYERS,
         activation_fn="relu",
     )
-    layer = LSTransformerDecoderLayer(
+    layer = LSFSTransformerDecoderLayerNew(
         config,
         initial_weights,
         initial_biases,
     )
     layer.to(torch.device("cuda:0"), dtype=torch.half)
-    return layer
+
+    base_config = LSFSTransformerDecoderLayer.get_config(
+        max_batch_tokens=max_batch_tokens,
+        max_seq_len=max_seq_len,
+        hidden_size=1024,
+        intermediate_size=4096,
+        nhead=16,
+        attn_prob_dropout_ratio=0.0,
+        activation_dropout_ratio=0.0,
+        hidden_dropout_ratio=0.0,
+        pre_layer_norm=True,
+        fp16=True,
+        local_rank=0,
+        nlayer=NUM_LAYERS,
+        activation_fn="relu",
+    )
+    base_layer = LSFSTransformerDecoderLayer(
+        base_config,
+        initial_weights,
+        initial_biases,
+    )
+    base_layer.to(torch.device("cuda:0"), dtype=torch.half)
+    return layer, base_layer
 
 
+base_dec_layer_list = []
 custom_dec_layer_list = []
 fairseq_dec_layer_list = []
 _initial_dec_weights_list = []
@@ -246,11 +270,60 @@ for i in range(NUM_LAYERS):
     _initial_dec_biases_list[i].pop(6)
     if i == 0:
         _initial_dec_biases_list[i].append(_initial_encdec_attn_kvb)
-    custom_dec_layer = generate_dec_layer(
+    custom_dec_layer, base_dec_layer = generate_dec_layer(
         _initial_dec_weights_list[i], _initial_dec_biases_list[i]
     )
     custom_dec_layer.train()
+    base_dec_layer.train()
     custom_dec_layer_list.append(custom_dec_layer)
+    base_dec_layer_list.append(base_dec_layer)
+
+
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
+def test_decoder_layer_forward():
+    batch_size, enc_seq_len = kt.bs_sl()
+    _, dec_seq_len = kt.bs_sl(batch_size)
+    batch_size, enc_seq_len, dec_seq_len = 11, 428, 563
+    print(
+        f"(batch_size, enc_seq_len, dec_seq_len): ({batch_size}, {enc_seq_len},"
+        f" {dec_seq_len})"
+    )
+
+    hidden_states = kt.rand((batch_size, dec_seq_len, 1024))
+    encoder_out = kt.rand((enc_seq_len, batch_size, 1024))
+    incremental_state = None
+    encoder_padding_mask = kt.attn_mask(batch_size, enc_seq_len, dtype=torch.bool)
+    self_attn_mask = kt.dec_self_attn_mask(dec_seq_len) * -1e8
+
+    def custom():
+        res = hidden_states.clone()
+        enc_copy = encoder_out.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = custom_dec_layer_list[i](
+                res,
+                encoder_out=enc_copy,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        return [
+            res.contiguous().detach(),
+        ]
+
+    def baseline():
+        res = hidden_states.clone()
+        enc_copy = encoder_out.clone()
+        for i in range(NUM_LAYERS):
+            res, _, _ = base_dec_layer_list[i](
+                res,
+                encoder_out=enc_copy,
+                encoder_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+            )
+        return [
+            res.contiguous().detach(),
+        ]
+
+    return custom, baseline
 
 
 if __name__ == "__main__":
@@ -260,5 +333,6 @@ if __name__ == "__main__":
         [
             "test_encoder_layer_forward",
             "test_encoder_layer_backward",
+            "test_decoder_layer_forward",
         ]
     )

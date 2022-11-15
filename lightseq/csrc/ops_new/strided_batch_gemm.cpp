@@ -8,7 +8,7 @@ Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
   Variable* result =
       new Variable("StridedBatchGemmOp_out", _max_ele_num * sizeof(T1),
                    _max_ele_num * sizeof(T2));
-  this->set_parents({inpA, inpB});
+  set_parents({inpA, inpB});
   this->set_children({result});
   return result;
 }
@@ -22,17 +22,27 @@ void StridedBatchGemmOp<T1, T2>::forward() {
   int stride_c = _m * _n;
 
   T1* _buffer_a = (T1*)parent(0)->value();
-  if (_dec_layer_id >= 0) {
-    _buffer_a += _dec_layer_id * _m * _k;
-  }
-
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
 
-  cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
-                              _buffer_b, output, _op_A, _op_B, stride_a,
-                              stride_b, stride_c, _batch_heads,
-                              cublasGemmAlgo_t(_gemm_algos[0]));
+  if (!_context_ptr->is_built()) {
+    return;
+  }
+
+  if (_max_seq > 0) {
+    CHECK_GPU_ERROR(cublasGemmStridedBatchedEx(
+        handle, _op_A, _op_B, _m, _n, _k, &_alpha, _buffer_a, CUDA_R_32F,
+        (_op_A == CUBLAS_OP_N) ? _m : _k,
+        _max_seq * ((_op_A == CUBLAS_OP_N) ? _m : _k), _buffer_b, CUDA_R_32F,
+        (_op_B == CUBLAS_OP_N) ? _k : _n, _k * _n, &_beta, output, CUDA_R_32F,
+        _m, _m * _n, _batch_heads, CUDA_R_32F,
+        cublasGemmAlgo_t(_gemm_algos[0])));
+  } else {
+    cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
+                                _buffer_b, output, _op_A, _op_B, stride_a,
+                                stride_b, stride_c, _batch_heads,
+                                cublasGemmAlgo_t(_gemm_algos[0]));
+  }
 }
 
 template <typename T1, typename T2>
@@ -50,20 +60,16 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   cublasOperation_t op_b = (_op_B == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
 
   T1* _buffer_a = (T1*)parent(0)->value();
-  if (_dec_layer_id >= 0) {
-    _buffer_a += _dec_layer_id * _m * _k;
-  }
-
   T1* _buffer_b = (T1*)parent(1)->value();
 
   T2* d_output = (T2*)child(0)->grad();
 
   T2* inpGradA = (T2*)parent(0)->grad();
-  if (_dec_layer_id >= 0) {
-    inpGradA += _dec_layer_id * _m * _k;
-  }
-
   T2* inpGradB = (T2*)parent(1)->grad();
+
+  if (!_context_ptr->is_built()) {
+    return;
+  }
 
   // Calculate d_A.
   cublas_strided_batched_gemm(handle, mb, kb, _n, &_alpha, &_beta,

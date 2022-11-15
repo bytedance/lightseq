@@ -45,7 +45,7 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
 
 template <typename T1, typename T2>
 Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
-  LAYER_PRE_INPUTS({inp});
+  set_inputs({inp});
   Variable* ff1_out = nullptr;
   Variable* ffn_ln_out = nullptr;
   if (_pre_or_postLayerNorm) {
@@ -68,10 +68,10 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
 
   if (!_pre_or_postLayerNorm) {
     Variable* ffn_ln_out = (*_ffn_ln)(ffn_dropout_residual, _ffn_nw, _ffn_nb);
-    LAYER_POST_OUTPUTS({ffn_ln_out});
+    set_outputs({ffn_ln_out});
     return ffn_ln_out;
   } else {
-    LAYER_POST_OUTPUTS({ffn_dropout_residual});
+    set_outputs({ffn_dropout_residual});
     return ffn_dropout_residual;
   }
 }

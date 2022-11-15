@@ -8,11 +8,11 @@
 namespace lightseq {
 
 const unsigned int WARP_REDUCE_MASK = 0xffffffff;
-const unsigned int WARP_SIZE = 32;
+#define WARP_SIZE 32
+#define MAX_THREADS 1024
 const float CUDA_FLOAT_INF_NEG = -100000000.f;  // FIXME later
 const float CUDA_FLOAT_INF_POS = 100000000.f;   // FIXME later
 const int CUDA_INT_INF = 2147483647;
-const int MAX_THREADS = 1024;
 
 template <typename T>
 __forceinline__ __device__ T gelu(T x) {
