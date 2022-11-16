@@ -34,9 +34,13 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
     step3. instantiate encoder and decoder, init the gpu memory buffer.
       using thrust vector to avoid manage gpu memory by hand
   */
-  CHECK_GPU_ERROR(
-      cudaMalloc(&_p_d_hard_gates, 4 * _max_batch_size * sizeof(int)));
-      
+
+  //malloc memory for hard gates
+  if (tw_._gate_type == 1) {
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_p_d_hard_gates, 4 * _max_batch_size * sizeof(int)));
+  }
+  
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
   CHECK_GPU_ERROR(cudaMalloc(
