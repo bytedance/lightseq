@@ -34,7 +34,9 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
     step3. instantiate encoder and decoder, init the gpu memory buffer.
       using thrust vector to avoid manage gpu memory by hand
   */
-
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_p_d_hard_gates, 4 * _max_batch_size * sizeof(int)));
+      
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
   CHECK_GPU_ERROR(cudaMalloc(
@@ -110,8 +112,62 @@ void Moe::Infer() {
     }
   }
 
-  encoder_->run_one_infer(batch_size, seq_len);
-  decoder_->run_one_infer(batch_size, seq_len);
+  // hard gate
+  if (tw_._gate_type == 1) {
+    std::vector<int> lang_id(_max_batch_size, (int)0);
+    CHECK_GPU_ERROR(cudaMemcpy(lang_id.data(), d_src_lang_id_,
+                               _max_batch_size * sizeof(int),
+                               cudaMemcpyDeviceToHost));
+    // [hard_gates,sizes of each gate,reorder indexs]
+    std::vector<int> h_hard_gates(_max_batch_size * 3, (int)0);
+    std::set<int> h_gate_sets;
+
+    for (int i = 0; i < batch_size; i++) {
+      auto iter = tw_.lang2gate.find(lang_id[i]);
+      int gate = -1;
+      if (iter != tw_.lang2gate.end()) {
+        gate = iter->second;
+        h_gate_sets.insert(gate);
+      }
+      h_hard_gates[i] = gate;
+    }
+
+    // double pointer
+    int cursor_p = 0, cursor_q = 0;
+    int sizes_index = _max_batch_size;
+    int reorder_index = _max_batch_size * 2;
+
+    for (auto it = h_gate_sets.begin(); it != h_gate_sets.end(); it++) {
+      // output pointer of each gate
+      // results will accumulate for each gate sequence
+      for (int i = 0; i < batch_size; i++) {
+        if (h_hard_gates[i] == *it) {
+          h_hard_gates[reorder_index] = i;
+          reorder_index++;
+          cursor_q++;
+        }
+      }
+
+      // save the size of each gate per batch
+      h_hard_gates[sizes_index] = cursor_q - cursor_p;
+      sizes_index++;
+      cursor_p = cursor_q;
+    }
+
+    encoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+    decoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+    CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_hard_gates, h_hard_gates.data(),
+                                    3 * _max_batch_size * sizeof(int),
+                                    cudaMemcpyHostToDevice, stream_));
+
+    encoder_->run_one_infer(batch_size, seq_len);
+    decoder_->run_one_infer(batch_size, seq_len);
+  } else {
+    encoder_->run_one_infer(batch_size, seq_len);
+    decoder_->run_one_infer(batch_size, seq_len);
+  }
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 

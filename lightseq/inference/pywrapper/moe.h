@@ -33,6 +33,10 @@ class Moe : public LSModel {
   cudaStream_t stream_;
   cublasHandle_t hd_;
   MoeWeight<moe_optytpe> tw_;
+  
+  // for hard gates
+  int *_p_d_hard_gates;
+  int _batch_size;
 
   int get_output_seq_len();
 
@@ -44,7 +48,6 @@ class Moe : public LSModel {
  public:
   Moe(const std::string weight_path, const int max_batch_size);
   ~Moe();
-
   void Infer() override;
   void set_input_ptr(int index, void *input_ptr) override;
   void set_output_ptr(int index, void *output_ptr) override;
