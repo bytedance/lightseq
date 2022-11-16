@@ -533,5 +533,89 @@ template void ker_bias_redirect_residual_launcher<__half>(
     int block_dim, cudaStream_t stream, const __half* input, const __half* bias,
     const float* score, const int* expert_routed, __half* output);
 
+template <typename T>
+__global__ void ker_hard_gate_reorder_pre(const T* input, T* output,
+                                          int seq_len, int hidden_size,
+                                          int* p_d_gate_indexs) {
+  int batch_index = blockIdx.x, seq_id = blockIdx.y;
+  int src_index = p_d_gate_indexs[batch_index];
+  int pos = batch_index * seq_len + seq_id;
+  int src_pos = src_index * seq_len + seq_id;
+  // if (__ldg(&score[score_pos]) > 0.) {
+  for (int i = threadIdx.x; i < hidden_size; i += blockDim.x) {
+    output[pos * hidden_size + i] = __ldg(&input[src_pos * hidden_size + i]);
+  }
+  // }
+}
+
+template <typename T>
+void ker_hard_gate_reorder_pre_launcher(const T* input, cudaStream_t stream,
+                                        int gate_size, int* p_d_gate_indexs,
+                                        T* output, int max_token_num,
+                                        int seq_len, int max_thread_per_block,
+                                        int hidden_size, int batch_token_num) {
+  // int batch_size=batch_token_num/seq_len;
+
+  ker_hard_gate_reorder_pre<T>
+      <<<dim3(gate_size, seq_len), max_thread_per_block, 0, stream>>>(
+          input, output, seq_len, hidden_size, p_d_gate_indexs);
+}
+
+template void ker_hard_gate_reorder_pre_launcher<float>(
+    const float* input, cudaStream_t stream, int gate_size,
+    int* p_d_gate_indexs, float* output, int max_token_num, int seq_len,
+    int max_thread_per_block, int hidden_size, int batch_token_num);
+template void ker_hard_gate_reorder_pre_launcher<__half>(
+    const __half* input, cudaStream_t stream, int gate_size,
+    int* p_d_gate_indexs, __half* output, int max_token_num, int seq_len,
+    int max_thread_per_block, int hidden_size, int batch_token_num);
+
+template <typename T>
+__global__ void ker_hard_gate_reorder_post(const T* input, T* output,
+                                           int* p_d_gate_reorder_indexs,
+                                           int hidden_size, int seq_len,
+                                           const T* bias,
+                                           int* _p_d_hard_gates) {
+  int batch_idx = blockIdx.x;
+  int seq_id = blockIdx.y;
+
+  int src_pos = batch_idx * seq_len + seq_id;
+  int tgt_batch_idx = p_d_gate_reorder_indexs[batch_idx];
+  int tgt_pos = tgt_batch_idx * seq_len + seq_id;
+
+  int gate_id = _p_d_hard_gates[tgt_batch_idx];
+  // printf("batch_idx %d ",batch_idx);
+  T bias_val;
+  for (int i = threadIdx.x; i < hidden_size; i += blockDim.x) {
+    bias_val = __ldg(&bias[gate_id * hidden_size + i]);
+    output[tgt_pos * hidden_size + i] +=
+        (__ldg(&input[src_pos * hidden_size + i]) + bias_val);
+    // output[tgt_pos * hidden_size + i] +=
+    // __ldg(&input[src_pos * hidden_size + i]);
+  }
+}
+
+template <typename T>
+void ker_hard_gate_reorder_post_launcher(
+    cudaStream_t stream, const T* input, T* output, int seq_len,
+    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
+    int batch_size, const T* bias, int* _p_d_hard_gates) {
+  // int batch_size=batch_token_num/seq_len;
+
+  ker_hard_gate_reorder_post<T>
+      <<<dim3(batch_size, seq_len), max_thread_per_block, 0, stream>>>(
+          input, output, p_d_gate_reorder_indexs, hidden_size, seq_len, bias,
+          _p_d_hard_gates);
+}
+
+template void ker_hard_gate_reorder_post_launcher<float>(
+    cudaStream_t stream, const float* input, float* output, int seq_len,
+    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
+    int batch_size, const float* bias, int* _p_d_hard_gates);
+template void ker_hard_gate_reorder_post_launcher<__half>(
+    cudaStream_t stream, const __half* input, __half* output, int seq_len,
+    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
+    int batch_size, const __half* bias, int* _p_d_hard_gates);
+
 }  // namespace cuda
 }  // namespace lightseq

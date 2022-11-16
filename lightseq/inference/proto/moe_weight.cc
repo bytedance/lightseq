@@ -680,6 +680,25 @@ void MoeWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
         get_hdf5_dataset_size(hdf5_file, "decoder_stack/0/ffn_first_kernel") /
         _hidden_size;
   }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/gate_type", H5T_NATIVE_INT,
+                             &_gate_type);
+  } catch (HDF5DatasetNotFoundError &e) {
+    // default value
+    _gate_type = 0;
+  }
+
+  if (_gate_type==1){
+    std::vector<int> langs2gate_langs =
+      read_hdf5_dataset_data_int(hdf5_file, "lang2gate/langs", H5T_NATIVE_INT);
+    std::vector<int> langs2gate_gates =
+      read_hdf5_dataset_data_int(hdf5_file, "lang2gate/gates", H5T_NATIVE_INT);
+  
+    for (int i = 0; i < langs2gate_langs.size(); i++) {
+      lang2gate[langs2gate_langs[i]] = langs2gate_gates[i];
+    }
+  }
 }
 
 /**
@@ -959,14 +978,17 @@ void MoeWeight<OpType_>::hdf5_parse_enc_wei(hid_t hdf5_file) {
       idx += _hidden_size;
     }
 
-    if (_is_moe_layer_encoder[layer_id]) {
-      offset_gate.push_back(idx_gate);
-      read_hdf5_dataset_data(
-          hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
-          value_gate.data() + idx_gate,
-          [=](int size) { return size != _hidden_size * _expert_num_encoder; },
-          "Wrong gate_kernel_size !");
-      idx_gate += _hidden_size * _expert_num_encoder;
+    //no gate kernel for hard gate moe
+    if (_gate_type==0){
+      if (_is_moe_layer_encoder[layer_id]) {
+        offset_gate.push_back(idx_gate);
+        read_hdf5_dataset_data(
+            hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
+            value_gate.data() + idx_gate,
+            [=](int size) { return size != _hidden_size * _expert_num_encoder; },
+            "Wrong gate_kernel_size !");
+        idx_gate += _hidden_size * _expert_num_encoder;
+      }
     }
   }
 
@@ -1186,15 +1208,19 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
       idx += _hidden_size;
     }
 
-    if (_is_moe_layer_decoder[layer_id]) {
-      offset_gate.push_back(idx_gate);
-      read_hdf5_dataset_data(
-          hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
-          value_gate.data() + idx_gate,
-          [=](int size) { return size != _hidden_size * _expert_num_decoder; },
-          "Wrong gate_kernel_size !");
-      idx_gate += _hidden_size * _expert_num_decoder;
+    //no gate kernel for hard gate moe
+    if (_gate_type==0){
+      if (_is_moe_layer_decoder[layer_id]) {
+        offset_gate.push_back(idx_gate);
+        read_hdf5_dataset_data(
+            hdf5_file, dataset_prefix + "/gate_kernel", H5T_NATIVE_FLOAT,
+            value_gate.data() + idx_gate,
+            [=](int size) { return size != _hidden_size * _expert_num_decoder; },
+            "Wrong gate_kernel_size !");
+        idx_gate += _hidden_size * _expert_num_decoder;
+      }
     }
+    
   }
 
   std::vector<_DataType> raw_value;

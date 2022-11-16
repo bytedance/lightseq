@@ -43,6 +43,8 @@ class MoeDecoder {
   void encdec_attention();
   void ffn_add_norm();
   void ffn();
+  void moe_fw_hard_gate();
+  void moe_fw_single_stride();
   void moe_fw();
   bool sample();
   bool beam_search();
@@ -75,6 +77,11 @@ class MoeDecoder {
   int* _p_d_alive_seq;
   int* _p_d_alive_seq_buf;
   int* _p_d_expert_id_routed;
+
+  int* _p_d_hard_gates;
+  int* _h_hard_gates;
+  std::set<int>* _gate_sets;
+
   _DataType* _p_d_cur_step_query;
   // cur step's projected query-key-value in self atten, one pointer for one
   // decoder layer device memory in [batch_size, beam_size, 3, hidden_size]
@@ -141,6 +148,8 @@ class MoeDecoder {
              MoeWeight<OpType_>& tw, cudaStream_t stream, cublasHandle_t hd,
              bool output_topk = false, const int* p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
+  void set_hard_gates_ptr(int* hard_gates, std::set<int>* gate_sets,
+                          int* p_d_hard_gates);
   void init_buffer(void* pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
