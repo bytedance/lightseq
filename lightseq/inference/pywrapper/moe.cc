@@ -112,59 +112,36 @@ void Moe::Infer() {
     }
   }
 
-  // hard gate
+  
   if (tw_._gate_type == 1) {
+    // hard gate
+    /*
+      1. calculate gate according to lang_id
+      2. copy [hard_gates,gate_sizes,reorder_indexs] to device
+    */
     std::vector<int> lang_id(_max_batch_size, (int)0);
-    CHECK_GPU_ERROR(cudaMemcpy(lang_id.data(), d_src_lang_id_,
-                               _max_batch_size * sizeof(int),
-                               cudaMemcpyDeviceToHost));
-    // [hard_gates,sizes of each gate,reorder indexs]
+
+    /**
+      @param: h_hard_gates
+      shape: [hard_gates,sizes of each gate,reorder indexs]
+      used for hard gate ffn calculation and reorder final ffn logits
+    */
     std::vector<int> h_hard_gates(_max_batch_size * 3, (int)0);
     std::set<int> h_gate_sets;
 
-    for (int i = 0; i < batch_size; i++) {
-      auto iter = tw_.lang2gate.find(lang_id[i]);
-      int gate = -1;
-      if (iter != tw_.lang2gate.end()) {
-        gate = iter->second;
-        h_gate_sets.insert(gate);
-      }
-      h_hard_gates[i] = gate;
-    }
+    init_hard_gates(lang_id,h_hard_gates,h_gate_sets,batch_size);
 
-    // double pointer
-    int cursor_p = 0, cursor_q = 0;
-    int sizes_index = _max_batch_size;
-    int reorder_index = _max_batch_size * 2;
-
-    for (auto it = h_gate_sets.begin(); it != h_gate_sets.end(); it++) {
-      // output pointer of each gate
-      // results will accumulate for each gate sequence
-      for (int i = 0; i < batch_size; i++) {
-        if (h_hard_gates[i] == *it) {
-          h_hard_gates[reorder_index] = i;
-          reorder_index++;
-          cursor_q++;
-        }
-      }
-
-      // save the size of each gate per batch
-      h_hard_gates[sizes_index] = cursor_q - cursor_p;
-      sizes_index++;
-      cursor_p = cursor_q;
-    }
-
+    // pass to encoder and decoder
     encoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
                                  _p_d_hard_gates);
     decoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
                                  _p_d_hard_gates);
-    CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_hard_gates, h_hard_gates.data(),
-                                    3 * _max_batch_size * sizeof(int),
-                                    cudaMemcpyHostToDevice, stream_));
 
     encoder_->run_one_infer(batch_size, seq_len);
     decoder_->run_one_infer(batch_size, seq_len);
   } else {
+
+    //soft moe
     encoder_->run_one_infer(batch_size, seq_len);
     decoder_->run_one_infer(batch_size, seq_len);
   }
@@ -276,6 +253,48 @@ DataType Moe::get_output_dtype(int index) {
       throw std::runtime_error("invalid output index");
       break;
   }
+}
+
+void Moe::init_hard_gates(std::vector<int> &lang_id,std::vector<int> &h_hard_gates,std::set<int> &h_gate_sets,int batch_size){
+  CHECK_GPU_ERROR(cudaMemcpy(lang_id.data(), d_src_lang_id_,
+                               _max_batch_size * sizeof(int),
+                               cudaMemcpyDeviceToHost));
+
+  for (int i = 0; i < batch_size; i++) {
+    auto iter = tw_.lang2gate.find(lang_id[i]);
+    int gate = -1;
+    if (iter != tw_.lang2gate.end()) {
+      gate = iter->second;
+      h_gate_sets.insert(gate);
+    }
+    h_hard_gates[i] = gate;
+  }
+
+  // two pointer
+  int cursor_p = 0, cursor_q = 0;
+  int sizes_index = _max_batch_size;
+  int reorder_index = _max_batch_size * 2;
+
+  for (auto it = h_gate_sets.begin(); it != h_gate_sets.end(); it++) {
+    // output pointer of each gate
+    // results will accumulate for each gate sequence
+    for (int i = 0; i < batch_size; i++) {
+      if (h_hard_gates[i] == *it) {
+        h_hard_gates[reorder_index] = i;
+        reorder_index++;
+        cursor_q++;
+      }
+    }
+
+    // save the size of each gate per batch
+    h_hard_gates[sizes_index] = cursor_q - cursor_p;
+    sizes_index++;
+    cursor_p = cursor_q;
+  }
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_hard_gates, h_hard_gates.data(),
+                                    3 * _max_batch_size * sizeof(int),
+                                    cudaMemcpyHostToDevice, stream_));
 }
 
 }  // namespace cuda

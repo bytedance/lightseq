@@ -668,27 +668,21 @@ void MoeDecoder<OpType_>::encdec_attention() {
 template <OperationType OpType_>
 void MoeDecoder<OpType_>::ffn_add_norm() {
   if (_tw._is_moe_layer_decoder[_layer_id]) {
-    /*
-     * _gate_type
-     * 0:soft gate
-     * 1:hard gate
-     */
     if (_tw._gate_type == 1) {
       if (_batch_size == 1) {
         /* ------to acceleratre------*/
         // moe_fw_single_stride 87ms compared to moe_fw 117ms
         moe_fw_single_stride();
       } else {
-        //for-loop: perform ffn() for each gate respectively, then reorder logits according to inputs
-        //faster then moe_fw() when most of gates in a batch is the same, 105ms -> 94ms
+        //moe_fw_hard_gate: perform ffn() for each gate respectively, then reorder logits according to inputs
+        //only need to perform kernel ffn() once when gates are all the same
         moe_fw_hard_gate();
       }
     } else {
-      //soft moe ffn
+      //soft gate
       moe_fw();
       ++_gate_weight_offset;
     }
-
   } else {
     ffn();
   }
@@ -747,14 +741,18 @@ void MoeDecoder<OpType_>::set_hard_gates_ptr(int* hard_gates,
   _p_d_hard_gates = p_d_hard_gates;
 }
 
+/**
+  moe_fw_hard_gate:hard gate: perform loop ffn
+  @param_shape:
+  _p_d_cur_step_query: [beam_size*batch_size , hidden_dim]
+  _p_d_query_buf1: [beam_size*batch_size , hidden_dim]
+  _p_d_moe_input_buf: [beam_size*batch_size , hidden_dim]
+  _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size , hidden_dim]
+  _p_d_moe_inner_buf: [beam_size*batch_size , inner_dim]
+*/
 template <OperationType OpType_>
 void MoeDecoder<OpType_>::moe_fw_hard_gate() {
   /* ---step 0. layer_norm --- */
-  //_p_d_cur_step_query: [beam_size*batch_size,hidden_dim]
-  //_p_d_query_buf1: [beam_size*batch_size,hidden_dim]
-  //_p_d_moe_input_buf: [beam_size*batch_size,hidden_dim]
-  //_p_d_moe_input_buf_tmp: [beam_size*cur_gate_size,hidden_dim]
-  //_p_d_moe_inner_buf: [beam_size*batch_size,inner_dim]
   ker_norm_layer_prepost_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
       _p_d_query_buf1, _p_d_dec_wei[_weight_offset + 12],
@@ -762,7 +760,6 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate() {
       _tw._is_post_ln);
 
   // used for reorder ouptut of each gate
-  // double pointer
   int cursor_p = 0;
   _DataType* _p_d_moe_input_buf_tmp;
 
@@ -772,7 +769,7 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate() {
   for (auto it = _gate_sets->begin(); it != _gate_sets->end(); it++) {
     int cur_gate_size = _h_hard_gates[sizes_index];
     
-    // _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size,hidden_dim]
+    // _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size , hidden_dim]
     // pointer of _p_d_moe_input_buf_tmp each gate will accumlate for each gate sequence
     _p_d_moe_input_buf_tmp =
         _p_d_moe_input_buf + cursor_p * _tw._beam_size * _tw._hidden_size;

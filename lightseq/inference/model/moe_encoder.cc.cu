@@ -250,23 +250,19 @@ void MoeEncoder<OpType_>::self_attention() {
 template <OperationType OpType_>
 void MoeEncoder<OpType_>::ffn_add_norm() {
   if (_tw._is_moe_layer_encoder[_layer_id]) {
-    /*
-     * _gate_type
-     * 0:soft gate
-     * 1:hard gate, the same as normal ffn
-     */
     if (_tw._gate_type == 1) {
+      //hard gate
       if (_batch_size == 1) {
         /* ------to acceleratre------*/
         // moe_fw_single_stride 87ms compared to moe_fw 117ms
         moe_fw_single_stride();
       } else {
-        //for-loop: perform ffn() for each gate respectively, then reorder logits according to inputs
-        //faster then moe_fw() when most of gates in a batch is the same, 105ms -> 94ms
+        //moe_fw_hard_gate: perform ffn() for each gate respectively, then reorder logits according to inputs
+        //only need to perform kernel ffn() once when gates are all the same
         moe_fw_hard_gate();
       }
     } else {
-      //soft moe ffn
+      //soft gate
       moe_fw();
       ++_gate_weight_offset;
     }
@@ -324,8 +320,8 @@ void MoeEncoder<OpType_>::set_hard_gates_ptr(int *hard_gates,
 template <OperationType OpType_>
 void MoeEncoder<OpType_>::moe_fw_hard_gate() {
   /*
-    hard gate loop ffn
-    shape:
+    hard gate: perform loop ffn
+    @param_shape
     _p_d_output: [_batch_seq_len*batch_size,hidden_dim]
     _p_d_ffn_buf1: [_batch_seq_len*batch_size,hidden_dim]
     _p_d_moe_input_buf: [_batch_seq_len*batch_size,hidden_dim]

@@ -533,6 +533,20 @@ template void ker_bias_redirect_residual_launcher<__half>(
     int block_dim, cudaStream_t stream, const __half* input, const __half* bias,
     const float* score, const int* expert_routed, __half* output);
 
+
+/**
+@brief: ker_hard_gate_reorder_pre
+reorder input, merge sequences with same gates according to p_d_gate_indexs
+
+@thread
+blockIdx.x = batch_index
+blockIdx.y = seq_id
+
+@param
+input: [seq_len * batch_size, feature_dim]
+output: [seq_len * gate_size, feature_dim]
+p_d_gate_indexs: [gate_size]
+*/
 template <typename T>
 __global__ void ker_hard_gate_reorder_pre(const T* input, T* output,
                                           int seq_len, int hidden_size,
@@ -567,6 +581,22 @@ template void ker_hard_gate_reorder_pre_launcher<__half>(
     int* p_d_gate_indexs, __half* output, int max_token_num, int seq_len,
     int max_thread_per_block, int hidden_size, int batch_token_num);
 
+
+/**
+@brief: ker_hard_gate_reorder_post
+1.reorder output, reorder output according to p_d_gate_reorder_indexs
+2.add bias to output
+
+@thread
+blockIdx.x = batch_index
+blockIdx.y = seq_id
+
+@param
+input: [seq_len * batch_size, feature_dim]
+output: [seq_len * batch_size, feature_dim]
+p_d_gate_reorder_indexs: [batch_size]
+bias: [expoert_num * feature_dim]
+*/
 template <typename T>
 __global__ void ker_hard_gate_reorder_post(const T* input, T* output,
                                            int* p_d_gate_reorder_indexs,

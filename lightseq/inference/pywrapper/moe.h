@@ -39,7 +39,7 @@ class Moe : public LSModel {
   int _batch_size;
 
   int get_output_seq_len();
-
+  void init_hard_gates(std::vector<int> &lang_id,std::vector<int> &h_hard_gates,std::set<int> &h_gate_sets,int batch_size);
   const int *get_result_ptr();
   const float *get_score_ptr();
   const int get_max_step() { return tw_._max_step; }
