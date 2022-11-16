@@ -541,11 +541,10 @@ __global__ void ker_hard_gate_reorder_pre(const T* input, T* output,
   int src_index = p_d_gate_indexs[batch_index];
   int pos = batch_index * seq_len + seq_id;
   int src_pos = src_index * seq_len + seq_id;
-  // if (__ldg(&score[score_pos]) > 0.) {
+
   for (int i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     output[pos * hidden_size + i] = __ldg(&input[src_pos * hidden_size + i]);
   }
-  // }
 }
 
 template <typename T>
@@ -554,8 +553,6 @@ void ker_hard_gate_reorder_pre_launcher(const T* input, cudaStream_t stream,
                                         T* output, int max_token_num,
                                         int seq_len, int max_thread_per_block,
                                         int hidden_size, int batch_token_num) {
-  // int batch_size=batch_token_num/seq_len;
-
   ker_hard_gate_reorder_pre<T>
       <<<dim3(gate_size, seq_len), max_thread_per_block, 0, stream>>>(
           input, output, seq_len, hidden_size, p_d_gate_indexs);
@@ -584,14 +581,12 @@ __global__ void ker_hard_gate_reorder_post(const T* input, T* output,
   int tgt_pos = tgt_batch_idx * seq_len + seq_id;
 
   int gate_id = _p_d_hard_gates[tgt_batch_idx];
-  // printf("batch_idx %d ",batch_idx);
+  
   T bias_val;
   for (int i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     bias_val = __ldg(&bias[gate_id * hidden_size + i]);
     output[tgt_pos * hidden_size + i] +=
         (__ldg(&input[src_pos * hidden_size + i]) + bias_val);
-    // output[tgt_pos * hidden_size + i] +=
-    // __ldg(&input[src_pos * hidden_size + i]);
   }
 }
 
@@ -600,7 +595,6 @@ void ker_hard_gate_reorder_post_launcher(
     cudaStream_t stream, const T* input, T* output, int seq_len,
     int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
     int batch_size, const T* bias, int* _p_d_hard_gates) {
-  // int batch_size=batch_token_num/seq_len;
 
   ker_hard_gate_reorder_post<T>
       <<<dim3(batch_size, seq_len), max_thread_per_block, 0, stream>>>(
