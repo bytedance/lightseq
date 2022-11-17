@@ -54,7 +54,7 @@ class Transformer : public LSModel {
 
   int cache_size;
   int _max_batch_size;
-  int _output_topk;
+  bool _output_topk = true;
   bool _is_sampling;
 
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
