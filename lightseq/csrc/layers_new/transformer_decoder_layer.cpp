@@ -14,7 +14,7 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
       _hidden_size(hidden_size) {
-  
+
   int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens : max_batch_size * beam_size;
 
   if (_layer_id == 0) {
