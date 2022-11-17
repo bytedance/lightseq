@@ -24,8 +24,8 @@ std::tuple<Variable*, Variable*> SampleLayer<T>::operator()(
     Variable* total_cache_v) {
   set_inputs({logits, alive_seq, total_cache_k, total_cache_v});
 
-  std::tuple<Variable*, Variable*> beam_search_outs =
-      (*_beam_search)(logits, _logit_bias, alive_seq, total_cache_k, total_cache_v);
+  std::tuple<Variable*, Variable*> beam_search_outs = (*_beam_search)(
+      logits, _logit_bias, alive_seq, total_cache_k, total_cache_v);
   Variable* alive_seq_out = std::get<0>(beam_search_outs);
   Variable* seq_score = std::get<1>(beam_search_outs);
 

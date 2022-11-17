@@ -21,6 +21,7 @@ class TransformerDecoderLayer : public Layer {
   int _hidden_size;
   int _step;
   int _batch_tokens;
+  int _beam_size;
 
   static Variable* total_enc_kv;
 
@@ -33,14 +34,15 @@ class TransformerDecoderLayer : public Layer {
                           int intermediate_size, float attn_dropout_ratio,
                           float hidden_output_dropout_ratio,
                           float activation_dropout_ratio,
-                          bool pre_or_postLayerNorm, std::string activation_fn);
+                          bool pre_or_postLayerNorm, std::string activation_fn, bool is_post_ln = false, bool is_continuous_cache = true, int max_batch_size = 1, int beam_size = 1);
 
   virtual ~TransformerDecoderLayer();
 
   /*
     Inputs:
       index 0, Transformer encoder output;
-      index 1,
+      index 1, cache_k_new;
+      index 2, cache_v_new;
   */
   std::tuple<Variable*, Variable*, Variable*> operator()(
       Variable* inp, Variable* enc_out, Variable* enc_mask,

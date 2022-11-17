@@ -53,6 +53,7 @@ class DecSelfAttentionLayer : public Layer {
   int _step;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
+  bool _is_continuous_cache;
 
   // tensor slice
   Variable* q_out;
@@ -64,7 +65,7 @@ class DecSelfAttentionLayer : public Layer {
                         int hidden_size, int num_heads,
                         float attn_prob_dropout_ratio,
                         float hidden_output_dropout_ratio,
-                        bool pre_or_postLayerNorm, bool is_post_ln = false);
+                        bool pre_or_postLayerNorm, bool is_post_ln, bool is_continuous_cache = true);
 
   virtual ~DecSelfAttentionLayer() {}
 

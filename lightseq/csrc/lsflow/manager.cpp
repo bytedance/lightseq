@@ -27,7 +27,9 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 }
 
 void MemoryManager::calculate_buffer_() {
+#ifdef DEBUG_MODE
   printf("===== Execute MemoryManager calculate_buffer_ =====\n");
+#endif
 
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
@@ -87,7 +89,10 @@ void MemoryManager::calculate_buffer_() {
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
 
-  printf("total_consumption: %zu\n", total_consumption);
+#ifdef DEBUG_MODE
+  printf("shared buffer memory size: %zu MB\n", total_consumption / MB_SIZE);
+#endif
+
   for (auto iter : buffer_vec_) {
     cuda_free(iter);
   }
@@ -149,10 +154,10 @@ void MemoryManager::calculate_buffer_() {
     char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef DEBUG_MODE
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s\n"
+        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %zu MB\n"
         "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), iter.second, size, addr, addr + size);
+        iter.first._name.c_str(), size / MB_SIZE, iter.second, size, addr, addr + size);
 #endif
   }
 

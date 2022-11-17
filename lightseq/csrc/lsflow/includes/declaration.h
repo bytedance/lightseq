@@ -49,4 +49,6 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
 
+const int MB_SIZE = 1024 * 1024;
+
 }  // namespace lightseq

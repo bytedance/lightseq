@@ -53,7 +53,7 @@ class DecEncAttentionLayer : public Layer {
                        int hidden_size, int num_heads,
                        float attn_prob_dropout_ratio,
                        float hidden_output_dropout_ratio,
-                       bool pre_or_postLayerNorm, bool is_post_ln = false);
+                       bool pre_or_postLayerNorm, bool is_post_ln);
 
   virtual ~DecEncAttentionLayer() {}
 

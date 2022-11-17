@@ -9,29 +9,31 @@ namespace lightseq {
 template <typename T1, typename T2>
 class Concat3Dim1 : public Operator {
  private:
-  int _max_batchs;
-  int _max_steps;
-  int _seq_len;
-  int _heads;
-  int _hidden_size;
-  int _batchs;
-  int _steps;
+  int _mx_sz0;
+  int _mx_sz1;
+  int _mx_sz2;
   bool _is_skip;
+  bool _is_continuous_cache;
+
+  int _sz0;
+  int _sz1_0;
+  int _sz1_1;
 
  public:
-  Concat3Dim1(int heads, int hidden_size, int max_steps = 0)
+  Concat3Dim1(int mx_sz0, int mx_sz1, int mx_sz2, bool is_continuous_cache)
       : Operator("Concat3Dim1"),
-        _heads(heads),
-        _max_steps(max_steps),
-        _hidden_size(hidden_size) {}
+        _mx_sz0(mx_sz0),
+        _mx_sz1(mx_sz1),
+        _mx_sz2(mx_sz2),
+        _is_continuous_cache(is_continuous_cache) {}
 
   virtual ~Concat3Dim1() {}
 
   Variable* operator()(Variable* inp, Variable* cache);
 
-  void before_forward(int batchs, int seq_len, int steps,
-                      bool is_skip = false) {
-    _batchs = batchs, _seq_len = seq_len, _steps = steps, _is_skip = is_skip;
+  void before_forward(int sz0, int sz1_0, int sz1_1, bool is_skip = false) {
+    _sz0 = sz0, _sz1_0 = sz1_0, 
+    _sz1_1 = sz1_1, _is_skip = is_skip;
   }
 
   void forward() override;

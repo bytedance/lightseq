@@ -47,7 +47,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/bias_add_transform_20314.cpp",
             "csrc/ops_new/dropout.cpp",
             "csrc/ops_new/softmax.cpp",
-            "csrc/ops_new/launch_concat3_dim1.cpp",
+            "csrc/ops_new/concat3_dim1.cpp",
             "csrc/ops_new/transform_0213.cpp",
             "csrc/ops_new/crf.cpp",
             "csrc/layers_new/feed_forward_layer.cpp",

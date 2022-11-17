@@ -48,9 +48,11 @@ class BeamSearchTopOp : public Operator {
   ~BeamSearchTopOp() {}
 
   // output:
-  std::tuple<Variable*, Variable*> operator()(
-      Variable* logits, Variable* logit_bias, Variable* alive_seq,
-      Variable* caches_k, Variable* caches_v);
+  std::tuple<Variable*, Variable*> operator()(Variable* logits,
+                                              Variable* logit_bias,
+                                              Variable* alive_seq,
+                                              Variable* caches_k,
+                                              Variable* caches_v);
 
   void forward() override;
 

@@ -315,7 +315,7 @@ class TransformerDecoderLayer {
   }
 
   void allocate_layer_memory() {
-    // allocate local gpu memory
+    // allocate local gpu memory 
     _qkv_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size * 3);
     _soft_out_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
     _attn_score_ptr = cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);

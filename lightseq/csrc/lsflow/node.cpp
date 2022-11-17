@@ -264,6 +264,9 @@ void Variable::set_grad(char* grad_ptr) {
 }
 
 void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
+#ifdef DEBUG_MODE
+  printf("Varaible %s malloc memory, value size: %zu MB, grad size: %zu MB\n", name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
+#endif
   _value_byte_size = value_byte_size;
   _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
@@ -307,6 +310,9 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
     printf("new parent_variable: %s\n", parent_variable->_name.c_str());
     printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
     exit(-1);
+  }
+  else if(_parent_variable == parent_variable){
+    return ;
   }
   _is_descendants = true;
   _parent_variable = parent_variable;

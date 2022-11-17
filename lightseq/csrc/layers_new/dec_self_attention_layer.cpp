@@ -7,7 +7,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool is_post_ln)
+    bool is_post_ln, bool is_continuous_cache)
     : Layer("DecSelfAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -16,6 +16,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _heads(num_heads),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
       _is_post_ln(is_post_ln),
+      _is_continuous_cache(is_continuous_cache),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -24,9 +25,9 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 3)),
       _concat_cache_k(
-          new Concat3Dim1<T1, T2>(num_heads, hidden_size, max_seq_len)),
+          new Concat3Dim1<T1, T2>(_max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads, is_continuous_cache)),
       _concat_cache_v(
-          new Concat3Dim1<T1, T2>(num_heads, hidden_size, max_seq_len)),
+          new Concat3Dim1<T1, T2>(_max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads, is_continuous_cache)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
           (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
@@ -136,9 +137,9 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   k_out->set_offset(_batch_dim * sizeof(T1) * 1, _batch_dim * sizeof(T2) * 1);
   v_out->set_offset(_batch_dim * sizeof(T1) * 2, _batch_dim * sizeof(T2) * 2);
 
-  _concat_cache_k->before_forward(_batch_size, from_len, _step,
+  _concat_cache_k->before_forward(_batch_size * _heads, _step, from_len, 
                                   _context_ptr->is_training());
-  _concat_cache_v->before_forward(_batch_size, from_len, _step,
+  _concat_cache_v->before_forward(_batch_size * _heads, _step, from_len, 
                                   _context_ptr->is_training());
 
   _softmax->before_forward(_batch_size, from_len, to_len, steps == -1);
@@ -152,24 +153,34 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_dropout->before_forward(_trg_batch_tokens, _hidden_size);
 
-#ifdef MODEL_INFER
-  _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
-                               _batch_heads, _max_seq_len);
-  _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
-                                _batch_heads, _max_seq_len);
-#else
-  if (_step >= 0) {
-    _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
-                                 _batch_heads);
-    _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
-                                  _batch_heads);
+  // [batch_size, beam, nhead, max_step, hidden_size/nhead]
+  if (!_is_continuous_cache) {
+    if (_step >= 0) {
+      _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
+                                  _batch_heads, _max_seq_len);
+      _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
+                                    _batch_heads, _max_seq_len);
+    }
+    else {
+      _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
+                                   _hidden_size / _heads, _batch_heads, _max_seq_len);
+      _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
+                                    _trg_seq_len, _batch_heads, _max_seq_len);
+    }
   } else {
-    _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
-                                 _hidden_size / _heads, _batch_heads);
-    _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
-                                  _trg_seq_len, _batch_heads);
+    if (_step >= 0) {
+      _attn_scores->before_forward(_step + 1, 1, _hidden_size / _heads,
+                                   _batch_heads);
+      _attn_context->before_forward(_hidden_size / _heads, 1, _step + 1,
+                                    _batch_heads);
+    } else {
+      _attn_scores->before_forward(_trg_seq_len, _trg_seq_len,
+                                   _hidden_size / _heads, _batch_heads);
+      _attn_context->before_forward(_hidden_size / _heads, _trg_seq_len,
+                                    _trg_seq_len, _batch_heads);
+    }
   }
-#endif
+  // [batch_size, beam, nhead, cur_step, hidden_size/nhead]
 }
 
 template <typename T1, typename T2>

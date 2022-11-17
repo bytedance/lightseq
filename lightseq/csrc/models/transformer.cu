@@ -73,7 +73,7 @@ Transformer::Transformer(const std::string weight_path,
 
   // initial LaunchDecEmb layer
   launch_dec_emb_layer.reset(new LaunchDecEmbLayer<OpType_>(
-      max_batch_tokens, tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
+      max_batch_size, tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
       tw_._max_step, tw_._multilg_type));
   launch_dec_emb_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
@@ -82,9 +82,9 @@ Transformer::Transformer(const std::string weight_path,
   for (int idx = 0; idx < tw_._n_dec_layer; idx++) {
     TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
         new TransformerDecoderLayer<OpType_, OpType_>(
-            tw_._n_dec_layer, idx, tw_._beam_size * max_batch_tokens,
+            tw_._n_dec_layer, idx, max_batch_tokens,
             tw_._max_step, tw_._hidden_size, tw_._head_num, tw_._inner_size, 0,
-            0, 0, true, tw_._use_gelu ? "gelu" : "relu"));
+            0, 0, true, tw_._use_gelu ? "gelu" : "relu", false, false, max_batch_size, tw_._beam_size));
     if (idx == 0) {
       dec_layer_->load_params(tw_.get_trg_emb_wei(), 4, true);
     }
@@ -95,12 +95,12 @@ Transformer::Transformer(const std::string weight_path,
 
   // // initial LayerNormalize layer
   dec_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
-      tw_._beam_size * max_batch_tokens, tw_._hidden_size));
+      max_batch_size * tw_._beam_size, tw_._hidden_size));
   dec_norm_layer->load_params(tw_.get_trg_emb_wei(), 2);
 
   // // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
-      tw_._beam_size * max_batch_tokens, tw_._hidden_size, tw_._trg_vocab_size,
+      max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
       CUBLAS_OP_N, CUBLAS_OP_N,
       tw_._no_scale_embedding ? 1.f : sqrt(1.f / tw_._hidden_size)));
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
@@ -179,8 +179,6 @@ void Transformer::decoder_before_forward(int batch_size, int seq_len,
 void Transformer::Infer() {
   int batch_size = input_shapes_[0][0], seq_len = input_shapes_[0][1];
 
-  printf("Running! batch_size: %d, seq_len: %d\n", batch_size, seq_len);
-
   if (tw_._sampling_method == "topk" || tw_._sampling_method == "topp") {
     _output_topk = false;
   }
@@ -209,7 +207,6 @@ void Transformer::Infer() {
   }
   enc_norm_layer->forward();
 
-
   int step = 0;
   for (step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);
@@ -227,36 +224,33 @@ void Transformer::Infer() {
     Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
 
-
   if (_output_topk || _is_sampling) {
     ker_write_topk_result<<<batch_size * tw_._beam_size, step + 1, 0,
                             _context_ptr->get_stream()>>>(
-        (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._trg_vocab_size,
-        tw_._max_step, tw_._beam_size, tw_._end_id);
-  }
-  else {
+        (int *)dec_tokens->value(), (float *)seq_score->value(),
+        (int *)transformer_out->value(), tw_._trg_vocab_size, tw_._max_step,
+        tw_._beam_size, tw_._end_id);
+  } else {
     if (tw_._length_penalty >= 0.f || step == _batch_max_decode_length) {
       ker_write_trg_tokenid_pos_penalty<<<batch_size, step + 1, 0,
                                           _context_ptr->get_stream()>>>(
-          (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._max_step,
-          tw_._beam_size);
+          (int *)dec_tokens->value(), (float *)seq_score->value(),
+          (int *)transformer_out->value(), tw_._max_step, tw_._beam_size);
     } else {
       ker_write_trg_tokenid_neg_penalty<<<batch_size, step + 1, 0,
                                           _context_ptr->get_stream()>>>(
-          (int*)dec_tokens->value(), (float*)seq_score->value(), (int*)transformer_out->value(), tw_._max_step,
-          tw_._beam_size, tw_._trg_vocab_size, tw_._end_id);
+          (int *)dec_tokens->value(), (float *)seq_score->value(),
+          (int *)transformer_out->value(), tw_._max_step, tw_._beam_size,
+          tw_._trg_vocab_size, tw_._end_id);
     }
   }
   /* ---step3. output the decoding result--- */
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
 
-  // print_vec((int*)transformer_out->value(), "transformer decoder tokens", 10);
-
-  
-  
-  set_output_shape(0, {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
-  set_output_shape(1, {batch_size,  _output_topk ? tw_._beam_size : 1});
+  set_output_shape(0,
+                   {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
+  set_output_shape(1, {batch_size, _output_topk ? tw_._beam_size : 1});
 }
 
 void Transformer::set_input_ptr(int index, void *input_ptr) {

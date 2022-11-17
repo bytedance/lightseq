@@ -38,7 +38,6 @@ class Context {  // model only
 
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
-
   static std::shared_ptr<Context> _global_context_ptr;
 
   bool check_validate();
@@ -47,7 +46,8 @@ class Context {  // model only
   static int global_context_id;
 
  public:
-  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
+  Context(StatusType status_type = StatusType::Inference,
+          int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }

@@ -8,27 +8,30 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
     float activation_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn)
+    std::string activation_fn, bool is_post_ln, bool is_continuous_cache, int max_batch_size, int beam_size)
     : Layer("TransformerDecoderLayer"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
       _hidden_size(hidden_size) {
+  
+  int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens : max_batch_size * beam_size;
+
   if (_layer_id == 0) {
     _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(
         nshared_layer, max_batch_tokens, hidden_size, num_heads));
   }
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
+      layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln, is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
+      layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
-      layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
+      layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
       pre_or_postLayerNorm, activation_fn));
 
@@ -51,9 +54,9 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
     total_enc_kv->malloc_memory(_nshared_layer * _max_batch_tokens *
                                 _hidden_size * 2 * sizeof(T1));
     _context_ptr->register_object("total_enc_kv", total_enc_kv);
-  }
-  else {
-    total_enc_kv = static_cast<Variable*>(_context_ptr->get_object("total_enc_kv"));
+  } else {
+    total_enc_kv =
+        static_cast<Variable*>(_context_ptr->get_object("total_enc_kv"));
   }
 
   enc_k = new Variable("enc_k", total_enc_kv);

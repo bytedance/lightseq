@@ -22,9 +22,10 @@ class SampleLayer : public Layer {
 
   virtual ~SampleLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(
-      Variable* logits, Variable* alive_seq, Variable* caches_k,
-      Variable* caches_v);
+  std::tuple<Variable*, Variable*> operator()(Variable* logits,
+                                              Variable* alive_seq,
+                                              Variable* caches_k,
+                                              Variable* caches_v);
 
   void before_forward(int batch_size, int cur_step);
 

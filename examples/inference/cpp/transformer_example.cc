@@ -79,7 +79,6 @@ int main(int argc, char* argv[]) {
       std::cout << shape[j] << " ";
     }
     std::cout << std::endl;
-
   }
 
   // const int* res = model.get_result_ptr();

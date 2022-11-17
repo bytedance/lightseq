@@ -7,7 +7,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
-  Context::create_global_context();
+  Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
 
   /* --- step.2 load model weights into GPU memory --- */
