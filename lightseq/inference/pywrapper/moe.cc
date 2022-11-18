@@ -38,7 +38,7 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
   //malloc memory for hard gates
   if (tw_._gate_type == 1) {
     CHECK_GPU_ERROR(
-        cudaMalloc(&_p_d_hard_gates, 4 * _max_batch_size * sizeof(int)));
+        cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
   }
   
   CHECK_GPU_ERROR(
@@ -119,14 +119,12 @@ void Moe::Infer() {
   
   if (tw_._gate_type == 1) {
     // hard gate
-    /*
-      1. calculate gate according to lang_id
-      2. copy [hard_gates,gate_sizes,reorder_indexs] to device
-    */
     std::vector<int> lang_id(_max_batch_size, (int)0);
 
     /**
-      @param: h_hard_gates
+      @param: h_hard_gates, the merge of three vector,
+      1. calculate gate according to lang_id
+      2. copy [hard_gates,gate_sizes,reorder_indexs] to device
       shape: [hard_gates,sizes of each gate,reorder indexs]
       used for hard gate ffn calculation and reorder final ffn logits
     */

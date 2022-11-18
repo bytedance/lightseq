@@ -671,12 +671,12 @@ void MoeDecoder<OpType_>::ffn_add_norm() {
     if (_tw._gate_type == 1) {
       if (_batch_size == 1) {
         /* ------to acceleratre------*/
-        // moe_fw_batch1 87ms compared to moe_fw 117ms
-        moe_fw_batch1();
+        // moe_fw_hard_gate_batch1 87ms compared to moe_fw 117ms
+        moe_fw_hard_gate_batch1();
       } else {
-        //moe_fw_hard_gate: perform ffn() for each gate respectively, then reorder logits according to inputs
+        //moe_fw_hard_gate_batchn: perform ffn() for each gate respectively, then reorder logits according to inputs
         //only need to perform kernel ffn() once when gates are all the same
-        moe_fw_hard_gate();
+        moe_fw_hard_gate_batchn();
       }
     } else {
       //soft gate
@@ -742,7 +742,7 @@ void MoeDecoder<OpType_>::set_hard_gates_ptr(int* hard_gates,
 }
 
 /**
-  moe_fw_hard_gate:hard gate: perform loop ffn
+  moe_fw_hard_gate_batchn:hard gate: perform loop ffn
   @param_shape:
   _p_d_cur_step_query: [beam_size*batch_size , hidden_dim]
   _p_d_query_buf1: [beam_size*batch_size , hidden_dim]
@@ -751,7 +751,7 @@ void MoeDecoder<OpType_>::set_hard_gates_ptr(int* hard_gates,
   _p_d_moe_inner_buf: [beam_size*batch_size , inner_dim]
 */
 template <OperationType OpType_>
-void MoeDecoder<OpType_>::moe_fw_hard_gate() {
+void MoeDecoder<OpType_>::moe_fw_hard_gate_batchn() {
   /* ---step 0. layer_norm --- */
   ker_norm_layer_prepost_launcher<_DataType>(
       _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
@@ -834,7 +834,7 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate() {
 }
 
 template <OperationType OpType_>
-void MoeDecoder<OpType_>::moe_fw_batch1() {
+void MoeDecoder<OpType_>::moe_fw_hard_gate_batch1() {
   //the same with ffn except ffn_weight
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   int expert_id = _h_hard_gates[0];
