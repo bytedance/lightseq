@@ -28,26 +28,6 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
       _host_alive_seq_probs(max_batch_size * beam_size,
                             min_log_probability / 2),
       _host_length_norm(max_step, 1.f) {
-  num_beam_can = new Variable("num_beam_can",
-                              (_max_batch_size * _beam_size + 1) * sizeof(int),
-                              0, LSMemoryType::FixedMemory);
-  can_idx = new Variable(
-      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int),
-      0, LSMemoryType::FixedMemory);
-  can_score = new Variable(
-      "can_score",
-      _max_batch_size * _beam_size * _trg_vocab_size * sizeof(float), 0,
-      LSMemoryType::FixedMemory);
-  seq_prob =
-      new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
-                   LSMemoryType::FixedMemory);
-
-  int cache_size =
-      max_batch_size * max_step * beam_size * hidden_size * sizeof(T);
-  caches_k_buf = new Variable("caches_k_buf", cache_size * nshared_dec_layer, 0,
-                              LSMemoryType::FixedMemory);
-  caches_v_buf = new Variable("caches_v_buf", cache_size * nshared_dec_layer, 0,
-                              LSMemoryType::FixedMemory);
 
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;
@@ -71,7 +51,30 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
 
   seq_score = new Variable(
       "seq_score", _max_batch_size * _beam_size * _max_step * sizeof(float), 0,
-      LSMemoryType::FixedMemory);
+      VariableType::RegressiveVariable);
+
+  // initial own variable
+
+  num_beam_can = new Variable("num_beam_can",
+                              (_max_batch_size * _beam_size + 1) * sizeof(int),
+                              0,  VariableType::RegressiveVariable);
+  can_idx = new Variable(
+      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int),
+      0,  VariableType::RegressiveVariable);
+  can_score = new Variable(
+      "can_score",
+      _max_batch_size * _beam_size * _trg_vocab_size * sizeof(float), 0,
+       VariableType::RegressiveVariable);
+  seq_prob =
+      new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
+                    VariableType::RegressiveVariable);
+
+  int cache_size =
+      _max_batch_size * _max_step * _beam_size * _hidden_size * sizeof(T);
+  caches_k_buf = new Variable("caches_k_buf", cache_size * _nshared_dec_layer, 0,
+                              VariableType::RegressiveVariable);
+  caches_v_buf = new Variable("caches_v_buf", cache_size * _nshared_dec_layer, 0,
+                              VariableType::RegressiveVariable);
 
   set_children({alive_seq_out, seq_score});
   return std::make_tuple(alive_seq_out, seq_score);
