@@ -671,8 +671,8 @@ void MoeDecoder<OpType_>::ffn_add_norm() {
     if (_tw._gate_type == 1) {
       if (_batch_size == 1) {
         /* ------to acceleratre------*/
-        // moe_fw_single_stride 87ms compared to moe_fw 117ms
-        moe_fw_single_stride();
+        // moe_fw_batch1 87ms compared to moe_fw 117ms
+        moe_fw_batch1();
       } else {
         //moe_fw_hard_gate: perform ffn() for each gate respectively, then reorder logits according to inputs
         //only need to perform kernel ffn() once when gates are all the same
@@ -834,7 +834,7 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate() {
 }
 
 template <OperationType OpType_>
-void MoeDecoder<OpType_>::moe_fw_single_stride() {
+void MoeDecoder<OpType_>::moe_fw_batch1() {
   //the same with ffn except ffn_weight
   /* ---step 0. layer_norm, add output_bias to "query"--- */
   int expert_id = _h_hard_gates[0];
