@@ -407,7 +407,7 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate_batchn() {
 }
 
 template <OperationType OpType_>
-void MoeEncoder<OpType_>::moe_fw_batch1() {
+void MoeEncoder<OpType_>::moe_fw_hard_gate_batch1() {
   // hard gate ffn
   int expert_id = _h_hard_gates[0];
 
