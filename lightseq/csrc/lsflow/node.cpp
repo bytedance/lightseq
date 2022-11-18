@@ -19,6 +19,10 @@ Node::Node(std::string name, NodeType nt_)
   int idx = _context_ptr->node_name_cnt[real_name];
   _context_ptr->node_name_cnt[real_name] += 1;
   _name = real_name + "_" + std::to_string(idx);
+  if(_context_ptr->in_regress()) {
+    _in_regress_scope = true;
+  }
+
   _context_ptr->add_node(this);
 }
 
@@ -402,9 +406,6 @@ void Operator::set_children(std::vector<Node*> children) {
   if (!this->_children.empty()) {
     printf("children not empty!");
     exit(-1);
-  }
-  if(_context_ptr->in_regress()) {
-    _in_regress_scope = true;
   }
   for (Node* iter : children) {
     iter->set_parents({this});

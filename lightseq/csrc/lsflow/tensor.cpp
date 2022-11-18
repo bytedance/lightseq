@@ -102,7 +102,6 @@ void Tensor::reset_fixed() {
     return;
   }
   this->remove_life_cycle();
-  printf("reset fixed %s\n", _name.c_str());
   _mtype = LSMemoryType::FixedMemory;
   _size = 0;
 }

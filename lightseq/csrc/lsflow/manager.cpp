@@ -90,7 +90,7 @@ void MemoryManager::calculate_buffer_() {
   }
 
 #ifdef DEBUG_MODE
-  printf("shared buffer memory size: %zu MB\n", total_consumption / MB_SIZE);
+  printf("**** shared buffer memory size: %zu MB ****\n", total_consumption / MB_SIZE);
 #endif
 
   for (auto iter : buffer_vec_) {
@@ -102,6 +102,7 @@ void MemoryManager::calculate_buffer_() {
   size_t record_last_addr = 0;
   std::vector<std::pair<TensorUsage, size_t>> temp_usages_vec{};
 
+  int buffer_idx = 0;
   for (int i = 0; i < ordered_tensor_usages.size(); i++) {
     max_last_addr =
         std::max(max_last_addr, (size_t)(ordered_tensor_usages[i].first.size +
@@ -112,6 +113,10 @@ void MemoryManager::calculate_buffer_() {
       char *current_buffer =
           cuda_malloc<char>(max_last_addr - record_last_addr);
       buffer_vec_.push_back(current_buffer);
+#ifdef DEBUG_MODE
+      printf("*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n", buffer_idx, (max_last_addr - record_last_addr), float(max_last_addr - record_last_addr)/MB_SIZE);
+#endif
+      buffer_idx ++;
       for (auto iter : temp_usages_vec) {
         int unique_id = iter.first.unique_id;
         tensor_ptr.emplace(unique_id,
@@ -140,9 +145,11 @@ void MemoryManager::calculate_buffer_() {
     return false;
   };
   temp_usages_vec.clear();
+  // print order
   std::sort(tensor_usages_vec.begin(), tensor_usages_vec.end(),
             [](const std::pair<TensorUsage, size_t> &x,
                const std::pair<TensorUsage, size_t> &y) -> bool {
+              // return x.first.first_idx < y.first.first_idx;
               if (x.second != y.second) return x.second < y.second;
               if (x.second + x.first.size != y.second + y.first.size)
                 return x.second + x.first.size > y.second + y.first.size;
@@ -154,10 +161,10 @@ void MemoryManager::calculate_buffer_() {
     char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef DEBUG_MODE
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %zu MB\n"
-        "offset: %zu, size: %zu, address: %p, end_addr: %p\n\n",
+        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end memory: %.2f MB\n"
+        "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: %p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), size / MB_SIZE, iter.second, size, addr, addr + size);
+        iter.first._name.c_str(), float(size) / MB_SIZE, float(iter.second + size) / MB_SIZE, iter.second, size, iter.second + size, addr, addr + size);
 #endif
   }
 
