@@ -33,7 +33,7 @@ class Moe : public LSModel {
   cudaStream_t stream_;
   cublasHandle_t hd_;
   MoeWeight<moe_optytpe> tw_;
-  
+
   // for hard gates
   int *_p_d_hard_gates;
   int _batch_size;

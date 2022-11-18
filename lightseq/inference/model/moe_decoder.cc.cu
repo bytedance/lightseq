@@ -768,7 +768,7 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate_batchn() {
 
   for (auto it = _gate_sets->begin(); it != _gate_sets->end(); it++) {
     int cur_gate_size = _h_hard_gates[sizes_index];
-    
+
     // _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size , hidden_dim]
     // pointer of _p_d_moe_input_buf_tmp each gate will accumlate for each gate sequence
     _p_d_moe_input_buf_tmp =

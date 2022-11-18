@@ -611,7 +611,7 @@ __global__ void ker_hard_gate_reorder_post(const T* input, T* output,
   int tgt_pos = tgt_batch_idx * seq_len + seq_id;
 
   int gate_id = _p_d_hard_gates[tgt_batch_idx];
-  
+
   T bias_val;
   for (int i = threadIdx.x; i < hidden_size; i += blockDim.x) {
     bias_val = __ldg(&bias[gate_id * hidden_size + i]);

@@ -694,7 +694,7 @@ void MoeWeight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
       read_hdf5_dataset_data_int(hdf5_file, "lang2gate/langs", H5T_NATIVE_INT);
     std::vector<int> langs2gate_gates =
       read_hdf5_dataset_data_int(hdf5_file, "lang2gate/gates", H5T_NATIVE_INT);
-  
+
     for (int i = 0; i < langs2gate_langs.size(); i++) {
       lang2gate[langs2gate_langs[i]] = langs2gate_gates[i];
     }
@@ -1220,7 +1220,7 @@ void MoeWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         idx_gate += _hidden_size * _expert_num_decoder;
       }
     }
-    
+
   }
 
   std::vector<_DataType> raw_value;

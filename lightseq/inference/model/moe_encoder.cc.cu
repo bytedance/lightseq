@@ -328,7 +328,7 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate_batchn() {
     _p_d_moe_input_buf_tmp: [_batch_seq_len*cur_gate_size,hidden_dim]
     _p_d_moe_inner_buf: [_batch_seq_len*batch_size,inner_dim]
   */
-  
+
 
   /* ---step 0. layer_norm --- */
   ker_norm_layer_prepost_launcher<_DataType>(

@@ -40,7 +40,7 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
     CHECK_GPU_ERROR(
         cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
   }
-  
+
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
   CHECK_GPU_ERROR(cudaMalloc(
@@ -116,7 +116,7 @@ void Moe::Infer() {
     }
   }
 
-  
+
   if (tw_._gate_type == 1) {
     // hard gate
     std::vector<int> lang_id(_max_batch_size, (int)0);
