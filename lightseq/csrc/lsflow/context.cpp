@@ -144,6 +144,12 @@ void Context::build() {
     }
   }
 
+  for(auto iter: _all_node_vec) {
+    if(iter->node_type() == NodeType::Variable) {
+      static_cast<Variable*>(iter)->update_regress_idx();
+    }
+  }
+
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
@@ -193,6 +199,22 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
   printf("regist_pybind_layer %s\n", full_name.c_str());
 #endif
   pybind_layers.emplace(full_name, layer_ptr);
+}
+
+void Context::update_regr_begin(int node_idx) {
+  if(node_idx < 0) {
+    printf("Error! update_regr_begin with node_idx %d\n", node_idx);
+    exit(-1);
+  }
+  _regress_begin_idx = (_regress_begin_idx == -1) ? node_idx : std::min(node_idx, _regress_begin_idx);
+}
+
+void Context::update_regr_end(int node_idx){
+  if(node_idx < 0) {
+    printf("Error! update_regr_begin with node_idx %d\n", node_idx);
+    exit(-1);
+  }
+  _regress_end_idx = (_regress_end_idx == -1) ? node_idx : std::max(node_idx, _regress_end_idx);
 }
 
 void Context::register_object(std::string object_name, void* object) {

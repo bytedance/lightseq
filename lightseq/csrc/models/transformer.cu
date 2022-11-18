@@ -22,25 +22,6 @@ Transformer::Transformer(const std::string weight_path,
 
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
-  inp_tokens = new Variable("inp_tokens");
-  dec_tokens = new Variable("dec_tokens",
-                            max_batch_tokens * tw_._beam_size * sizeof(int), 0,
-                            LSMemoryType::FixedMemory);
-  transformer_out = new Variable("transformer_out");
-  std::vector<int> start_id_vec(
-      _max_batch_size * tw_._beam_size * tw_._max_step, tw_._start_id);
-
-  CHECK_GPU_ERROR(cudaMemcpyAsync(dec_tokens->value(), start_id_vec.data(),
-                                  sizeof(int) * start_id_vec.size(),
-                                  cudaMemcpyHostToDevice,
-                                  _context_ptr->get_stream()));
-
-  cache_size =
-      max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
-  total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
-                               0, LSMemoryType::FixedMemory);
-  total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
-                               0, LSMemoryType::FixedMemory);
 
   /* --- step.4 inital operator & layer --- */
 
@@ -112,6 +93,10 @@ Transformer::Transformer(const std::string weight_path,
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
+  inp_tokens = new Variable("inp_tokens");
+  dec_tokens = new Variable("dec_tokens",
+                            max_batch_tokens * tw_._beam_size * sizeof(int), 0,
+                            VariableType::FixedVariable);
   std::tuple<Variable *, Variable *> enc_emb_outs =
       (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
@@ -122,6 +107,14 @@ Transformer::Transformer(const std::string weight_path,
   Variable *enc_out = (*enc_norm_layer)(enc_emb);
 
   Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
+
+  _context_ptr->regress_begin();
+  cache_size =
+      max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
+  total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
+                               0, VariableType::RegressiveVariable);
+  total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
+                               0, VariableType::RegressiveVariable);
 
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
@@ -137,10 +130,9 @@ Transformer::Transformer(const std::string weight_path,
     cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
     dec_layer_idx++;
   }
-
   Variable *dec_out = (*dec_norm_layer)(dec_emb);
-
   dec_out = (*linear_layer)(dec_out);
+  _context_ptr->regress_end();
 
   std::tuple<Variable *, Variable *> sample_outs =
       (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
@@ -148,6 +140,15 @@ Transformer::Transformer(const std::string weight_path,
   seq_score = std::get<1>(sample_outs);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
                                 sizeof(int));
+
+  transformer_out = new Variable("transformer_out");
+
+  std::vector<int> start_id_vec(
+      _max_batch_size * tw_._beam_size * tw_._max_step, tw_._start_id);
+  CHECK_GPU_ERROR(cudaMemcpyAsync(dec_tokens->value(), start_id_vec.data(),
+                                  sizeof(int) * start_id_vec.size(),
+                                  cudaMemcpyHostToDevice,
+                                  _context_ptr->get_stream()));
 }
 
 Transformer::~Transformer() {}

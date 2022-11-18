@@ -45,6 +45,10 @@ class Context {  // model only
   static std::unordered_map<int, std::shared_ptr<Context>> global_contexts_map;
   static int global_context_id;
 
+  int _regress_begin_idx = -1;
+  int _regress_end_idx = -1;
+  bool _in_regress = false;
+
  public:
   Context(StatusType status_type = StatusType::Inference,
           int device_id = 0);
@@ -98,6 +102,14 @@ class Context {  // model only
     return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
                                 : nullptr;
   }
+
+  void regress_begin() { _in_regress = true; }
+  void regress_end() { _in_regress = false; }
+  int regress_begin_idx() { return _regress_begin_idx; }
+  int regress_end_idx() { return _regress_end_idx; }
+  void update_regr_begin(int node_idx);
+  void update_regr_end(int node_idx);
+  bool in_regress() { return _in_regress; }
 
   std::string status_type_str() { return StatusTypeString[_status_type]; }
 

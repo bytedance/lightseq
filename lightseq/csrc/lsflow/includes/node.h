@@ -15,13 +15,14 @@ class Node {
   std::string _name;
   NodeType _node_type;
 
-  bool _fw_flag;
-  bool _bw_flag;
-  bool _bw_first_flag;
+  bool _fw_flag = false;
+  bool _bw_flag = false;
+  bool _bw_first_flag = false;
 
   std::vector<Node*> _parents{};
   std::vector<Node*> _children{};
   int _fw_node_idx, _bw_node_idx;
+  bool _in_regress_scope = false;
 
  public:
   Node(std::string name, NodeType nt_);
@@ -70,7 +71,7 @@ class Variable : public Node {
   Variable(std::string name);  // for Fixed memory
   Variable(
       std::string name, size_t value_byte_size, size_t grad_byte_size = 0,
-      LSMemoryType mmtype = LSMemoryType::SharedMemory);  // for Shared memory
+      VariableType vt = VariableType::SharedVariable);  // for Shared memory
   Variable(std::string name, const char* para_ptr,
            char* grad_ptr = nullptr);  // for Fixed memory
   Variable(std::string name, Variable* parent_variable, size_t offset_value = 0,
@@ -88,6 +89,7 @@ class Variable : public Node {
   void set_grad(char* grad_ptr);
 
   void malloc_memory(size_t value_byte_size, size_t grad_byte_size = 0);
+  VariableType variable_type() { return _variable_type; }
   std::string variable_type_str() { return VariableTypeString[_variable_type]; }
 
   /*
@@ -96,6 +98,7 @@ class Variable : public Node {
   */
   char* value(bool is_open_interval = false);
   char* grad(bool is_open_interval = false);
+  void update_regress_idx();
 
   bool enable_override_grad();
   bool is_descendants() { return _is_descendants; }

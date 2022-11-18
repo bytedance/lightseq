@@ -51,6 +51,10 @@ void Node::recursive_forward() {
   _context_ptr->update_node_idx();
   if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
+    if(_in_regress_scope) {
+      _context_ptr->update_regr_begin(_fw_node_idx);
+      _context_ptr->update_regr_end(_fw_node_idx);
+    }
   }
 
 #ifdef DEBUG_MODE
@@ -113,6 +117,10 @@ void Node::recursive_backward() {
   _context_ptr->update_node_idx();
   if (!_context_ptr->is_built()) {
     _bw_node_idx = _context_ptr->node_idx();
+    if(_in_regress_scope) {
+      _context_ptr->update_regr_begin(_bw_node_idx);
+      _context_ptr->update_regr_end(_bw_node_idx);
+    }
   }
 
 #ifdef DEBUG_MODE
@@ -175,20 +183,22 @@ Variable::Variable(std::string name)
 }
 
 Variable::Variable(std::string name, size_t value_byte_size,
-                   size_t grad_byte_size, LSMemoryType mmtype)
+                   size_t grad_byte_size, VariableType vt)
     : Node(name, NodeType::Variable),
       _value_byte_size(value_byte_size),
-      _grad_byte_size(grad_byte_size) {
+      _grad_byte_size(grad_byte_size),
+      _variable_type(vt) {
   _value.reset(new Tensor("value", _value_byte_size));
   if (_context_ptr->is_training())
     _grad.reset(new Tensor("grad", _grad_byte_size));
-  if (mmtype == LSMemoryType::SharedMemory) {
-    _variable_type = VariableType::SharedVariable;
-  } else if (mmtype == LSMemoryType::FixedMemory) {
-    _variable_type = VariableType::FixedVariable;
+  if (vt == VariableType::SharedVariable) {
+    return ;
+  } else if (vt == VariableType::FixedVariable) {
     malloc_memory(_value_byte_size, _grad_byte_size);
+  } else if(vt == VariableType::RegressiveVariable){
+    return ;
   } else {
-    printf("Error! var %s useless mmtype %d\n", _name.c_str(), mmtype);
+    printf("Error! var %s useless vt %d\n", _name.c_str(), vt);
     exit(-1);
   }
 }
@@ -288,6 +298,18 @@ char* Variable::grad(bool is_open_interval) {
   return _grad->tensor(is_open_interval);
 }
 
+void Variable::update_regress_idx() {
+  if(variable_type() != VariableType::RegressiveVariable) {
+    return ;
+  }
+  _value->update_life_idx(_context_ptr->regress_begin_idx());
+  _value->update_life_idx(_context_ptr->regress_end_idx());
+  if(_context_ptr->is_training() && _grad) {
+    _grad->update_life_idx(_context_ptr->regress_begin_idx());
+    _grad->update_life_idx(_context_ptr->regress_end_idx());
+  }
+}
+
 bool Variable::enable_override_grad() {
   if (this->_children.size() == 1) {
     return true;
@@ -380,6 +402,9 @@ void Operator::set_children(std::vector<Node*> children) {
   if (!this->_children.empty()) {
     printf("children not empty!");
     exit(-1);
+  }
+  if(_context_ptr->in_regress()) {
+    _in_regress_scope = true;
   }
   for (Node* iter : children) {
     iter->set_parents({this});
