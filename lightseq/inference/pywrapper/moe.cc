@@ -35,12 +35,6 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
       using thrust vector to avoid manage gpu memory by hand
   */
 
-  //malloc memory for hard gates
-  if (tw_._gate_type == 1) {
-    CHECK_GPU_ERROR(
-        cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
-  }
-
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input_, _max_batch_size * tw_._max_step * sizeof(int32_t)));
   CHECK_GPU_ERROR(cudaMalloc(
@@ -80,6 +74,21 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+
+
+  //malloc memory for hard gates
+  if (tw_._gate_type == 1) {
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
+    h_hard_gates.resize(3 * _max_batch_size);
+    h_lang_id.resize(_max_batch_size);
+
+    // pass to encoder and decoder
+    encoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+    decoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+  }
 }
 
 Moe::~Moe() {
@@ -119,8 +128,6 @@ void Moe::Infer() {
 
   if (tw_._gate_type == 1) {
     // hard gate
-    std::vector<int> lang_id(_max_batch_size, (int)0);
-
     /**
       @param: h_hard_gates, the merge of three vector,
       1. calculate gate according to lang_id
@@ -128,16 +135,8 @@ void Moe::Infer() {
       shape: [hard_gates,sizes of each gate,reorder indexs]
       used for hard gate ffn calculation and reorder final ffn logits
     */
-    std::vector<int> h_hard_gates(_max_batch_size * 3, (int)0);
-    std::set<int> h_gate_sets;
 
-    init_hard_gates(lang_id,h_hard_gates,h_gate_sets,batch_size);
-
-    // pass to encoder and decoder
-    encoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
-                                 _p_d_hard_gates);
-    decoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
-                                 _p_d_hard_gates);
+    init_hard_gates();
 
     encoder_->run_one_infer(batch_size, seq_len);
     decoder_->run_one_infer(batch_size, seq_len);
@@ -257,13 +256,19 @@ DataType Moe::get_output_dtype(int index) {
   }
 }
 
-void Moe::init_hard_gates(std::vector<int> &lang_id,std::vector<int> &h_hard_gates,std::set<int> &h_gate_sets,int batch_size){
-  CHECK_GPU_ERROR(cudaMemcpy(lang_id.data(), d_src_lang_id_,
+void Moe::init_hard_gates(){
+  int batch_size = input_shapes_[0][0];
+  //clear
+  std::fill(h_hard_gates.begin(),h_hard_gates.end(),0);
+  std::fill(h_lang_id.begin(),h_lang_id.end(),0);
+  h_gate_sets.clear();
+
+  CHECK_GPU_ERROR(cudaMemcpy(h_lang_id.data(), d_src_lang_id_,
                                _max_batch_size * sizeof(int),
                                cudaMemcpyDeviceToHost));
 
   for (int i = 0; i < batch_size; i++) {
-    auto iter = tw_.lang2gate.find(lang_id[i]);
+    auto iter = tw_.lang2gate.find(h_lang_id[i]);
     int gate = -1;
     if (iter != tw_.lang2gate.end()) {
       gate = iter->second;
