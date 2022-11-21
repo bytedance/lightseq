@@ -310,7 +310,7 @@ void MoeEncoder<OpType_>::set_hard_gates_ptr(int *hard_gates,
 }
 
 template <OperationType OpType_>
-void MoeEncoder<OpType_>::moe_fw_hard_gate_batchn() {
+void MoeEncoder<OpType_>::moe_fw_hard_gate() {
   if (_batch_size == 1) {
     // if size ==1, perform ffn() for all batch data according to gate
     int expert_id = _h_hard_gates[0];
