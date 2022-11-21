@@ -32,8 +32,7 @@ class MoeEncoder {
   void self_attention();
   void ffn_add_norm();
   void ffn();
-  void moe_fw_hard_gate_batchn();
-  void moe_fw_hard_gate_batch1();
+  void moe_fw_hard_gate();
   void moe_fw();
 
   const int _max_batch_size;

@@ -129,23 +129,16 @@ void Moe::Infer() {
   if (tw_._gate_type == 1) {
     // hard gate
     /**
-      @param: h_hard_gates, the merge of three vector,
       1. calculate gate according to lang_id
       2. copy [hard_gates,gate_sizes,reorder_indexs] to device
       shape: [hard_gates,sizes of each gate,reorder indexs]
       used for hard gate ffn calculation and reorder final ffn logits
     */
-
     init_hard_gates();
-
-    encoder_->run_one_infer(batch_size, seq_len);
-    decoder_->run_one_infer(batch_size, seq_len);
-  } else {
-
-    //soft moe
-    encoder_->run_one_infer(batch_size, seq_len);
-    decoder_->run_one_infer(batch_size, seq_len);
   }
+
+  encoder_->run_one_infer(batch_size, seq_len);
+  decoder_->run_one_infer(batch_size, seq_len);
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 

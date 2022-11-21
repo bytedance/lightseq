@@ -252,15 +252,7 @@ void MoeEncoder<OpType_>::ffn_add_norm() {
   if (_tw._is_moe_layer_encoder[_layer_id]) {
     if (_tw._gate_type == 1) {
       //hard gate
-      if (_batch_size == 1) {
-        /* ------to acceleratre------*/
-        // moe_fw_hard_gate_batch1 87ms compared to moe_fw 117ms
-        moe_fw_hard_gate_batch1();
-      } else {
-        //moe_fw_hard_gate_batchn: perform ffn() for each gate respectively, then reorder logits according to inputs
-        //only need to perform kernel ffn() once when gates are all the same
-        moe_fw_hard_gate_batchn();
-      }
+      moe_fw_hard_gate();
     } else {
       //soft gate
       moe_fw();
@@ -319,37 +311,9 @@ void MoeEncoder<OpType_>::set_hard_gates_ptr(int *hard_gates,
 
 template <OperationType OpType_>
 void MoeEncoder<OpType_>::moe_fw_hard_gate_batchn() {
-  /*
-    hard gate: perform loop ffn
-    @param_shape
-    _p_d_output: [_batch_seq_len*batch_size,hidden_dim]
-    _p_d_ffn_buf1: [_batch_seq_len*batch_size,hidden_dim]
-    _p_d_moe_input_buf: [_batch_seq_len*batch_size,hidden_dim]
-    _p_d_moe_input_buf_tmp: [_batch_seq_len*cur_gate_size,hidden_dim]
-    _p_d_moe_inner_buf: [_batch_seq_len*batch_size,inner_dim]
-  */
-
-
-  /* ---step 0. layer_norm --- */
-  ker_norm_layer_prepost_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
-      _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
-      _max_thread_per_block, _tw._is_post_ln);
-  // used for reorder ouptut of each gate
-  // double pointer
-  int cursor_p = 0;
-  _DataType *_p_d_moe_input_buf_tmp;
-  int *_p_d_cur_gate_indexs = _p_d_hard_gates + 2 * _max_batch_size;
-  int sizes_index = _max_batch_size;
-
-  for (auto it = _gate_sets->begin(); it != _gate_sets->end(); it++) {
-    int cur_gate_size = _h_hard_gates[sizes_index];
-    // output pointer of each gate
-    // results will accumulate for each gate sequence
-    _p_d_moe_input_buf_tmp =
-        _p_d_moe_input_buf + cursor_p * _batch_seq_len * _tw._hidden_size;
-
-    int expert_id = *it;
+  if (_batch_size == 1) {
+    // if size ==1, perform ffn() for all batch data according to gate
+    int expert_id = _h_hard_gates[0];
 
     int ffn1_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
     int ffn1_bias_offset = _tw._inner_size * expert_id;
@@ -357,100 +321,125 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate_batchn() {
     int ffn2_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
     int ffn2_bias_offset = _tw._hidden_size * expert_id;
 
-    /* ---step 1. reorder batch-inputs according to gate--- */
-    ker_hard_gate_reorder_pre_launcher(
-        _p_d_ffn_buf1, _stream, cur_gate_size, _p_d_cur_gate_indexs,
-        _p_d_moe_input_buf_tmp, _max_token_num, _batch_seq_len,
-        _max_thread_per_block, _tw._hidden_size, _batch_token_num);
-    /* ---step 2. first ffn layer--- */
-    CHECK_GPU_ERROR(cublasGemmEx(
-        _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
-        cur_gate_size * _batch_seq_len, _tw._hidden_size, &_fone,
-        _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
-        _tw._inner_size, _p_d_moe_input_buf_tmp, _BType, _tw._hidden_size,
-        &_fzero, _p_d_moe_inner_buf, _CType, _tw._inner_size, _computeType,
-        CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+    /* ---step 0. layer_norm, add output_bias to "query"--- */
+    ker_norm_layer_resual_launcher<_DataType>(
+        _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
+        _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
+        _p_d_enc_wei[_weight_offset + 11] + ffn2_bias_offset,
+        _max_thread_per_block, _tw._is_post_ln);
+
+    /* ---step 1. first ffn layer--- */
+    CHECK_GPU_ERROR(
+        cublasGemmEx(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
+                    _batch_token_num, _tw._hidden_size, &_fone,
+                    _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
+                    _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size,
+                    &_fzero, _p_d_ffn_buf2, _CType, _tw._inner_size,
+                    _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
     if (_tw._use_gelu) {
       ker_bias_gelu_launcher<_DataType>(
-          _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
-          _p_d_moe_inner_buf,
+          _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
           _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
     } else {
       ker_bias_relu_launcher<_DataType>(
-          _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
-          _p_d_moe_inner_buf,
+          _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
           _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
     }
-    /* ---step 3. second ffn layer--- */
+
     CHECK_GPU_ERROR(cublasGemmEx(
-        _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
-        _batch_seq_len * cur_gate_size, _tw._inner_size, &_fone,
+        _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
+        _tw._inner_size, &_fone,
         _p_d_enc_wei[_weight_offset + 10] + ffn2_weight_offset, _AType,
-        _tw._hidden_size, _p_d_moe_inner_buf, _BType, _tw._inner_size, &_fzero,
-        _p_d_moe_input_buf_tmp, _CType, _tw._hidden_size, _computeType,
+        _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
+        _p_d_output, _CType, _tw._hidden_size, _computeType,
         CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-    cursor_p += cur_gate_size;
-    _p_d_cur_gate_indexs = _p_d_cur_gate_indexs + cur_gate_size;
-    sizes_index++;
-  }
+  }else{
+    /**
+      if batch_size>1: perform ffn() for each gate respectively, then reorder logits according to inputs
+      @param_shape:
+        _p_d_output: [_batch_seq_len*batch_size,hidden_dim]
+        _p_d_ffn_buf1: [_batch_seq_len*batch_size,hidden_dim]
+        _p_d_moe_input_buf: [_batch_seq_len*batch_size,hidden_dim]
+        _p_d_moe_input_buf_tmp: [_batch_seq_len*cur_gate_size,hidden_dim]
+        _p_d_moe_inner_buf: [_batch_seq_len*batch_size,inner_dim]
+    */
 
-  /* ---step 4. reorder output of different gate--- */
-  // 1. add ffn2 bias
-  // 2. reorder ffn result(_p_d_moe_input_buf)  according to input
-  ker_hard_gate_reorder_post_launcher(
-      _stream, _p_d_moe_input_buf, _p_d_output, _batch_seq_len,
-      _max_thread_per_block, _tw._hidden_size,
-      _p_d_hard_gates + 2 * _max_batch_size, _batch_size,
-      _p_d_enc_wei[_weight_offset + 11], _p_d_hard_gates);
-}
-
-template <OperationType OpType_>
-void MoeEncoder<OpType_>::moe_fw_hard_gate_batch1() {
-  // hard gate ffn
-  int expert_id = _h_hard_gates[0];
-
-  int ffn1_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
-  int ffn1_bias_offset = _tw._inner_size * expert_id;
-
-  int ffn2_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
-  int ffn2_bias_offset = _tw._hidden_size * expert_id;
-
-  /* ---step 0. layer_norm, add output_bias to "query"--- */
-  ker_norm_layer_resual_launcher<_DataType>(
+    /* ---step 0. layer_norm --- */
+    ker_norm_layer_prepost_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
       _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
-      _p_d_enc_wei[_weight_offset + 11] + ffn2_bias_offset,
       _max_thread_per_block, _tw._is_post_ln);
+    // used for reorder ouptut of each gate
+    int cursor_p = 0;
+    _DataType *_p_d_moe_input_buf_tmp;
+    int *_p_d_cur_gate_indexs = _p_d_hard_gates + 2 * _max_batch_size;
+    int sizes_index = _max_batch_size;
 
-  /* ---step 1. first ffn layer--- */
-  CHECK_GPU_ERROR(
-      cublasGemmEx(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
-                   _batch_token_num, _tw._hidden_size, &_fone,
-                   _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
-                   _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size,
-                   &_fzero, _p_d_ffn_buf2, _CType, _tw._inner_size,
-                   _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+    for (auto it = _gate_sets->begin(); it != _gate_sets->end(); it++) {
+      int cur_gate_size = _h_hard_gates[sizes_index];
+      // output pointer of each gate
+      // results will accumulate for each gate sequence
+      _p_d_moe_input_buf_tmp =
+          _p_d_moe_input_buf + cursor_p * _batch_seq_len * _tw._hidden_size;
 
-  if (_tw._use_gelu) {
-    ker_bias_gelu_launcher<_DataType>(
-        _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-        _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
-  } else {
-    ker_bias_relu_launcher<_DataType>(
-        _batch_token_num, _max_thread_per_block, _stream, _p_d_ffn_buf2,
-        _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
+      int expert_id = *it;
+
+      int ffn1_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
+      int ffn1_bias_offset = _tw._inner_size * expert_id;
+
+      int ffn2_weight_offset = _tw._inner_size * _tw._hidden_size * expert_id;
+      int ffn2_bias_offset = _tw._hidden_size * expert_id;
+
+      /* ---step 1. reorder batch-inputs according to gate--- */
+      ker_hard_gate_reorder_pre_launcher(
+          _p_d_ffn_buf1, _stream, cur_gate_size, _p_d_cur_gate_indexs,
+          _p_d_moe_input_buf_tmp, _max_token_num, _batch_seq_len,
+          _max_thread_per_block, _tw._hidden_size, _batch_token_num);
+      /* ---step 2. first ffn layer--- */
+      CHECK_GPU_ERROR(cublasGemmEx(
+          _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
+          cur_gate_size * _batch_seq_len, _tw._hidden_size, &_fone,
+          _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
+          _tw._inner_size, _p_d_moe_input_buf_tmp, _BType, _tw._hidden_size,
+          &_fzero, _p_d_moe_inner_buf, _CType, _tw._inner_size, _computeType,
+          CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+      if (_tw._use_gelu) {
+        ker_bias_gelu_launcher<_DataType>(
+            _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
+            _p_d_moe_inner_buf,
+            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
+      } else {
+        ker_bias_relu_launcher<_DataType>(
+            _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
+            _p_d_moe_inner_buf,
+            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
+      }
+      /* ---step 3. second ffn layer--- */
+      CHECK_GPU_ERROR(cublasGemmEx(
+          _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
+          _batch_seq_len * cur_gate_size, _tw._inner_size, &_fone,
+          _p_d_enc_wei[_weight_offset + 10] + ffn2_weight_offset, _AType,
+          _tw._hidden_size, _p_d_moe_inner_buf, _BType, _tw._inner_size, &_fzero,
+          _p_d_moe_input_buf_tmp, _CType, _tw._hidden_size, _computeType,
+          CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+
+      cursor_p += cur_gate_size;
+      _p_d_cur_gate_indexs = _p_d_cur_gate_indexs + cur_gate_size;
+      sizes_index++;
+    }
+
+    /* ---step 4. reorder output of different gate--- */
+    // 1. add ffn2 bias
+    // 2. reorder ffn result(_p_d_moe_input_buf)  according to input
+    ker_hard_gate_reorder_post_launcher(
+        _stream, _p_d_moe_input_buf, _p_d_output, _batch_seq_len,
+        _max_thread_per_block, _tw._hidden_size,
+        _p_d_hard_gates + 2 * _max_batch_size, _batch_size,
+        _p_d_enc_wei[_weight_offset + 11], _p_d_hard_gates);
   }
-
-  CHECK_GPU_ERROR(cublasGemmEx(
-      _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size, _batch_token_num,
-      _tw._inner_size, &_fone,
-      _p_d_enc_wei[_weight_offset + 10] + ffn2_weight_offset, _AType,
-      _tw._hidden_size, _p_d_ffn_buf2, _BType, _tw._inner_size, &_fone,
-      _p_d_output, _CType, _tw._hidden_size, _computeType,
-      CUBLAS_GEMM_DEFAULT_TENSOR_OP));
-  return;
 }
 
 template <OperationType OpType_>
