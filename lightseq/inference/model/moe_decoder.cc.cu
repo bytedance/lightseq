@@ -733,20 +733,6 @@ void MoeDecoder<OpType_>::set_hard_gates_ptr(int* hard_gates,
   _p_d_hard_gates = p_d_hard_gates;
 }
 
-/**
-  moe_fw_hard_gate_batchn:hard gate: perform loop ffn
-  @param_shape:
-  _p_d_cur_step_query: [beam_size*batch_size , hidden_dim]
-  _p_d_query_buf1: [beam_size*batch_size , hidden_dim]
-  _p_d_moe_input_buf: [beam_size*batch_size , hidden_dim]
-  _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size , hidden_dim]
-  _p_d_moe_inner_buf: [beam_size*batch_size , inner_dim]
-*/
-template <OperationType OpType_>
-void MoeDecoder<OpType_>::moe_fw_hard_gate_batchn() {
-
-}
-
 template <OperationType OpType_>
 void MoeDecoder<OpType_>::moe_fw_hard_gate() {
   //the same with ffn except ffn_weight
@@ -805,7 +791,7 @@ void MoeDecoder<OpType_>::moe_fw_hard_gate() {
       _p_d_moe_input_buf_tmp: [beam_size*cur_gate_size , hidden_dim]
       _p_d_moe_inner_buf: [beam_size*batch_size , inner_dim]
     */
-    
+
     /* ---step 0. layer_norm --- */
     ker_norm_layer_prepost_launcher<_DataType>(
         _step_token_num, _tw._hidden_size, _stream, _p_d_cur_step_query,
