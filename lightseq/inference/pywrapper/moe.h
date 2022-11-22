@@ -34,8 +34,25 @@ class Moe : public LSModel {
   cublasHandle_t hd_;
   MoeWeight<moe_optytpe> tw_;
 
-  int get_output_seq_len();
+  // for hard gates
+  int *_p_d_hard_gates;
+  int _batch_size;
+  /**
+    @param: h_hard_gates, the merge of three vector,each has the size of
+    _max_batch_size: [hard_gates,gate_sizes,reorder_indexs]
+    @shape: [_max_batch_size*3]
+    for example:
+        h_hard_gates: [15, 15, 13, 11, 11, 10, 9, 8, 1, 1, 1, 2, 1, 2, 0, 0, 7,
+    6, 5, 3, 4, 2, 0, 1] the merge of: hard_gates: [15, 15, 13, 11, 11, 10, 9,
+    8] gate_sizes: [1, 1, 1, 2, 1, 2, 0, 0] reorder_indexs: [7, 6, 5, 3, 4, 2,
+    0, 1]
+  */
+  std::vector<int> h_hard_gates;
+  std::set<int> h_gate_sets;
+  std::vector<int> h_lang_id;
 
+  int get_output_seq_len();
+  void init_hard_gates();
   const int *get_result_ptr();
   const float *get_score_ptr();
   const int get_max_step() { return tw_._max_step; }
@@ -44,7 +61,6 @@ class Moe : public LSModel {
  public:
   Moe(const std::string weight_path, const int max_batch_size);
   ~Moe();
-
   void Infer() override;
   void set_input_ptr(int index, void *input_ptr) override;
   void set_output_ptr(int index, void *output_ptr) override;

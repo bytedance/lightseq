@@ -143,6 +143,8 @@ class MoeWeight {
   int _n_moelayer_decoder;
   std::vector<bool> _is_moe_layer_encoder;
   std::vector<bool> _is_moe_layer_decoder;
+  std::map<int, int> lang2gate;
+  int _gate_type;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
@@ -161,6 +163,7 @@ class MoeWeight {
     std::cout << "end_id: " << _end_id << std::endl;
     std::cout << "padding_id: " << _padding_id << std::endl;
     std::cout << "multilg_type: " << _multilg_type << std::endl;
+    std::cout << "gate_type: " << _gate_type << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
