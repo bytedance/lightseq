@@ -75,8 +75,7 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
   decoder_->init_buffer(d_buf_);
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
 
-
-  //malloc memory for hard gates
+  // malloc memory for hard gates
   if (tw_._gate_type == 1) {
     CHECK_GPU_ERROR(
         cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
@@ -124,7 +123,6 @@ void Moe::Infer() {
       seq_len -= 1;
     }
   }
-
 
   if (tw_._gate_type == 1) {
     // hard gate
@@ -249,16 +247,16 @@ DataType Moe::get_output_dtype(int index) {
   }
 }
 
-void Moe::init_hard_gates(){
+void Moe::init_hard_gates() {
   int batch_size = input_shapes_[0][0];
-  //clear
-  std::fill(h_hard_gates.begin(),h_hard_gates.end(),0);
-  std::fill(h_lang_id.begin(),h_lang_id.end(),0);
+  // clear
+  std::fill(h_hard_gates.begin(), h_hard_gates.end(), 0);
+  std::fill(h_lang_id.begin(), h_lang_id.end(), 0);
   h_gate_sets.clear();
 
   CHECK_GPU_ERROR(cudaMemcpy(h_lang_id.data(), d_src_lang_id_,
-                               _max_batch_size * sizeof(int),
-                               cudaMemcpyDeviceToHost));
+                             _max_batch_size * sizeof(int),
+                             cudaMemcpyDeviceToHost));
 
   for (int i = 0; i < batch_size; i++) {
     auto iter = tw_.lang2gate.find(h_lang_id[i]);
@@ -293,8 +291,8 @@ void Moe::init_hard_gates(){
   }
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_hard_gates, h_hard_gates.data(),
-                                    3 * _max_batch_size * sizeof(int),
-                                    cudaMemcpyHostToDevice, stream_));
+                                  3 * _max_batch_size * sizeof(int),
+                                  cudaMemcpyHostToDevice, stream_));
 }
 
 }  // namespace cuda

@@ -38,14 +38,14 @@ class Moe : public LSModel {
   int *_p_d_hard_gates;
   int _batch_size;
   /**
-    @param: h_hard_gates, the merge of three vector,each has the size of _max_batch_size: [hard_gates,gate_sizes,reorder_indexs]
+    @param: h_hard_gates, the merge of three vector,each has the size of
+    _max_batch_size: [hard_gates,gate_sizes,reorder_indexs]
     @shape: [_max_batch_size*3]
     for example:
-        h_hard_gates: [15, 15, 13, 11, 11, 10, 9, 8, 1, 1, 1, 2, 1, 2, 0, 0, 7, 6, 5, 3, 4, 2, 0, 1]
-        the merge of:
-        hard_gates: [15, 15, 13, 11, 11, 10, 9, 8]
-        gate_sizes: [1, 1, 1, 2, 1, 2, 0, 0]
-        reorder_indexs: [7, 6, 5, 3, 4, 2, 0, 1]
+        h_hard_gates: [15, 15, 13, 11, 11, 10, 9, 8, 1, 1, 1, 2, 1, 2, 0, 0, 7,
+    6, 5, 3, 4, 2, 0, 1] the merge of: hard_gates: [15, 15, 13, 11, 11, 10, 9,
+    8] gate_sizes: [1, 1, 1, 2, 1, 2, 0, 0] reorder_indexs: [7, 6, 5, 3, 4, 2,
+    0, 1]
   */
   std::vector<int> h_hard_gates;
   std::set<int> h_gate_sets;

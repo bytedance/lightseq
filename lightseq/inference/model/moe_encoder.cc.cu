@@ -251,10 +251,10 @@ template <OperationType OpType_>
 void MoeEncoder<OpType_>::ffn_add_norm() {
   if (_tw._is_moe_layer_encoder[_layer_id]) {
     if (_tw._gate_type == 1) {
-      //hard gate
+      // hard gate
       moe_fw_hard_gate();
     } else {
-      //soft gate
+      // soft gate
       moe_fw();
       ++_gate_weight_offset;
     }
@@ -329,13 +329,13 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
         _max_thread_per_block, _tw._is_post_ln);
 
     /* ---step 1. first ffn layer--- */
-    CHECK_GPU_ERROR(
-        cublasGemmEx(_hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size,
-                    _batch_token_num, _tw._hidden_size, &_fone,
-                    _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
-                    _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size,
-                    &_fzero, _p_d_ffn_buf2, _CType, _tw._inner_size,
-                    _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+    CHECK_GPU_ERROR(cublasGemmEx(
+        _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._inner_size, _batch_token_num,
+        _tw._hidden_size, &_fone,
+        _p_d_enc_wei[_weight_offset + 8] + ffn1_weight_offset, _AType,
+        _tw._inner_size, _p_d_ffn_buf1, _BType, _tw._hidden_size, &_fzero,
+        _p_d_ffn_buf2, _CType, _tw._inner_size, _computeType,
+        CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
     if (_tw._use_gelu) {
       ker_bias_gelu_launcher<_DataType>(
@@ -355,9 +355,10 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
         _p_d_output, _CType, _tw._hidden_size, _computeType,
         CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
-  }else{
+  } else {
     /**
-      if batch_size>1: perform ffn() for each gate respectively, then reorder logits according to inputs
+      if batch_size>1: perform ffn() for each gate respectively, then reorder
+      logits according to inputs
       @param_shape:
         _p_d_output: [_batch_seq_len*batch_size,hidden_dim]
         _p_d_ffn_buf1: [_batch_seq_len*batch_size,hidden_dim]
@@ -368,9 +369,9 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
 
     /* ---step 0. layer_norm --- */
     ker_norm_layer_prepost_launcher<_DataType>(
-      _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
-      _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
-      _max_thread_per_block, _tw._is_post_ln);
+        _batch_token_num, _tw._hidden_size, _stream, _p_d_output, _p_d_ffn_buf1,
+        _p_d_enc_wei[_weight_offset + 6], _p_d_enc_wei[_weight_offset + 7],
+        _max_thread_per_block, _tw._is_post_ln);
     // used for reorder ouptut of each gate
     int cursor_p = 0;
     _DataType *_p_d_moe_input_buf_tmp;
@@ -410,21 +411,23 @@ void MoeEncoder<OpType_>::moe_fw_hard_gate() {
         ker_bias_gelu_launcher<_DataType>(
             _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
             _p_d_moe_inner_buf,
-            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
+            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset,
+            _tw._inner_size);
       } else {
         ker_bias_relu_launcher<_DataType>(
             _batch_seq_len * cur_gate_size, _max_thread_per_block, _stream,
             _p_d_moe_inner_buf,
-            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset, _tw._inner_size);
+            _p_d_enc_wei[_weight_offset + 9] + ffn1_bias_offset,
+            _tw._inner_size);
       }
       /* ---step 3. second ffn layer--- */
       CHECK_GPU_ERROR(cublasGemmEx(
           _hd, CUBLAS_OP_N, CUBLAS_OP_N, _tw._hidden_size,
           _batch_seq_len * cur_gate_size, _tw._inner_size, &_fone,
           _p_d_enc_wei[_weight_offset + 10] + ffn2_weight_offset, _AType,
-          _tw._hidden_size, _p_d_moe_inner_buf, _BType, _tw._inner_size, &_fzero,
-          _p_d_moe_input_buf_tmp, _CType, _tw._hidden_size, _computeType,
-          CUBLAS_GEMM_DEFAULT_TENSOR_OP));
+          _tw._hidden_size, _p_d_moe_inner_buf, _BType, _tw._inner_size,
+          &_fzero, _p_d_moe_input_buf_tmp, _CType, _tw._hidden_size,
+          _computeType, CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 
       cursor_p += cur_gate_size;
       _p_d_cur_gate_indexs = _p_d_cur_gate_indexs + cur_gate_size;
