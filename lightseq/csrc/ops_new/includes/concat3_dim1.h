@@ -12,7 +12,7 @@ class Concat3Dim1 : public Operator {
   int _mx_sz0;
   int _mx_sz1;
   int _mx_sz2;
-  bool _is_skip;
+  bool _is_skip = false;
   bool _is_continuous_cache;
 
   int _sz0;

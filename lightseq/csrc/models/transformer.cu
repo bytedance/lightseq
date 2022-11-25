@@ -108,7 +108,7 @@ Transformer::Transformer(const std::string weight_path,
 
   Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
 
-  _context_ptr->regress_begin();
+  // _context_ptr->regress_begin();
   cache_size =
       max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
   total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
@@ -201,13 +201,13 @@ void Transformer::Infer() {
   /* --- notice that the order of forward should be the same with network --- */
   encoder_before_forward(batch_size, seq_len);
   decoder_before_forward(batch_size, seq_len, 0);
-
+  
   launch_enc_emb_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
   enc_norm_layer->forward();
-
+  
   int step = 0;
   for (step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);

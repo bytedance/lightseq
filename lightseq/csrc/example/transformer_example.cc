@@ -1,5 +1,6 @@
 #include "model_base.h"
 #include "util.h"
+#include<unistd.h>  
 
 /**
 @file
@@ -56,21 +57,23 @@ int main(int argc, char* argv[]) {
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   std::cout << "infer preprocessing finished" << std::endl;
 
-  std::chrono::duration<double> elapsed;
+  std::chrono::duration<double> elapsed(0);
   int iter = 0;
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 2; i++) {
+    printf("\n\n\n\n\n\n");
+    printf("***************************************************************************\n");
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
     CHECK_GPU_ERROR(cudaStreamSynchronize(0));
     auto finish = std::chrono::high_resolution_clock::now();
-    if (i >= 5) {
+    if (i > 0) {
       iter++;
       elapsed += finish - start;
     }
   }
 
-  std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
+  std::cout << "new arch lightseq inference latency: " << elapsed.count() * 1000 / iter
             << " ms" << std::endl;
 
   for (int i = 0; i < model->get_output_size(); i++) {
@@ -86,7 +89,7 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
 
     if(!i) {
-      print_vec((int*)d_output, "generate tokens", size);
+      print_vec((int*)d_output, "generate tokens", std::min(size, 10));
     }
     else {
       print_vec((float*)d_output, "score: ", 1);

@@ -55,6 +55,9 @@ void Node::recursive_forward() {
   _context_ptr->update_node_idx();
   if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
+// #ifdef MEM_DEBUG
+//     printf("### node %s forward node idx: %d, _in_regress_scope: %d ###\n", name().c_str(), _context_ptr->node_idx(), _in_regress_scope);
+// #endif
     if(_in_regress_scope) {
       _context_ptr->update_regr_begin(_fw_node_idx);
       _context_ptr->update_regr_end(_fw_node_idx);
@@ -200,6 +203,7 @@ Variable::Variable(std::string name, size_t value_byte_size,
   } else if (vt == VariableType::FixedVariable) {
     malloc_memory(_value_byte_size, _grad_byte_size);
   } else if(vt == VariableType::RegressiveVariable){
+    _in_regress_scope = true;
     return ;
   } else {
     printf("Error! var %s useless vt %d\n", _name.c_str(), vt);
@@ -208,7 +212,7 @@ Variable::Variable(std::string name, size_t value_byte_size,
 }
 
 Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
-    : Variable(name, (size_t)0, (size_t)0) {
+    : Variable(name, (size_t)0, (size_t)0, VariableType::FixedVariable) {
   _value->set_tensor(para_ptr);
   if (_grad) {
     _grad->set_tensor(grad_ptr);
@@ -278,7 +282,7 @@ void Variable::set_grad(char* grad_ptr) {
 }
 
 void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
-#ifdef DEBUG_MODE
+#ifdef MEM_DEBUG
   printf("Varaible %s malloc memory, value size: %zu MB, grad size: %zu MB\n", name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
 #endif
   _value_byte_size = value_byte_size;

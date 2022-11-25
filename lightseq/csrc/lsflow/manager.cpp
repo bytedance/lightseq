@@ -27,7 +27,7 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 }
 
 void MemoryManager::calculate_buffer_() {
-#ifdef DEBUG_MODE
+#ifdef MEM_DEBUG
   printf("===== Execute MemoryManager calculate_buffer_ =====\n");
 #endif
 
@@ -89,7 +89,7 @@ void MemoryManager::calculate_buffer_() {
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
 
-#ifdef DEBUG_MODE
+#ifdef MEM_DEBUG
   printf("**** shared buffer memory size: %zu MB ****\n", total_consumption / MB_SIZE);
 #endif
 
@@ -113,7 +113,7 @@ void MemoryManager::calculate_buffer_() {
       char *current_buffer =
           cuda_malloc<char>(max_last_addr - record_last_addr);
       buffer_vec_.push_back(current_buffer);
-#ifdef DEBUG_MODE
+#ifdef MEM_DEBUG
       printf("*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n", buffer_idx, (max_last_addr - record_last_addr), float(max_last_addr - record_last_addr)/MB_SIZE);
 #endif
       buffer_idx ++;
@@ -159,7 +159,7 @@ void MemoryManager::calculate_buffer_() {
     int unique_id = iter.first.unique_id;
     size_t size = iter.first.size;
     char *addr = tensor_ptr.find(unique_id)->second;
-#ifdef DEBUG_MODE
+#ifdef MEM_DEBUG
     printf(
         "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end memory: %.2f MB\n"
         "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: %p\n\n",

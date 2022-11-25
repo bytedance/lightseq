@@ -54,6 +54,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
     total_enc_kv->malloc_memory(_nshared_layer * _max_batch_tokens *
                                 _hidden_size * 2 * sizeof(T1));
     _context_ptr->register_object("total_enc_kv", total_enc_kv);
+    _context_ptr->regress_begin();
   } else {
     total_enc_kv =
         static_cast<Variable*>(_context_ptr->get_object("total_enc_kv"));
