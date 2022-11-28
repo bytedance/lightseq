@@ -13,6 +13,7 @@ Transformer::Transformer(const std::string weight_path,
       decoder_(nullptr),
       _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
+  CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
   CHECK_GPU_ERROR(cublasCreate(&hd_));
   CHECK_GPU_ERROR(cublasSetStream(hd_, stream_));
@@ -49,15 +50,9 @@ Transformer::Transformer(const std::string weight_path,
   CHECK_GPU_ERROR(
       cudaMalloc(&d_trg_lang_id_, _max_batch_size * sizeof(int32_t)));
 
-  if (tw_._multilg_type < 3) {
-    encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
-        _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-        stream_, hd_, d_src_lang_id_);
-  } else {
-    encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
-        _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
-        stream_, hd_, d_trg_lang_id_);
-  }
+  encoder_ = std::make_shared<Encoder<transformer_optytpe>>(
+      _max_batch_size, d_input_, d_padding_mask_, d_encoder_output_, tw_,
+      stream_, hd_, d_src_lang_id_);
   res = encoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -114,7 +109,7 @@ void Transformer::Infer() {
     if (tw_._multilg_type == 1) {
       seq_len -= 2;
     }
-    if (tw_._multilg_type == 2 || tw_._multilg_type == 3) {
+    if (tw_._multilg_type == 2) {
       seq_len -= 1;
     }
   }
@@ -229,10 +224,6 @@ DataType Transformer::get_output_dtype(int index) {
       throw std::runtime_error("invalid output index");
       break;
   }
-}
-
-void Transformer::benchmark_mode(bool is_benchmark) {
-  decoder_->benchmark_mode(is_benchmark);
 }
 
 }  // namespace cuda

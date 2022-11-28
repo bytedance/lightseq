@@ -53,7 +53,7 @@ class GptEncoder {
   std::vector<int> _h_sample_id;
   int _h_unfinished;
 
-  // gpu memory buffer
+  // gpu memeory buffer
   _DataType *_p_d_query;
   _DataType *_p_d_k_cache;
   _DataType *_p_d_v_cache;
@@ -82,10 +82,8 @@ class GptEncoder {
 
   int _batch_size;
   int _batch_token_num;
-  int _batch_max_seq_len;
   int _layer_id;
   int _weight_offset;
-  bool _is_benchmark;
 
   const std::set<std::string> kSamplingMethods = {"topk", "topp", "ppl"};
 
@@ -104,7 +102,6 @@ class GptEncoder {
   void run_one_infer(int batch_size, int batch_seq_len);
   int run_one_sample(int batch_size, int batch_seq_len);
   void compute_ppl();
-  void benchmark_mode(bool is_benchmark);
 };
 
 }  // namespace cuda

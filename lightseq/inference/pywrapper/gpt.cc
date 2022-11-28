@@ -10,6 +10,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
       encoder_(nullptr),
       _max_batch_size(max_batch_size) {
   /* ---step1. init environment--- */
+  CHECK_GPU_ERROR(cudaSetDevice(0));
   CHECK_GPU_ERROR(cudaStreamCreate(&stream_));
   CHECK_GPU_ERROR(cudaStreamCreate(&cache_stream_));
   CHECK_GPU_ERROR(cublasCreate(&hd_));
@@ -202,10 +203,6 @@ DataType Gpt::get_output_dtype(int index) {
       throw std::runtime_error("invalid output index");
       break;
   }
-}
-
-void Gpt::benchmark_mode(bool is_benchmark) {
-  encoder_->benchmark_mode(is_benchmark);
 }
 
 }  // namespace cuda

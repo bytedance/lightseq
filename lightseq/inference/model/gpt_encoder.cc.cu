@@ -37,8 +37,7 @@ GptEncoder<OpType_>::GptEncoder(int max_batch_size, const int *p_d_token_id,
       _h_real_seq_len(max_batch_size, 0),
       _h_ppl(max_batch_size, 0.f),
       _h_sample_id(max_batch_size * tw._max_step, 0),
-      _h_unfinished(1),
-      _is_benchmark(false) {}
+      _h_unfinished(1) {}
 
 /**
 Compute GPU memory size needed by gpt encoder,
@@ -191,11 +190,6 @@ void GptEncoder<OpType_>::run_one_infer(int batch_size, int batch_seq_len) {
 }
 
 template <OperationType OpType_>
-void GptEncoder<OpType_>::benchmark_mode(bool is_benchmark) {
-  _is_benchmark = is_benchmark;
-}
-
-template <OperationType OpType_>
 int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   if (batch_size > _max_batch_size) {
     throw std::runtime_error("batch size of input greater than max_batch_size");
@@ -206,8 +200,6 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   _batch_size = batch_size;
   _batch_seq_len = batch_seq_len;
   _batch_token_num = batch_size * batch_seq_len;
-  _batch_max_seq_len =
-      min(_tw._max_step, batch_seq_len + _tw._extra_decode_length);
 
   CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_real_seq_len, _h_real_seq_len.data(),
                                   sizeof(int) * _batch_size,
@@ -248,7 +240,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
   ker_norm_layer_launcher<_DataType>(
       _batch_token_num, _tw._hidden_size, _stream, _p_d_query,
       _p_d_src_emb_wei[2], _p_d_src_emb_wei[3], _max_thread_per_block);
-  if (sample_one_token() == 0 || _batch_seq_len >= _batch_max_seq_len) {
+  if (sample_one_token() == 0 || _batch_seq_len >= _tw._max_step) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_sample_id_buf, _p_d_sample_id,
                                     _batch_token_num * sizeof(int),
                                     cudaMemcpyDeviceToDevice, _stream));
@@ -256,7 +248,7 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
     return _batch_seq_len;
   }
 
-  while (_batch_seq_len < _batch_max_seq_len) {
+  while (1) {
 #ifdef DEBUG_RESULT
     std::cout << "before sample:batch_size-" << _batch_size << " batch_seq_len-"
               << _batch_seq_len << std::endl;
@@ -282,15 +274,16 @@ int GptEncoder<OpType_>::run_one_sample(int batch_size, int batch_seq_len) {
     ker_norm_layer_launcher<_DataType>(
         _batch_size, _tw._hidden_size, _stream, _p_d_query, _p_d_src_emb_wei[2],
         _p_d_src_emb_wei[3], _max_thread_per_block);
-
 #ifdef DEBUG_RESULT
+
     print_vec(_p_d_query, "_p_d_query before logits",
               _batch_size * _tw._hidden_size - 10,
               _batch_size * _tw._hidden_size);
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
+      break;
 #else
-
-    bool unfinish = sample_one_token_with_cache();
-    if (!unfinish && !_is_benchmark) break;
+    if (sample_one_token_with_cache() == 0 || _batch_seq_len >= _tw._max_step)
+      break;
 #endif
   }
 

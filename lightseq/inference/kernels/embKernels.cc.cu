@@ -492,7 +492,7 @@ __global__ void ker_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
   decompose_3dim(idx, beam_size, hidden_dim, &batch_idx, &beam_idx, &dim_idx);
 
   T emb;
-  if ((multilg_type == 2 || multilg_type == 3) && step == 0) {
+  if (multilg_type == 2 && step == 0) {
     // the bos of sentense level multilg is target lang id
     int lid = lang_id[batch_idx];
     emb = lang_emb[flat_2dim(lid, dim_idx, hidden_dim)];
@@ -543,91 +543,5 @@ template void launch_dec_emb<__half>(const __half *token_emb,
                                      int beam_size, int hidden_dim,
                                      int vocab_size, int step, int max_step,
                                      int multilg_type, cudaStream_t stream);
-
-/**
-@brief: ker_patch_emb
-patch embedding by conv2d, concat cls embedding, add position embedding
-
-@thread
-gridDim.x = batch_size
-gridDim.y = max_step
-gridDim.z = hidden_dim
-blockDim.x = MAX_THREADS
-
-@param
-conv_weight: [hidden_dim, channel_input, patch_size, patch_size]
-conv_bias: [hidden_dim]
-pos_emb: [max_step, hidden_dim]
-cls_emb: [hidden_dim]
-input: [batch_size, channel_input, image_size, image_size]
-output: result, [batch_size, max_step, hidden_dim]
-*/
-template <typename T>
-__global__ void ker_patch_emb(const T *conv_weight, const T *conv_bias,
-                              const T *pos_emb, const T *cls_emb,
-                              const float *input, T *output, int patch_size,
-                              int image_size, int channel_input) {
-  if (blockIdx.y == 0) {
-    if (threadIdx.x == 0) {
-      output[flat_3dim(blockIdx.x, 0, blockIdx.z, gridDim.y, gridDim.z)] =
-          __ldg(&cls_emb[blockIdx.z]) + __ldg(&pos_emb[blockIdx.z]);
-    }
-    return;
-  }
-
-  int val_num_per_block = channel_input * patch_size * patch_size;
-  int patch_row_id, patch_col_id, value_row_id, value_col_id, channel_id;
-  decompose_2dim(blockIdx.y - 1, image_size / patch_size, &patch_row_id,
-                 &patch_col_id);
-
-  float val = 0.f;
-  for (int idx = threadIdx.x; idx < val_num_per_block; idx += blockDim.x) {
-    decompose_3dim(idx, patch_size, patch_size, &channel_id, &value_row_id,
-                   &value_col_id);
-    int conv_weight_offset = flat_2dim(blockIdx.z, idx, val_num_per_block);
-    int in_offset = flat_4dim(blockIdx.x, channel_id,
-                              patch_row_id * patch_size + value_row_id,
-                              patch_col_id * patch_size + value_col_id,
-                              channel_input, image_size, image_size);
-    val += __ldg(&input[in_offset]) *
-           (float)__ldg(&conv_weight[conv_weight_offset]);
-  }
-
-  float rsum = blockReduceSum(val);
-  if (threadIdx.x == 0) {
-    float out_float;
-    int out_offset =
-        flat_3dim(blockIdx.x, blockIdx.y, blockIdx.z, gridDim.y, gridDim.z);
-    out_float =
-        rsum + (float)__ldg(&conv_bias[blockIdx.z]) +
-        (float)__ldg(&pos_emb[flat_2dim(blockIdx.y, blockIdx.z, gridDim.z)]);
-    output[out_offset] = (T)out_float;
-  }
-}
-
-template <typename T>
-void launch_patch_emb(const T *conv_weight, const T *conv_bias,
-                      const T *pos_emb, const T *cls_emb, const float *input,
-                      T *output, int patch_size, int image_size, int batch_size,
-                      int max_step, int hidden_dim, int channel_input,
-                      cudaStream_t stream) {
-  ker_patch_emb<T>
-      <<<dim3(batch_size, max_step, hidden_dim), MAX_THREADS, 0, stream>>>(
-          conv_weight, conv_bias, pos_emb, cls_emb, input, output, patch_size,
-          image_size, channel_input);
-}
-
-template void launch_patch_emb<float>(
-    const float *conv_weight, const float *conv_bias, const float *pos_emb,
-    const float *cls_emb, const float *input, float *output, int patch_size,
-    int image_size, int batch_size, int max_step, int hidden_dim,
-    int channel_input, cudaStream_t stream);
-
-template void launch_patch_emb<__half>(
-    const __half *conv_weight, const __half *conv_bias, const __half *pos_emb,
-    const __half *cls_emb, const float *input, __half *output, int patch_size,
-    int image_size, int batch_size, int max_step, int hidden_dim,
-    int channel_input, cudaStream_t stream);
-
 }  // namespace cuda
 }  // namespace lightseq

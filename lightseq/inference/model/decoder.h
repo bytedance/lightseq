@@ -6,7 +6,6 @@
 #include <curand_kernel.h>
 #include <thrust/functional.h>
 #include <thrust/sequence.h>
-#include <cublasLt.h>
 
 #include <algorithm>
 #include <chrono>
@@ -110,15 +109,12 @@ class Decoder {
   int _step_token_num;
   int _batch_max_decode_length;
   bool _is_sampling;
-  bool _is_benchmark;
 
   const std::vector<const _DataType*>& _p_d_trg_emb_wei;  // size: 7
   const std::vector<const _DataType*>&
       _p_d_dec_wei;  // size: 18 * dec_layer_num
-
   const _DataType _type_one;
   const _DataType _type_zero;
-
   const float _fzero;
   const _DataType
       _atten_scaler;          // scaling factor of Scaled Dot-Product Attention
@@ -139,7 +135,6 @@ class Decoder {
   void init_buffer(void* pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
-  void benchmark_mode(bool is_benchmark);
   int _cur_step;
   float* _p_d_alive_seq_score;
   bool _output_topk;

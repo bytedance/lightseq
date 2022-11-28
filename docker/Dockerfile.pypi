@@ -1,0 +1,64 @@
+FROM quay.io/pypa/manylinux2010_x86_64
+
+
+ENV CUDA_VERSION 10.1.243
+ENV CUDA_PKG_VERSION 10-1-$CUDA_VERSION-1
+
+
+RUN yum -y install yum-utils && yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel6/x86_64/cuda-rhel6.repo &&\
+    yum install --setopt=obsoletes=0 -y \
+    # base
+    cuda-cudart-$CUDA_PKG_VERSION \
+    cuda-compat-10-1 \
+    # runtime
+    cuda-libraries-$CUDA_PKG_VERSION \
+    cuda-nvtx-$CUDA_PKG_VERSION \
+    cuda-npp-$CUDA_PKG_VERSION \
+    libcublas10-10.2.1.243-1 \
+    libnccl-2.7.8-1+cuda10.1 \
+    # devel
+    cuda-nvml-dev-$CUDA_PKG_VERSION \
+    cuda-command-line-tools-$CUDA_PKG_VERSION \
+    libcublas-devel-10.2.1.243-1 \
+    cuda-cudart-dev-$CUDA_PKG_VERSION \
+    cuda-libraries-dev-$CUDA_PKG_VERSION \
+    cuda-minimal-build-$CUDA_PKG_VERSION \
+    cuda-nvprof-$CUDA_PKG_VERSION \
+    cuda-npp-dev-$CUDA_PKG_VERSION \
+    libnccl-devel-2.7.8-1+cuda10.1 \
+    && ln -s cuda-10.1 /usr/local/cuda \
+    && yum clean all \
+    && rm -rf /var/cache/yum/*
+
+RUN yum install -y yum-plugin-versionlock && yum versionlock libcublas10
+
+
+# install protobuf
+RUN curl -O -L -C - \
+    https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz && \
+    tar xf protobuf-cpp-3.13.0.tar.gz && \
+    rm protobuf-cpp-3.13.0.tar.gz && \
+    cd protobuf-3.13.0 && ./autogen.sh && \
+    ./configure "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" && \
+    make -j$(nproc) && make install && ldconfig && cd .. && rm -rf protobuf-3.13.0
+
+# install cmake
+ARG CMAKE_PATH=/cmake
+RUN mkdir -p ${CMAKE_PATH} && cd ${CMAKE_PATH} && \
+    curl -O -L -C - \
+    https://github.com/Kitware/CMake/releases/download/v3.18.2/cmake-3.18.2-Linux-x86_64.sh && \
+    sh cmake-3.18.2-Linux-x86_64.sh --skip-license && \
+    rm cmake-3.18.2-Linux-x86_64.sh && ln -s ${CMAKE_PATH}/bin/cmake /usr/bin/cmake
+
+# install HDF5
+RUN curl -O -L -C - \
+    https://github.com/HDFGroup/hdf5/archive/refs/tags/hdf5-1_12_0.tar.gz && \
+    tar xf hdf5-1_12_0.tar.gz && \
+    rm hdf5-1_12_0.tar.gz && \
+    cd hdf5-hdf5-1_12_0 && \
+    ./configure --prefix=/usr/local/hdf5 "CFLAGS=-fPIC" "CXXFLAGS=-fPIC" --enable-build-mode=production && \
+    make -j$(nproc) && make install && cd .. && rm -rf hdf5-hdf5-1_12_0
+
+
+ENV LIBRARY_PATH /usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
+ENV PATH /usr/local/cuda/bin:/usr/local/hdf5:${PATH}

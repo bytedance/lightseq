@@ -42,7 +42,6 @@ class LSFSTransformerDecoderLayer(LSTransformerDecoderLayer):
         encoder_out,
         encoder_padding_mask,
         incremental_state,
-        self_attn_mask=None,
     ):
         if incremental_state is None:
             cache = None

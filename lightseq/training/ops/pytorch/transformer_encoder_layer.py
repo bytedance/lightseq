@@ -1,26 +1,22 @@
-from itertools import zip_longest
 import math
+from dataclasses import dataclass
 
 import torch
+import os
 from torch import nn
 from torch.autograd import Function
 
-from lightseq.training.ops.pytorch.layer_base import TransformerEncoderLayerBase
+
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
-from lightseq.training.ops.pytorch.quantization import (
-    weight_quant_config,
-    act_quant_config,
-    relu_quant_config,
-)
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,
+    MODEL_ARCH,
+    check_config,
     calc_offset,
 )
 
-transformer_cuda_module = TransformerBuilder().load()
-
-
+transformer_cuda_module = None
 _all_layer_grads = dict()
 
 
@@ -44,12 +40,7 @@ class LSTransformerEncoderFunc(Function):
             input_mask = input_mask.to(torch.half)
 
         (output,) = forward_func(
-            config.layer_id,
-            input,
-            input_mask,
-            config.training,
-            config.pre_layer_norm,
-            config.quant_mode,
+            config.layer_id, input, input_mask, config.training, config.pre_layer_norm
         )
 
         if config.is_grad_enabled and config.training:
@@ -83,7 +74,7 @@ class LSTransformerEncoderFunc(Function):
         return (grad_input, None, grad, None)
 
 
-class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
+class LSTransformerEncoderLayer(nn.Module):
     """Initialize the Lightseq Transformer Encoder Layer.
 
     Static variable:
@@ -108,69 +99,17 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
-        self.quant_mode = False
-
         if self.config.local_rank >= 0:
             torch.cuda.set_device(self.config.local_rank)
 
-        self.create_cpp_layer()
-
-        hs = self.config.hidden_size
-        ims = self.config.intermediate_size
-        self.hs = hs
-        self.ims = ims
-        self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
-        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
-
-        if initial_weights is None or initial_biases is None:
-            self.init_transformer_weights()
-            return
-
-        # For testing only.
-        qkv_w = [ele.detach().clone() for ele in initial_weights[:3]]
-        qkv_w = torch.cat(qkv_w, dim=0)
-        weights = [qkv_w] + [copy_para(ele) for ele in initial_weights[3:]]
-
-        qkv_b = [ele.detach().clone() for ele in initial_biases[:3]]
-        qkv_b = torch.cat(qkv_b, dim=0)
-        biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
-
-        idx = 0
-        for w, b in zip_longest(weights, biases):
-            if w is not None:
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == w.numel()
-                cur_para.copy_(w.view(-1))
-                idx += 1
-
-            if b is not None:
-                cur_para = self._get_weights(idx)
-                assert cur_para.numel() == b.numel()
-                cur_para.copy_(b.view(-1))
-                idx += 1
-
-    @staticmethod
-    def gen_offset(hidden_size, intermediate_size):
-        hs, ims = hidden_size, intermediate_size
-        sizes = [
-            hs * hs * 3,  # attn_qkvw
-            hs * 3,  # attn_qkvb
-            hs * hs,  # attn_ow
-            hs,  # attn_ob
-            hs,  # attn_nw
-            hs,  # attn_nb
-            hs * ims,  # inter_w
-            ims,  # inter_b
-            hs * ims,  # output_w
-            hs,  # output_b
-            hs,  # ffn_nw
-            hs,  # ffn_nb
-            12,  # clip_max
-        ]
-        offsets = calc_offset(sizes)
-        return offsets
-
-    def create_cpp_layer(self):
+        # Load cuda modules if needed
+        global transformer_cuda_module
+        if transformer_cuda_module is None:
+            if os.getenv('ROCM_PATH') is not None:
+                import importlib
+                transformer_cuda_module = importlib.import_module("op_builder.lightseq_layers_op")
+            else:
+                 transformer_cuda_module = TransformerBuilder().load()            
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -192,8 +131,84 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
             self.config.hidden_dropout_ratio,
             self.config.pre_layer_norm,
             self.config.activation_fn,
-            False,  # mask_future_tokens
         )
+
+        hs = self.config.hidden_size
+        ims = self.config.intermediate_size
+        self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
+        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+
+        if initial_weights is None and initial_biases is None:
+            self.init_transformer_weights()
+            return
+
+        # For testing only.
+        qkv_w = [ele.detach().clone() for ele in initial_weights[:3]]
+        qkv_w = torch.cat(qkv_w, dim=0)
+        weights = [qkv_w] + [copy_para(ele) for ele in initial_weights[3:]]
+
+        qkv_b = [ele.detach().clone() for ele in initial_biases[:3]]
+        qkv_b = torch.cat(qkv_b, dim=0)
+        biases = [qkv_b] + [copy_para(ele) for ele in initial_biases[3:]]
+
+        idx = 0
+        for w, b in zip(weights, biases):
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == w.numel()
+            cur_para.copy_(w.view(-1))
+            idx += 1
+
+            cur_para = self._get_weights(idx)
+            assert cur_para.numel() == b.numel()
+            cur_para.copy_(b.view(-1))
+            idx += 1
+
+    @staticmethod
+    def get_config(**kwargs):
+        @dataclass
+        class Config:
+            max_batch_tokens: int  # max batch token numbers
+            max_seq_len: int  # max sequence length
+            hidden_size: int  # size of transformer hidden layers
+            intermediate_size: int  # size of ffn inner size
+            nhead: int  # number of heads in attention
+            attn_prob_dropout_ratio: float  # attention score dropout ratio
+            activation_dropout_ratio: float  # ffn activation dropout ratio
+            hidden_dropout_ratio: float  # dropout ration before residual
+            pre_layer_norm: bool  # pre layer norm or post
+            fp16: bool  # fp16 presion
+            local_rank: int  # rank in local node
+            activation_fn: str = "relu"  # relu or gelu
+
+        if "model" in kwargs:
+            if kwargs["model"] not in MODEL_ARCH:
+                raise ValueError("{} architecture is not supported.")
+            MODEL_ARCH[kwargs["model"]](kwargs)
+            del kwargs["model"]
+
+        config = Config(**kwargs)
+        check_config(config)
+        return config
+
+    @staticmethod
+    def gen_offset(hidden_size, intermediate_size):
+        hs, ims = hidden_size, intermediate_size
+        sizes = [
+            hs * hs * 3,  # attn_qkvw
+            hs * 3,  # attn_qkvb
+            hs * hs,  # attn_ow
+            hs,  # attn_ob
+            hs,  # attn_nw
+            hs,  # attn_nb
+            hs * ims,  # inter_w
+            ims,  # inter_b
+            hs * ims,  # output_w
+            hs,  # output_b
+            hs,  # ffn_nw
+            hs,  # ffn_nb
+        ]
+        offsets = calc_offset(sizes)
+        return offsets
 
     def _get_weights(self, i):
         return self.para.data.narrow(
@@ -232,55 +247,6 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         nn.init.ones_(self._get_weights(10))
         nn.init.zeros_(self._get_weights(11))
 
-        act_cmax = act_quant_config.amax.tolist()
-        wei_cmax = weight_quant_config.amax.tolist()
-        init_clip_max = torch.tensor([act_cmax, wei_cmax, act_cmax] * 4)
-        self._get_weights(12).copy_(init_clip_max)
-
-    def params_dict(self):
-        """
-        Returns:
-            weight: dict
-            bias: dict
-        """
-
-        def copy_and_view(m, shape=None):
-            if shape is None:
-                shape = (-1,)
-            return m.data.clone().view(*shape)
-
-        self_attn_qkvw = self._get_weights(0)
-        self_attn_qw, self_attn_kw, self_attn_vw = self_attn_qkvw.split(
-            self.hs * self.hs, 0
-        )
-        self_attn_qkvb = self._get_weights(1)
-        self_attn_qb, self_attn_kb, self_attn_vb = self_attn_qkvb.split(self.hs, 0)
-
-        weight = {
-            "self_attn.q_proj": copy_and_view(self_attn_qw, (self.hs, self.hs)),
-            "self_attn.k_proj": copy_and_view(self_attn_kw, (self.hs, self.hs)),
-            "self_attn.v_proj": copy_and_view(self_attn_vw, (self.hs, self.hs)),
-            "self_attn.out_proj": copy_and_view(
-                self._get_weights(2), (self.hs, self.hs)
-            ),
-            "self_attn_layer_norm": copy_and_view(self._get_weights(4), (self.hs,)),
-            "fc1": copy_and_view(self._get_weights(6), (self.ims, self.hs)),
-            "fc2": copy_and_view(self._get_weights(8), (self.hs, self.ims)),
-            "final_layer_norm": copy_and_view(self._get_weights(10), (self.hs,)),
-            "clip_max": copy_and_view(self._get_weights(12), (12,)),
-        }
-        bias = {
-            "self_attn.q_proj": copy_and_view(self_attn_qb),
-            "self_attn.k_proj": copy_and_view(self_attn_kb),
-            "self_attn.v_proj": copy_and_view(self_attn_vb),
-            "self_attn.out_proj": copy_and_view(self._get_weights(3)),
-            "self_attn_layer_norm": copy_and_view(self._get_weights(5)),
-            "fc1": copy_and_view(self._get_weights(7)),
-            "fc2": copy_and_view(self._get_weights(9)),
-            "final_layer_norm": copy_and_view(self._get_weights(11)),
-        }
-        return weight, bias
-
     def __assign_layer_weight_grad(self):
         param = (
             self.para_16
@@ -289,13 +255,12 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         )
         if self.config.layer_id in _all_layer_grads:
             return
-        global transformer_cuda_module
         cuda_module = transformer_cuda_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
             func = cuda_module.assign_layer_weight_grad_fp32
-        grad = torch.zeros_like(param)
+        grad = torch.empty_like(param)
         func(param, grad, "TransformerEncoderLayer", self.config.layer_id)
         _all_layer_grads[self.config.layer_id] = grad
 
@@ -306,14 +271,8 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         return destination
 
     def forward(self, hidden_states, encoder_padding_mask, **kwargs):
-        # encoder_padding_mask is a mask for the input sequence
-        # sizes are [batch_size, seq_len] or [seq_len] when batch_size = 1
-        # masked value should be 1.0, unmasked value should be 0.0
-
         self.config.training = self.training
         self.config.is_grad_enabled = torch.is_grad_enabled()
-        self.config.quant_mode = self.quant_mode
-
         hidden_states = hidden_states.contiguous()
         encoder_padding_mask = (
             (encoder_padding_mask * -1e8).type_as(hidden_states).contiguous()
@@ -328,8 +287,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         bs, sl, dim = hidden_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
-                f"Batch token numbers {bs * sl} exceeds the limit"
-                f" {self.config.max_batch_tokens}."
+                f"Batch token numbers {bs * sl} exceeds the limit {self.config.max_batch_tokens}."
             )
         if sl > self.config.max_seq_len:
             raise ValueError(
@@ -349,9 +307,3 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
         )
 
         return output.to(self.para)
-
-    def disable_quant(self):
-        self.quant_mode = False
-
-    def enable_quant(self):
-        self.quant_mode = True

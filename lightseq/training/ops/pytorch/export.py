@@ -4,9 +4,7 @@ from lightseq.training.ops.pytorch.util import get_pos_embedding
 from lightseq.training import LSTransformerEncoderLayer, LSTransformerDecoderLayer
 
 
-def gather_token_embedding(
-    tensor_names, state_dict, tn_pattern, scale=True, emb_dim=None
-):
+def gather_token_embedding(tensor_names, state_dict, tn_pattern, scale=True):
     target_tn = []
     for tn in tensor_names:
         if tn_pattern in tn.split("."):
@@ -14,10 +12,8 @@ def gather_token_embedding(
             continue
     target_tensor = [state_dict[name] for name in target_tn]
     target_tensor = np.concatenate(target_tensor, axis=0)
-    if emb_dim is None:
-        emb_dim = target_tensor.shape[1]
     if scale:
-        target_tensor = target_tensor * (emb_dim**0.5)
+        target_tensor = target_tensor * (target_tensor.shape[1] ** 0.5)
     return target_tensor, target_tn
 
 
@@ -72,10 +68,7 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
             expression = [expression]
         exec("tt['save'] = [%s]" % ",".join(expression))
 
-    try:
-        target_tensor = np.concatenate(tt["save"], axis=-1)
-    except:
-        target_tensor = tt["save"]
+    target_tensor = np.concatenate(tt["save"], axis=-1)
     print(
         "%s -> %s, convert finished!"
         % (target_tn if target_tn else "created", proto_name)
@@ -159,17 +152,9 @@ def fill_encdec_weight(
             )
 
 
-def export_ls_embedding(
-    file, state_dict, max_length, emb_dim, is_encoder, save_pb=True
-):
+def export_ls_embedding(file, state_dict, max_length, is_encoder, save_pb=True):
     var_name_list = list(state_dict.keys())
-    emb, target_tn = gather_token_embedding(
-        var_name_list, state_dict, "embed_tokens", emb_dim=emb_dim
-    )
-    emb_size = emb.flatten().shape[0] - 1
-    assert emb_size % emb_dim == 0
-    emb = emb.flatten()[:-1].reshape(emb_size // emb_dim, emb_dim)
-
+    emb, target_tn = gather_token_embedding(var_name_list, state_dict, "embeddings")
     if is_encoder:
         emb_list = emb.flatten().tolist()
         if save_pb:
@@ -191,7 +176,7 @@ def export_ls_embedding(
         % (target_tn, "src" if is_encoder else "trg")
     )
 
-    pos_emb = get_pos_embedding(max_length, emb_dim)
+    pos_emb = get_pos_embedding(max_length, emb.shape[-1])
     pos_emb_list = pos_emb.flatten().tolist()
     if is_encoder:
         if save_pb:
@@ -326,10 +311,10 @@ def export_ls_decoder(
     enc_out_mapping_dict = OrderedDict(
         {
             "encode_output_project_kernel_kv": "para&&expression_[{0}:{1}].reshape({2}, {3}).transpose(0, 1)".format(
-                offsets[19], offsets[20], 2 * nlayer * hs, hs
+                offsets[18], offsets[19], 2 * nlayer * hs, hs
             ),
             "encode_output_project_bias_kv": "para&&expression_[{0}:{1}]".format(
-                offsets[20], offsets[21]
+                offsets[19], offsets[20]
             ),
         }
     )
@@ -370,127 +355,3 @@ def export_ls_config(
         sampling_method = np.array([ord(c) for c in sampling_method]).astype(np.int8)
         for v in list(args.keys()):
             exec("file.create_dataset('model_conf/{0}', data={0})".format(v))
-
-
-def export_pb2hdf5(transformer, f):
-    """Convert Transformer protobuf to hdf5 format to support larger weight."""
-    MODEL_CONF_KEYS = [
-        # model_conf
-        "head_num",
-        "beam_size",
-        "extra_decode_length",
-        "length_penalty",
-        "src_padding_id",
-        "trg_start_id",
-        "diverse_lambda",
-        "sampling_method",
-        "topp",
-        "topk",
-        "trg_end_id",
-        "is_post_ln",
-        "no_scale_embedding",
-        "use_gelu",
-        "multilg_type",
-    ]
-
-    EMBEDDING_KEYS = [
-        # src_embedding
-        # trg_embedding
-        "token_embedding",
-        "position_embedding",
-        "norm_scale",
-        "norm_bias",
-        "encode_output_project_kernel_kv",
-        "encode_output_project_bias_kv",
-        "shared_bias",
-        "lang_emb",
-        "trg_vocab_mask",
-    ]
-
-    ENCODER_LAYER_KEYS = [
-        # encoder_stack/{i}
-        "multihead_norm_scale",
-        "multihead_norm_bias",
-        "multihead_project_kernel_qkv",
-        "multihead_project_bias_qkv",
-        "multihead_project_kernel_output",
-        "multihead_project_bias_output",
-        "ffn_norm_scale",
-        "ffn_norm_bias",
-        "ffn_first_kernel",
-        "ffn_first_bias",
-        "ffn_second_kernel",
-        "ffn_second_bias",
-    ]
-
-    DECODER_LAYER_KEYS = [
-        # decoder_stack/{i}
-        "self_norm_scale",
-        "self_norm_bias",
-        "self_project_kernel_qkv",
-        "self_project_bias_qkv",
-        "self_project_kernel_output",
-        "self_project_bias_output",
-        "encdec_norm_scale",
-        "encdec_norm_bias",
-        "encdec_project_kernel_q",
-        "encdec_project_bias_q",
-        "encdec_project_kernel_output",
-        "encdec_project_bias_output",
-        "ffn_norm_scale",
-        "ffn_norm_bias",
-        "ffn_first_kernel",
-        "ffn_first_bias",
-        "ffn_second_kernel",
-        "ffn_second_bias",
-    ]
-    base_attr_to_keys = {
-        "src_embedding": EMBEDDING_KEYS,
-        "trg_embedding": EMBEDDING_KEYS,
-        "model_conf": MODEL_CONF_KEYS,
-    }
-
-    from operator import attrgetter
-
-    print(f"start converting protobuf to hdf5 format.")
-    # load src_embedding, trg_embedding, model_conf
-    for base_attr, keys in base_attr_to_keys.items():
-        for key in keys:
-            hdf5_key = f"{base_attr}/{key}"
-            proto_attr = f"{base_attr}.{key}"
-
-            if key not in dir(attrgetter(base_attr)(transformer)):
-                print(f"key {key} not found in {base_attr}, skipping")
-                continue
-
-            print(f"loading transformer {proto_attr} -> {hdf5_key}")
-            _data = attrgetter(proto_attr)(transformer)
-            if type(_data) is str:
-                print(
-                    f"find type str, explicitly convert string to ascii encoded array."
-                )
-                # explict convert to array of char (int8) to avoid issues on string reading in C
-                _data = np.array([ord(c) for c in _data]).astype(np.int8)
-            f.create_dataset(hdf5_key, data=_data)
-
-    # save number of layers metadata
-    f.create_dataset("model_conf/n_encoder_stack", data=len(transformer.encoder_stack))
-    f.create_dataset("model_conf/n_decoder_stack", data=len(transformer.decoder_stack))
-
-    # load encoder_stack
-    for layer_id, layer in enumerate(transformer.encoder_stack):
-        for key in ENCODER_LAYER_KEYS:
-            hdf5_key = f"encoder_stack/{layer_id}/{key}"
-            proto_attr = key
-            print(f"loading transformer.encoder_stack {proto_attr} -> {hdf5_key}")
-            f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
-
-    # load decoder_stack
-    for layer_id, layer in enumerate(transformer.decoder_stack):
-        for key in DECODER_LAYER_KEYS:
-            hdf5_key = f"decoder_stack/{layer_id}/{key}"
-            proto_attr = key
-            print(f"loading transformer.decoder_stack {proto_attr} -> {hdf5_key}")
-            f.create_dataset(hdf5_key, data=attrgetter(proto_attr)(layer))
-
-    print(f"proto to hdf5 conversion completed.")

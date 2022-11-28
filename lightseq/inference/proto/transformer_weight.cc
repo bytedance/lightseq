@@ -34,18 +34,16 @@ template <OperationType OpType_>
 void TransformerWeight<OpType_>::proto_get_model_config(
     const Transformer &transformer, bool only_decoder) {
   _hidden_size = transformer.trg_embedding().norm_scale_size();
-  _max_step =
-      transformer.trg_embedding().position_embedding_size() / _hidden_size;
-
   _inner_size =
       transformer.decoder_stack()[0].ffn_first_kernel_size() / _hidden_size;
+  _max_step =
+      transformer.trg_embedding().position_embedding_size() / _hidden_size;
   if (!only_decoder) {
     _src_vocab_size =
         transformer.src_embedding().token_embedding_size() / _hidden_size;
   }
   _trg_vocab_size =
       transformer.trg_embedding().token_embedding_size() / _hidden_size;
-
   if (!only_decoder) {
     _n_enc_layer = transformer.encoder_stack_size();
   }
@@ -98,7 +96,6 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
   int idx = 0;
 
   offset.push_back(idx);
-
   if (layer.token_embedding_size() != vocab_size * _hidden_size)
     return "Wrong token_embedding_size !";
   for (float ele : layer.token_embedding()) value.push_back(ele);
@@ -131,13 +128,11 @@ std::string TransformerWeight<OpType_>::proto_parse_emb_wei(
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
     offset.push_back(idx);
-
     if (layer.encode_output_project_kernel_kv_size() !=
         _hidden_size * _hidden_size * 2 * _n_dec_layer)
       return "Wrong encode_output_project_kernel_kv_size !";
     for (float ele : layer.encode_output_project_kernel_kv())
       value.push_back(ele);
-
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
@@ -213,13 +208,11 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (enc_layer.multihead_project_kernel_qkv_size() !=
         _hidden_size * _hidden_size * 3)
       return "Wrong multihead_project_kernel_qkv_size !";
     for (float ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(ele);
-
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -230,13 +223,11 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
-
     if (enc_layer.multihead_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
       return "Wrong multihead_project_kernel_output_size !";
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
-
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -259,11 +250,9 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
-
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -273,11 +262,9 @@ std::string TransformerWeight<OpType_>::proto_parse_enc_wei(
     idx += _inner_size;
 
     offset.push_back(idx);
-
     if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
-
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -322,12 +309,10 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (dec_layer.self_project_kernel_qkv_size() !=
         _hidden_size * _hidden_size * 3)
       return "Wrong self_project_kernel_qkv size !";
     for (float ele : dec_layer.self_project_kernel_qkv()) value.push_back(ele);
-
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -337,13 +322,11 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size * 3;
 
     offset.push_back(idx);
-
     if (dec_layer.self_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
       return "Wrong self_project_kernel_output size !";
     for (float ele : dec_layer.self_project_kernel_output())
       value.push_back(ele);
-
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -365,11 +348,9 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_q size !";
     for (float ele : dec_layer.encdec_project_kernel_q()) value.push_back(ele);
-
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -379,13 +360,11 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (dec_layer.encdec_project_kernel_output_size() !=
         _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_output size !";
     for (float ele : dec_layer.encdec_project_kernel_output())
       value.push_back(ele);
-
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -408,11 +387,9 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _hidden_size;
 
     offset.push_back(idx);
-
     if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
     for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
-
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -422,11 +399,9 @@ std::string TransformerWeight<OpType_>::proto_parse_dec_wei(
     idx += _inner_size;
 
     offset.push_back(idx);
-
     if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
-
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -957,6 +932,7 @@ void TransformerWeight<OpType_>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         value.data() + idx, [=](int size) { return size != _hidden_size; },
         "Wrong ffn_second_bias_size !");
     idx += _hidden_size;
+
   }  // for
 
   std::vector<_DataType> raw_value;

@@ -1,10 +1,5 @@
-#include "transformerKernels.h"
-
 #include "common.h"
-
-#include <cooperative_groups.h>
-
-namespace cg = cooperative_groups;
+#include "transformerKernels.h"
 
 /**
 @file
@@ -14,70 +9,6 @@ Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
 namespace cuda {
-
-template <typename T>
-__global__ void scaled_colsum_reduce_kernel(const T* __restrict__ inp,
-                                            T* __restrict__ out, int rows,
-                                            int cols, float scale) {
-  __shared__ float tile[WARP_SIZE][WARP_SIZE];
-
-  cg::thread_block b = cg::this_thread_block();
-  cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
-
-  int idx = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
-  int y_stride = cols * WARP_SIZE;
-  float localSum = 0;
-
-  // Loop across matrix row
-  // TODO: optimize to log complexity
-  if (idx < cols) {
-    int offset = flat_2dim(threadIdx.y, idx, cols);
-    for (int r = threadIdx.y; r < rows; r += WARP_SIZE) {
-      localSum += (float)inp[offset];
-      offset += y_stride;
-    }
-  }
-
-  // The sum of a row in tile is equal to the sum of a col in original matrix
-  tile[threadIdx.x][threadIdx.y] = localSum;
-
-  __syncthreads();
-
-  // Sum the shared buffer.
-  // The change of threadIdx.x is continuous
-  float sum = tile[threadIdx.y][threadIdx.x];
-
-  __syncthreads();
-
-  // Calculate the sum of a row in tile
-  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
-
-  if (threadIdx.x == 0) {
-    int pos = flat_2dim(blockIdx.x, threadIdx.y, WARP_SIZE);
-    if (pos < cols) out[pos] = sum * scale;
-  }
-}
-
-// [r, c] -> [c]
-template <>
-void launch_scaled_colsum<float>(const float* inp, float* out, int rows,
-                                 int cols, float scale, cudaStream_t stream) {
-  dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
-  dim3 block_dim(WARP_SIZE, WARP_SIZE);
-
-  scaled_colsum_reduce_kernel<float>
-      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols, scale);
-}
-
-template <>
-void launch_scaled_colsum<__half>(const __half* inp, __half* out, int rows,
-                                  int cols, float scale, cudaStream_t stream) {
-  dim3 grid_dim((cols - 1) / WARP_SIZE + 1);
-  dim3 block_dim(WARP_SIZE, WARP_SIZE);
-
-  scaled_colsum_reduce_kernel<__half>
-      <<<grid_dim, block_dim, 0, stream>>>(inp, out, rows, cols, scale);
-}
 
 /**
 @brief: select_beam_rough_topk
@@ -810,7 +741,7 @@ __global__ void ker_arrange_decself_qkv(const T* ori_qkv, const T* qkv_bias,
     T val = ori_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * hidden_size + i] +
             __ldg(&qkv_bias[blockIdx.y * hidden_size + i]);
     int seq_id =
-        blockIdx.x;  // obvious, seq_id = batch_id * beam_size + beam_id
+        blockIdx.x;  // obvious， seq_id = batch_id * beam_size + beam_id
     if (blockIdx.y == 0) {
       // for query
       new_q[seq_id * hidden_size + i] = val;
@@ -841,7 +772,7 @@ __global__ void ker_arrange_decself_qkv<__half>(
     half2 val = __hadd2(
         p_qkv[(blockIdx.x * gridDim.y + blockIdx.y) * half_hidden_size + i],
         __ldg(&p_bias[blockIdx.y * half_hidden_size + i]));
-    // obvious, seq_id = batch_id * beam_size + beam_id
+    // obvious，seq_id = batch_id * beam_size + beam_id
     int seq_id = blockIdx.x;
     if (blockIdx.y == 0) {
       // for query
@@ -1575,56 +1506,6 @@ __global__ void ker_refresh_cache<__half>(
   }
 }
 
-template <>
-__global__ void ker_refresh_cache<int8_t>(
-    const int* num_can_per_beam, const int* can_idx, const int8_t* self_k_bgeem,
-    const int8_t* self_v_bgeem, int8_t* new_self_k_bgeem,
-    int8_t* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse, int end_id) {
-  int layer_id = blockIdx.x;
-  int kv_id = blockIdx.y & 1;
-  int beam_id_global = blockIdx.y >> 1;
-  int batch_id = beam_id_global / beam_size;
-  int beam_id = beam_id_global % beam_size;
-  int hidden_size = dim_per_head * head_num;
-
-  int can_pos = num_can_per_beam[batch_id * beam_size] + beam_id;
-  int can_beam_id =
-      can_idx[can_pos] / vocab_size;  // can_beam_id * vocab_size + vocab_id
-  if (diverse) can_beam_id %= beam_size;
-  if (can_idx[can_pos] % vocab_size == end_id) {
-    return;
-  }
-
-  int layer_offset = layer_id * self_k_bgeem_offset;
-  int ori_beam_offset = hidden_size * max_step * can_beam_id + layer_offset;
-  int new_beam_offset = hidden_size * max_step * beam_id + layer_offset;
-  for (int head_id = 0; head_id < head_num; ++head_id) {
-    for (int i = threadIdx.x; i < dim_per_head * (cur_step + 1);
-         i += blockDim.x) {
-      int step_id = i / dim_per_head;
-      int dim_id = i % dim_per_head;
-      int base_pos = targetid_5dim(batch_id, 0, head_id, step_id, dim_id,
-                                   beam_size, head_num, max_step, dim_per_head);
-
-      int ori_id = base_pos + ori_beam_offset;
-      int new_id = base_pos + new_beam_offset;
-
-      if (kv_id == 0) {
-        // for key
-        reinterpret_cast<char4*>(new_self_k_bgeem)[new_id] =
-            reinterpret_cast<const char4*>(self_k_bgeem)[ori_id];
-
-      } else {
-        // for value
-        reinterpret_cast<char4*>(new_self_v_bgeem)[new_id] =
-            reinterpret_cast<const char4*>(self_v_bgeem)[ori_id];
-      }
-    }
-  }
-}
-
 template <typename T>
 void ker_refresh_cache_launcher(
     int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
@@ -1654,32 +1535,6 @@ void ker_refresh_cache_launcher<__half>(
           diverse, end_id);
 }
 
-template <>
-void ker_refresh_cache_launcher<int8_t>(
-    int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
-    const int* num_can_per_beam, const int* can_idx, const int8_t* self_k_bgeem,
-    const int8_t* self_v_bgeem, int8_t* new_self_k_bgeem,
-    int8_t* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse, int end_id) {
-  int block_workload = (cur_step + 1) * dim_per_head / 4;
-  if (block_workload < 256) {
-    block_dim = 128;
-  } else if (block_workload < 512) {
-    block_dim = 256;
-  } else if (block_workload < 1024) {
-    block_dim = 512;
-  } else {
-    block_dim = 1024;
-  }
-  ker_refresh_cache<int8_t>
-      <<<dim3(grid_dim_x, grid_dim_y), block_dim, 0, stream>>>(
-          num_can_per_beam, can_idx, self_k_bgeem, self_v_bgeem,
-          new_self_k_bgeem, new_self_v_bgeem, self_k_bgeem_offset / 4,
-          beam_size, dim_per_head / 4, head_num, vocab_size, cur_step, max_step,
-          diverse, end_id);
-}
-
 template void ker_refresh_cache_launcher<float>(
     int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
     const int* num_can_per_beam, const int* can_idx, const float* self_k_bgeem,
@@ -1692,14 +1547,6 @@ template void ker_refresh_cache_launcher<__half>(
     const int* num_can_per_beam, const int* can_idx, const __half* self_k_bgeem,
     const __half* self_v_bgeem, __half* new_self_k_bgeem,
     __half* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
-    int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
-    bool diverse, int end_id);
-
-template void ker_refresh_cache_launcher<int8_t>(
-    int grid_dim_x, int grid_dim_y, int block_dim, cudaStream_t stream,
-    const int* num_can_per_beam, const int* can_idx, const int8_t* self_k_bgeem,
-    const int8_t* self_v_bgeem, int8_t* new_self_k_bgeem,
-    int8_t* new_self_v_bgeem, int self_k_bgeem_offset, int beam_size,
     int dim_per_head, int head_num, int vocab_size, int cur_step, int max_step,
     bool diverse, int end_id);
 

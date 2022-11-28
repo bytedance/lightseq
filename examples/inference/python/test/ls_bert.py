@@ -76,7 +76,6 @@ def main():
     print("creating huggingface model...")
     hf_model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
     hf_model.to("cuda:0")
-    hf_model.eval()
 
     print("creating lightseq model...")
     ls_model = LightseqBertClassification("lightseq_bert_base_uncased.hdf5", hf_model)

@@ -23,12 +23,5 @@ void launch_dec_emb(const T *token_emb, const T *pos_emb, int *tokens,
                     int vocab_size, int step, int max_step, int multilg_type,
                     cudaStream_t stream);
 
-template <typename T>
-void launch_patch_emb(const T *conv_weight, const T *conv_bias,
-                      const T *pos_emb, const T *cls_emb, const float *input,
-                      T *output, int patch_size, int image_size, int batch_size,
-                      int max_step, int hidden_dim, int channel_input,
-                      cudaStream_t stream);
-
 }  // namespace cuda
 }  // namespace lightseq

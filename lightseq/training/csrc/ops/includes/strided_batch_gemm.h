@@ -9,9 +9,7 @@
 #include <stdio.h>
 
 #include <array>
-
 #include "cublas_wrappers.h"
-
 template <typename T>
 class StridedBatchGemm {
  public:
@@ -31,7 +29,11 @@ class StridedBatchGemm {
           beta(param_beta),
           op_A(opA),
           op_B(opB),
+#ifdef __HIPCC__
+          gemm_algos(std::array<int, 3>({160, 160, 160})) {}
+#else
           gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+#endif
     void SetConfig(int mm, int nn, int kk) {
       m = mm;
       n = nn;
@@ -52,7 +54,12 @@ class StridedBatchGemm {
     cublas_strided_batched_gemm(
         handle, _config.m, _config.n, _config.k, &_config.alpha, &_config.beta,
         _buffer_a, _buffer_b, output, _config.op_A, _config.op_B, stride_a,
-        stride_b, stride_c, bsz, cublasGemmAlgo_t(_config.gemm_algos[0]));
+        stride_b, stride_c, bsz, 
+#ifdef __HIPCC__
+        rocblas_gemm_algo(_config.gemm_algos[0]));
+#else
+        cublasGemmAlgo_t(_config.gemm_algos[0]));
+#endif
   }
 
   void Backward(int bsz, const T *d_output, const T *_buffer_a,
@@ -75,7 +82,11 @@ class StridedBatchGemm {
         (_config.op_A == CUBLAS_OP_T ? _buffer_b : d_output),
         (_config.op_A == CUBLAS_OP_T ? d_output : _buffer_b), inpGradA,
         CUBLAS_OP_N, op_b, stride_a, stride_b, stride_c, bsz,
+#ifdef __HIPCC__
+        rocblas_gemm_algo(_config.gemm_algos[1]));
+#else
         cublasGemmAlgo_t(_config.gemm_algos[1]));
+#endif
 
     // A need to transpose.
     cublasOperation_t op_a =
@@ -89,7 +100,12 @@ class StridedBatchGemm {
     cublas_strided_batched_gemm(
         handle, _config.k, _config.n, _config.m, &_config.alpha, &_config.beta,
         _buffer_a, d_output, inpGradB, op_a, CUBLAS_OP_N, stride_a, stride_b,
-        stride_c, bsz, cublasGemmAlgo_t(_config.gemm_algos[2]));
+        stride_c, bsz, 
+#ifdef __HIPCC__
+        rocblas_gemm_algo(_config.gemm_algos[2]));
+#else
+        cublasGemmAlgo_t(_config.gemm_algos[2]));
+#endif
   }
 
   inline void SetConfig(int m, int n, int k) { _config.SetConfig(m, n, k); }

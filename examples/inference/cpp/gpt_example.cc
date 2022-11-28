@@ -8,28 +8,14 @@ Example of how to run gpt inference using our implementation.
 
 int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
-  std::vector<int> example_input = {40, 1842, 345, 11, 475, 345, 910, 326};
-  int eg_seq_len = example_input.size();
-
-  int batch_size = 1;
-  int batch_seq_len = eg_seq_len;
-
-  if (argc == 4) {
-    batch_size = atoi(argv[2]);
-    batch_seq_len = atoi(argv[3]);
-  }
-
-  int max_batch_size = std::max(8, batch_size);
-
-  std::vector<int> host_input;
-  for (int i = 0; i < batch_size; ++i) {
-    for (int j = 0; j < batch_seq_len; ++j) {
-      host_input.push_back(example_input[j % eg_seq_len]);
-    }
-  }
+  int max_batch_size = 128;
 
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Gpt", model_weights_path, max_batch_size);
+
+  int batch_size = 1;
+  int batch_seq_len = 5;
+  std::vector<int> host_input = {3666, 1438, 318, 402, 11571};
 
   void* d_input;
   lightseq::cuda::CHECK_GPU_ERROR(
@@ -38,7 +24,6 @@ int main(int argc, char* argv[]) {
       d_input, host_input.data(), sizeof(int) * batch_size * batch_seq_len,
       cudaMemcpyHostToDevice));
 
-  model->benchmark_mode(true);
   model->set_input_ptr(0, d_input);
   model->set_input_shape(0, {batch_size, batch_seq_len});
 
@@ -56,21 +41,12 @@ int main(int argc, char* argv[]) {
   lightseq::cuda::CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   std::cout << "infer preprocessing finished" << std::endl;
 
-  std::chrono::duration<double> elapsed;
-  int iter = 0;
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 20; i++) {
+  for (int i = 0; i < 10; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    auto finish = std::chrono::high_resolution_clock::now();
-    if (i >= 5) {
-      iter++;
-      elapsed += finish - start;
-    }
+    lightseq::cuda::print_time_duration(start, "one infer time", 0);
   }
-
-  std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
-            << " ms" << std::endl;
 
   for (int i = 0; i < model->get_output_size(); i++) {
     const int* d_output;
@@ -82,7 +58,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << std::endl;
 
-    lightseq::cuda::print_vec(d_output, "output", 10);
+    lightseq::cuda::print_vec(d_output, "output", 5);
   }
 
   return 0;

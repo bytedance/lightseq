@@ -38,8 +38,8 @@ class Transformer : public LSModel {
 
   const int *get_result_ptr();
   const float *get_score_ptr();
-  int get_max_step() { return tw_._max_step; }
-  int get_beam_size() { return tw_._beam_size; }
+  const int get_max_step() { return tw_._max_step; }
+  const int get_beam_size() { return tw_._beam_size; }
 
  public:
   Transformer(const std::string weight_path, const int max_batch_size);
@@ -53,7 +53,6 @@ class Transformer : public LSModel {
   std::vector<int> get_output_max_shape(int index) override;
   DataType get_input_dtype(int index) override;
   DataType get_output_dtype(int index) override;
-  void benchmark_mode(bool is_benchmark) override;
 };
 
 LSMODEL_REGISTER(Transformer);

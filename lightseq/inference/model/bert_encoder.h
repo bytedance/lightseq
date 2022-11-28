@@ -17,7 +17,7 @@
 
 /**
 @file
-Bert encoder, composed by gemm lib and
+Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 

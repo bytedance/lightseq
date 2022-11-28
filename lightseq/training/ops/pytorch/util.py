@@ -1,33 +1,6 @@
 import math
-from typing import Callable
 import numpy as np
 import torch
-import torch.nn.functional as F
-
-
-def softmax(x, dim: int, onnx_trace: bool = False):
-    if onnx_trace:
-        return F.softmax(x.float(), dim=dim)
-    else:
-        return F.softmax(x, dim=dim, dtype=torch.float32)
-
-
-def gelu(x: torch.Tensor) -> torch.Tensor:
-    return torch.nn.functional.gelu(x.float()).type_as(x)
-
-
-def get_activation_fn(activation: str) -> Callable:
-    """Returns the activation function corresponding to `activation`"""
-    if activation == "relu":
-        return F.relu
-    elif activation == "gelu":
-        return gelu
-    elif activation == "tanh":
-        return torch.tanh
-    elif activation == "linear":
-        return lambda x: x
-    else:
-        raise RuntimeError("--activation-fn {} not supported".format(activation))
 
 
 def copy_para(x):

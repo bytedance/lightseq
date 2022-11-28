@@ -17,7 +17,7 @@
 
 /**
 @file
-Transformer encoder, composed by gemm lib and
+Transformer decoder, composed by gemm lib and
   custom cuda kernel function
 */
 
@@ -45,10 +45,8 @@ class Encoder {
   const TransformerWeight<OpType_> &_tw;
   cudaStream_t _stream;
   cublasHandle_t _hd;
-
   const _DataType _fone;
   const _DataType _fzero;
-
   const _DataType _atten_scaler;
   const int _max_batch_dim;
   const int _max_thread_per_block;
