@@ -1,21 +1,31 @@
-########lightseq_hip构建######
+## Lightseq for HIP Quick Start
+Now lighteq hip only support training.
+### Build
 
-#1、设置HIP env,参考如下：
+1. 设置环境变量
+```shell
 export C_INCLUDE_PATH=${ROCM_PATH}/rocblas/include:${ROCM_PATH}/rocrand/include/:${ROCM_PATH}/hiprand/include:${ROCM_PATH}/hip/include/hip:$ROCM_PATH/hip/include/hip/hsa_detail:$ROCM_PATH/hipcub/include/hipcub:$C_INCLUDE_PATH
 export CPLUS_INCLUDE_PATH=$C_INCLUDE_PATH
 export LD_LIBRART_PATH=${ROCM_PATH}/rocblas/lib/:${ROCM_PATH}/rocrand/lib:$LD_LIBRART_PATH
 export LIBRARY_PATH=${ROCM_PATH}/rocblas/lib/:$LIBRARY_PATH
-
-
-#2、编译ls
-source `pwd`/shell/env_build.sh
+```
+2. 编译lightseq
+```
 verbose=1 ENABLE_FP32=1 ENABLE_DEBUG=1 CXX=hipcc CC=hipcc python3 setup.py install bdist_wheel
+```
+编译后在dist下生成whl文件,可以方便的迁移到其他平台环境使用。
+### Fast training from Fairseq
 
-#编译后在dist下生成whl文件
+You can experience lightning fast training by running following commands,
+Firstly install these requirements.
 
-#3、简单用例验证
-同cuda环境运行方式，如需在指定卡上运行，可使用HIP_VISIBLE_DEVICES指定。使用ls训练transformer示例：
+```shell
+pip install lightseq fairseq sacremoses
+```
+python层同cuda环境运行方式完全一致，更多示例可以参考[README.md](README.md).
 
+如需指定加速卡运行，可使用HIP_VISIBLE_DEVICES指定。使用lightseq训练transformer示例：
+```
 export HIP_VISIBLE_DEVICES=0
 lightseq-train /public/DL_DATA/wmt14_en_de_joined_dict  \
     --task translation \
@@ -33,3 +43,4 @@ lightseq-train /public/DL_DATA/wmt14_en_de_joined_dict  \
     --best-checkpoint-metric bleu \
     --maximize-best-checkpoint-metric \
     --fp16
+```
