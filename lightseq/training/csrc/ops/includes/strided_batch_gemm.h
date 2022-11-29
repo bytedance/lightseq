@@ -30,9 +30,11 @@ class StridedBatchGemm {
           op_A(opA),
           op_B(opB),
 #ifdef __HIPCC__
-          gemm_algos(std::array<int, 3>({160, 160, 160})) {}
+          gemm_algos(std::array<int, 3>({160, 160, 160})) {
+    }
 #else
-          gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+          gemm_algos(std::array<int, 3>({99, 99, 99})) {
+    }
 #endif
     void SetConfig(int mm, int nn, int kk) {
       m = mm;
@@ -51,14 +53,14 @@ class StridedBatchGemm {
     int stride_b = _config.n * _config.k;
     int stride_c = _config.m * _config.n;
 
-    cublas_strided_batched_gemm(
-        handle, _config.m, _config.n, _config.k, &_config.alpha, &_config.beta,
-        _buffer_a, _buffer_b, output, _config.op_A, _config.op_B, stride_a,
-        stride_b, stride_c, bsz, 
+    cublas_strided_batched_gemm(handle, _config.m, _config.n, _config.k,
+                                &_config.alpha, &_config.beta, _buffer_a,
+                                _buffer_b, output, _config.op_A, _config.op_B,
+                                stride_a, stride_b, stride_c, bsz,
 #ifdef __HIPCC__
-        rocblas_gemm_algo(_config.gemm_algos[0]));
+                                rocblas_gemm_algo(_config.gemm_algos[0]));
 #else
-        cublasGemmAlgo_t(_config.gemm_algos[0]));
+                                cublasGemmAlgo_t(_config.gemm_algos[0]));
 #endif
   }
 
@@ -97,14 +99,14 @@ class StridedBatchGemm {
     stride_c = _config.n * _config.k;
 
     // Calculate d_B.
-    cublas_strided_batched_gemm(
-        handle, _config.k, _config.n, _config.m, &_config.alpha, &_config.beta,
-        _buffer_a, d_output, inpGradB, op_a, CUBLAS_OP_N, stride_a, stride_b,
-        stride_c, bsz, 
+    cublas_strided_batched_gemm(handle, _config.k, _config.n, _config.m,
+                                &_config.alpha, &_config.beta, _buffer_a,
+                                d_output, inpGradB, op_a, CUBLAS_OP_N, stride_a,
+                                stride_b, stride_c, bsz,
 #ifdef __HIPCC__
-        rocblas_gemm_algo(_config.gemm_algos[2]));
+                                rocblas_gemm_algo(_config.gemm_algos[2]));
 #else
-        cublasGemmAlgo_t(_config.gemm_algos[2]));
+                                cublasGemmAlgo_t(_config.gemm_algos[2]));
 #endif
   }
 

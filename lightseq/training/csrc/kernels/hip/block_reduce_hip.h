@@ -25,8 +25,8 @@ __forceinline__ __device__ T warpReduceSum(T val) {
 template <typename T>
 __forceinline__ __device__ T blockReduceSum(T val) {
   static __shared__ T shared[16];
-  int lane = threadIdx.x & 0x3f;  
-  int wid = threadIdx.x >> 6; 
+  int lane = threadIdx.x & 0x3f;
+  int wid = threadIdx.x >> 6;
 
   val = warpReduceSum<T>(val);
 
@@ -48,21 +48,21 @@ __inline__ __device__ void warpReduce(float *pval);
 // static
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kMax, 1>(float *pval) {
-  *pval = max(*pval, __shfl_xor( *pval, 32, 64));
-  *pval = max(*pval, __shfl_xor( *pval, 16, 64));
-  *pval = max(*pval, __shfl_xor( *pval, 8, 64));
-  *pval = max(*pval, __shfl_xor( *pval, 4, 64));
-  *pval = max(*pval, __shfl_xor( *pval, 2, 64));
-  *pval = max(*pval, __shfl_xor( *pval, 1, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 32, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 16, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 8, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 4, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 2, 64));
+  *pval = max(*pval, __shfl_xor(*pval, 1, 64));
 }
 
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kMax, 2>(float *pval) {
   float val0_tmp, val1_tmp;
-#define WarpReduceMaxOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor( *(pval), a, b);     \
-  val1_tmp = __shfl_xor( *(pval + 1), a, b); \
-  *(pval) = max(val0_tmp, *(pval));                                \
+#define WarpReduceMaxOneStep(a, b)          \
+  val0_tmp = __shfl_xor(*(pval), a, b);     \
+  val1_tmp = __shfl_xor(*(pval + 1), a, b); \
+  *(pval) = max(val0_tmp, *(pval));         \
   *(pval + 1) = max(val1_tmp, *(pval + 1));
   WarpReduceMaxOneStep(32, 64);
   WarpReduceMaxOneStep(16, 64);
@@ -75,12 +75,12 @@ __inline__ __device__ void warpReduce<ReduceType::kMax, 2>(float *pval) {
 
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kSum, 1>(float *pval) {
-  *pval += __shfl_xor( *pval, 32, 64); 
-  *pval += __shfl_xor( *pval, 16, 64);
-  *pval += __shfl_xor( *pval, 8, 64);
-  *pval += __shfl_xor( *pval, 4, 64);
-  *pval += __shfl_xor( *pval, 2, 64);
-  *pval += __shfl_xor( *pval, 1, 64);
+  *pval += __shfl_xor(*pval, 32, 64);
+  *pval += __shfl_xor(*pval, 16, 64);
+  *pval += __shfl_xor(*pval, 8, 64);
+  *pval += __shfl_xor(*pval, 4, 64);
+  *pval += __shfl_xor(*pval, 2, 64);
+  *pval += __shfl_xor(*pval, 1, 64);
 }
 
 /*
@@ -93,10 +93,10 @@ __inline__ __device__ void warpReduce<ReduceType::kSum, 1>(float *pval) {
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kSum, 2>(float *pval) {
   float val0_tmp, val1_tmp;
-#define WarpReduceSumOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor( *(pval + 0), a, b); \
-  val1_tmp = __shfl_xor( *(pval + 1), a, b); \
-  *(pval + 0) += val0_tmp;                                         \
+#define WarpReduceSumOneStep(a, b)          \
+  val0_tmp = __shfl_xor(*(pval + 0), a, b); \
+  val1_tmp = __shfl_xor(*(pval + 1), a, b); \
+  *(pval + 0) += val0_tmp;                  \
   *(pval + 1) += val1_tmp
   WarpReduceSumOneStep(32, 64);
   WarpReduceSumOneStep(16, 64);
@@ -111,14 +111,14 @@ __inline__ __device__ void warpReduce<ReduceType::kSum, 2>(float *pval) {
 template <>
 __inline__ __device__ void warpReduce<ReduceType::kSum, 4>(float *pval) {
   float val0_tmp, val1_tmp, val2_tmp, val3_tmp;
-#define WarpReduceSumOneStep(a, b)                                 \
-  val0_tmp = __shfl_xor( *(pval + 0), a, b); \
-  val1_tmp = __shfl_xor( *(pval + 1), a, b); \
-  val2_tmp = __shfl_xor( *(pval + 2), a, b); \
-  val3_tmp = __shfl_xor( *(pval + 3), a, b); \
-  *(pval + 0) += val0_tmp;                                         \
-  *(pval + 1) += val1_tmp;                                         \
-  *(pval + 2) += val2_tmp;                                         \
+#define WarpReduceSumOneStep(a, b)          \
+  val0_tmp = __shfl_xor(*(pval + 0), a, b); \
+  val1_tmp = __shfl_xor(*(pval + 1), a, b); \
+  val2_tmp = __shfl_xor(*(pval + 2), a, b); \
+  val3_tmp = __shfl_xor(*(pval + 3), a, b); \
+  *(pval + 0) += val0_tmp;                  \
+  *(pval + 1) += val1_tmp;                  \
+  *(pval + 2) += val2_tmp;                  \
   *(pval + 3) += val3_tmp
   WarpReduceSumOneStep(32, 64);
   WarpReduceSumOneStep(16, 64);
@@ -166,7 +166,7 @@ __inline__ __device__ void blockReduce<ReduceType::kSum, 2>(float *pval) {
   static __shared__ float shared[num][16];
   int lane_id = threadIdx.x & 0x3f;
   int wid = threadIdx.x >> 6;
- 
+
   warpReduce<ReduceType::kSum, num>(pval);
 
   if (lane_id == 0) {
@@ -188,7 +188,7 @@ __inline__ __device__ void blockReduce<ReduceType::kSum, 2>(float *pval) {
       *(pval + i) = 0.f;
     }
   }
- 
+
   warpReduce<ReduceType::kSum, num>(pval);
 }
 

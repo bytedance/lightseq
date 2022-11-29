@@ -23,8 +23,7 @@ cols: the number of cols in the matrix
 */
 template <typename T>
 __global__ void column_sum_reduce(const T *__restrict__ inp,
-                                  T *__restrict__ out, int rows, int cols)
-{
+                                  T *__restrict__ out, int rows, int cols) {
   __shared__ float tile[WARP_SIZE][WARP_SIZE];
 #ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();

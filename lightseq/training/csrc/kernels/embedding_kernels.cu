@@ -326,8 +326,7 @@ embedding_dim: dim of the embeddings
 padding_idx: padding index of the sentences (default: 2)
 */
 template <typename T>
-__global__ void zero_grads(T *grad_embeddings, int total_nums)
-{
+__global__ void zero_grads(T *grad_embeddings, int total_nums) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= total_nums) return;
   float4 *grad_embeddings4 = reinterpret_cast<float4 *>(grad_embeddings);
@@ -346,8 +345,7 @@ template <>
 __global__ void d_lookup_scale_pos_dropout<float>(
     float *grad_embeddings, const float *grad_output, const int *input,
     const uint8_t *dropout_mask, int seq_len, int embedding_dim,
-    int padding_idx, float dropout_ratio, float emb_scale)
-  {
+    int padding_idx, float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
   if (seq_id >= seq_len) return;
@@ -384,23 +382,21 @@ __global__ void d_lookup_scale_pos_dropout<float>(
   }
 }
 
-__device__ __forceinline__ void AddImpl(half2* address, half2 val) {
+__device__ __forceinline__ void AddImpl(half2 *address, half2 val) {
   float2 address_value = __half22float2(*address);
 
   float2 tmp1 = __half22float2(val);
   atomicAdd(&(address_value.x), tmp1.x);
   atomicAdd(&(address_value.y), tmp1.y);
 
-  * address = __float22half2_rn(address_value);
-
+  *address = __float22half2_rn(address_value);
 }
 
 template <>
 __global__ void d_lookup_scale_pos_dropout<__half>(
     __half *grad_embeddings, const __half *grad_output, const int *input,
     const uint8_t *dropout_mask, int seq_len, int embedding_dim,
-    int padding_idx, float dropout_ratio, float emb_scale)
-  {
+    int padding_idx, float dropout_ratio, float emb_scale) {
   int batch_id = blockIdx.x;
   int seq_id = blockIdx.y * blockDim.x + threadIdx.x;
   if (seq_id >= seq_len) return;
@@ -454,7 +450,6 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
     }
   }
 }
-   
 
 template <>
 void launch_d_lookup_scale_pos_dropout<float>(
@@ -471,11 +466,11 @@ void launch_d_lookup_scale_pos_dropout<float>(
 
   zero_grads<float>
       <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
-// #ifdef __HIPCC__
-//   int threads_per_token = MAX_THREADS;
-// #else
-//   int threads_per_token = min(embedding_dim, MAX_THREADS);
-// #endif
+  // #ifdef __HIPCC__
+  //   int threads_per_token = MAX_THREADS;
+  // #else
+  //   int threads_per_token = min(embedding_dim, MAX_THREADS);
+  // #endif
   int threads_per_token = min(embedding_dim, MAX_THREADS);
   int tokens_per_block = MAX_THREADS / threads_per_token;
   int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;

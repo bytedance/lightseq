@@ -1,6 +1,7 @@
 import torch
 from lightseq.training.ops.pytorch.builder import AdamBuilder
 import os
+
 fused_adam_cuda = None
 
 
@@ -45,9 +46,10 @@ class LSAdam(torch.optim.Optimizer):
         global fused_adam_cuda
 
         if fused_adam_cuda is None:
-            if os.getenv('ROCM_PATH') is not None:
+            if os.getenv("ROCM_PATH") is not None:
                 import importlib
-                fused_adam_cuda=importlib.import_module("op_builder.lightseq_adam_op")
+
+                fused_adam_cuda = importlib.import_module("op_builder.lightseq_adam_op")
             else:
                 fused_adam_cuda = AdamBuilder().load()
 

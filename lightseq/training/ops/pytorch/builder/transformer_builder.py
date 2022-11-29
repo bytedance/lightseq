@@ -19,7 +19,7 @@ class TransformerBuilder(CUDAOpBuilder):
         return f"op_builder.{self.NAME}_op"
 
     def sources(self):
-        if os.getenv('ROCM_PATH') is None:
+        if os.getenv("ROCM_PATH") is None:
             return [
                 "csrc/kernels/cublas_wrappers.cu",
                 "csrc/kernels/transform_kernels.cu",
@@ -55,14 +55,18 @@ class TransformerBuilder(CUDAOpBuilder):
             ]
 
     def include_paths(self):
-        include_file_list = [os.path.abspath("lightseq/training/csrc/kernels/includes"), os.path.abspath("lightseq/training/csrc/ops/includes")]
-        if os.getenv('ROCM_PATH') is None:
-                include_file_list.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),)
+        include_file_list = [
+            os.path.abspath("lightseq/training/csrc/kernels/includes"),
+            os.path.abspath("lightseq/training/csrc/ops/includes"),
+        ]
+        if os.getenv("ROCM_PATH") is None:
+            include_file_list.append(
+                str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"),
+            )
         return include_file_list
-     
-      
+
     def nvcc_args(self):
-        if os.getenv('ROCM_PATH') is not None: 
+        if os.getenv("ROCM_PATH") is not None:
             args = [
                 "-O3",
                 "-U__HIP_NO_HALF_OPERATORS__",
@@ -81,10 +85,10 @@ class TransformerBuilder(CUDAOpBuilder):
                 "-U__CUDA_NO_HALF2_OPERATORS__",
                 "-DTHRUST_IGNORE_CUB_VERSION_CHECK",
             ]
-        if os.getenv('ROCM_PATH') is not None:
-            return args 
+        if os.getenv("ROCM_PATH") is not None:
+            return args
         else:
-            return args + self.compute_capability_args()        
+            return args + self.compute_capability_args()
 
     def cxx_args(self):
         return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]

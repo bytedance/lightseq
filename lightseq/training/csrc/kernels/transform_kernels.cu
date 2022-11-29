@@ -13,7 +13,6 @@ using namespace hipcub;
 using namespace cub;
 #endif
 
-
 /**
 @brief: transform_0213
 Split the attention heads and reshape input

@@ -39,13 +39,11 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
                    _max_batch_tokens * _hidden_size),
       _attn_scores(typename StridedBatchGemm<T>::Config(
 #ifdef __HIPCC__
-          (T(1.0/sqrt(_hidden_size / _heads))),
-#else      
+          (T(1.0 / sqrt(_hidden_size / _heads))),
+#else
           (T(1.0) / T(sqrt(_hidden_size / _heads))),
-#endif 
-          T(0.0), 
-          CUBLAS_OP_T,
-          CUBLAS_OP_N)),
+#endif
+          T(0.0), CUBLAS_OP_T, CUBLAS_OP_N)),
       _attn_context(typename StridedBatchGemm<T>::Config(
           T(1.0), T(0.0), CUBLAS_OP_N, CUBLAS_OP_N)) {
   assert(_hidden_size % _heads == 0);

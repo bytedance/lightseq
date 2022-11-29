@@ -8,7 +8,7 @@
 #include <cuda_fp16.h>
 #include <stdio.h>
 
-#include <array> 
+#include <array>
 #include "cublas_wrappers.h"
 #include "kernels.h"
 
@@ -23,9 +23,11 @@ class FeedForward {
         : outputSize(outputs),
           inputSize(inputs),
 #ifdef __HIPCC__
-          gemm_algos(std::array<int, 3>({160, 160, 160})) {}
+          gemm_algos(std::array<int, 3>({160, 160, 160})) {
+    }
 #else
-          gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+          gemm_algos(std::array<int, 3>({99, 99, 99})) {
+    }
 #endif
   };
 
@@ -41,8 +43,8 @@ class FeedForward {
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, config_.outputSize,
                    bsz, config_.inputSize, &alpha, &beta, weights, input_ptr,
                    out,
-#ifdef __HIPCC__                  
-                   rocblas_gemm_algo(config_.gemm_algos[0])); 
+#ifdef __HIPCC__
+                   rocblas_gemm_algo(config_.gemm_algos[0]));
 #else
                    cublasGemmAlgo_t(config_.gemm_algos[0]));
 #endif
@@ -55,7 +57,7 @@ class FeedForward {
     float alpha = (T)1.0, beta = (T)0.0;
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, config_.inputSize,
                    config_.outputSize, bsz, &alpha, &beta, input_ptr, out_grad,
-                   weights_grad, 
+                   weights_grad,
 #ifdef __HIPCC__
                    rocblas_gemm_algo(config_.gemm_algos[1]));
 #else
@@ -64,7 +66,7 @@ class FeedForward {
 
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, config_.inputSize,
                    bsz, config_.outputSize, &alpha, &beta, weights, out_grad,
-                   inp_grad_out, 
+                   inp_grad_out,
 #ifdef __HIPCC__
                    rocblas_gemm_algo(config_.gemm_algos[2]));
 #else

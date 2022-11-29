@@ -25,12 +25,11 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
       _attn_scores(typename StridedBatchGemm<T>::Config(
 #ifdef __HIPCC__
-          (T(1.0/sqrt(_hidden_size / _heads))),
-#else      
+          (T(1.0 / sqrt(_hidden_size / _heads))),
+#else
           (T(1.0) / T(sqrt(_hidden_size / _heads))),
-#endif 
-          T(0.0), CUBLAS_OP_T,
-          CUBLAS_OP_N)),
+#endif
+          T(0.0), CUBLAS_OP_T, CUBLAS_OP_N)),
       _softmax(typename Softmax<T>::Config(num_heads)),
       _attn_prob_dropout(typename Dropout<T>::Config(attn_prob_dropout_ratio),
                          _max_batch_tokens * _heads * _max_seq_len),
@@ -49,12 +48,11 @@ TransformerDecoderLayer<T>::TransformerDecoderLayer(
           typename FeedForward<T>::Config(2 * hidden_size, hidden_size)),
       _encdec_attn_scores(typename StridedBatchGemm<T>::Config(
 #ifdef __HIPCC__
-          (T(1.0/sqrt(_hidden_size / _heads))),
-#else      
+          (T(1.0 / sqrt(_hidden_size / _heads))),
+#else
           (T(1.0) / T(sqrt(_hidden_size / _heads))),
-#endif 
-          T(0.0), CUBLAS_OP_T,
-          CUBLAS_OP_N)),
+#endif
+          T(0.0), CUBLAS_OP_T, CUBLAS_OP_N)),
       _encdec_softmax(typename Softmax<T>::Config(num_heads)),
       _encdec_attn_prob_dropout(
           typename Dropout<T>::Config(attn_prob_dropout_ratio),

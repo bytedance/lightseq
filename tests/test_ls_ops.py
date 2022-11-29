@@ -254,8 +254,8 @@ custom_cross_entropy_layer_fp32.train()
 custom_cross_entropy_layer_fp16.train()
 
 
-#@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-2, ntest=10) 
+# @kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=10)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=5e-2, ntest=10)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
@@ -831,7 +831,7 @@ def test_embedding_layer_backward():
         fs_layer = fs_emb_layer_fp16
 
     loss_data = torch.randn(1, dtype=kt.dtype).sum()
-    
+
     def custom():
         custom_layer.zero_grad()
         custom_input = input.clone()

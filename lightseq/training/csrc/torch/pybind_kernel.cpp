@@ -6,7 +6,6 @@
 #include "cuda_util.h"
 #include "kernels.h"
 
-
 typedef const torch::Tensor cts;
 typedef torch::Tensor ts;
 
@@ -29,7 +28,6 @@ void torch_launch_transform_0213(torch::Tensor &output,
                         hidden_dim, nhead, stream);
   //   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
-
 }
 
 template <typename T>

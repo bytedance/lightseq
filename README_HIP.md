@@ -33,4 +33,3 @@ lightseq-train /public/DL_DATA/wmt14_en_de_joined_dict  \
     --best-checkpoint-metric bleu \
     --maximize-best-checkpoint-metric \
     --fp16
-

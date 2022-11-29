@@ -18,11 +18,10 @@ class AdamBuilder(CUDAOpBuilder):
         return f"op_builder.{self.NAME}_op"
 
     def sources(self):
-        if os.getenv('ROCM_PATH') is None:
+        if os.getenv("ROCM_PATH") is None:
             return [
                 "csrc/kernels/fused_adam_kernel.cu",
                 "csrc/torch/pybind_adam.cpp",
-
             ]
         else:
             return [
@@ -31,10 +30,13 @@ class AdamBuilder(CUDAOpBuilder):
             ]
 
     def include_paths(self):
-        return [os.path.abspath("lightseq/training/csrc/kernels/includes"), os.path.abspath("lightseq/training/csrc/ops/includes")]
+        return [
+            os.path.abspath("lightseq/training/csrc/kernels/includes"),
+            os.path.abspath("lightseq/training/csrc/ops/includes"),
+        ]
 
     def nvcc_args(self):
-        if os.getenv('ROCM_PATH') is not None: 
+        if os.getenv("ROCM_PATH") is not None:
             args = [
                 "-O3",
                 "-U__HIP_NO_HALF_OPERATORS__",
@@ -54,7 +56,6 @@ class AdamBuilder(CUDAOpBuilder):
                 "-U__CUDA_NO_HALF2_OPERATORS__",
             ]
             return args + self.compute_capability_args()
-
 
     def cxx_args(self):
         return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]

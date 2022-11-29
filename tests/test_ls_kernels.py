@@ -6,12 +6,14 @@ from torch.nn import functional
 from lightseq.training.ops.pytorch.builder import KernelBuilder, AdamBuilder
 from tests.util import TestDecorator, cast_fp32_tensor
 import os
-if os.getenv('ROCM_PATH') is not None:
+
+if os.getenv("ROCM_PATH") is not None:
     import importlib
-    #cuda_module=importlib.import_module("lightseq_kernels")
-    #adam_module=importlib.import_module("adam")
-    cuda_module=importlib.import_module("op_builder.lightseq_kernels_op")
-    adam_module=importlib.import_module("op_builder.adam_op")
+
+    # cuda_module=importlib.import_module("lightseq_kernels")
+    # adam_module=importlib.import_module("adam")
+    cuda_module = importlib.import_module("op_builder.lightseq_kernels_op")
+    adam_module = importlib.import_module("op_builder.adam_op")
 else:
     cuda_module = KernelBuilder().load()
     adam_module = AdamBuilder().load()
@@ -282,7 +284,7 @@ def test_launch_fused_add2():
     return custom, baseline
 
 
-#@kt.case(atol=1e-2, rtol=1e-3)
+# @kt.case(atol=1e-2, rtol=1e-3)
 @kt.case(atol=5e-2, rtol=1e-3)
 def test_launch_layer_norm():
     batch_size, seq_len = kt.bs_sl()
@@ -728,8 +730,8 @@ def test_launch_dropout_gelu_bias_bwd():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
-        #"test_adam",
-        #"test_launch_ffn_bias_bwd",
+        # "test_adam",
+        # "test_launch_ffn_bias_bwd",
         "test_launch_transform_0213",
         "test_launch_bias_add_transform_20314",
         "test_launch_transform4d_0213",

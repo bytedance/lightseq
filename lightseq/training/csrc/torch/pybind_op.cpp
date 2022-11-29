@@ -8,8 +8,6 @@
 #include "transformer_embedding_layer.h"
 #include "transformer_encoder_layer.h"
 
-
-
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) \

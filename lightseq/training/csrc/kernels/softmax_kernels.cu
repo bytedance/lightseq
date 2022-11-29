@@ -42,7 +42,7 @@ __global__ void ker_attn_softmax(T *inp, const T *attn_mask, int from_len,
   const int token_per_reduce = 1;
 #ifdef __HIPCC__
   typedef hipcub::BlockLoad<T, block_dim, ele_per_thread,
-                         hipcub::BLOCK_LOAD_VECTORIZE>
+                            hipcub::BLOCK_LOAD_VECTORIZE>
       BlockLoad;
 #else
   typedef cub::BlockLoad<T, block_dim, ele_per_thread,
@@ -52,7 +52,7 @@ __global__ void ker_attn_softmax(T *inp, const T *attn_mask, int from_len,
   __shared__ typename BlockLoad::TempStorage ts_load;
 #ifdef __HIPCC__
   typedef hipcub::BlockStore<T, block_dim, ele_per_thread,
-                          hipcub::BLOCK_STORE_VECTORIZE>
+                             hipcub::BLOCK_STORE_VECTORIZE>
       BlockStore;
 #else
   typedef cub::BlockStore<T, block_dim, ele_per_thread,
@@ -147,9 +147,9 @@ __global__ void ker_attn_softmax_lt32(T *inp, const T *attn_mask, int from_len,
   const int token_per_reduce = 1;
 #ifdef __HIPCC__
   typedef hipcub::BlockLoad<T, block_dim, ele_per_thread,
-                         hipcub::BLOCK_LOAD_VECTORIZE>
+                            hipcub::BLOCK_LOAD_VECTORIZE>
       BlockLoad;
-#else                        
+#else
   typedef cub::BlockLoad<T, block_dim, ele_per_thread,
                          cub::BLOCK_LOAD_VECTORIZE>
       BlockLoad;
@@ -157,7 +157,7 @@ __global__ void ker_attn_softmax_lt32(T *inp, const T *attn_mask, int from_len,
   __shared__ typename BlockLoad::TempStorage ts_load;
 #ifdef __HIPCC__
   typedef hipcub::BlockStore<T, block_dim, ele_per_thread,
-                          hipcub::BLOCK_STORE_VECTORIZE>
+                             hipcub::BLOCK_STORE_VECTORIZE>
       BlockStore;
 #else
   typedef cub::BlockStore<T, block_dim, ele_per_thread,

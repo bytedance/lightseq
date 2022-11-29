@@ -30,14 +30,18 @@ try:
     from torch.utils.cpp_extension import BuildExtension
 except ImportError:
     torch_available = False
-    print('[WARNING] Unable to import torch, pre-compiling ops will be disabled. ' \
-        'Please visit https://pytorch.org/ to see how to properly install torch on your system.')
+    print(
+        "[WARNING] Unable to import torch, pre-compiling ops will be disabled. "
+        "Please visit https://pytorch.org/ to see how to properly install torch on your system."
+    )
 
 is_rocm_pytorch = OpBuilder.is_rocm_pytorch()
 print("is_rocm_pytorch: ", is_rocm_pytorch)
 
 if torch.utils.cpp_extension.CUDA_HOME is None and (not is_rocm_pytorch):
-    raise RuntimeError("--cuda_ext was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, only images whose names contain 'devel' will provide nvcc.")
+    raise RuntimeError(
+        "--cuda_ext was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, only images whose names contain 'devel' will provide nvcc."
+    )
 
 cmdclass = {}
 ext_modules = []
@@ -53,7 +57,6 @@ class CMakeExtension(Extension):
 
 
 class CMakeBuild(build_ext):
-
     def run(self):
         try:
             out = subprocess.check_output(["cmake", "--version"])
@@ -93,7 +96,7 @@ class CMakeBuild(build_ext):
             cmake_args += [
                 "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(cfg.upper(), extdir)
             ]
-            if sys.maxsize > 2 ** 32:
+            if sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
             build_args += ["--", "/m"]
         else:
@@ -119,7 +122,7 @@ class CMakeBuild(build_ext):
 
 
 for op_name, builder in ALL_OPS.items():
-    print(f'Install Ops={op_name}')
+    print(f"Install Ops={op_name}")
     op_compatible = builder.is_compatible()
     print(f"op_name: {op_name}")
 
@@ -127,13 +130,15 @@ for op_name, builder in ALL_OPS.items():
         reqs = builder.python_requirements()
         install_requires += builder.python_requirements()
 
-        assert torch_available, f"Unable to pre-compile {op_name}, please first install torch"
+        assert (
+            torch_available
+        ), f"Unable to pre-compile {op_name}, please first install torch"
         if is_rocm_pytorch:
-            define_macros += [('WITH_HIP', None)]
+            define_macros += [("WITH_HIP", None)]
             ext_modules.append(builder.builder())
-            cmd_class = {'build_ext': BuildExtension.with_options(use_ninja=False)}
+            cmd_class = {"build_ext": BuildExtension.with_options(use_ninja=False)}
         else:
-            cmd_class={build_ext: CMakeBuild}
+            cmd_class = {build_ext: CMakeBuild}
             ext_modules = [CMakeExtension("inference")]
 
 with open("README.md", "r") as fh:

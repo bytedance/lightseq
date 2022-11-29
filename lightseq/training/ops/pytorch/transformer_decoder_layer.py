@@ -130,11 +130,14 @@ class LSTransformerDecoderLayer(nn.Module):
             # Load cuda modules if needed
         global transformer_cuda_module
         if transformer_cuda_module is None:
-            if os.getenv('ROCM_PATH') is not None:
+            if os.getenv("ROCM_PATH") is not None:
                 import importlib
-                transformer_cuda_module = importlib.import_module("op_builder.lightseq_layers_op")
+
+                transformer_cuda_module = importlib.import_module(
+                    "op_builder.lightseq_layers_op"
+                )
             else:
-                 transformer_cuda_module = TransformerBuilder().load()            
+                transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module

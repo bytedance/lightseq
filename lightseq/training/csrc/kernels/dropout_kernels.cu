@@ -56,9 +56,8 @@ __device__ __half2
 activation_kernel<ActivationType::kRelu, __half2>(__half2 x) {
 #ifdef __HIPCC__
   float2 tmp = __half22float2(x);
-  return __floats2half2_rn(fmaxf(0.f, tmp.x),
-                           fmaxf(0.f, tmp.y));
-#else                          
+  return __floats2half2_rn(fmaxf(0.f, tmp.x), fmaxf(0.f, tmp.y));
+#else
   return __floats2half2_rn(fmaxf(0.f, __half2float(x.x)),
                            fmaxf(0.f, __half2float(x.y)));
 #endif
@@ -122,12 +121,15 @@ __device__ __half2 activation_bwd_kernel<ActivationType::kRelu, __half2>(
     __half2 grad2, __half2 x_half2) {
   const __half half_zero = __float2half(0.f);
 #ifdef __HIPCC__
-  return __floats2half2_rn(static_cast<half>(x_half2.x) > half_zero ? static_cast<half>(grad2.x) : half_zero,
-                           static_cast<half>(x_half2.y) > half_zero ? static_cast<half>(grad2.y) : half_zero);
-#else                           
+  return __floats2half2_rn(
+      static_cast<half>(x_half2.x) > half_zero ? static_cast<half>(grad2.x)
+                                               : half_zero,
+      static_cast<half>(x_half2.y) > half_zero ? static_cast<half>(grad2.y)
+                                               : half_zero);
+#else
   return __floats2half2_rn(x_half2.x > half_zero ? grad2.x : half_zero,
                            x_half2.y > half_zero ? grad2.y : half_zero);
-#endif                           
+#endif
 }
 
 /**
@@ -586,15 +588,14 @@ __global__ void ls_dropout_bias_bwd_kernel(
 }
 
 #ifdef __HIPCC__
-__device__
-inline
-half2 __shfl_down(half2 var, unsigned int lane_delta, int width = warpSize) {
+__device__ inline half2 __shfl_down(half2 var, unsigned int lane_delta,
+                                    int width = warpSize) {
   static_assert(sizeof(half2) == sizeof(int), "");
-  
+
   int tmp;
   __builtin_memcpy(&tmp, &var, sizeof(tmp));
   tmp = __shfl_down(tmp, lane_delta, width);
-  
+
   half2 tmp1;
   __builtin_memcpy(&tmp1, &tmp, sizeof(tmp));
   return tmp1;

@@ -37,8 +37,7 @@ bias: [hidden_size], ln bias
 */
 template <typename T>
 __global__ void ker_layer_norm(T *ln_res, T *vars, T *means, const T *inp,
-                               const T *scale, const T *bias, int hidden_size)
- {
+                               const T *scale, const T *bias, int hidden_size) {
   // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
@@ -84,8 +83,7 @@ template <>
 __global__ void ker_layer_norm<__half>(__half *ln_res, __half *vars,
                                        __half *means, const __half *inp,
                                        const __half *scale, const __half *bias,
-                                       int hidden_size) 
-  {
+                                       int hidden_size) {
   // step 0. compute local sum
   float l_sum = 0;
   float l_square_sum = 0;
@@ -150,8 +148,8 @@ void launch_layer_norm<float>(float *ln_res, float *vars, float *means,
     throw std::runtime_error("violate hidden_dim % 4 = 0");
   }
   hidden_dim >>= 2;
-//aiss add
-#ifdef __HIPCC__ 
+// aiss add
+#ifdef __HIPCC__
   int nthread = 1024;
 #else
   int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
@@ -219,8 +217,7 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
                                         const T *out_grad, const T *inp_or_out,
                                         const T *gamma, const T *betta,
                                         const T *vars, const T *means, int rows,
-                                        int width)
-{
+                                        int width) {
   __shared__ float betta_buffer[TILE_DIM][TILE_DIM];
   __shared__ float gamma_buffer[TILE_DIM][TILE_DIM];
 #ifndef __HIPCC__
@@ -287,16 +284,16 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
 
 #ifdef __HIPCC__
 template <>
-__global__ void ker_ln_bw_dgamma_dbetta<__half>(__half *gamma_grad, __half *betta_grad,
-                                        const __half *out_grad, const __half *inp_or_out,
-                                        const __half *gamma, const __half *betta,
-                                        const __half *vars, const __half *means, int rows,
-                                        int width)__attribute__((amdgpu_flat_work_group_size(1,1024))) {
+__global__ void ker_ln_bw_dgamma_dbetta<__half>(
+    __half *gamma_grad, __half *betta_grad, const __half *out_grad,
+    const __half *inp_or_out, const __half *gamma, const __half *betta,
+    const __half *vars, const __half *means, int rows, int width)
+    __attribute__((amdgpu_flat_work_group_size(1, 1024))) {
   __shared__ float betta_buffer[TILE_DIM][TILE_DIM];
   __shared__ float gamma_buffer[TILE_DIM][TILE_DIM];
 
-  //cg::thread_block b = cg::this_thread_block();
-  //cg::thread_block_tile<TILE_DIM> g = cg::tiled_partition<TILE_DIM>(b);
+  // cg::thread_block b = cg::this_thread_block();
+  // cg::thread_block_tile<TILE_DIM> g = cg::tiled_partition<TILE_DIM>(b);
 
   int idx = blockDim.x * blockIdx.x + threadIdx.x;
   int offset = threadIdx.y * width + idx;
@@ -343,7 +340,7 @@ __global__ void ker_ln_bw_dgamma_dbetta<__half>(__half *gamma_grad, __half *bett
     s1 += __shfl_down(s1, i, 32);
     s2 += __shfl_down(s2, i, 32);
   }
-   __syncthreads();
+  __syncthreads();
   int pos = blockIdx.x * TILE_DIM + threadIdx.y;
   if (threadIdx.x == 0 && idx < width) {
     betta_grad[pos] = __float2half(s1);
@@ -385,8 +382,7 @@ template <typename T>
 __global__ void ker_ln_bw_dinp(T *inp_grad, const T *out_grad,
                                const T *residual_grad, const T *inp_or_out,
                                const T *gamma, const T *betta, const T *vars,
-                               const T *means, int hidden_dim)
-{
+                               const T *means, int hidden_dim) {
   int offset = blockIdx.x * hidden_dim + threadIdx.x;
   float4 dxhat, xhat;
   float var_rsqrt;
@@ -468,8 +464,7 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
                                        const __half *inp_or_out,
                                        const __half *gamma, const __half *betta,
                                        const __half *vars, const __half *means,
-                                       int hidden_dim)                                        
-{
+                                       int hidden_dim) {
   int offset = blockIdx.x * hidden_dim + threadIdx.x;
 
   float2 dxhat[4], xhat[4];
@@ -550,11 +545,15 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
 #pragma unroll
     for (int i = 0; i < 4; i++) {
 #ifdef __HIPCC__
-      float tmpf_x = (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) * var_rsqrt + __half2float(hdres[2 * i]);
-      float tmpf_y = (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) * var_rsqrt + __half2float(hdres[2 * i + 1]);
+      float tmpf_x = (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) *
+                         var_rsqrt +
+                     __half2float(hdres[2 * i]);
+      float tmpf_y = (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) *
+                         var_rsqrt +
+                     __half2float(hdres[2 * i + 1]);
       float2 tmpf = float2(tmpf_x, tmpf_y);
       tmp_h2[i] = __float22half2_rn(tmpf);
-#else      
+#else
       tmp_h2[i].x = __float2half(
           (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) *
               var_rsqrt +
@@ -569,8 +568,10 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
 #pragma unroll
     for (int i = 0; i < 4; i++) {
 #ifdef __HIPCC__
-      float tmpf_x = (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) * var_rsqrt;
-      float tmpf_y = (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) * var_rsqrt;
+      float tmpf_x =
+          (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) * var_rsqrt;
+      float tmpf_y =
+          (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) * var_rsqrt;
       float2 tmpf = float2(tmpf_x, tmpf_y);
       tmp_h2[i] = __float22half2_rn(tmpf);
 #else
