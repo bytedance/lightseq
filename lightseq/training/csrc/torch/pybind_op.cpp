@@ -1,6 +1,6 @@
-#include <ATen/cuda/CUDAContext.h>
 #include <torch/extension.h>
 #include <string>
+#include <ATen/cuda/CUDAContext.h>
 
 #include "context.h"
 #include "cross_entropy_layer.h"

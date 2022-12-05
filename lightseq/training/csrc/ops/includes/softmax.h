@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #include <fstream>
-
 #include "kernels.h"
 
 using namespace std;

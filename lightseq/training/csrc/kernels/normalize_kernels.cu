@@ -1,8 +1,11 @@
-#include "block_reduce.h"
-#include "kernels.h"
-
+#ifdef __HIPCC__
+#include <hip_cooperative_groups.h>
+#include "./hip/block_reduce_hip.h"
+#else
 #include <cooperative_groups.h>
-
+#include "block_reduce.h"
+#endif
+#include "kernels.h"
 namespace cg = cooperative_groups;
 const float LN_EPSILON = 1e-8f;
 #define TILE_DIM 32
@@ -145,7 +148,12 @@ void launch_layer_norm<float>(float *ln_res, float *vars, float *means,
     throw std::runtime_error("violate hidden_dim % 4 = 0");
   }
   hidden_dim >>= 2;
+// aiss add
+#ifdef __HIPCC__
+  int nthread = 1024;
+#else
   int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
+#endif
   dim3 grid_dim(batch_size);
   dim3 block_dim(nthread);
 
@@ -162,7 +170,11 @@ void launch_layer_norm<__half>(__half *ln_res, __half *vars, __half *means,
     throw std::runtime_error("violate hidden_dim % 8 = 0");
   }
   hidden_dim >>= 3;
+#ifdef __HIPCC__
+  int nthread = 1024;
+#else
   int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
+#endif
   dim3 grid_dim(batch_size);
   dim3 block_dim(nthread);
 
@@ -208,10 +220,10 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
                                         int width) {
   __shared__ float betta_buffer[TILE_DIM][TILE_DIM];
   __shared__ float gamma_buffer[TILE_DIM][TILE_DIM];
-
+#ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<TILE_DIM> g = cg::tiled_partition<TILE_DIM>(b);
-
+#endif
   int idx = blockDim.x * blockIdx.x + threadIdx.x;
   int offset = threadIdx.y * width + idx;
   int y_stride = width * TILE_DIM;
@@ -254,8 +266,13 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
   __syncthreads();
 
   for (int i = 1; i < TILE_DIM; i <<= 1) {
+#ifdef __HIPCC__
+    s1 += __shfl_down(s1, i, 32);
+    s2 += __shfl_down(s2, i, 32);
+#else
     s1 += g.shfl_down(s1, i);
     s2 += g.shfl_down(s2, i);
+#endif
   }
 
   int pos = blockIdx.x * TILE_DIM + threadIdx.y;
@@ -265,6 +282,72 @@ __global__ void ker_ln_bw_dgamma_dbetta(T *gamma_grad, T *betta_grad,
   }
 }
 
+#ifdef __HIPCC__
+template <>
+__global__ void ker_ln_bw_dgamma_dbetta<__half>(
+    __half *gamma_grad, __half *betta_grad, const __half *out_grad,
+    const __half *inp_or_out, const __half *gamma, const __half *betta,
+    const __half *vars, const __half *means, int rows, int width)
+    __attribute__((amdgpu_flat_work_group_size(1, 1024))) {
+  __shared__ float betta_buffer[TILE_DIM][TILE_DIM];
+  __shared__ float gamma_buffer[TILE_DIM][TILE_DIM];
+
+  // cg::thread_block b = cg::this_thread_block();
+  // cg::thread_block_tile<TILE_DIM> g = cg::tiled_partition<TILE_DIM>(b);
+
+  int idx = blockDim.x * blockIdx.x + threadIdx.x;
+  int offset = threadIdx.y * width + idx;
+  int y_stride = width * TILE_DIM;
+
+  // Loop across inp height
+  float dbetta = 0;
+  float dgamma = 0;
+  float dout, val;
+  if (idx < width) {
+    if (means == nullptr) {
+      float vbetta = __half2float(betta[idx]);
+      float vgamma = __half2float(gamma[idx]);
+      for (int r = threadIdx.y; r < rows; r += TILE_DIM) {
+        dout = __half2float(out_grad[offset]);
+        // inp_or_out is output
+        val = __half2float(inp_or_out[offset]);
+        dbetta += dout;
+        dgamma += ((val - vbetta) / add_eps(vgamma) * dout);
+        offset += y_stride;
+      }
+    } else {
+      for (int r = threadIdx.y; r < rows; r += TILE_DIM) {
+        dout = __half2float(out_grad[offset]);
+        // inp_or_out is input
+        val = __half2float(inp_or_out[offset]);
+        dbetta += dout;
+        dgamma += ((val - __half2float(means[r])) *
+                   rsqrtf(__half2float(vars[r]) + LN_EPSILON) * dout);
+        offset += y_stride;
+      }
+    }
+  }
+
+  // Sum the shared buffer.
+  betta_buffer[threadIdx.x][threadIdx.y] = dbetta;
+  gamma_buffer[threadIdx.x][threadIdx.y] = dgamma;
+  __syncthreads();
+  float s1 = betta_buffer[threadIdx.y][threadIdx.x];
+  float s2 = gamma_buffer[threadIdx.y][threadIdx.x];
+  __syncthreads();
+
+  for (int i = 1; i < TILE_DIM; i <<= 1) {
+    s1 += __shfl_down(s1, i, 32);
+    s2 += __shfl_down(s2, i, 32);
+  }
+  __syncthreads();
+  int pos = blockIdx.x * TILE_DIM + threadIdx.y;
+  if (threadIdx.x == 0 && idx < width) {
+    betta_grad[pos] = __float2half(s1);
+    gamma_grad[pos] = __float2half(s2);
+  }
+}
+#endif
 /**
 @brief: ker_ln_bw_dinp
 Layer norm backword kernel, compute the gradient of input.
@@ -461,6 +544,16 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
     __half *hdres = reinterpret_cast<__half *>(&dresidual);
 #pragma unroll
     for (int i = 0; i < 4; i++) {
+#ifdef __HIPCC__
+      float tmpf_x = (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) *
+                         var_rsqrt +
+                     __half2float(hdres[2 * i]);
+      float tmpf_y = (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) *
+                         var_rsqrt +
+                     __half2float(hdres[2 * i + 1]);
+      float2 tmpf = float2(tmpf_x, tmpf_y);
+      tmp_h2[i] = __float22half2_rn(tmpf);
+#else
       tmp_h2[i].x = __float2half(
           (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) *
               var_rsqrt +
@@ -469,16 +562,26 @@ __global__ void ker_ln_bw_dinp<__half>(__half *inp_grad, const __half *out_grad,
           (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) *
               var_rsqrt +
           __half2float(hdres[2 * i + 1]));
+#endif
     }
   } else {
 #pragma unroll
     for (int i = 0; i < 4; i++) {
+#ifdef __HIPCC__
+      float tmpf_x =
+          (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) * var_rsqrt;
+      float tmpf_y =
+          (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) * var_rsqrt;
+      float2 tmpf = float2(tmpf_x, tmpf_y);
+      tmp_h2[i] = __float22half2_rn(tmpf);
+#else
       tmp_h2[i].x = __float2half(
           (dxhat[i].x - s_sum_dxhat - xhat[i].x * s_sum_dxhat_xhat) *
           var_rsqrt);
       tmp_h2[i].y = __float2half(
           (dxhat[i].y - s_sum_dxhat - xhat[i].y * s_sum_dxhat_xhat) *
           var_rsqrt);
+#endif
     }
   }
   ((float4 *)inp_grad)[offset] = vtmp;
@@ -520,7 +623,11 @@ void launch_ln_bw<float>(float *gamma_grad, float *betta_grad, float *inp_grad,
     throw std::runtime_error("hidden_dim % 4 != 0 || hidden_dim > 4096");
   }
   hidden_dim >>= 2;
+#ifdef __HIPCC__
+  int nthread = 1024;
+#else
   int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
+#endif
   ker_ln_bw_dinp<<<batch, nthread, 0, stream[1]>>>(
       inp_grad, out_grad, residual_grad, inp_or_out, gamma, betta, vars, means,
       hidden_dim);
@@ -545,7 +652,11 @@ void launch_ln_bw<__half>(__half *gamma_grad, __half *betta_grad,
     throw std::runtime_error("hidden_dim % 8 != 0 || hidden_dim > 8192");
   }
   hidden_dim >>= 3;
+#ifdef __HIPCC__
+  int nthread = 1024;
+#else
   int nthread = min(((hidden_dim + 31) / 32) * 32, MAX_THREADS);
+#endif
   ker_ln_bw_dinp<<<batch, nthread, 0, stream[1]>>>(
       inp_grad, out_grad, residual_grad, inp_or_out, gamma, betta, vars, means,
       hidden_dim);

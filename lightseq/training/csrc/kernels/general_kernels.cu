@@ -1,7 +1,9 @@
-#include "kernels.h"
-
+#ifdef __HIPCC__
+#include <hip_cooperative_groups.h>
+#else
 #include <cooperative_groups.h>
-
+#endif
+#include "kernels.h"
 namespace cg = cooperative_groups;
 
 /**
@@ -23,10 +25,10 @@ template <typename T>
 __global__ void column_sum_reduce(const T *__restrict__ inp,
                                   T *__restrict__ out, int rows, int cols) {
   __shared__ float tile[WARP_SIZE][WARP_SIZE];
-
+#ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
-
+#endif
   int idx = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
   int y_stride = cols * WARP_SIZE;
   float localSum = 0;
@@ -53,8 +55,11 @@ __global__ void column_sum_reduce(const T *__restrict__ inp,
   __syncthreads();
 
   // Calculate the sum of a row in tile
+#ifdef __HIPCC__
+  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += __shfl_down(sum, i, WARP_SIZE);
+#else
   for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
-
+#endif
   if (threadIdx.x == 0) {
     int pos = flat_2dim(blockIdx.x, threadIdx.y, WARP_SIZE);
     if (pos < cols) out[pos] = sum;

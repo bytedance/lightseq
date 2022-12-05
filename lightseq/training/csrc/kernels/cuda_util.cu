@@ -2,7 +2,6 @@
 #include <thrust/reduce.h>
 
 #include "cuda_util.h"
-
 /* GPU function guard */
 std::string _cudaGetErrorString(cudaError_t error) {
   return cudaGetErrorString(error);
@@ -27,7 +26,7 @@ std::string _cudaGetErrorString(cublasStatus_t error) {
 
     case CUBLAS_STATUS_MAPPING_ERROR:
       return "CUBLAS_STATUS_MAPPING_ERROR";
-
+#ifndef __HIPCC__
     case CUBLAS_STATUS_EXECUTION_FAILED:
       return "CUBLAS_STATUS_EXECUTION_FAILED";
 
@@ -39,6 +38,7 @@ std::string _cudaGetErrorString(cublasStatus_t error) {
 
     case CUBLAS_STATUS_LICENSE_ERROR:
       return "CUBLAS_STATUS_LICENSE_ERROR";
+#endif
   }
   return "CUBLAS_UNKNOW";
 }

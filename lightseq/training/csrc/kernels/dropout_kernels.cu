@@ -1,9 +1,11 @@
 #include <chrono>
 #include <ctime>
-
 #include "kernels.h"
-
+#ifdef __HIPCC__
+#include <hip_cooperative_groups.h>
+#else
 #include <cooperative_groups.h>
+#endif
 
 namespace cg = cooperative_groups;
 
@@ -52,8 +54,13 @@ __device__ float activation_kernel<ActivationType::kRelu, float>(float x) {
 template <>
 __device__ __half2
 activation_kernel<ActivationType::kRelu, __half2>(__half2 x) {
+#ifdef __HIPCC__
+  float2 tmp = __half22float2(x);
+  return __floats2half2_rn(fmaxf(0.f, tmp.x), fmaxf(0.f, tmp.y));
+#else
   return __floats2half2_rn(fmaxf(0.f, __half2float(x.x)),
                            fmaxf(0.f, __half2float(x.y)));
+#endif
 }
 
 /**
@@ -113,8 +120,16 @@ template <>
 __device__ __half2 activation_bwd_kernel<ActivationType::kRelu, __half2>(
     __half2 grad2, __half2 x_half2) {
   const __half half_zero = __float2half(0.f);
+#ifdef __HIPCC__
+  return __floats2half2_rn(
+      static_cast<half>(x_half2.x) > half_zero ? static_cast<half>(grad2.x)
+                                               : half_zero,
+      static_cast<half>(x_half2.y) > half_zero ? static_cast<half>(grad2.y)
+                                               : half_zero);
+#else
   return __floats2half2_rn(x_half2.x > half_zero ? grad2.x : half_zero,
                            x_half2.y > half_zero ? grad2.y : half_zero);
+#endif
 }
 
 /**
@@ -527,10 +542,10 @@ __global__ void ls_dropout_bias_bwd_kernel(
   const float scale = 1.f / (1.f - ratio);
   // every block generate 8 bias result
   __shared__ float tile[8][129];
-
+#ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
-
+#endif
   int col_idx = flat_2dim(blockIdx.x, threadIdx.x, 8);
   int stride = hidden_size * 128;
   float local_sum = 0;
@@ -558,9 +573,11 @@ __global__ void ls_dropout_bias_bwd_kernel(
     }
   }
   __syncthreads();
-
+#ifdef __HIPCC__
+  for (int i = 1; i < 32; i <<= 1) sum += __shfl_down(sum, i, WARP_SIZE);
+#else
   for (int i = 1; i < 32; i <<= 1) sum += g.shfl_down(sum, i);
-
+#endif
   if (y == 0) tile[0][x] = sum;
   __syncthreads();
 
@@ -570,16 +587,31 @@ __global__ void ls_dropout_bias_bwd_kernel(
   }
 }
 
+#ifdef __HIPCC__
+__device__ inline half2 __shfl_down(half2 var, unsigned int lane_delta,
+                                    int width = warpSize) {
+  static_assert(sizeof(half2) == sizeof(int), "");
+
+  int tmp;
+  __builtin_memcpy(&tmp, &var, sizeof(tmp));
+  tmp = __shfl_down(tmp, lane_delta, width);
+
+  half2 tmp1;
+  __builtin_memcpy(&tmp1, &tmp, sizeof(tmp));
+  return tmp1;
+}
+#endif
+
 __global__ void ls_dropout_bias_bwd_kernel(
     const int row_size, const float ratio, __half *__restrict__ in_grad,
     __half *__restrict__ bias_grad, const __half *__restrict__ out_grad,
     const uint8_t *__restrict__ mask, const int hidden_size) {
   const __half2 scale = __float2half2_rn(1.f / (1.f - ratio));
   __shared__ __half2 tile[8][129];
-
+#ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
-
+#endif
   __half2 *in_grad2 = reinterpret_cast<__half2 *>(in_grad);
   const __half2 *out_grad2 = reinterpret_cast<const __half2 *>(out_grad);
   __half2 *bias_grad2 = reinterpret_cast<__half2 *>(bias_grad);
@@ -612,9 +644,11 @@ __global__ void ls_dropout_bias_bwd_kernel(
     }
   }
   __syncthreads();
-
+#ifdef __HIPCC__
+  for (int i = 1; i < WARP_SIZE; i <<= 1) sum += __shfl_down(sum, i, WARP_SIZE);
+#else
   for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
-
+#endif
   if (y == 0) tile[0][x] = sum;
   __syncthreads();
 
@@ -849,6 +883,7 @@ void launch_ls_dropout_act_bias<ActivationType::kRelu, __half>(
  * @param hidden_size
  * @return void
  */
+
 template <ActivationType act_type, typename T>
 __global__ void ls_dropout_act_bias_bwd_kernel(
     const int row_size, const float ratio, T *in_grad,
@@ -857,10 +892,10 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
     const uint8_t *__restrict__ mask, const int hidden_size) {
   const float scale = 1.f / (1.f - ratio);
   __shared__ float tile[WARP_SIZE][WARP_SIZE + 1];
-
+#ifndef __HIPCC__
   cg::thread_block b = cg::this_thread_block();
   cg::thread_block_tile<WARP_SIZE> g = cg::tiled_partition<WARP_SIZE>(b);
-
+#endif
   int col_idx = flat_2dim(blockIdx.x, threadIdx.x, WARP_SIZE);
 
   int stride = hidden_size * WARP_SIZE;
@@ -884,9 +919,11 @@ __global__ void ls_dropout_act_bias_bwd_kernel(
   __syncthreads();
   float sum = tile[threadIdx.y][threadIdx.x];
   __syncthreads();
-
+#ifdef __HIPCC__
+  for (int i = 1; i < 32; i <<= 1) sum += __shfl_down(sum, i, WARP_SIZE);
+#else
   for (int i = 1; i < WARP_SIZE; i <<= 1) sum += g.shfl_down(sum, i);
-
+#endif
   if (threadIdx.x == 0) tile[0][threadIdx.y] = sum;
   __syncthreads();
 

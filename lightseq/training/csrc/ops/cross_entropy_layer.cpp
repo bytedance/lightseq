@@ -1,8 +1,6 @@
 #include "cross_entropy_layer.h"
-
 #include "context.h"
 #include "kernels.h"
-
 template <typename T>
 CrossEntropyLayer<T>::CrossEntropyLayer(float epsilon, int padding_idx,
                                         int max_batch_tokens)

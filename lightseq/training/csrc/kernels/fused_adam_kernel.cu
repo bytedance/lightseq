@@ -15,8 +15,8 @@
 #include "ATen/cuda/CUDAContext.h"
 #include "ATen/cuda/detail/IndexUtils.cuh"
 #include "fused_adam_kernel.h"
-#include "multi_tensor_apply.cuh"
 
+#include "multi_tensor_apply.cuh"
 typedef enum {
   ADAM_MODE_0 = 0,  // eps under square root
   ADAM_MODE_1 = 1   // eps outside square root

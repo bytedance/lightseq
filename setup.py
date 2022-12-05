@@ -12,12 +12,42 @@ from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 
 from lightseq import __version__
+import torch
+import pathlib
 
 logging.basicConfig()
 logger = logging.getLogger(__file__)
 
 ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
 ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
+
+
+from lightseq.training.ops.pytorch.builder import ALL_OPS, OpBuilder
+
+torch_available = True
+try:
+    import torch
+    from torch.utils.cpp_extension import BuildExtension
+except ImportError:
+    torch_available = False
+    print(
+        "[WARNING] Unable to import torch, pre-compiling ops will be disabled. "
+        "Please visit https://pytorch.org/ to see how to properly install torch on your system."
+    )
+
+is_rocm_pytorch = OpBuilder.is_rocm_pytorch()
+print("is_rocm_pytorch: ", is_rocm_pytorch)
+
+if torch.utils.cpp_extension.CUDA_HOME is None and (not is_rocm_pytorch):
+    raise RuntimeError(
+        "--cuda_ext was requested, but nvcc was not found.  Are you sure your environment has nvcc available?  If you're installing within a container from https://hub.docker.com/r/pytorch/pytorch, only images whose names contain 'devel' will provide nvcc."
+    )
+
+cmdclass = {}
+ext_modules = []
+define_macros = []
+install_requires = []
+compatible_ops = dict.fromkeys(ALL_OPS.keys(), False)
 
 
 class CMakeExtension(Extension):
@@ -44,6 +74,7 @@ class CMakeBuild(build_ext):
                 raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
         for ext in self.extensions:
+            print("ext: ", ext)
             self.build_extension(ext)
 
     def build_extension(self, ext):
@@ -65,7 +96,7 @@ class CMakeBuild(build_ext):
             cmake_args += [
                 "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}".format(cfg.upper(), extdir)
             ]
-            if sys.maxsize > 2 ** 32:
+            if sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
             build_args += ["--", "/m"]
         else:
@@ -90,6 +121,26 @@ class CMakeBuild(build_ext):
         )
 
 
+for op_name, builder in ALL_OPS.items():
+    print(f"Install Ops={op_name}")
+    op_compatible = builder.is_compatible()
+    print(f"op_name: {op_name}")
+
+    if op_compatible:
+        reqs = builder.python_requirements()
+        install_requires += builder.python_requirements()
+
+        assert (
+            torch_available
+        ), f"Unable to pre-compile {op_name}, please first install torch"
+        if is_rocm_pytorch:
+            define_macros += [("WITH_HIP", None)]
+            ext_modules.append(builder.builder())
+            cmd_class = {"build_ext": BuildExtension.with_options(use_ninja=False)}
+        else:
+            cmd_class = {build_ext: CMakeBuild}
+            ext_modules = [CMakeExtension("inference")]
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -113,12 +164,11 @@ setup_kwargs = dict(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
     ],
-    install_requires=["ninja"],
+    install_requires=install_requires,
     python_requires=">=3.6",
-    cmdclass=dict(build_ext=CMakeBuild),
+    cmdclass=cmd_class,
     zip_safe=False,
     packages=setuptools.find_packages(exclude=["docs", "tests"]) + ["."],
-    include_package_data=True,
     entry_points={
         "console_scripts": [
             "lightseq-train = lightseq.training.cli."
@@ -132,15 +182,14 @@ setup_kwargs = dict(
         ],
     },
 )
-ext_modules = [CMakeExtension("inference")]
 
 try:
     setup(ext_modules=ext_modules, **setup_kwargs)
 except Exception as e:
     logger.warning(e)
-    logger.warning("The inference extension could not be compiled")
+    logger.warning("The extension could not be compiled")
 
     # If this new 'setup' call don't fail, the module
     # will be successfully installed, without the C extension :
     setup(**setup_kwargs)
-    logger.info("lightseq training installation succeeded.")
+    logger.info("lightseq extension installation succeeded.")

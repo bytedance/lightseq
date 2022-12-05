@@ -2,7 +2,6 @@
 
 #include "context.h"
 #include "kernels.h"
-
 template <typename T>
 TransformerEmbeddingLayer<T>::TransformerEmbeddingLayer(
     int layer_id, const T *pos_embeddings_ptr, int max_batch_tokens,

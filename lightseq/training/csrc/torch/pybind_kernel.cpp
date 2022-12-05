@@ -1,8 +1,7 @@
-#include <ATen/cuda/CUDAContext.h>
-#include <cuda_fp16.h>
 #include <torch/extension.h>
-
+#include <ATen/cuda/CUDAContext.h>
 #include <cuda.h>
+#include <cuda_fp16.h>
 
 #include "cuda_util.h"
 #include "kernels.h"

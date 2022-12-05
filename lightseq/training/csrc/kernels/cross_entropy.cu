@@ -1,15 +1,23 @@
-#include "block_reduce.h"
 #include "cuda_util.h"
 #include "kernels.h"
 #include "ls_cub.cuh"
-
+#ifdef __HIPCC__
+#include "./hip/block_reduce_hip.h"
+hipcub::CachingDeviceAllocator g_allocator(true);
+#else
+#include "block_reduce.h"
 ls::cub::CachingDeviceAllocator g_allocator(true);
+#endif
 
 template <typename T>
 __global__ void ls_cross_entropy_fw_kernel(
     const T *__restrict__ inputs, const int *__restrict__ targets,
     float *__restrict__ outputs, float *__restrict__ nll_loss_outputs,
-    const int padding_idx, const float epsilon, const int vocab_size) {
+    const int padding_idx, const float epsilon, const int vocab_size)
+// #ifdef __HIPCC__
+//     __attribute__((amdgpu_flat_work_group_size(1,1024)))
+// #endif
+{
   /* step1: compute each thread's max_logit and sum_exp_logit, store in
    * max_input, sum_exp_logit */
   const int block_start = blockIdx.x * vocab_size;
@@ -140,17 +148,32 @@ void launch_cross_entropy_fw(const T *inputs_ptr, const int *targets_ptr,
   int num_items = grid_dim;
   void *d_temp_storage = NULL;
   size_t temp_storage_bytes = 0;
+#ifdef __HIPCC__
+  CHECK_GPU_ERROR(hipcub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                            loss_buffer, outputs_ptr, num_items,
+                                            stream));
+#else
   CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
                                              loss_buffer, outputs_ptr,
                                              num_items, stream));
+#endif
   CHECK_GPU_ERROR(
       g_allocator.DeviceAllocate(&d_temp_storage, temp_storage_bytes));
+#ifdef __HIPCC__
+  CHECK_GPU_ERROR(hipcub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                            loss_buffer, outputs_ptr, num_items,
+                                            stream));
+  CHECK_GPU_ERROR(hipcub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
+                                            nll_loss_buffer, nll_loss_ptr,
+                                            num_items, stream));
+#else
   CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
                                              loss_buffer, outputs_ptr,
                                              num_items, stream));
   CHECK_GPU_ERROR(ls::cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes,
                                              nll_loss_buffer, nll_loss_ptr,
                                              num_items, stream));
+#endif
   CHECK_GPU_ERROR(g_allocator.DeviceFree(d_temp_storage));
 }
 

@@ -5,6 +5,7 @@ from torch import nn
 from torch.autograd import Function
 
 from lightseq.training.ops.pytorch.builder import TransformerBuilder
+import os
 
 transformer_cuda_module = None
 
@@ -24,7 +25,6 @@ class LSCrossEntropyFunc(Function):
             inputs = inputs.to(torch.half)
 
         (reduced_loss, nll_loss) = forward_func(config.layer_id, inputs, targets)
-
         if config.is_grad_enabled and config.training:
             ctx.save_for_backward(inputs, targets)
             ctx.config = config
@@ -79,7 +79,14 @@ class LSCrossEntropyLayer(nn.Module):
         # Load cuda modules if needed
         global transformer_cuda_module
         if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
+            if os.getenv("ROCM_PATH") is not None:
+                import importlib
+
+                transformer_cuda_module = importlib.import_module(
+                    "op_builder.lightseq_layers_op"
+                )
+            else:
+                transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module

@@ -4,7 +4,6 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <stdio.h>
-
 #include "kernels.h"
 
 template <typename T>

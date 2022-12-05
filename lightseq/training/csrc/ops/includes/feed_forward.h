@@ -9,7 +9,6 @@
 #include <stdio.h>
 
 #include <array>
-
 #include "cublas_wrappers.h"
 #include "kernels.h"
 
@@ -23,7 +22,13 @@ class FeedForward {
     Config(int outputs, int inputs)
         : outputSize(outputs),
           inputSize(inputs),
-          gemm_algos(std::array<int, 3>({99, 99, 99})) {}
+#ifdef __HIPCC__
+          gemm_algos(std::array<int, 3>({160, 160, 160})) {
+    }
+#else
+          gemm_algos(std::array<int, 3>({99, 99, 99})) {
+    }
+#endif
   };
 
   FeedForward(Config config) : config_(config) {}
@@ -37,7 +42,12 @@ class FeedForward {
 
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_T, CUBLAS_OP_N, config_.outputSize,
                    bsz, config_.inputSize, &alpha, &beta, weights, input_ptr,
-                   out, cublasGemmAlgo_t(config_.gemm_algos[0]));
+                   out,
+#ifdef __HIPCC__
+                   rocblas_gemm_algo(config_.gemm_algos[0]));
+#else
+                   cublasGemmAlgo_t(config_.gemm_algos[0]));
+#endif
   }
   void Backward(int bsz, const T *out_grad, const T *input_ptr,
                 const T *weights, T *weights_grad, T *bias_grad,
@@ -47,11 +57,21 @@ class FeedForward {
     float alpha = (T)1.0, beta = (T)0.0;
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, config_.inputSize,
                    config_.outputSize, bsz, &alpha, &beta, input_ptr, out_grad,
-                   weights_grad, cublasGemmAlgo_t(config_.gemm_algos[1]));
+                   weights_grad,
+#ifdef __HIPCC__
+                   rocblas_gemm_algo(config_.gemm_algos[1]));
+#else
+                   cublasGemmAlgo_t(config_.gemm_algos[1]));
+#endif
 
     cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, config_.inputSize,
                    bsz, config_.outputSize, &alpha, &beta, weights, out_grad,
-                   inp_grad_out, cublasGemmAlgo_t(config_.gemm_algos[2]));
+                   inp_grad_out,
+#ifdef __HIPCC__
+                   rocblas_gemm_algo(config_.gemm_algos[2]));
+#else
+                   cublasGemmAlgo_t(config_.gemm_algos[2]));
+#endif
     if (compute_bias) {
       launch_fuse_transpose_bias_kernel<T>(out_grad, bias_grad, bsz,
                                            config_.outputSize, stream);

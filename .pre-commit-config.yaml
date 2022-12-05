@@ -12,7 +12,7 @@ repos:
         args: [-style=file]
 
   - repo: https://github.com/psf/black
-    rev: 21.5b2
+    rev: 22.3.0
     hooks:
       - id: black
 

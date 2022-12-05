@@ -2,11 +2,14 @@
 
 #include <cub/block/block_load.cuh>
 #include <cub/cub.cuh>
-
-#include "block_reduce.h"
-#include "kernels.h"
-
+#ifdef __HIPCC__
+#include <hip_cooperative_groups.h>
+#include "./hip/block_reduce_hip.h"
+#else
 #include <cooperative_groups.h>
+#include "block_reduce.h"
+#endif
+#include "kernels.h"
 
 namespace cg = cooperative_groups;
 const float EPSILON = 1e-8f;
@@ -37,13 +40,25 @@ __global__ void ker_attn_softmax(T *inp, const T *attn_mask, int from_len,
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
   const int token_per_reduce = 1;
+#ifdef __HIPCC__
+  typedef hipcub::BlockLoad<T, block_dim, ele_per_thread,
+                            hipcub::BLOCK_LOAD_VECTORIZE>
+      BlockLoad;
+#else
   typedef cub::BlockLoad<T, block_dim, ele_per_thread,
                          cub::BLOCK_LOAD_VECTORIZE>
       BlockLoad;
+#endif
   __shared__ typename BlockLoad::TempStorage ts_load;
+#ifdef __HIPCC__
+  typedef hipcub::BlockStore<T, block_dim, ele_per_thread,
+                             hipcub::BLOCK_STORE_VECTORIZE>
+      BlockStore;
+#else
   typedef cub::BlockStore<T, block_dim, ele_per_thread,
                           cub::BLOCK_STORE_VECTORIZE>
       BlockStore;
+#endif
   __shared__ typename BlockStore::TempStorage ts_store;
 
   T mval[ele_per_thread];
@@ -130,13 +145,25 @@ __global__ void ker_attn_softmax_lt32(T *inp, const T *attn_mask, int from_len,
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
   const int token_per_reduce = 1;
+#ifdef __HIPCC__
+  typedef hipcub::BlockLoad<T, block_dim, ele_per_thread,
+                            hipcub::BLOCK_LOAD_VECTORIZE>
+      BlockLoad;
+#else
   typedef cub::BlockLoad<T, block_dim, ele_per_thread,
                          cub::BLOCK_LOAD_VECTORIZE>
       BlockLoad;
+#endif
   __shared__ typename BlockLoad::TempStorage ts_load;
+#ifdef __HIPCC__
+  typedef hipcub::BlockStore<T, block_dim, ele_per_thread,
+                             hipcub::BLOCK_STORE_VECTORIZE>
+      BlockStore;
+#else
   typedef cub::BlockStore<T, block_dim, ele_per_thread,
                           cub::BLOCK_STORE_VECTORIZE>
       BlockStore;
+#endif
   __shared__ typename BlockStore::TempStorage ts_store;
 
   T mval[ele_per_thread];

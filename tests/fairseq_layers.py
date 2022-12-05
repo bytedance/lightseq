@@ -683,7 +683,7 @@ class TransformerEmbeddingLayer(nn.Module):
         self.embeddings = nn.Embedding(
             vocab_size, embedding_dim, padding_idx=padding_idx
         )
-        nn.init.normal_(self.embeddings.weight, mean=0, std=embedding_dim ** -0.5)
+        nn.init.normal_(self.embeddings.weight, mean=0, std=embedding_dim**-0.5)
         nn.init.constant_(self.embeddings.weight[padding_idx], 0)
         self.embeddings.to(
             torch.device("cuda:0"), dtype=(torch.half if fp16 else torch.float)

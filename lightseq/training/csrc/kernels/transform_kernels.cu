@@ -1,10 +1,17 @@
+#include "kernels.h"
+
+#ifdef __HIPCC__
+#include <hipcub/hipcub.hpp>
+#include <hipcub/block/block_scan.hpp>
+#include <hipcub/block/block_store.hpp>
+using namespace hipcub;
+
+#else
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_scan.cuh>
 #include <cub/block/block_store.cuh>
-
-#include "kernels.h"
-
 using namespace cub;
+#endif
 
 /**
 @brief: transform_0213

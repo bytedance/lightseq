@@ -1,8 +1,6 @@
 #include <chrono>
 #include <ctime>
-
 #include "kernels.h"
-
 /**
 @brief: get_tokens_position
 get tokens position in sequences that the padding tokens are ignored.
@@ -384,6 +382,16 @@ __global__ void d_lookup_scale_pos_dropout<float>(
   }
 }
 
+__device__ __forceinline__ void AddImpl(half2 *address, half2 val) {
+  float2 address_value = __half22float2(*address);
+
+  float2 tmp1 = __half22float2(val);
+  atomicAdd(&(address_value.x), tmp1.x);
+  atomicAdd(&(address_value.y), tmp1.y);
+
+  *address = __float22half2_rn(address_value);
+}
+
 template <>
 __global__ void d_lookup_scale_pos_dropout<__half>(
     __half *grad_embeddings, const __half *grad_output, const int *input,
@@ -434,7 +442,11 @@ __global__ void d_lookup_scale_pos_dropout<__half>(
     int idx = (tid * (embedding_dim) + offset) << 2;
 #pragma unroll
     for (uint j = 0; j < 4; ++j) {
+#ifdef __HIPCC__
+      AddImpl(grad_embeddings_h2 + idx + j, res_h2[j]);
+#else
       atomicAdd(grad_embeddings_h2 + idx + j, res_h2[j]);
+#endif
     }
   }
 }
@@ -454,7 +466,11 @@ void launch_d_lookup_scale_pos_dropout<float>(
 
   zero_grads<float>
       <<<zg_grid_dim, zg_block_dim, 0, stream>>>(grad_embeddings, total_nums);
-
+  // #ifdef __HIPCC__
+  //   int threads_per_token = MAX_THREADS;
+  // #else
+  //   int threads_per_token = min(embedding_dim, MAX_THREADS);
+  // #endif
   int threads_per_token = min(embedding_dim, MAX_THREADS);
   int tokens_per_block = MAX_THREADS / threads_per_token;
   int blocks_per_seq = (seq_len + tokens_per_block - 1) / tokens_per_block;

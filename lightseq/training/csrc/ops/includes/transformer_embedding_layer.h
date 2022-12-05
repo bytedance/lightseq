@@ -5,7 +5,6 @@
 #include <cuda_runtime_api.h>
 
 #include <type_traits>
-
 #include "cuda_util.h"
 
 template <typename T>

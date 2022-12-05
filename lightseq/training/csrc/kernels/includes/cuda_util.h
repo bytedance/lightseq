@@ -2,7 +2,9 @@
 
 #include <cublas_v2.h>
 #include <cuda.h>
+#ifndef __HIPCC__
 #include <math_constants.h>
+#endif
 
 #include <chrono>
 #include <fstream>

@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 
 import torch
+import os
 from torch import nn
 from torch.autograd import Function
 
@@ -40,7 +41,6 @@ class LSTransformerEmbeddingFunc(Function):
             else cuda_module.transformer_embedding_layer_bw_fp32
         )
         assert ctx.config.training
-
         (input,) = ctx.saved_tensors
 
         if ctx.config.fp16:
@@ -98,7 +98,14 @@ class LSTransformerEmbeddingLayer(nn.Module):
         # Load cuda modules if needed
         global transformer_cuda_module
         if transformer_cuda_module is None:
-            transformer_cuda_module = TransformerBuilder().load()
+            if os.getenv("ROCM_PATH") is not None:
+                import importlib
+
+                transformer_cuda_module = importlib.import_module(
+                    "op_builder.lightseq_layers_op"
+                )
+            else:
+                transformer_cuda_module = TransformerBuilder().load()
 
         # create the layer in cuda kernels.
         cuda_module = transformer_cuda_module
@@ -134,7 +141,7 @@ class LSTransformerEmbeddingLayer(nn.Module):
         return Config(**kwargs)
 
     def reset_parameters(self):
-        nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim ** -0.5)
+        nn.init.normal_(self.embeddings, mean=0, std=self.config.embedding_dim**-0.5)
         nn.init.constant_(self.embeddings[self.config.padding_idx], 0)
 
     def __assign_layer_weight_grad(self):

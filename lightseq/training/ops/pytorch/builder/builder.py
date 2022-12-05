@@ -17,6 +17,16 @@ WARNING = f"{YELLOW} [WARNING] {END}"
 DEFAULT_TORCH_EXTENSION_PATH = "/tmp/torch_extensions"
 DEFAULT_COMPUTE_CAPABILITIES = "6.0;6.1;7.0"
 
+try:
+    import torch
+except ImportError:
+    print(
+        f"{WARNING} unable to import torch, please install it if you want to pre-compile any deepspeed ops."
+    )
+else:
+    TORCH_MAJOR = int(torch.__version__.split(".")[0])
+    TORCH_MINOR = int(torch.__version__.split(".")[1])
+
 
 def installed_cuda_version():
     import torch.utils.cpp_extension
@@ -91,9 +101,52 @@ def assert_torch_info(torch_info):
 
 
 class OpBuilder(ABC):
+    _rocm_version = None
+    _is_rocm_pytorch = None
+
     def __init__(self, name):
         self.name = name
         self.jit_mode = False
+
+    @staticmethod
+    def is_rocm_pytorch():
+        if OpBuilder._is_rocm_pytorch is not None:
+            return OpBuilder._is_rocm_pytorch
+
+        _is_rocm_pytorch = False
+        try:
+            import torch
+        except ImportError:
+            pass
+        else:
+            if TORCH_MAJOR > 1 or (TORCH_MAJOR == 1 and TORCH_MINOR >= 5):
+                _is_rocm_pytorch = (
+                    hasattr(torch.version, "hip") and torch.version.hip is not None
+                )
+                if _is_rocm_pytorch:
+                    from torch.utils.cpp_extension import ROCM_HOME
+
+                    _is_rocm_pytorch = ROCM_HOME is not None
+        OpBuilder._is_rocm_pytorch = _is_rocm_pytorch
+        return OpBuilder._is_rocm_pytorch
+
+    # @staticmethod
+    # def installed_rocm_version():
+    #     if OpBuilder._rocm_version:
+    #         return OpBuilder._rocm_version
+
+    #     ROCM_MAJOR = '0'
+    #     ROCM_MINOR = '0'
+    #     if OpBuilder.is_rocm_pytorch():
+    #         from torch.utils.cpp_extension import ROCM_HOME
+    #         ls_build_version = os.getenv('ROCM_PATH', "")
+
+    #         with open('{0}/.info/version-dev'.format(ls_build_version), 'r') as file:
+    #             ROCM_VERSION_DEV_RAW = file.read()
+    #         ROCM_MAJOR = ROCM_VERSION_DEV_RAW.split('.')[0]
+    #         ROCM_MINOR = ROCM_VERSION_DEV_RAW.split('.')[1]
+    #     OpBuilder._rocm_version = (int(ROCM_MAJOR), int(ROCM_MINOR))
+    #     return OpBuilder._rocm_version
 
     @abstractmethod
     def absolute_name(self):
@@ -319,7 +372,10 @@ class CUDAOpBuilder(OpBuilder):
     def builder(self):
         from torch.utils.cpp_extension import CUDAExtension
 
-        assert_no_cuda_mismatch()
+        if self._is_rocm_pytorch:
+            pass
+        else:
+            assert_no_cuda_mismatch()
         return CUDAExtension(
             name=self.absolute_name(),
             sources=self.sources(),

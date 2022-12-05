@@ -1,5 +1,4 @@
 #include <torch/extension.h>
-
 #include "fused_adam_kernel.h"
 
 // x is torch::Tensor
