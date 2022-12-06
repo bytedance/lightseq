@@ -36,6 +36,11 @@ void Node::set_parents(std::vector<Node*> parents) {
     _parents.push_back(iter);
     iter->add_child(this);
   }
+  if(node_type() == NodeType::Operator) {
+    if(_context_ptr->in_regress()) {
+      _in_regress_scope = true;
+    }
+  }
 }
 
 void Node::recursive_forward() {
@@ -52,7 +57,9 @@ void Node::recursive_forward() {
   }
 
   _fw_flag = true;
-  _context_ptr->update_node_idx();
+  if(node_type() == NodeType::Operator){
+    _context_ptr->update_node_idx();
+  }
   if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
 // #ifdef MEM_DEBUG
@@ -86,7 +93,7 @@ void Node::recursive_forward() {
 #endif
 
   forward();
-
+  
 #ifdef DEBUG_MODE
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() != NodeType::Operator) {
@@ -121,7 +128,9 @@ void Node::recursive_backward() {
   }
 
   _bw_flag = true;
-  _context_ptr->update_node_idx();
+  if(node_type() == NodeType::Operator){
+    _context_ptr->update_node_idx();
+  }
   if (!_context_ptr->is_built()) {
     _bw_node_idx = _context_ptr->node_idx();
     if(_in_regress_scope) {
@@ -203,7 +212,6 @@ Variable::Variable(std::string name, size_t value_byte_size,
   } else if (vt == VariableType::FixedVariable) {
     malloc_memory(_value_byte_size, _grad_byte_size);
   } else if(vt == VariableType::RegressiveVariable){
-    _in_regress_scope = true;
     return ;
   } else {
     printf("Error! var %s useless vt %d\n", _name.c_str(), vt);

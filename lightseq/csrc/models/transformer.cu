@@ -115,6 +115,7 @@ Transformer::Transformer(const std::string weight_path,
                                0, VariableType::RegressiveVariable);
   total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
                                0, VariableType::RegressiveVariable);
+  pad_mask->set_regress_var();
 
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
@@ -207,7 +208,7 @@ void Transformer::Infer() {
     iter->forward();
   }
   enc_norm_layer->forward();
-  
+
   int step = 0;
   for (step = 0; step < _batch_max_decode_length - 1; step++) {
     decoder_before_forward(batch_size, seq_len, step);

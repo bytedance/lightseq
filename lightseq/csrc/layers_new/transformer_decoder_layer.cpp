@@ -13,7 +13,8 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
-      _hidden_size(hidden_size) {
+      _hidden_size(hidden_size),
+      _beam_size(beam_size) {
 
   int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens : max_batch_size * beam_size;
 
@@ -54,6 +55,7 @@ TransformerDecoderLayer<T1, T2>::operator()(Variable* inp, Variable* enc_out,
     total_enc_kv->malloc_memory(_nshared_layer * _max_batch_tokens *
                                 _hidden_size * 2 * sizeof(T1));
     _context_ptr->register_object("total_enc_kv", total_enc_kv);
+    total_enc_kv->set_regress_var();
     _context_ptr->regress_begin();
   } else {
     total_enc_kv =
@@ -97,6 +99,7 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
                                                      int src_seq_len,
                                                      int step) {
   _step = step;
+  _batch_size = batch_size;
   _batch_tokens = batch_size * trg_seq_len;
 
   enc_k->set_offset(

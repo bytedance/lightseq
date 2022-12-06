@@ -6,6 +6,7 @@ find_package(CUDA 11 REQUIRED)
 option(USE_NEW_ARCH "inference with new arch" OFF)
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
+option(MEM_DEBUG "debug memory message" OFF)
 option(DYNAMIC_API "build dynamic lightseq api library" OFF)
 option(USE_TRITONBACKEND "build tritonbackend for lightseq" OFF)
 
@@ -41,7 +42,13 @@ if(USE_NEW_ARCH)
 
   if(DEBUG_MODE)
     add_definitions(-DDEBUG_MODE)
+    set_option(MEM_DEBUG ON)
     message(STATUS "Build using debug mode")
+  endif()
+
+  if(MEM_DEBUG) 
+    add_definitions(-DMEM_DEBUG)
+    message(STATUS "Build using memory debug")
   endif()
 
   if(FP16_MODE)

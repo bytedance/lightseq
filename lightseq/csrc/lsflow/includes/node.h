@@ -111,6 +111,7 @@ class Variable : public Node {
   void remove_ancestor();
   void add_descendants(Variable* var);
   void remove_descendants(Variable* var);
+  void set_regress_var() { _variable_type = VariableType::RegressiveVariable; }
 
   friend class Node;
 
