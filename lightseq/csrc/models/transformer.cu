@@ -58,17 +58,18 @@ Transformer::Transformer(const std::string weight_path,
       tw_._max_step, tw_._multilg_type));
   launch_dec_emb_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
+  _enc_kv_layer.reset(new EncDecKvLayer<OpType_, OpType_>(
+      tw_._n_dec_layer, max_batch_tokens, tw_._hidden_size, tw_._head_num));
+  _enc_kv_layer->load_params(tw_.get_trg_emb_wei(), 4);
+
   // initial TransformerDecoder layers
   int dec_wei_offset = 0;
   for (int idx = 0; idx < tw_._n_dec_layer; idx++) {
-    TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
-        new TransformerDecoderLayer<OpType_, OpType_>(
+    TransformerDecoderLayerV2Ptr<OpType_, OpType_> dec_layer_(
+        new TransformerDecoderLayerV2<OpType_, OpType_>(
             tw_._n_dec_layer, idx, max_batch_tokens,
             tw_._max_step, tw_._hidden_size, tw_._head_num, tw_._inner_size, 0,
             0, 0, true, tw_._use_gelu ? "gelu" : "relu", false, false, max_batch_size, tw_._beam_size));
-    if (idx == 0) {
-      dec_layer_->load_params(tw_.get_trg_emb_wei(), 4, true);
-    }
     dec_wei_offset +=
         dec_layer_->load_params(tw_.get_dec_wei(), dec_wei_offset);
     dec_layer_vec.push_back(dec_layer_);
@@ -106,9 +107,12 @@ Transformer::Transformer(const std::string weight_path,
   }
   Variable *enc_out = (*enc_norm_layer)(enc_emb);
 
-  Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
+  Variable* total_enc_kv = (*_enc_kv_layer)(enc_out);
 
-  // _context_ptr->regress_begin();
+  total_enc_kv->set_regress_var();
+
+  _context_ptr->regress_begin();
+  Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
   cache_size =
       max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
   total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
@@ -122,7 +126,7 @@ Transformer::Transformer(const std::string weight_path,
     Variable *cache_k = new Variable("cache_k");
     Variable *cache_v = new Variable("cache_v");
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
-        (*iter)(dec_emb, enc_out, pad_mask, cache_k, cache_v);
+        (*iter)(dec_emb, total_enc_kv, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
     Variable *cache_k_out = std::get<1>(dec_outs);
     Variable *cache_v_out = std::get<2>(dec_outs);
@@ -162,6 +166,7 @@ void Transformer::encoder_before_forward(int batch_size, int seq_len) {
     dec_layer_idx++;
   }
   enc_norm_layer->before_forward(batch_size * seq_len);
+  _enc_kv_layer->before_forward(batch_size, seq_len);
 }
 
 void Transformer::decoder_before_forward(int batch_size, int seq_len,
@@ -208,6 +213,7 @@ void Transformer::Infer() {
     iter->forward();
   }
   enc_norm_layer->forward();
+  _enc_kv_layer->forward();
 
   int step = 0;
   for (step = 0; step < _batch_max_decode_length - 1; step++) {

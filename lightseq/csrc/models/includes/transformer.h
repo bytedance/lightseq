@@ -10,6 +10,7 @@
 #include "lyr_normalize_layer.h"
 #include "linear_layer.h"
 #include "sample_layer.h"
+#include "encdec_kv_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -30,7 +31,8 @@ class Transformer : public LSModel {
   LyrNormalizeLayerPtr<OpType_, OpType_> enc_norm_layer;
 
   LaunchDecEmbLayerPtr<OpType_> launch_dec_emb_layer;
-  std::vector<TransformerDecoderLayerPtr<OpType_, OpType_>> dec_layer_vec;
+  EncDecKvLayerPtr<OpType_, OpType_> _enc_kv_layer;
+  std::vector<TransformerDecoderLayerV2Ptr<OpType_, OpType_>> dec_layer_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
   LinearLayerPtr<OpType_, OpType_> linear_layer;
 
