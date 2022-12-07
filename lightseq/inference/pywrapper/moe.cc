@@ -74,6 +74,20 @@ Moe::Moe(const std::string weight_path, const int max_batch_size)
   encoder_->init_buffer(d_buf_);
   decoder_->init_buffer(d_buf_);
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream_));
+
+  // malloc memory for hard gates
+  if (tw_._gate_type == 1) {
+    CHECK_GPU_ERROR(
+        cudaMalloc(&_p_d_hard_gates, 3 * _max_batch_size * sizeof(int)));
+    h_hard_gates.resize(3 * _max_batch_size);
+    h_lang_id.resize(_max_batch_size);
+
+    // pass to encoder and decoder
+    encoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+    decoder_->set_hard_gates_ptr(h_hard_gates.data(), &h_gate_sets,
+                                 _p_d_hard_gates);
+  }
 }
 
 Moe::~Moe() {
@@ -108,6 +122,17 @@ void Moe::Infer() {
     if (tw_._multilg_type == 2 || tw_._multilg_type == 3) {
       seq_len -= 1;
     }
+  }
+
+  if (tw_._gate_type == 1) {
+    // hard gate
+    /**
+      1. calculate gate according to lang_id
+      2. copy [hard_gates,gate_sizes,reorder_indexs] to device
+      shape: [hard_gates,sizes of each gate,reorder indexs]
+      used for hard gate ffn calculation and reorder final ffn logits
+    */
+    init_hard_gates();
   }
 
   encoder_->run_one_infer(batch_size, seq_len);
@@ -220,6 +245,54 @@ DataType Moe::get_output_dtype(int index) {
       throw std::runtime_error("invalid output index");
       break;
   }
+}
+
+void Moe::init_hard_gates() {
+  int batch_size = input_shapes_[0][0];
+  // clear
+  std::fill(h_hard_gates.begin(), h_hard_gates.end(), 0);
+  std::fill(h_lang_id.begin(), h_lang_id.end(), 0);
+  h_gate_sets.clear();
+
+  CHECK_GPU_ERROR(cudaMemcpy(h_lang_id.data(), d_src_lang_id_,
+                             _max_batch_size * sizeof(int),
+                             cudaMemcpyDeviceToHost));
+
+  for (int i = 0; i < batch_size; i++) {
+    auto iter = tw_.lang2gate.find(h_lang_id[i]);
+    int gate = -1;
+    if (iter != tw_.lang2gate.end()) {
+      gate = iter->second;
+      h_gate_sets.insert(gate);
+    }
+    h_hard_gates[i] = gate;
+  }
+
+  // two pointer
+  int cursor_p = 0, cursor_q = 0;
+  int sizes_index = _max_batch_size;
+  int reorder_index = _max_batch_size * 2;
+
+  for (auto it = h_gate_sets.begin(); it != h_gate_sets.end(); it++) {
+    // output pointer of each gate
+    // results will accumulate for each gate sequence
+    for (int i = 0; i < batch_size; i++) {
+      if (h_hard_gates[i] == *it) {
+        h_hard_gates[reorder_index] = i;
+        reorder_index++;
+        cursor_q++;
+      }
+    }
+
+    // save the size of each gate per batch
+    h_hard_gates[sizes_index] = cursor_q - cursor_p;
+    sizes_index++;
+    cursor_p = cursor_q;
+  }
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(_p_d_hard_gates, h_hard_gates.data(),
+                                  3 * _max_batch_size * sizeof(int),
+                                  cudaMemcpyHostToDevice, stream_));
 }
 
 }  // namespace cuda

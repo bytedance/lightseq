@@ -127,6 +127,14 @@ message MoeModelConf {
   int32 moe_topk_decoder = 19;
   repeated int32 moe_list_encoder = 20;
   repeated int32 moe_list_decoder = 21;
+  int32 gate_type = 22;
+  //0 for soft gate
+  //1 for hard gate
+}
+
+message Lang2gate{
+  repeated int32 langs = 1;
+  repeated int32 gates = 2;
 }
 
 message Moe {
@@ -135,4 +143,5 @@ message Moe {
   MoeEmbeddingLayer trg_embedding = 3;         // target embedding
   repeated MoeDecoderLayer decoder_stack = 4;  // decoder weighs
   MoeModelConf model_conf = 5;                 // model_config
+  Lang2gate lang2gate = 6;
 }

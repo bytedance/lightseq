@@ -46,5 +46,18 @@ void ker_bias_redirect_residual_launcher(int hidden_size, int max_token_num,
                                          const float* score,
                                          const int* expert_routed, T* output);
 
+template <typename T>
+void ker_hard_gate_reorder_pre_launcher(const T* input, cudaStream_t stream,
+                                        int gate_size, int* p_d_gate_indexs,
+                                        T* output, int max_token_num,
+                                        int seq_len, int max_thread_per_block,
+                                        int hidden_size, int batch_token_num);
+
+template <typename T>
+void ker_hard_gate_reorder_post_launcher(
+    cudaStream_t stream, const T* input, T* output, int seq_len,
+    int max_thread_per_block, int hidden_size, int* p_d_gate_reorder_indexs,
+    int batch_size, const T* bias, int* _p_d_hard_gates);
+
 }  // namespace cuda
 }  // namespace lightseq

@@ -32,6 +32,7 @@ class MoeEncoder {
   void self_attention();
   void ffn_add_norm();
   void ffn();
+  void moe_fw_hard_gate();
   void moe_fw();
 
   const int _max_batch_size;
@@ -61,6 +62,10 @@ class MoeEncoder {
   float *_p_d_score_routed;
   int *_p_d_expert_id_routed;
 
+  int *_h_hard_gates;
+  int *_p_d_hard_gates;
+  std::set<int> *_gate_sets;
+
   // {token_emb, pos_emb, norm_scale, norm_bias}
   const std::vector<const _DataType *> &_p_d_src_emb_wei;
   // {multihead_norm_scale, multihead_norm_bias, multihead_qkv_kernel,
@@ -84,6 +89,8 @@ class MoeEncoder {
              cudaStream_t stream, cublasHandle_t hd,
              const int *p_d_lang_id = nullptr);
   long compute_buffer_bytesize();
+  void set_hard_gates_ptr(int *hard_gates, std::set<int> *gate_sets,
+                          int *p_d_hard_gates);
   void init_buffer(void *pbuf);
   std::string check();
   void run_one_infer(int batch_size, int batch_seq_len);
