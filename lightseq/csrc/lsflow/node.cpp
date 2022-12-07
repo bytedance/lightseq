@@ -19,7 +19,7 @@ Node::Node(std::string name, NodeType nt_)
   int idx = _context_ptr->node_name_cnt[real_name];
   _context_ptr->node_name_cnt[real_name] += 1;
   _name = real_name + "_" + std::to_string(idx);
-  if(_context_ptr->in_regress()) {
+  if (_context_ptr->in_regress()) {
     _in_regress_scope = true;
   }
 
@@ -36,8 +36,8 @@ void Node::set_parents(std::vector<Node*> parents) {
     _parents.push_back(iter);
     iter->add_child(this);
   }
-  if(node_type() == NodeType::Operator) {
-    if(_context_ptr->in_regress()) {
+  if (node_type() == NodeType::Operator) {
+    if (_context_ptr->in_regress()) {
       _in_regress_scope = true;
     }
   }
@@ -57,15 +57,16 @@ void Node::recursive_forward() {
   }
 
   _fw_flag = true;
-  if(node_type() == NodeType::Operator){
+  if (node_type() == NodeType::Operator) {
     _context_ptr->update_node_idx();
   }
   if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
-// #ifdef MEM_DEBUG
-//     printf("### node %s forward node idx: %d, _in_regress_scope: %d ###\n", name().c_str(), _context_ptr->node_idx(), _in_regress_scope);
-// #endif
-    if(_in_regress_scope) {
+    // #ifdef MEM_DEBUG
+    //     printf("### node %s forward node idx: %d, _in_regress_scope: %d
+    //     ###\n", name().c_str(), _context_ptr->node_idx(), _in_regress_scope);
+    // #endif
+    if (_in_regress_scope) {
       _context_ptr->update_regr_begin(_fw_node_idx);
       _context_ptr->update_regr_end(_fw_node_idx);
     }
@@ -128,12 +129,12 @@ void Node::recursive_backward() {
   }
 
   _bw_flag = true;
-  if(node_type() == NodeType::Operator){
+  if (node_type() == NodeType::Operator) {
     _context_ptr->update_node_idx();
   }
   if (!_context_ptr->is_built()) {
     _bw_node_idx = _context_ptr->node_idx();
-    if(_in_regress_scope) {
+    if (_in_regress_scope) {
       _context_ptr->update_regr_begin(_bw_node_idx);
       _context_ptr->update_regr_end(_bw_node_idx);
     }
@@ -208,11 +209,11 @@ Variable::Variable(std::string name, size_t value_byte_size,
   if (_context_ptr->is_training())
     _grad.reset(new Tensor("grad", _grad_byte_size));
   if (vt == VariableType::SharedVariable) {
-    return ;
+    return;
   } else if (vt == VariableType::FixedVariable) {
     malloc_memory(_value_byte_size, _grad_byte_size);
-  } else if(vt == VariableType::RegressiveVariable){
-    return ;
+  } else if (vt == VariableType::RegressiveVariable) {
+    return;
   } else {
     printf("Error! var %s useless vt %d\n", _name.c_str(), vt);
     exit(-1);
@@ -291,7 +292,8 @@ void Variable::set_grad(char* grad_ptr) {
 
 void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
 #ifdef MEM_DEBUG
-  printf("Varaible %s malloc memory, value size: %zu MB, grad size: %zu MB\n", name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
+  printf("Varaible %s malloc memory, value size: %zu MB, grad size: %zu MB\n",
+         name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
 #endif
   _value_byte_size = value_byte_size;
   _grad_byte_size = grad_byte_size;
@@ -315,12 +317,12 @@ char* Variable::grad(bool is_open_interval) {
 }
 
 void Variable::update_regress_idx() {
-  if(variable_type() != VariableType::RegressiveVariable) {
-    return ;
+  if (variable_type() != VariableType::RegressiveVariable) {
+    return;
   }
   _value->update_life_idx(_context_ptr->regress_begin_idx());
   _value->update_life_idx(_context_ptr->regress_end_idx());
-  if(_context_ptr->is_training() && _grad) {
+  if (_context_ptr->is_training() && _grad) {
     _grad->update_life_idx(_context_ptr->regress_begin_idx());
     _grad->update_life_idx(_context_ptr->regress_end_idx());
   }
@@ -348,9 +350,8 @@ void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
     printf("new parent_variable: %s\n", parent_variable->_name.c_str());
     printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
     exit(-1);
-  }
-  else if(_parent_variable == parent_variable){
-    return ;
+  } else if (_parent_variable == parent_variable) {
+    return;
   }
   _is_descendants = true;
   _parent_variable = parent_variable;

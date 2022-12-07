@@ -90,7 +90,8 @@ void MemoryManager::calculate_buffer_() {
   }
 
 #ifdef MEM_DEBUG
-  printf("**** shared buffer memory size: %zu MB ****\n", total_consumption / MB_SIZE);
+  printf("**** shared buffer memory size: %zu MB ****\n",
+         total_consumption / MB_SIZE);
 #endif
 
   for (auto iter : buffer_vec_) {
@@ -114,9 +115,12 @@ void MemoryManager::calculate_buffer_() {
           cuda_malloc<char>(max_last_addr - record_last_addr);
       buffer_vec_.push_back(current_buffer);
 #ifdef MEM_DEBUG
-      printf("*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n", buffer_idx, (max_last_addr - record_last_addr), float(max_last_addr - record_last_addr)/MB_SIZE);
+      printf(
+          "*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n",
+          buffer_idx, (max_last_addr - record_last_addr),
+          float(max_last_addr - record_last_addr) / MB_SIZE);
 #endif
-      buffer_idx ++;
+      buffer_idx++;
       for (auto iter : temp_usages_vec) {
         int unique_id = iter.first.unique_id;
         tensor_ptr.emplace(unique_id,
@@ -161,10 +165,14 @@ void MemoryManager::calculate_buffer_() {
     char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef MEM_DEBUG
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end memory: %.2f MB\n"
-        "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: %p\n\n",
+        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end "
+        "memory: %.2f MB\n"
+        "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: "
+        "%p\n\n",
         unique_id, iter.first.first_idx, iter.first.last_idx,
-        iter.first._name.c_str(), float(size) / MB_SIZE, float(iter.second + size) / MB_SIZE, iter.second, size, iter.second + size, addr, addr + size);
+        iter.first._name.c_str(), float(size) / MB_SIZE,
+        float(iter.second + size) / MB_SIZE, iter.second, size,
+        iter.second + size, addr, addr + size);
 #endif
   }
 

@@ -8,15 +8,16 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
     float activation_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool is_post_ln, bool is_continuous_cache, int max_batch_size, int beam_size)
+    std::string activation_fn, bool is_post_ln, bool is_continuous_cache,
+    int max_batch_size, int beam_size)
     : Layer("TransformerDecoderLayer"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
       _hidden_size(hidden_size),
       _beam_size(beam_size) {
-
-  int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens : max_batch_size * beam_size;
+  int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens
+                                                   : max_batch_size * beam_size;
 
   if (_layer_id == 0) {
     _enc_kv_layer.reset(new EncDecKvLayer<T1, T2>(
@@ -25,11 +26,13 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln, is_continuous_cache));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
+      is_post_ln, is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
+      is_post_ln));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
@@ -175,7 +178,6 @@ int TransformerDecoderLayer<T1, T2>::load_params(
 template <typename T1, typename T2>
 Variable* TransformerDecoderLayer<T1, T2>::total_enc_kv = nullptr;
 
-
 // #######
 template <typename T1, typename T2>
 TransformerDecoderLayerV2<T1, T2>::TransformerDecoderLayerV2(
@@ -183,23 +185,26 @@ TransformerDecoderLayerV2<T1, T2>::TransformerDecoderLayerV2(
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
     float activation_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool is_post_ln, bool is_continuous_cache, int max_batch_size, int beam_size)
+    std::string activation_fn, bool is_post_ln, bool is_continuous_cache,
+    int max_batch_size, int beam_size)
     : Layer("TransformerDecoderLayerV2"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
       _hidden_size(hidden_size),
       _beam_size(beam_size) {
-
-  int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens : max_batch_size * beam_size;
+  int max_trg_tokens = _context_ptr->is_training() ? max_batch_tokens
+                                                   : max_batch_size * beam_size;
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln, is_continuous_cache));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
+      is_post_ln, is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm, is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
+      is_post_ln));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
@@ -214,10 +219,11 @@ TransformerDecoderLayerV2<T1, T2>::~TransformerDecoderLayerV2() {}
 
 template <typename T1, typename T2>
 std::tuple<Variable*, Variable*, Variable*>
-TransformerDecoderLayerV2<T1, T2>::operator()(Variable* inp, Variable* total_enc_kv,
-                                            Variable* enc_mask,
-                                            Variable* cache_self_k,
-                                            Variable* cache_self_v) {
+TransformerDecoderLayerV2<T1, T2>::operator()(Variable* inp,
+                                              Variable* total_enc_kv,
+                                              Variable* enc_mask,
+                                              Variable* cache_self_k,
+                                              Variable* cache_self_v) {
   set_inputs({inp, total_enc_kv, enc_mask, cache_self_k, cache_self_v});
 
   enc_k = new Variable("enc_k", total_enc_kv);
@@ -241,9 +247,9 @@ TransformerDecoderLayerV2<T1, T2>::operator()(Variable* inp, Variable* total_enc
 
 template <typename T1, typename T2>
 void TransformerDecoderLayerV2<T1, T2>::before_forward(int batch_size,
-                                                     int trg_seq_len,
-                                                     int src_seq_len,
-                                                     int step) {
+                                                       int trg_seq_len,
+                                                       int src_seq_len,
+                                                       int step) {
   _step = step;
   _batch_size = batch_size;
   _batch_tokens = batch_size * trg_seq_len;
@@ -267,7 +273,8 @@ void TransformerDecoderLayerV2<T1, T2>::before_forward(int batch_size,
 template <typename T1, typename T2>
 int TransformerDecoderLayerV2<T1, T2>::load_para_and_grad(
     const T1* para_ptr, T2* grad_ptr) {  // for training
-  throw std::runtime_error("TransformerDecoderLayerV2 not support load_para_and_grad() now");
+  throw std::runtime_error(
+      "TransformerDecoderLayerV2 not support load_para_and_grad() now");
   return -1;
 }
 
@@ -279,7 +286,6 @@ int TransformerDecoderLayerV2<T1, T2>::load_params(
   size += _self_attn_layer->load_params(para_vec, offset + size);
   size += _enc_attn_layer->load_params(para_vec, offset + size);
   size += _ffn_layer->load_params(para_vec, offset + size);
-
 
   return size;
 }

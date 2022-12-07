@@ -50,8 +50,7 @@ class Context {  // model only
   bool _in_regress = false;
 
  public:
-  Context(StatusType status_type = StatusType::Inference,
-          int device_id = 0);
+  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }

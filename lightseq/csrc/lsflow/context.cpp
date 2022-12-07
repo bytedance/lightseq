@@ -101,8 +101,10 @@ void Context::build() {
   _building = true;
 
 #ifdef DEBUG_MODE
-  printf("========== start Context build, StatusType: %s, StatusType id: %d ==========\n",
-         status_type_str().c_str(), int(_status_type));
+  printf(
+      "========== start Context build, StatusType: %s, StatusType id: %d "
+      "==========\n",
+      status_type_str().c_str(), int(_status_type));
 #endif
 
   if (!check_validate()) {
@@ -144,8 +146,8 @@ void Context::build() {
     }
   }
 
-  for(auto iter: _all_node_vec) {
-    if(iter->node_type() == NodeType::Variable) {
+  for (auto iter : _all_node_vec) {
+    if (iter->node_type() == NodeType::Variable) {
       static_cast<Variable*>(iter)->update_regress_idx();
     }
   }
@@ -160,7 +162,6 @@ void Context::build() {
   draw_all_context();
   printf("===== finish Context build =====\n");
 #endif
-
 }
 
 bool Context::check_validate() {
@@ -202,19 +203,23 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
 }
 
 void Context::update_regr_begin(int node_idx) {
-  if(node_idx < 0) {
+  if (node_idx < 0) {
     printf("Error! update_regr_begin with node_idx %d\n", node_idx);
     exit(-1);
   }
-  _regress_begin_idx = (_regress_begin_idx == -1) ? node_idx : std::min(node_idx, _regress_begin_idx);
+  _regress_begin_idx = (_regress_begin_idx == -1)
+                           ? node_idx
+                           : std::min(node_idx, _regress_begin_idx);
 }
 
-void Context::update_regr_end(int node_idx){
-  if(node_idx < 0) {
+void Context::update_regr_end(int node_idx) {
+  if (node_idx < 0) {
     printf("Error! update_regr_begin with node_idx %d\n", node_idx);
     exit(-1);
   }
-  _regress_end_idx = (_regress_end_idx == -1) ? node_idx : std::max(node_idx, _regress_end_idx);
+  _regress_end_idx = (_regress_end_idx == -1)
+                         ? node_idx
+                         : std::max(node_idx, _regress_end_idx);
 }
 
 void Context::register_object(std::string object_name, void* object) {

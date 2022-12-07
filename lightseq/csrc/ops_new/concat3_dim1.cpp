@@ -5,10 +5,9 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
   Variable* new_cache;
-  if (!_is_continuous_cache){
+  if (!_is_continuous_cache) {
     new_cache = new Variable("cache_out", cache);
-  }
-  else{
+  } else {
     new_cache = new Variable("cache_out");
   }
 
@@ -34,22 +33,18 @@ void Concat3Dim1<T1, T2>::forward() {
   }
 
   if (_is_skip) {
-    CHECK_GPU_ERROR(
-        cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
-                        _sz0 * _sz1_1 * _mx_sz2 * sizeof(T1),
-                        cudaMemcpyDefault, _stream));
+    CHECK_GPU_ERROR(cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
+                                    _sz0 * _sz1_1 * _mx_sz2 * sizeof(T1),
+                                    cudaMemcpyDefault, _stream));
     return;
   }
 
-
   if (!_is_continuous_cache) {
-    launch_filling_concat3_dim1(cache_ptr, inp_ptr, _sz0,
-                                _mx_sz1, _mx_sz2, _sz1_0, _sz1_1,
-                                _stream);
-  }
-  else{
-    launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _sz0,
-                        _mx_sz2, _sz1_0, _sz1_1, _stream);
+    launch_filling_concat3_dim1(cache_ptr, inp_ptr, _sz0, _mx_sz1, _mx_sz2,
+                                _sz1_0, _sz1_1, _stream);
+  } else {
+    launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _sz0, _mx_sz2, _sz1_0,
+                        _sz1_1, _stream);
   }
   // import lightseq
   // lightseq.inference.Transformer
@@ -69,10 +64,9 @@ void Concat3Dim1<T1, T2>::backward() {
     printf("Model infer does not have backward() function\n");
   else {
     if (inp_grad != val_grad) {
-      CHECK_GPU_ERROR(
-          cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,
-                          _sz0 * _sz1_1 * _mx_sz2  * sizeof(T2),
-                          cudaMemcpyDefault, _stream));
+      CHECK_GPU_ERROR(cudaMemcpyAsync((void*)inp_grad, (void*)val_grad,
+                                      _sz0 * _sz1_1 * _mx_sz2 * sizeof(T2),
+                                      cudaMemcpyDefault, _stream));
     }
   }
 }

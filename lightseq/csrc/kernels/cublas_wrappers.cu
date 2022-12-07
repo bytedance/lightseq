@@ -16,7 +16,8 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
 
   if (status != CUBLAS_STATUS_SUCCESS) {
     fprintf(stderr,
-            "!!!! kernel cublasGemmEx(float*) execution error. (m: %d, n: %d, k: %d, error: %d) \n",
+            "!!!! kernel cublasGemmEx(float*) execution error. (m: %d, n: %d, "
+            "k: %d, error: %d) \n",
             m, n, k, (int)status);
     return EXIT_FAILURE;
   }
@@ -35,7 +36,8 @@ int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
 
   if (status != CUBLAS_STATUS_SUCCESS) {
     fprintf(stderr,
-            "!!!! kernel cublasGemmEx(__half*) execution error. (m: %d, n: %d, k: %d, error: %d) \n",
+            "!!!! kernel cublasGemmEx(__half*) execution error. (m: %d, n: %d, "
+            "k: %d, error: %d) \n",
             m, n, k, (int)status);
     return EXIT_FAILURE;
   }
@@ -56,7 +58,8 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
 
   if (status != CUBLAS_STATUS_SUCCESS) {
     fprintf(stderr,
-            "!!!! kernel cublasGemmStridedBatchedEx(*float) execution error. (batch: %d, m: %d, n: %d, k: %d, "
+            "!!!! kernel cublasGemmStridedBatchedEx(*float) execution error. "
+            "(batch: %d, m: %d, n: %d, k: %d, "
             "error: %d) \n",
             batch, m, n, k, (int)status);
     return EXIT_FAILURE;
@@ -78,7 +81,8 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
 
   if (status != CUBLAS_STATUS_SUCCESS) {
     fprintf(stderr,
-            "!!!! kernel cublasGemmStridedBatchedEx(__half*) execution error. (m: %d, n: %d, k: %d, error: %d) \n",
+            "!!!! kernel cublasGemmStridedBatchedEx(__half*) execution error. "
+            "(m: %d, n: %d, k: %d, error: %d) \n",
             m, n, k, (int)status);
     return EXIT_FAILURE;
   }

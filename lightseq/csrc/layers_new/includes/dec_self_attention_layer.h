@@ -65,7 +65,8 @@ class DecSelfAttentionLayer : public Layer {
                         int hidden_size, int num_heads,
                         float attn_prob_dropout_ratio,
                         float hidden_output_dropout_ratio,
-                        bool pre_or_postLayerNorm, bool is_post_ln, bool is_continuous_cache = true);
+                        bool pre_or_postLayerNorm, bool is_post_ln,
+                        bool is_continuous_cache = true);
 
   virtual ~DecSelfAttentionLayer() {}
 

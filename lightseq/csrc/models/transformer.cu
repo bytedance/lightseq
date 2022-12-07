@@ -67,9 +67,10 @@ Transformer::Transformer(const std::string weight_path,
   for (int idx = 0; idx < tw_._n_dec_layer; idx++) {
     TransformerDecoderLayerV2Ptr<OpType_, OpType_> dec_layer_(
         new TransformerDecoderLayerV2<OpType_, OpType_>(
-            tw_._n_dec_layer, idx, max_batch_tokens,
-            tw_._max_step, tw_._hidden_size, tw_._head_num, tw_._inner_size, 0,
-            0, 0, true, tw_._use_gelu ? "gelu" : "relu", false, false, max_batch_size, tw_._beam_size));
+            tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step,
+            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0, true,
+            tw_._use_gelu ? "gelu" : "relu", false, false, max_batch_size,
+            tw_._beam_size));
     dec_wei_offset +=
         dec_layer_->load_params(tw_.get_dec_wei(), dec_wei_offset);
     dec_layer_vec.push_back(dec_layer_);
@@ -107,7 +108,7 @@ Transformer::Transformer(const std::string weight_path,
   }
   Variable *enc_out = (*enc_norm_layer)(enc_emb);
 
-  Variable* total_enc_kv = (*_enc_kv_layer)(enc_out);
+  Variable *total_enc_kv = (*_enc_kv_layer)(enc_out);
 
   total_enc_kv->set_regress_var();
 

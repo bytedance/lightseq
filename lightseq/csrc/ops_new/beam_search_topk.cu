@@ -28,7 +28,6 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
       _host_alive_seq_probs(max_batch_size * beam_size,
                             min_log_probability / 2),
       _host_length_norm(max_step, 1.f) {
-
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;
   }
@@ -57,24 +56,24 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
 
   num_beam_can = new Variable("num_beam_can",
                               (_max_batch_size * _beam_size + 1) * sizeof(int),
-                              0,  VariableType::RegressiveVariable);
+                              0, VariableType::RegressiveVariable);
   can_idx = new Variable(
       "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int),
-      0,  VariableType::RegressiveVariable);
+      0, VariableType::RegressiveVariable);
   can_score = new Variable(
       "can_score",
       _max_batch_size * _beam_size * _trg_vocab_size * sizeof(float), 0,
-       VariableType::RegressiveVariable);
+      VariableType::RegressiveVariable);
   seq_prob =
       new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
-                    VariableType::RegressiveVariable);
+                   VariableType::RegressiveVariable);
 
   int cache_size =
       _max_batch_size * _max_step * _beam_size * _hidden_size * sizeof(T);
-  caches_k_buf = new Variable("caches_k_buf", cache_size * _nshared_dec_layer, 0,
-                              VariableType::RegressiveVariable);
-  caches_v_buf = new Variable("caches_v_buf", cache_size * _nshared_dec_layer, 0,
-                              VariableType::RegressiveVariable);
+  caches_k_buf = new Variable("caches_k_buf", cache_size * _nshared_dec_layer,
+                              0, VariableType::RegressiveVariable);
+  caches_v_buf = new Variable("caches_v_buf", cache_size * _nshared_dec_layer,
+                              0, VariableType::RegressiveVariable);
 
   set_children({alive_seq_out, seq_score});
   return std::make_tuple(alive_seq_out, seq_score);
@@ -198,9 +197,8 @@ void BeamSearchTopOp<T>::forward() {
         _nshared_dec_layer * (_cur_step + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
         (T*)caches_k_ptr, (T*)caches_v_ptr, (T*)caches_k_buf_ptr,
-        (T*)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head,
-        _head_num, _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0,
-        _end_id);
+        (T*)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head, _head_num,
+        _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0, _end_id);
     Variable::swap_tensor(caches_k, caches_k_buf);
     Variable::swap_tensor(caches_v, caches_v_buf);
   }

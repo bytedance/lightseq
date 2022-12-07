@@ -32,8 +32,7 @@ class Concat3Dim1 : public Operator {
   Variable* operator()(Variable* inp, Variable* cache);
 
   void before_forward(int sz0, int sz1_0, int sz1_1, bool is_skip = false) {
-    _sz0 = sz0, _sz1_0 = sz1_0,
-    _sz1_1 = sz1_1, _is_skip = is_skip;
+    _sz0 = sz0, _sz1_0 = sz1_0, _sz1_1 = sz1_1, _is_skip = is_skip;
   }
 
   void forward() override;

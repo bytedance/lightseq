@@ -287,8 +287,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   // create default context
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  lightseq::Context::create_global_context(
-      lightseq::StatusType::Training);
+  lightseq::Context::create_global_context(lightseq::StatusType::Training);
   lightseq::Context::global_instance()->set_stream(stream);
 
   m.def("create_global_context", &lightseq::create_global_context,
