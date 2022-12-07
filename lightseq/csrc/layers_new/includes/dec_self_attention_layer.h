@@ -8,7 +8,7 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "transform_0213.h"
-#include "launch_concat3_dim1.h"
+#include "concat3_dim1.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -27,8 +27,8 @@ class DecSelfAttentionLayer : public Layer {
   Transform0213<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
-  LaunchConcat3Dim1<T1, T2>* _deal_cache_k = nullptr;
-  LaunchConcat3Dim1<T1, T2>* _deal_cache_v = nullptr;
+  Concat3Dim1<T1, T2>* _concat_cache_k = nullptr;
+  Concat3Dim1<T1, T2>* _concat_cache_v = nullptr;
 
   // parameters
   Variable* _attn_qkvw;
@@ -53,13 +53,19 @@ class DecSelfAttentionLayer : public Layer {
   int _step;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
+  bool _is_continuous_cache;
+
+  // tensor slice
+  Variable* q_out;
+  Variable* k_out;
+  Variable* v_out;
 
  public:
   DecSelfAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                         int hidden_size, int num_heads,
                         float attn_prob_dropout_ratio,
                         float hidden_output_dropout_ratio,
-                        bool pre_or_postLayerNorm, bool is_post_ln = false);
+                        bool pre_or_postLayerNorm, bool is_post_ln, bool is_continuous_cache = true);
 
   virtual ~DecSelfAttentionLayer() {}
 
@@ -67,8 +73,7 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_k,
                                                          Variable* cache_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
-                      int steps);
+  void before_forward(int batch_size, int trg_seq_len, int steps);
 
   void before_backward();
 

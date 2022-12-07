@@ -7,7 +7,7 @@ Context::Context(StatusType status_type, int device_id)
       _device_id(device_id),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
-  // CHECK_GPU_ERROR(cudaSetDevice(device_id));
+  if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
@@ -100,9 +100,10 @@ void Context::build() {
   }
   _building = true;
 
-  printf("========== start Context build ==========\n");
-  printf("========== construct StatusType: %s, StatusType id: %d ==========\n",
+#ifdef DEBUG_MODE
+  printf("========== start Context build, StatusType: %s, StatusType id: %d ==========\n",
          status_type_str().c_str(), int(_status_type));
+#endif
 
   if (!check_validate()) {
     printf("Check validate error!\n");
@@ -123,7 +124,7 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    rl->gather_root_leaf_var();
+    // rl->gather_root_leaf_var();
 #ifdef DEBUG_MODE
     printf("\n########## Context build layer %s forward ##########\n",
            rl->name().c_str());
@@ -143,15 +144,23 @@ void Context::build() {
     }
   }
 
+  for(auto iter: _all_node_vec) {
+    if(iter->node_type() == NodeType::Variable) {
+      static_cast<Variable*>(iter)->update_regress_idx();
+    }
+  }
+
   cuda_free(temporary_buffer_);
   _mm_ptr->calculate_buffer_();
   _built = true;
 
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
+
 #ifdef DEBUG_MODE
   draw_all_context();
+  printf("===== finish Context build =====\n");
 #endif
 
-  printf("===== finish Context build =====\n");
 }
 
 bool Context::check_validate() {
@@ -190,6 +199,39 @@ void Context::regist_pybind_layer(std::string layer_name, int layer_id,
   printf("regist_pybind_layer %s\n", full_name.c_str());
 #endif
   pybind_layers.emplace(full_name, layer_ptr);
+}
+
+void Context::update_regr_begin(int node_idx) {
+  if(node_idx < 0) {
+    printf("Error! update_regr_begin with node_idx %d\n", node_idx);
+    exit(-1);
+  }
+  _regress_begin_idx = (_regress_begin_idx == -1) ? node_idx : std::min(node_idx, _regress_begin_idx);
+}
+
+void Context::update_regr_end(int node_idx){
+  if(node_idx < 0) {
+    printf("Error! update_regr_begin with node_idx %d\n", node_idx);
+    exit(-1);
+  }
+  _regress_end_idx = (_regress_end_idx == -1) ? node_idx : std::max(node_idx, _regress_end_idx);
+}
+
+void Context::register_object(std::string object_name, void* object) {
+  if (_resources_pool.find(object_name) != _resources_pool.end()) {
+    printf("Error! register same name(%s) twice!\n", object_name.c_str());
+    exit(-1);
+  }
+  _resources_pool.emplace(object_name, object);
+}
+
+void* Context::get_object(std::string object_name) {
+  auto iter = _resources_pool.find(object_name);
+  if (iter == _resources_pool.end()) {
+    printf("Error! can't get %s\n", object_name.c_str());
+    exit(-1);
+  }
+  return iter->second;
 }
 
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,

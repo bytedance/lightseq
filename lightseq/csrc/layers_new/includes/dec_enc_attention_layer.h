@@ -8,7 +8,7 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "transform_0213.h"
-#include "launch_concat3_dim1.h"
+#include "concat3_dim1.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -53,11 +53,12 @@ class DecEncAttentionLayer : public Layer {
                        int hidden_size, int num_heads,
                        float attn_prob_dropout_ratio,
                        float hidden_output_dropout_ratio,
-                       bool pre_or_postLayerNorm, bool is_post_ln = false);
+                       bool pre_or_postLayerNorm, bool is_post_ln);
 
   virtual ~DecEncAttentionLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* enc_k, Variable* enc_v);
+  Variable* operator()(Variable* inp, Variable* enc_mask, Variable* enc_k,
+                       Variable* enc_v);
 
   void before_forward(int batch_size, int src_seq_len, int trg_seq_len);
 

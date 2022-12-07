@@ -15,12 +15,14 @@ class Node {
   std::string _name;
   NodeType _node_type;
 
-  bool _fw_flag;
-  bool _bw_flag;
-  bool _bw_first_flag;
+  bool _fw_flag = false;
+  bool _bw_flag = false;
+  bool _bw_first_flag = false;
 
   std::vector<Node*> _parents{};
   std::vector<Node*> _children{};
+  int _fw_node_idx, _bw_node_idx;
+  bool _in_regress_scope = false;
 
  public:
   Node(std::string name, NodeType nt_);
@@ -36,6 +38,7 @@ class Node {
 
   const std::vector<Node*>& parents() { return _parents; }
   const std::vector<Node*>& children() { return _children; }
+  // std::string node_type_str() { return NodeTypeString[_node_type]; }
 
   void recursive_forward();
 
@@ -53,18 +56,31 @@ class Node {
 
 class Variable : public Node {
  private:
+  VariableType _variable_type;
   size_t _value_byte_size;
   size_t _grad_byte_size;
+  bool _is_descendants = false;
+  Variable* _parent_variable = nullptr;
+  std::unordered_set<Variable*> _children_variable;
+
+ protected:
   TensorPtr _value = nullptr;
   TensorPtr _grad = nullptr;
 
  public:
-  Variable(std::string name);
-  Variable(std::string name, size_t value_byte_size, size_t grad_byte_size = 0);
-  Variable(std::string name, const char* para_ptr, char* grad_ptr = nullptr);
+  Variable(std::string name);  // for Fixed memory
+  Variable(
+      std::string name, size_t value_byte_size, size_t grad_byte_size = 0,
+      VariableType vt = VariableType::SharedVariable);  // for Shared memory
+  Variable(std::string name, const char* para_ptr,
+           char* grad_ptr = nullptr);  // for Fixed memory
+  Variable(std::string name, Variable* parent_variable, size_t offset_value = 0,
+           size_t offset_grad = 0);  // for inherit Variable
+
   virtual ~Variable() {}
 
   void fixed_memory();  // Convert VariableNode to IONode
+  static void swap_tensor(Variable* var_a, Variable* var_b);
 
   void set_value(char* value_ptr);
 
@@ -72,11 +88,36 @@ class Variable : public Node {
 
   void set_grad(char* grad_ptr);
 
-  char* value(bool is_open_interval = false);
+  void malloc_memory(size_t value_byte_size, size_t grad_byte_size = 0);
+  VariableType variable_type() { return _variable_type; }
+  std::string variable_type_str() { return VariableTypeString[_variable_type]; }
 
-  char* grad();
+  /*
+    value() / grad() means get the value or grad of this node, when
+    is_open_interval is true, it doesn't update the lifecycle of the tensor.
+  */
+  char* value(bool is_open_interval = false);
+  char* grad(bool is_open_interval = false);
+  void update_regress_idx();
 
   bool enable_override_grad();
+  bool is_descendants() { return _is_descendants; }
+  bool is_ancestor() { return _children_variable.size(); }
+  Variable* ancestor() { return _parent_variable; }
+  std::unordered_set<Variable*>& descendants() { return _children_variable; }
+  void set_ancestor(Variable* parent_variable, size_t offset_value = 0,
+                    size_t offset_grad = 0);
+  void set_offset(size_t offset_value, size_t offset_grad);
+  void remove_ancestor();
+  void add_descendants(Variable* var);
+  void remove_descendants(Variable* var);
+  void set_regress_var() { _variable_type = VariableType::RegressiveVariable; }
+
+  friend class Node;
+
+#ifdef DEBUG_MODE
+  void debug_var();
+#endif
 };
 
 class Operator : public Node {

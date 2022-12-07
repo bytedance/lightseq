@@ -279,38 +279,3 @@ __global__ void transform_20314_bwd_new(T *output, const T *q_inp,
   else
     res4[trg_offset] = q_inp4[offset];
 }
-
-// [tc, b, nh, s, ad] -> [b, s, tc, nh, ad]
-template <>
-void launch_transform_20314_bwd_new<float>(float *output, const float *q_inp,
-                                           const float *k_inp,
-                                           const float *v_inp, int batch_size,
-                                           int seq_len, int hidden_dim,
-                                           int nhead, int trans_count,
-                                           cudaStream_t stream) {
-  hidden_dim >>= 2;
-  int head_dim = hidden_dim / nhead;
-  int batch_ele_num = batch_size * seq_len * hidden_dim;
-  int nblock = (batch_ele_num * 3 + MAX_THREADS - 1) / MAX_THREADS;
-
-  transform_20314_bwd_new<float><<<nblock, MAX_THREADS, 0, stream>>>(
-      output, q_inp, k_inp, v_inp, batch_size, seq_len, trans_count, nhead,
-      head_dim, batch_ele_num);
-}
-
-template <>
-void launch_transform_20314_bwd_new<__half>(__half *output, const __half *q_inp,
-                                            const __half *k_inp,
-                                            const __half *v_inp, int batch_size,
-                                            int seq_len, int hidden_dim,
-                                            int nhead, int trans_count,
-                                            cudaStream_t stream) {
-  hidden_dim >>= 3;
-  int head_dim = hidden_dim / nhead;
-  int batch_ele_num = batch_size * seq_len * hidden_dim;
-  int nblock = (batch_ele_num * 3 + MAX_THREADS - 1) / MAX_THREADS;
-
-  transform_20314_bwd_new<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-      output, q_inp, k_inp, v_inp, batch_size, seq_len, trans_count, nhead,
-      head_dim, batch_ele_num);
-}

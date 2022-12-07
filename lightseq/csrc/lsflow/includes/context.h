@@ -20,6 +20,7 @@ const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 class Context {  // model only
  private:
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+  std::unordered_map<std::string, void*> _resources_pool;
 
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
@@ -37,7 +38,6 @@ class Context {  // model only
 
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
-
   static std::shared_ptr<Context> _global_context_ptr;
 
   bool check_validate();
@@ -45,8 +45,13 @@ class Context {  // model only
   static std::unordered_map<int, std::shared_ptr<Context>> global_contexts_map;
   static int global_context_id;
 
+  int _regress_begin_idx = -1;
+  int _regress_end_idx = -1;
+  bool _in_regress = false;
+
  public:
-  Context(StatusType status_type = StatusType::Inference, int device_id = 0);
+  Context(StatusType status_type = StatusType::Inference,
+          int device_id = 0);
   virtual ~Context();
 
   cudaStream_t get_stream() { return _stream; }
@@ -59,7 +64,7 @@ class Context {  // model only
   void convert_into_eval();
 
   static int create_global_context(
-      StatusType status_type = StatusType::Inference, int device_id = 0);
+      StatusType status_type = StatusType::Inference, int device_id = -1);
   static void set_global_context(int context_id);
   static std::shared_ptr<Context> global_instance();
 
@@ -98,12 +103,26 @@ class Context {  // model only
                                 : nullptr;
   }
 
+  void regress_begin() { _in_regress = true; }
+  void regress_end() { _in_regress = false; }
+  int regress_begin_idx() { return _regress_begin_idx; }
+  int regress_end_idx() { return _regress_end_idx; }
+  void update_regr_begin(int node_idx);
+  void update_regr_end(int node_idx);
+  bool in_regress() { return _in_regress; }
+
   std::string status_type_str() { return StatusTypeString[_status_type]; }
+
+  void register_object(std::string object_name, void* object);
+  void* get_object(std::string object_name);
 
   static void regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr);
   static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
                                                 int layer_id);
 };
+
+#define REGISTER_OBJECT(objname) register_object_func(#objname, objname)
+#define GET_OBJECT(objname) get_object_func(#objname)
 
 }  // namespace lightseq

@@ -97,19 +97,6 @@ void torch_launch_quant_transform4d_0213(
 }
 
 template <typename T>
-void torch_launch_transform_20314_bwd_new(
-    torch::Tensor &out, const torch::Tensor &q_inp, const torch::Tensor &k_inp,
-    const torch::Tensor &v_inp, int batch_size, int seq_len, int hidden_dim,
-    int nhead, int trans_count) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_transform_20314_bwd_new(rptr<T>(out), rptr<T>(q_inp), rptr<T>(k_inp),
-                                 rptr<T>(v_inp), batch_size, seq_len,
-                                 hidden_dim, nhead, trans_count, stream);
-  //   cudaStreamSynchronize(stream);
-  CHECK_GPU_ERROR(cudaGetLastError());
-}
-
-template <typename T>
 void torch_launch_attn_softmax(torch::Tensor &vals,
                                const torch::Tensor &attn_mask, int batch_size,
                                int nhead, int from_len, int to_len,
@@ -454,10 +441,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_bias_add_transform_20314_new_fp16",
         &torch_launch_bias_add_transform_20314_new<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_transform_20314_bwd_new_fp32",
-        &torch_launch_transform_20314_bwd_new<float>, "Test kernel wrapper");
-  m.def("torch_launch_transform_20314_bwd_new_fp16",
-        &torch_launch_transform_20314_bwd_new<__half>, "Test kernel wrapper");
 
   m.def("torch_launch_fused_add2_fp32", &torch_launch_fused_add2<float>,
         "Test kernel wrapper");

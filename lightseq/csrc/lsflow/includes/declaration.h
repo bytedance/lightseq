@@ -3,23 +3,34 @@
 #include "thread"
 #include <stdio.h>
 #include <fstream>
+#include "unordered_set"
 
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
-#include <type_traits>
-#include "cuda_util.h"
-#include "cublas_wrappers.h"
-
 #include <cublas_v2.h>
+#include <type_traits>
+
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/random.h>
+#include <curand_kernel.h>
+#include <thrust/functional.h>
+#include <thrust/sequence.h>
+#include <thrust/scan.h>
+
+#include <unistd.h>  
+#include "cuda_util.h"
+#include "cublas_wrappers.h"
 
 namespace lightseq {
 
-enum class NodeType { FixedVariable, SharedVariable, Operator };
+enum class NodeType { Variable, Operator };
+// const std::string NodeTypeString[] = {"Variable", "Operator"};
+enum VariableType { FixedVariable, SharedVariable, OffsetVariable, RegressiveVariable };
+const std::string VariableTypeString[] = {"FixedVariable", "SharedVariable",
+                                          "OffsetVariable", "RegressiveVariable"};
 
 class Node;
 
@@ -38,5 +49,7 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
+
+const int MB_SIZE = 1024 * 1024;
 
 }  // namespace lightseq

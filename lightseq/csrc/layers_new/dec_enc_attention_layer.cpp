@@ -54,11 +54,12 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
 
 template <typename T1, typename T2>
 Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
+                                                   Variable* enc_mask,
                                                    Variable* enc_k,
                                                    Variable* enc_v) {
   Variable* q_linear_out = nullptr;
   Variable* attn_ln_out = nullptr;
-  LAYER_PRE_INPUTS({inp, enc_k, enc_v});
+  set_inputs({inp, enc_mask, enc_k, enc_v});
   if (_pre_or_postLayerNorm) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
@@ -66,21 +67,15 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
     q_linear_out = (*_q_linear)(inp, _attn_qw);
   }
 
-  std::tuple<Variable*, Variable*, Variable*> transform_20314_out =
+  Variable* transform_20314_out =
       (*_bias_add_transform_20314_q)(q_linear_out, _attn_qb);
-  Variable* q_out = std::get<0>(transform_20314_out);
 
-  Variable* attn_score = (*_attn_scores)(enc_k, q_out);
+  Variable* attn_score = (*_attn_scores)(enc_k, transform_20314_out);
 
-  Variable* soft_out = (*_softmax)(attn_score);
+  Variable* soft_out = (*_softmax)(attn_score, enc_mask);
 
-  Variable* attn_context = nullptr;
-  if (_context_ptr->is_training()) {
-    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-    attn_context = (*_attn_context)(enc_v, prob_dropout);
-  } else {
-    attn_context = (*_attn_context)(enc_v, soft_out);
-  }
+  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+  Variable* attn_context = (*_attn_context)(enc_v, prob_dropout);
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
@@ -97,10 +92,10 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
   if (!_pre_or_postLayerNorm) {
     Variable* attn_ln_out =
         (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-    LAYER_POST_OUTPUTS({attn_ln_out});
+    set_outputs({attn_ln_out});
     return attn_ln_out;
   } else {
-    LAYER_POST_OUTPUTS({attn_dropout_residual});
+    set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 }
@@ -120,14 +115,15 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
   _bias_add_transform_20314_q->before_forward(batch_size, trg_seq_len);
 
   _attn_scores->before_forward(src_seq_len, trg_seq_len, _hidden_size / _heads,
-                               _batch_heads, _layer_id);
+                               _batch_heads);
 
   _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
+  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len,
+                                     !_context_ptr->is_training());
 
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
-                                _batch_heads, _layer_id);
+                                _batch_heads);
 
   _transform_0213->before_forward(batch_size, trg_seq_len);
 
@@ -145,11 +141,11 @@ int DecEncAttentionLayer<T1, T2>::load_para_and_grad(
   int offset = 0;
   _attn_qw->set_value((char*)(para_ptr + offset));
   _attn_qw->set_grad((char*)(grad_ptr + offset));
-  offset += _hidden_size * _hidden_size * 3;
+  offset += _hidden_size * _hidden_size;
 
   _attn_qb->set_value((char*)(para_ptr + offset));
   _attn_qb->set_grad((char*)(grad_ptr + offset));
-  offset += _hidden_size * 3;
+  offset += _hidden_size;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));

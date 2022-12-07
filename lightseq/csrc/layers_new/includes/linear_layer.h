@@ -20,7 +20,9 @@ class LinearLayer : public Layer {
   int _output_size;
 
  public:
-  LinearLayer(int max_batch_tokens, int input_size, int output_size);
+  LinearLayer(int max_batch_tokens, int input_size, int output_size,
+              cublasOperation_t opA = CUBLAS_OP_T,
+              cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.));
 
   virtual ~LinearLayer() {}
 
