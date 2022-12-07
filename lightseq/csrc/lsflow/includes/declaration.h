@@ -20,7 +20,7 @@
 #include <thrust/sequence.h>
 #include <thrust/scan.h>
 
-#include <unistd.h>  
+#include <unistd.h>
 #include "cuda_util.h"
 #include "cublas_wrappers.h"
 

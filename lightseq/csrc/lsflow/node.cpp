@@ -93,7 +93,7 @@ void Node::recursive_forward() {
 #endif
 
   forward();
-  
+
 #ifdef DEBUG_MODE
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() != NodeType::Operator) {

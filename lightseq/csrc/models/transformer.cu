@@ -207,7 +207,7 @@ void Transformer::Infer() {
   /* --- notice that the order of forward should be the same with network --- */
   encoder_before_forward(batch_size, seq_len);
   decoder_before_forward(batch_size, seq_len, 0);
-  
+
   launch_enc_emb_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();

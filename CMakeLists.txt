@@ -46,7 +46,7 @@ if(USE_NEW_ARCH)
     message(STATUS "Build using debug mode")
   endif()
 
-  if(MEM_DEBUG) 
+  if(MEM_DEBUG)
     add_definitions(-DMEM_DEBUG)
     message(STATUS "Build using memory debug")
   endif()
