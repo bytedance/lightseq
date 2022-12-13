@@ -32,6 +32,7 @@ class KernelBuilder(CUDAOpBuilder):
             "csrc/kernels/embedding_kernels.cu",
             "csrc/kernels/quantize_kernels.cu",
             "csrc/kernels/crf.cu",
+            "csrc/kernels/generation.cc.cu",
             "csrc/pybind/pybind_kernel.cpp",
         ]
 

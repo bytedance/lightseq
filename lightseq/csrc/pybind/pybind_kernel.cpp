@@ -419,6 +419,31 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
+/*
+(const int* enc_input_ids, const T* pad_mask,
+                           const int* dec_prev_ids, T* logits, int enc_seq_len,
+                           int cur_step, int max_step,
+                           int encoder_no_repeat_ngram_size,
+                           int no_repeat_ngram_size, int vocab_size,
+                           int batch_size, int beam_size, cudaStream_t stream);
+*/
+template <typename T>
+void torch_process_logits(const torch::Tensor &enc_input_ids,
+                          const torch::Tensor &pad_mask,
+                          const torch::Tensor &dec_prev_ids,
+                          torch::Tensor &logits, int enc_seq_len, int cur_step,
+                          int max_step, int encoder_no_repeat_ngram_size,
+                          int no_repeat_ngram_size, int vocab_size,
+                          int batch_size, int beam_size) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_process_logits<T>(rptr<int>(enc_input_ids), rptr<T>(pad_mask),
+                           rptr<int>(dec_prev_ids), rptr<T>(logits),
+                           enc_seq_len, cur_step, max_step,
+                           encoder_no_repeat_ngram_size, no_repeat_ngram_size,
+                           vocab_size, batch_size, beam_size, stream);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
@@ -575,5 +600,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_viterbi_fp16", &torch_launch_viterbi<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_viterbi_fp32", &torch_launch_viterbi<float>,
+        "Test kernel wrapper");
+  m.def("torch_process_logits_fp16", &torch_process_logits<__half>,
         "Test kernel wrapper");
 }

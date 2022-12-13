@@ -33,6 +33,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/kernels/cross_entropy.cu",
             "csrc/kernels/transformerKernels.cc.cu",
             "csrc/kernels/crf.cu",
+            "csrc/kernels/generation.cc.cu",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
             "csrc/lsflow/manager.cpp",

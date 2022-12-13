@@ -1645,6 +1645,81 @@ def test_torch_launch_fake_quantize():
     return custom, baseline
 
 
+@kt.case(dtypes=[torch.float16])
+def test_torch_process_logits():
+    batch_size = 2
+    enc_seq_len = 5
+    cur_step = 3
+    max_step = 10
+    encoder_no_repeat_ngram_size = 2
+    no_repeat_ngram_size = 2
+    vocab_size = 4
+    beam_size = 3
+
+    """
+    void torch_process_logits(const torch::Tensor &enc_input_ids,
+                          const torch::Tensor &pad_mask,
+                          const torch::Tensor &dec_prev_ids,
+                          torch::Tensor &logits, int enc_seq_len, int cur_step,
+                          int max_step, int encoder_no_repeat_ngram_size,
+                          int no_repeat_ngram_size, int vocab_size,
+                          int batch_size, int beam_size)
+    """
+    enc_input_ids = kt.randint(0, vocab_size, (batch_size, enc_seq_len)).to(torch.int32)
+    pad_mask = kt.zeros((batch_size, enc_seq_len))
+    dec_prev_ids = kt.randint(0, vocab_size, (batch_size * beam_size, max_step)).to(
+        torch.int32
+    )
+    logits = kt.rand((batch_size * beam_size, vocab_size))
+
+    dec_prev_ids_hg = dec_prev_ids[:, :cur_step].clone()
+    logits_hg = logits.clone()
+
+    func = cuda_module.torch_process_logits_fp16
+    from transformers.generation_logits_process import (
+        NoRepeatNGramLogitsProcessor,
+        EncoderNoRepeatNGramLogitsProcessor,
+    )
+
+    hg_enc = EncoderNoRepeatNGramLogitsProcessor(
+        encoder_no_repeat_ngram_size, enc_input_ids
+    )
+    hg_dec = NoRepeatNGramLogitsProcessor(no_repeat_ngram_size)
+
+    # hg_enc(dec_prev_ids_hg, logits_hg)
+    # hg_dec(dec_prev_ids_hg, logits_hg)
+
+    # func(enc_input_ids, pad_mask, dec_prev_ids, logits, enc_seq_len, cur_step, max_step, \
+    #    0, no_repeat_ngram_size, vocab_size, batch_size, beam_size)
+    # print(enc_input_ids)
+    # print(dec_prev_ids_hg)
+    # print(logits)
+
+    def custom():
+        func(
+            enc_input_ids,
+            pad_mask,
+            dec_prev_ids,
+            logits,
+            enc_seq_len,
+            cur_step,
+            max_step,
+            encoder_no_repeat_ngram_size,
+            no_repeat_ngram_size,
+            vocab_size,
+            batch_size,
+            beam_size,
+        )
+        return [logits]
+
+    def baseline():
+        hg_enc(dec_prev_ids_hg, logits_hg)
+        hg_dec(dec_prev_ids_hg, logits_hg)
+        return [logits_hg]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kernel_list = [
@@ -1678,6 +1753,7 @@ if __name__ == "__main__":
         # "test_torch_launch_ls_quantize",
         # "test_torch_launch_ls_dequantize",
         # "test_torch_launch_fake_quantize",
-        "test_crf",
+        # "test_crf",
+        "test_torch_process_logits",
     ]
     kt.run(kernel_list)

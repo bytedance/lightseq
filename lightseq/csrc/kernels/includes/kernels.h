@@ -229,6 +229,14 @@ void launch_viterbi(const T *start_transition, const T *end_transition,
                     cudaStream_t stream, const T *bias = nullptr);
 
 template <typename T>
+void launch_process_logits(const int *enc_input_ids, const T *pad_mask,
+                           const int *dec_prev_ids, T *logits, int enc_seq_len,
+                           int cur_step, int max_step,
+                           int encoder_no_repeat_ngram_size,
+                           int no_repeat_ngram_size, int vocab_size,
+                           int batch_size, int beam_size, cudaStream_t stream);
+
+template <typename T>
 void launch_quantize(int8_t *q_ptr, uint8_t *clip_mask_ptr, float *alpha_ptr,
                      const T *f_ptr, const T *clip_max_ptr, int numel,
                      int mask_start_bit, cudaStream_t stream);
