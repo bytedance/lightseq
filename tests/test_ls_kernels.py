@@ -1647,24 +1647,15 @@ def test_torch_launch_fake_quantize():
 
 @kt.case(dtypes=[torch.float16])
 def test_torch_process_logits():
-    batch_size = 2
-    enc_seq_len = 5
-    cur_step = 3
-    max_step = 10
-    encoder_no_repeat_ngram_size = 2
-    no_repeat_ngram_size = 2
-    vocab_size = 4
-    beam_size = 3
+    batch_size = random.randint(1, 20)
+    enc_seq_len = random.randint(1, 200)
+    cur_step = random.randint(1, 200)
+    max_step = random.randint(cur_step, 200)
+    encoder_no_repeat_ngram_size = random.randint(0, 5)
+    no_repeat_ngram_size = random.randint(0, 5)
+    vocab_size = random.randint(3, 10)
+    beam_size = random.randint(1, 10)
 
-    """
-    void torch_process_logits(const torch::Tensor &enc_input_ids,
-                          const torch::Tensor &pad_mask,
-                          const torch::Tensor &dec_prev_ids,
-                          torch::Tensor &logits, int enc_seq_len, int cur_step,
-                          int max_step, int encoder_no_repeat_ngram_size,
-                          int no_repeat_ngram_size, int vocab_size,
-                          int batch_size, int beam_size)
-    """
     enc_input_ids = kt.randint(0, vocab_size, (batch_size, enc_seq_len)).to(torch.int32)
     pad_mask = kt.zeros((batch_size, enc_seq_len))
     dec_prev_ids = kt.randint(0, vocab_size, (batch_size * beam_size, max_step)).to(
@@ -1681,19 +1672,13 @@ def test_torch_process_logits():
         EncoderNoRepeatNGramLogitsProcessor,
     )
 
-    hg_enc = EncoderNoRepeatNGramLogitsProcessor(
-        encoder_no_repeat_ngram_size, enc_input_ids
-    )
-    hg_dec = NoRepeatNGramLogitsProcessor(no_repeat_ngram_size)
-
-    # hg_enc(dec_prev_ids_hg, logits_hg)
-    # hg_dec(dec_prev_ids_hg, logits_hg)
-
-    # func(enc_input_ids, pad_mask, dec_prev_ids, logits, enc_seq_len, cur_step, max_step, \
-    #    0, no_repeat_ngram_size, vocab_size, batch_size, beam_size)
-    # print(enc_input_ids)
-    # print(dec_prev_ids_hg)
-    # print(logits)
+    hg_enc, hg_dec = None, None
+    if encoder_no_repeat_ngram_size > 0:
+        hg_enc = EncoderNoRepeatNGramLogitsProcessor(
+            encoder_no_repeat_ngram_size, enc_input_ids
+        )
+    if no_repeat_ngram_size > 0:
+        hg_dec = NoRepeatNGramLogitsProcessor(no_repeat_ngram_size)
 
     def custom():
         func(
@@ -1713,8 +1698,10 @@ def test_torch_process_logits():
         return [logits]
 
     def baseline():
-        hg_enc(dec_prev_ids_hg, logits_hg)
-        hg_dec(dec_prev_ids_hg, logits_hg)
+        if encoder_no_repeat_ngram_size > 0:
+            hg_enc(dec_prev_ids_hg, logits_hg)
+        if no_repeat_ngram_size > 0:
+            hg_dec(dec_prev_ids_hg, logits_hg)
         return [logits_hg]
 
     return custom, baseline
