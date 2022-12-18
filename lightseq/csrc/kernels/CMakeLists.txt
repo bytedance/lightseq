@@ -13,10 +13,12 @@ set(cuda_kernel_files
     normalize_kernels.cu
     softmax_kernels.cu
     softmax_kernels_new.cu
+    t5EmbKernels.cc.cu
+    t5Kernels.cc.cu
     transform_kernels.cu
     transform_kernels_new.cu
     crf.cu
     transformerKernels.cc.cu)
 
-add_library(cuda_kernels STATIC ${cuda_kernel_files})
+add_library(cuda_kernels SHARED ${cuda_kernel_files})
 target_include_directories(cuda_kernels INTERFACE includes)
