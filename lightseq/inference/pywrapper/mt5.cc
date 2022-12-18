@@ -54,10 +54,12 @@ MT5::MT5(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-
+  int _encoder_no_repeat_ngram_size = 0;
+  int _no_repeat_ngram_size = 0;
   decoder_ = std::make_shared<MT5Decoder<mt5_optype>>(
       _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
-      stream_, hd_, true, d_trg_lang_id_);
+      stream_, hd_, true, d_trg_lang_id_, 
+      _encoder_no_repeat_ngram_size, _no_repeat_ngram_size);
   res = decoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
@@ -126,6 +128,7 @@ void MT5::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
       encoder_->_p_d_token_id = static_cast<int *>(input_ptr);
+      decoder_->_p_d_token_id = static_cast<int *>(input_ptr);
       break;
 
     default:

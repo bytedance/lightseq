@@ -7,6 +7,7 @@ set(cuda_kernel_files
     multilgKernels.cc.cu
     embKernels.cc.cu
     embKernels_int8.cc.cu
+    generation.cc.cu
     transformerKernels_int8.cc.cu
     moeKernels.cc.cu
     t5Kernels.cc.cu

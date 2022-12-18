@@ -117,6 +117,8 @@ message MT5ModelConf {
   // 2 for sentence level multilingual
   int32 multilg_type = 15;
   int32 max_step = 16;
+  int32 encoder_no_repeat_ngram_size = 17;
+  int32 no_repeat_ngram_size = 18;
 }
 
 message MT5 {

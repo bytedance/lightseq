@@ -126,6 +126,8 @@ class MT5Decoder {
                               // after decoder
   const long _layer_size_encdec_k;
   const long _layer_size_self_k;
+  int _encoder_no_repeat_ngram_size;
+  int _no_repeat_ngram_size;
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
                                                   "topk_greedy"};
 
@@ -133,7 +135,8 @@ class MT5Decoder {
   MT5Decoder(int max_batch_size, const int* p_d_padding_mask,
              const _DataType* p_d_encoder_output, int* p_d_result,
              MT5Weight<OpType_>& tw, cudaStream_t stream, cublasHandle_t hd,
-             bool output_topk = false, const int* p_d_lang_id = nullptr);
+             bool output_topk = false, const int* p_d_lang_id = nullptr,
+             int encoder_no_repeat_ngram_size = 0, int no_repeat_ngram_size = 0);
   long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();
@@ -142,6 +145,7 @@ class MT5Decoder {
   float* _p_d_alive_seq_score;
   bool _output_topk;
   int* _p_d_result;
+  int* _p_d_token_id;
   const int* _p_d_lang_id;
 };
 
