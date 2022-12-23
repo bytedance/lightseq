@@ -890,7 +890,7 @@ void MT5Decoder<OpType_>::update_new_seq_probs() {
 
   if(_encoder_no_repeat_ngram_size || _no_repeat_ngram_size) {
     launch_process_logits<_DataType>(_p_d_token_id, _p_d_padding_mask, _p_d_alive_seq,
-                            _p_d_logit_buf, _batch_seq_len, _cur_step, _tw._max_step,
+                            _p_d_logit_buf, _batch_seq_len, _cur_step + 1, _tw._max_step,
                             _encoder_no_repeat_ngram_size, _no_repeat_ngram_size,
                             _tw._trg_vocab_size, _batch_size, _tw._beam_size, _stream);
   }

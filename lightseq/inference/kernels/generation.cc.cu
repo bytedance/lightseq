@@ -1,5 +1,10 @@
+#include <random>
+
 #include "common.h"
 #include "generation.h"
+#include "transformerKernels.h"
+#include "gptKernels.h"
+
 namespace lightseq {
 namespace cuda {
 /**
@@ -57,8 +62,7 @@ __global__ void ker_process_logits(const int* enc_input_ids, const int* pad_mask
             enc_input_ids[flat_2dim(blockIdx.x, i + j, enc_seq_len)];
         T* trg = logits + flat_3dim(blockIdx.x, blockIdx.y, banned_token,
                                     beam_size, vocab_size);
-        // atomicAdd(trg, CUDA_FLOAT_INF_NEG);
-        *trg += CUDA_FLOAT_INF_NEG;
+        atomicAdd(trg, (T)CUDA_FLOAT_INF_NEG);
       }
     }
     __syncthreads();
