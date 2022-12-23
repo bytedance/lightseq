@@ -130,6 +130,21 @@ void MT5Weight<OpType_>::hdf5_get_model_config(hid_t hdf5_file,
                            &_use_gelu);
 
   try {
+    read_hdf5_dataset_scalar(hdf5_file,
+                             "model_conf/encoder_no_repeat_ngram_size",
+                             H5T_NATIVE_INT, &_encoder_no_repeat_ngram_size);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _encoder_no_repeat_ngram_size = 0;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/no_repeat_ngram_size",
+                             H5T_NATIVE_INT, &_no_repeat_ngram_size);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _no_repeat_ngram_size = 0;
+  }
+
+  try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/multilg_type",
                              H5T_NATIVE_INT, &_multilg_type);
   } catch (HDF5DatasetNotFoundError &e) {

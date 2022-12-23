@@ -96,6 +96,8 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "no_scale_embedding",
         "use_gelu",
         "is_multilingual",
+        "encoder_no_repeat_ngram_size",
+        "no_repeat_ngram_size"
     ]
 
     EMBEDDING_KEYS = [
@@ -243,6 +245,8 @@ def extract_transformer_weights(
     lang="en",
     only_decoder=True,
     save_proto=False,
+    encoder_no_repeat_ngram_size=0,
+    no_repeat_ngram_size=0,
 ):
     transformer = Transformer()
     # load var names
@@ -412,6 +416,8 @@ def extract_transformer_weights(
     transformer.model_conf.is_post_ln = True
     transformer.model_conf.no_scale_embedding = True
     transformer.model_conf.use_gelu = True
+    transformer.model_conf.encoder_no_repeat_ngram_size = encoder_no_repeat_ngram_size
+    transformer.model_conf.no_repeat_ngram_size = no_repeat_ngram_size
 
     if save_proto:
         output_file += ".pb"
@@ -462,6 +468,10 @@ if __name__ == "__main__":
     # maximum_generation_length = min(src_length + extra_decode_length, max_step)
     extra_decode_length = 50
     length_penalty = 1.0
+    encoder_no_repeat_ngram_size = int(
+        os.environ.get("encoder_no_repeat_ngram_size", 0)
+    )
+    no_repeat_ngram_size = int(os.environ.get("no_repeat_ngram_size", 0))
     extract_transformer_weights(
         output_lightseq_model_name,
         input_huggingface_t5_model,
@@ -473,4 +483,6 @@ if __name__ == "__main__":
         only_decoder=False,
         length_penalty=length_penalty,
         save_proto=False,
+        encoder_no_repeat_ngram_size=encoder_no_repeat_ngram_size,
+        no_repeat_ngram_size=no_repeat_ngram_size,
     )

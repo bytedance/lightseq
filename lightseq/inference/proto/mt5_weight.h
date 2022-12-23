@@ -109,6 +109,8 @@ class MT5Weight {
   bool _no_scale_embedding;
   bool _use_gelu;
   int _multilg_type;
+  int _encoder_no_repeat_ngram_size;
+  int _no_repeat_ngram_size;
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
@@ -140,6 +142,9 @@ class MT5Weight {
     std::cout << "sampling method: " << _sampling_method << std::endl;
     std::cout << "topk: " << _topk << std::endl;
     std::cout << "topp: " << _topp << std::endl;
+    std::cout << "encoder_no_repeat_ngram_size: "
+              << _encoder_no_repeat_ngram_size << std::endl;
+    std::cout << "no_repeat_ngram_size: " << _no_repeat_ngram_size << std::endl;
   }
 };
 

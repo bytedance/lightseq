@@ -54,13 +54,14 @@ MT5::MT5(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-  int _encoder_no_repeat_ngram_size = 3;
-  int _no_repeat_ngram_size = 3;
-  printf("_encoder_no_repeat_ngram_size: %d, _no_repeat_ngram_size: %d\n", _encoder_no_repeat_ngram_size, _no_repeat_ngram_size);
+  int _encoder_no_repeat_ngram_size = tw_._encoder_no_repeat_ngram_size;
+  int _no_repeat_ngram_size = tw_._no_repeat_ngram_size;
+  printf("_encoder_no_repeat_ngram_size: %d, _no_repeat_ngram_size: %d\n",
+         _encoder_no_repeat_ngram_size, _no_repeat_ngram_size);
   decoder_ = std::make_shared<MT5Decoder<mt5_optype>>(
       _max_batch_size, d_padding_mask_, d_encoder_output_, d_output_, tw_,
-      stream_, hd_, true, d_trg_lang_id_, 
-      _encoder_no_repeat_ngram_size, _no_repeat_ngram_size);
+      stream_, hd_, true, d_trg_lang_id_, _encoder_no_repeat_ngram_size,
+      _no_repeat_ngram_size);
   res = decoder_->check();
   if (!res.empty()) {
     throw std::runtime_error(res);
