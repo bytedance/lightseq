@@ -71,6 +71,7 @@ class MT5Decoder {
   int* _p_d_can_num;
   int* _p_d_alive_seq;
   int* _p_d_alive_seq_buf;
+  int8_t* _p_d_banned_tokens;
   _DataType* _p_d_cur_step_query;
   // cur step's projected query-key-value in self atten, one pointer for one
   // decoder layer device memory in [batch_size, beam_size, 3, hidden_size]
@@ -136,7 +137,8 @@ class MT5Decoder {
              const _DataType* p_d_encoder_output, int* p_d_result,
              MT5Weight<OpType_>& tw, cudaStream_t stream, cublasHandle_t hd,
              bool output_topk = false, const int* p_d_lang_id = nullptr,
-             int encoder_no_repeat_ngram_size = 0, int no_repeat_ngram_size = 0);
+             int encoder_no_repeat_ngram_size = 0,
+             int no_repeat_ngram_size = 0);
   long compute_buffer_bytesize();
   void init_buffer(void* pbuf);
   std::string check();

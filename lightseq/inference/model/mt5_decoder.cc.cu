@@ -20,8 +20,9 @@ MT5Decoder<OpType_>::MT5Decoder(int max_batch_size, const int* p_d_padding_mask,
                                 const _DataType* p_d_encoder_output,
                                 int* p_d_result, MT5Weight<OpType_>& tw,
                                 cudaStream_t stream, cublasHandle_t hd,
-                                bool output_topk, const int* p_d_lang_id, 
-                                int encoder_no_repeat_ngram_size, int no_repeat_ngram_size)
+                                bool output_topk, const int* p_d_lang_id,
+                                int encoder_no_repeat_ngram_size,
+                                int no_repeat_ngram_size)
     : _max_batch_size(max_batch_size),
       _max_thread_per_block(1024),
       _h_can_num_batch(0),
@@ -49,7 +50,7 @@ MT5Decoder<OpType_>::MT5Decoder(int max_batch_size, const int* p_d_padding_mask,
                          min_log_probability / 2),
       _h_length_norm(tw._max_step, 1.f),
       _h_unfinished(1),
-      _encoder_no_repeat_ngram_size(encoder_no_repeat_ngram_size), 
+      _encoder_no_repeat_ngram_size(encoder_no_repeat_ngram_size),
       _no_repeat_ngram_size(no_repeat_ngram_size) {
   for (int i = 0; i < _h_alive_seq_probs.size(); i += tw._beam_size) {
     _h_alive_seq_probs[i] = 0.f;
@@ -208,6 +209,9 @@ void MT5Decoder<OpType_>::init_buffer(void* pbuf) {
   CHECK_GPU_ERROR(cudaMalloc((void**)&_p_d_curandstate,
                              _max_batch_size * sizeof(curandState)));
   ker_curand_setup<<<_max_batch_size, 1, 0, _stream>>>(_p_d_curandstate);
+  CHECK_GPU_ERROR(
+      cudaMalloc(&_p_d_banned_tokens,
+                 _max_batch_size * _tw._beam_size * _tw._trg_vocab_size));
 
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
   CHECK_GPU_ERROR(cudaGetLastError());
@@ -888,20 +892,28 @@ template <OperationType OpType_>
 void MT5Decoder<OpType_>::update_new_seq_probs() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_can_num, 0, sizeof(int), _stream));
 
-  if(_encoder_no_repeat_ngram_size || _no_repeat_ngram_size) {
-    launch_process_logits<_DataType>(_p_d_token_id, _p_d_padding_mask, _p_d_alive_seq,
-                            _p_d_logit_buf, _batch_seq_len, _cur_step + 1, _tw._max_step,
-                            _encoder_no_repeat_ngram_size, _no_repeat_ngram_size,
-                            _tw._trg_vocab_size, _batch_size, _tw._beam_size, _stream);
+  if (_encoder_no_repeat_ngram_size || _no_repeat_ngram_size) {
+    launch_process_logits<_DataType>(
+        _p_d_token_id, _p_d_padding_mask, _p_d_alive_seq, _p_d_banned_tokens,
+        _batch_seq_len, _cur_step + 1, _tw._max_step,
+        _encoder_no_repeat_ngram_size, _no_repeat_ngram_size,
+        _tw._trg_vocab_size, _batch_size, _tw._beam_size, _stream);
+    masked_select_beam_rough_topk_launcher(
+        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+        _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
+        _p_d_can_num, _p_d_banned_tokens, _tw._trg_vocab_size, _tw._max_step,
+        _h_length_norm[_cur_step], _cur_step, _step_token_num,
+        _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
+        _tw._end_id);
+  } else {
+    select_beam_rough_topk_launcher(
+        _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
+        _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
+        _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
+        _h_length_norm[_cur_step], _cur_step, _step_token_num,
+        _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
+        _tw._end_id);
   }
-
-  select_beam_rough_topk_launcher(
-      _p_d_logit_buf, _p_d_trg_emb_wei[6], _p_d_alive_seq_probs,
-      _p_d_alive_seq_score, _p_d_alive_seq, _p_d_can_idx, _p_d_can_score,
-      _p_d_can_num, _tw._trg_vocab_size, _tw._max_step,
-      _h_length_norm[_cur_step], _cur_step, _step_token_num,
-      _max_thread_per_block, _stream, _tw._beam_size, _tw._diverse_lambda,
-      _tw._end_id);
 
   thrust::exclusive_scan(thrust::cuda::par.on(_stream), _p_d_can_num + 1,
                          _p_d_can_num + 1 + _step_token_num, _p_d_can_num + 1);
