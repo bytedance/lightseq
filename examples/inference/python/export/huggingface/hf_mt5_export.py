@@ -97,7 +97,7 @@ def save_t5_proto_to_hdf5(transformer: Transformer, f: h5py.File):
         "use_gelu",
         "is_multilingual",
         "encoder_no_repeat_ngram_size",
-        "no_repeat_ngram_size"
+        "no_repeat_ngram_size",
     ]
 
     EMBEDDING_KEYS = [
