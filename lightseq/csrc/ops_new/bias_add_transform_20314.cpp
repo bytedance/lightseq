@@ -15,8 +15,6 @@ Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
 
 template <typename T1, typename T2>
 void BiasAddTrans20314<T1, T2>::forward() {
-  cudaStream_t _stream = _context_ptr->get_stream();
-
   T1* inp_ptr = (T1*)parent(0)->value();
   T1* bias_ptr = (T1*)parent(1)->value();
 
@@ -26,14 +24,16 @@ void BiasAddTrans20314<T1, T2>::forward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t _stream = _context_ptr->get_stream();
   launch_bias_add_transform_20314<T1>(res_ptr, inp_ptr, bias_ptr, _batch,
                                       _seq_len, _trans_count, _heads,
                                       _hidden_size / _heads, _stream);
+#endif
 }
 
 template <typename T1, typename T2>
 void BiasAddTrans20314<T1, T2>::backward() {
-  cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T2*)parent(0)->grad();
   T2* res_grad = (T2*)child(0)->grad();
   T2* qkv_bias_grad = (T2*)parent(1)->grad();
@@ -42,12 +42,14 @@ void BiasAddTrans20314<T1, T2>::backward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t _stream = _context_ptr->get_stream();
   launch_transform4d_0213<T2>(inp_grad, res_grad, _batch, _seq_len,
                               _hidden_size, _heads, _trans_count, _stream);
-
   // calculate bias
   launch_fuse_transpose_bias_kernel<T2>(
       inp_grad, qkv_bias_grad, _batch * _seq_len, 3 * _hidden_size, _stream);
+#endif
 }
 
 template class BiasAddTrans20314<float, float>;

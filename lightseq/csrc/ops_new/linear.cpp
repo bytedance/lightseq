@@ -19,15 +19,21 @@ void LinearOp<T1, T2>::forward() {
   T1* input_ptr = (T1*)parent(0)->value();
   T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
-  cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
   if (!_context_ptr->is_built()) {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
                  _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                  cublasGemmAlgo_t(_gemm_algos[0]));
+#elif DEVICE_ARCHITECTURE == ls_x86
+
+#elif DEVICE_ARCHITECTURE == ls_arm
+
+#endif
 }
 
 template <typename T1, typename T2>
@@ -50,10 +56,9 @@ void LinearOp<T1, T2>::backward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-
   // Q: how to adpat _opA & _opB
-
   // calculate weights_grad
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
                  _output_size, _batch_tokens, &bw_alpha, &w_beta, input_ptr,
@@ -63,6 +68,11 @@ void LinearOp<T1, T2>::backward() {
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
                  _batch_tokens, _output_size, &bw_alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
+#elif DEVICE_ARCHITECTURE == ls_x86
+
+#elif DEVICE_ARCHITECTURE == ls_arm
+
+#endif
 }
 
 template class LinearOp<float, float>;

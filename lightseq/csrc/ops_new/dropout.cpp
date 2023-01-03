@@ -13,8 +13,6 @@ Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
 
 template <typename T1, typename T2>
 void DropoutOp<T1, T2>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T1* input = (T1*)parent(0)->value();
   T1* output = (T1*)child(0)->value();
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
@@ -26,8 +24,12 @@ void DropoutOp<T1, T2>::forward() {
   if (_is_skip) {
     return;
   }
+
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
+#endif
 }
 
 template <typename T1, typename T2>
@@ -46,8 +48,10 @@ void DropoutOp<T1, T2>::backward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
   launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count, RATIO(),
                         stream, true);
+#endif
 }
 
 template class DropoutOp<float, float>;

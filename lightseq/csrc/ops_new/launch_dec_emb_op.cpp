@@ -19,8 +19,6 @@ Variable* LaunchDecEmbOp<T>::operator()(Variable* inp_tokens,
 
 template <typename T>
 void LaunchDecEmbOp<T>::forward() {
-  cudaStream_t _stream = _context_ptr->get_stream();
-
   int* inp_tokens = (int*)parent(0)->value();
   const T* token_emb = (const T*)parent(1)->value();
   const T* pos_emb = (const T* const)parent(2)->value();
@@ -33,10 +31,13 @@ void LaunchDecEmbOp<T>::forward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t _stream = _context_ptr->get_stream();
   cuda::launch_dec_emb<T>(token_emb, pos_emb, inp_tokens, lang_emb, lang_id,
                           output_ptr, _batch_size, _beam_size, _hidden_size,
                           _trg_vocab_size, _cur_step, _max_step, _multilg_type,
                           _stream);
+#endif
 }
 
 template class LaunchDecEmbOp<float>;

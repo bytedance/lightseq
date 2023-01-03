@@ -81,7 +81,6 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
 
 template <typename T>
 void BeamSearchTopOp<T>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)parent(0)->value();
   T* logits_bias_ptr = (T*)parent(1)->value();
   int* alive_seq_ptr = (int*)parent(2)->value();
@@ -104,6 +103,8 @@ void BeamSearchTopOp<T>::forward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   if (_cur_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(
         (void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
@@ -202,6 +203,7 @@ void BeamSearchTopOp<T>::forward() {
     Variable::swap_tensor(caches_k, caches_k_buf);
     Variable::swap_tensor(caches_v, caches_v_buf);
   }
+#endif
 }
 
 template class BeamSearchTopOp<float>;

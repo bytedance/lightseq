@@ -3,6 +3,24 @@ project(LightSeq LANGUAGES C CXX CUDA)
 
 find_package(CUDA 11 REQUIRED)
 
+set(DEVICE_ARCHITECTURE cuda)
+if(DEVICE_ARCH) # The value of DEVICE should be in cuda/x86/arm
+  set(DEVICE_ARCHITECTURE ${DEVICE_ARCH})
+endif()
+set(DEVICE_ARCHITECTURES_LIST cuda x86 arm)
+list(FIND DEVICE_ARCHITECTURES_LIST ${DEVICE_ARCHITECTURE} index)
+if(index GREATER -1)
+  message(STATUS "compile with device ${DEVICE_ARCHITECTURE} ${index}")
+  add_definitions(-DDEVICE_ARCHITECTURE=index)
+else()
+  message(WARNING "compiled with -DDEVICE_ARCHITECTURE=${DEVICE_ARCHITECTURE}")
+  message(
+    FATAL_ERROR
+      "-DDEVICE_ARCHITECTURE=\$\{device\} must in value of list [${DEVICE_ARCHITECTURES_LIST}]"
+  )
+  return()
+endif()
+
 option(USE_NEW_ARCH "inference with new arch" OFF)
 option(FP16_MODE "inference with fp16" OFF)
 option(DEBUG_MODE "debug computation result" OFF)
@@ -61,7 +79,7 @@ if(USE_NEW_ARCH)
   set(COMMON_HEADER_DIRS
       ${PROJECT_SOURCE_DIR}
       ${CUDA_PATH}/include
-      lightseq/csrc/kernels/includes
+      lightseq/csrc/kernels/cuda/includes
       lightseq/csrc/layers_new/includes
       lightseq/csrc/lsflow/includes
       lightseq/csrc/models/includes
@@ -78,7 +96,7 @@ if(USE_NEW_ARCH)
 
   add_subdirectory(3rdparty/pybind11)
   add_subdirectory(lightseq/csrc/tools)
-  add_subdirectory(lightseq/csrc/kernels)
+  add_subdirectory(lightseq/csrc/kernels/cuda)
   add_subdirectory(lightseq/csrc/layers_new)
   add_subdirectory(lightseq/csrc/lsflow)
   add_subdirectory(lightseq/csrc/models)

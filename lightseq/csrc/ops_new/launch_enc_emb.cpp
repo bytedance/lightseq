@@ -16,8 +16,6 @@ std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(
 
 template <typename T>
 void LaunchEncEmbOp<T>::forward() {
-  cudaStream_t _stream = _context_ptr->get_stream();
-
   int* inp_tokens = (int*)parent(0)->value();
   const T* token_emb = (const T*)parent(1)->value();
   const T* pos_emb = (const T*)parent(2)->value();
@@ -31,9 +29,12 @@ void LaunchEncEmbOp<T>::forward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t _stream = _context_ptr->get_stream();
   cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
                           _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,
                           lang_emb, lang_id, _multilg_type);
+#endif
 }
 
 template class LaunchEncEmbOp<float>;

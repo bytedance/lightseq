@@ -14,8 +14,6 @@ Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
 
 template <typename T1, typename T2>
 void BiasActDropoutOp<T1, T2>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
@@ -26,6 +24,8 @@ void BiasActDropoutOp<T1, T2>::forward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
         output, input, mask_ptr, bias, _rows * _cols, _cols, RATIO(), stream);
@@ -35,12 +35,11 @@ void BiasActDropoutOp<T1, T2>::forward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
+#endif
 }
 
 template <typename T1, typename T2>
 void BiasActDropoutOp<T1, T2>::backward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
 
@@ -54,6 +53,8 @@ void BiasActDropoutOp<T1, T2>::backward() {
     return;
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(
         grad_inp, grad_bias, input, bias, grad_out, mask_ptr, _rows, _cols,
@@ -65,6 +66,7 @@ void BiasActDropoutOp<T1, T2>::backward() {
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
   }
+#endif
 }
 
 template class BiasActDropoutOp<float, float>;

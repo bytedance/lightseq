@@ -1,4 +1,8 @@
 #pragma once
+#define ls_cuda 0
+#define ls_x86 1
+#define ls_arm 2
+
 #include "memory"
 #include "thread"
 #include <stdio.h>
