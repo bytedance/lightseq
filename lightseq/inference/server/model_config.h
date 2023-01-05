@@ -40,8 +40,8 @@ using CorrelationID = uint64_t;
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 
 /// The type for the metric_tags map.
-using MetricTagsMap = ::google::protobuf::Map<::google::protobuf::string,
-                                              ::google::protobuf::string>;
+using MetricTagsMap = ::google::protobuf::Map<::std::string,
+                                              ::std::string>;
 
 /// The type from platform name to the backend configuration for that
 /// platform.
