@@ -1,5 +1,5 @@
 if [ ! -d 'build' ]; then
     mkdir build
 fi
-
-cd build && cmake -DUSE_NEW_ARCH=ON -DUSE_TRITONBACKEND=ON -DDEBUG_MODE=OFF -DFP16_MODE=ON -DMEM_DEBUG=OFF .. && make -j${nproc}
+# DEVICE_ARCH could be cuda/x86/arm
+cd build && cmake -DUSE_NEW_ARCH=ON -DDEVICE_ARCH=cuda -DUSE_TRITONBACKEND=ON -DDEBUG_MODE=OFF -DFP16_MODE=ON -DMEM_DEBUG=OFF .. && make -j${nproc}
