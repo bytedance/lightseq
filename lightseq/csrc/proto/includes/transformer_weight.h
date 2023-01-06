@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "../tools/includes/util.h"
+#include "util.h"
 #include "transformer.pb.h"
 
 namespace lightseq {

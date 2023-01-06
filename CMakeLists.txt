@@ -80,12 +80,12 @@ if(USE_NEW_ARCH)
       ${PROJECT_SOURCE_DIR}
       ${CUDA_PATH}/include
       lightseq/csrc/kernels/cuda/includes
+      lightseq/csrc/kernels/cuda/tools/includes
       lightseq/csrc/layers_new/includes
       lightseq/csrc/lsflow/includes
       lightseq/csrc/models/includes
       lightseq/csrc/ops_new/includes
-      lightseq/csrc/proto/includes
-      lightseq/csrc/tools/includes)
+      lightseq/csrc/proto/includes)
 
   set(COMMON_LIB_DIRS ${CUDA_PATH}/lib64)
 
@@ -95,7 +95,7 @@ if(USE_NEW_ARCH)
   link_directories(${COMMON_LIB_DIRS})
 
   add_subdirectory(3rdparty/pybind11)
-  add_subdirectory(lightseq/csrc/tools)
+  # add_subdirectory(lightseq/csrc/tools)
   add_subdirectory(lightseq/csrc/kernels/cuda)
   add_subdirectory(lightseq/csrc/layers_new)
   add_subdirectory(lightseq/csrc/lsflow)

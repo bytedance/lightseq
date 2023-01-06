@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "bert.pb.h"
-#include "../tools/includes/util.h"
+#include "util.h"
 
 namespace lightseq {
 
