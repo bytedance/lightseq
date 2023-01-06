@@ -19,11 +19,12 @@ void LinearOp<T1, T2>::forward() {
   T1* input_ptr = (T1*)parent(0)->value();
   T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
-  cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
   if (!_context_ptr->is_built()) {
     return;
   }
+
+  cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
 
   cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
                  _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
