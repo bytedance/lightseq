@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "bert_crf.pb.h"
-#include "util.h"
+#include "declaration.h"
 
 namespace lightseq {
 

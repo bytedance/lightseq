@@ -517,15 +517,15 @@ __inline__ float get_float<__half>(__half val) {
 }
 
 template <typename T>
-__inline__ __global__ void zero_grad(T *grad);
+static __global__ void zero_grad(T *grad);
 
 template <>
-__inline__ __global__ void zero_grad<float>(float *grad) {
+__global__ void zero_grad<float>(float *grad) {
   grad[0] = 0;
 }
 
 template <>
-__inline__ __global__ void zero_grad<__half>(__half *grad) {
+__global__ void zero_grad<__half>(__half *grad) {
   grad[0] = __half(0.0);
 }
 

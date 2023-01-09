@@ -298,11 +298,21 @@ void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
   _value_byte_size = value_byte_size;
   _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
+
+#if DEVICE_ARCHITECTURE == ls_cuda
   char* value_ptr = cuda_malloc<char>(value_byte_size);
+#else
+  char* value_ptr = (char*)malloc(value_byte_size);
+#endif
+
   _value->remove_life_cycle();
   _value->set_tensor(value_ptr);
   if (_context_ptr->is_training() && grad_byte_size) {
+#if DEVICE_ARCHITECTURE == ls_cuda
     char* grad_ptr = cuda_malloc<char>(grad_byte_size);
+#else
+    char* grad_ptr = (char*)malloc(grad_byte_size);
+#endif
     _grad->remove_life_cycle();
     _grad->set_tensor(grad_ptr);
   }

@@ -1,11 +1,12 @@
 #pragma once
+#include "memory"
+#include <cstdlib>
+#include <iostream>
+
 #include "declaration.h"
 #include "tensor.h"
 #include "context.h"
 #include "manager.h"
-#include "memory"
-#include <cstdlib>
-#include <iostream>
 
 namespace lightseq {
 

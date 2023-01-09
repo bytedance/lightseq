@@ -112,7 +112,11 @@ void Context::build() {
     exit(-1);
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
+#else
+  temporary_buffer_ = (char*)malloc(mx_tensor_size);
+#endif
 
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
@@ -152,7 +156,12 @@ void Context::build() {
     }
   }
 
+#if DEVICE_ARCHITECTURE == ls_cuda
   cuda_free(temporary_buffer_);
+#else
+  free(temporary_buffer_);
+#endif
+
   _mm_ptr->calculate_buffer_();
   _built = true;
 

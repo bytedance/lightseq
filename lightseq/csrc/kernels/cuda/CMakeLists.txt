@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.18)
 # (default) use C API for HDF5 library
 find_package(HDF5 REQUIRED)
 
-add_subdirectory(tools)
+find_package(CUDA 11 REQUIRED)
 
 set(cuda_kernel_files
     util.cc.cu
@@ -27,3 +27,4 @@ add_library(cuda_kernels STATIC ${cuda_kernel_files})
 target_include_directories(cuda_kernels PUBLIC ${HDF5_INCLUDE_DIRS})
 target_include_directories(cuda_kernels INTERFACE includes)
 target_link_libraries(cuda_kernels PRIVATE ${HDF5_LIBRARIES})
+target_link_libraries(cuda_kernels PUBLIC -lcublas)

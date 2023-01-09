@@ -95,7 +95,11 @@ void MemoryManager::calculate_buffer_() {
 #endif
 
   for (auto iter : buffer_vec_) {
+#if DEVICE_ARCHITECTURE == ls_cuda
     cuda_free(iter);
+#else
+    free(iter);
+#endif
   }
   buffer_vec_.clear();
 
@@ -111,8 +115,13 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(ordered_tensor_usages[i]);
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
+#if DEVICE_ARCHITECTURE == ls_cuda
       char *current_buffer =
           cuda_malloc<char>(max_last_addr - record_last_addr);
+#else
+      char *current_buffer = (char *)malloc(max_last_addr - record_last_addr);
+#endif
+
       buffer_vec_.push_back(current_buffer);
 #ifdef MEM_DEBUG
       printf(

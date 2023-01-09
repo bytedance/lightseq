@@ -1506,11 +1506,11 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
 
   int idx = flat_2dim(threadIdx.y, col_idx, hidden_size);
 
-  float thread_cmax_out_grad = 0;
+  // float thread_cmax_out_grad = 0;
   float thread_cmax_in_grad = 0;
   float thread_in_grad = 0;
   float temp_cmax_in_grad = 0;
-  float temp_cmax_out_grad = 0;
+  // float temp_cmax_out_grad = 0;
 
   int input_index;
 
@@ -1542,7 +1542,8 @@ __global__ void ls_quant_dropout_act_bias_bwd_kernel(
       idx += stride;
     }
   }
-  __shared__ float block_cmax_in_grad, block_cmax_out_grad;
+  __shared__ float block_cmax_in_grad;
+  // __shared__ float block_cmax_out_grad;
   if (threadIdx.x == 0 && threadIdx.y == 0) {
     block_cmax_in_grad = 0;
     // block_cmax_out_grad = 0;

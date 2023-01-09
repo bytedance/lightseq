@@ -4,13 +4,12 @@
 #include "queue"
 #include "deque"
 #include "stack"
+#include "unordered_map"
 
 #include "declaration.h"
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
-#include "cuda_util.h"
-#include "unordered_map"
 
 namespace lightseq {
 

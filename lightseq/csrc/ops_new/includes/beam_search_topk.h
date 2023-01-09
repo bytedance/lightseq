@@ -1,7 +1,7 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "transformerKernels.h"
+#include "headers.h"
 
 namespace lightseq {
 
