@@ -25,7 +25,7 @@ void DropoutOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
@@ -48,7 +48,7 @@ void DropoutOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count, RATIO(),
                         stream, true);
 #endif

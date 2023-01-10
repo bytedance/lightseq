@@ -31,7 +31,7 @@ void StridedBatchGemmOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cublasHandle_t handle = _context_ptr->get_cublashandle();
   cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
                               _buffer_b, output, _op_A, _op_B, stride_a,
@@ -64,7 +64,7 @@ void StridedBatchGemmOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cublasHandle_t handle = _context_ptr->get_cublashandle();
   // Calculate d_A.
   cublas_strided_batched_gemm(handle, mb, kb, _n, &_alpha, &_beta,

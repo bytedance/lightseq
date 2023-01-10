@@ -31,7 +31,7 @@ void LaunchDecEmbOp<T>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   cuda::launch_dec_emb<T>(token_emb, pos_emb, inp_tokens, lang_emb, lang_id,
                           output_ptr, _batch_size, _beam_size, _hidden_size,

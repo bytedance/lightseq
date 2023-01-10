@@ -34,7 +34,7 @@ void LayerNormalizeOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                     betta_val, _batch_tokens, _hidden_dim, stream);
@@ -70,7 +70,7 @@ void LayerNormalizeOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t streams[2] = {_context_ptr->get_stream(),
                              _context_ptr->get_stream()};
   launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,

@@ -33,7 +33,11 @@ class MemoryManager {
   MemoryManager() {}
   virtual ~MemoryManager() {
     if (buffer_ != nullptr) {
+#ifdef LIGHTSEQ_cuda
       cudaFree(buffer_);
+#else
+      free(buffer_);
+#endif
     }
   }
 

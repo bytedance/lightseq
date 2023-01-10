@@ -24,7 +24,7 @@ void BiasAddTrans20314<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   launch_bias_add_transform_20314<T1>(res_ptr, inp_ptr, bias_ptr, _batch,
                                       _seq_len, _trans_count, _heads,
@@ -42,7 +42,7 @@ void BiasAddTrans20314<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   launch_transform4d_0213<T2>(inp_grad, res_grad, _batch, _seq_len,
                               _hidden_size, _heads, _trans_count, _stream);

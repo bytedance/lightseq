@@ -35,8 +35,11 @@ class Context {  // model only
 
   int _device_id;
 
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream;
   cublasHandle_t _cublasHandle;
+#endif
+
   static std::shared_ptr<Context> _global_context_ptr;
 
   bool check_validate();
@@ -52,11 +55,11 @@ class Context {  // model only
   Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
 
+#ifdef LIGHTSEQ_cuda
   cudaStream_t get_stream() { return _stream; }
-
   cublasHandle_t get_cublashandle() { return _cublasHandle; }
-
   void set_stream(cudaStream_t stream);
+#endif
 
   void convert_into_train();
   void convert_into_eval();

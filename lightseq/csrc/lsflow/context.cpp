@@ -7,10 +7,12 @@ Context::Context(StatusType status_type, int device_id)
       _device_id(device_id),
       _status_type(status_type) {
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
+#ifdef LIGHTSEQ_cuda
   if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
+#endif
 }
 
 Context::~Context() {
@@ -19,10 +21,12 @@ Context::~Context() {
   }
 }
 
+#ifdef LIGHTSEQ_cuda
 void Context::set_stream(cudaStream_t stream) {
   _stream = stream;
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
 }
+#endif
 
 void Context::convert_into_train() { _status_type = StatusType::Training; }
 
@@ -112,7 +116,7 @@ void Context::build() {
     exit(-1);
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
 #else
   temporary_buffer_ = (char*)malloc(mx_tensor_size);
@@ -156,7 +160,7 @@ void Context::build() {
     }
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cuda_free(temporary_buffer_);
 #else
   free(temporary_buffer_);
@@ -165,7 +169,9 @@ void Context::build() {
   _mm_ptr->calculate_buffer_();
   _built = true;
 
+#ifdef LIGHTSEQ_cuda
   CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
+#endif
 
 #ifdef DEBUG_MODE
   draw_all_context();

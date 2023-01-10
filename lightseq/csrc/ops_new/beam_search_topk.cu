@@ -103,7 +103,7 @@ void BeamSearchTopOp<T>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   if (_cur_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(

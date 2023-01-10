@@ -1,20 +1,8 @@
 #pragma once
 
-#include <fcntl.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <thrust/device_vector.h>
-#include <unistd.h>
-
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-
 #include "transformer.pb.h"
-#include "declaration.h"
+#include "proto_headers.h"
+#include "proto_util.h"
 
 namespace lightseq {
 
@@ -46,6 +34,7 @@ class TransformerWeight {
   std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
   std::vector<const T *> _p_d_dec_wei;      // size: 18 * dec_layer_num
 
+#ifdef LIGHTSEQ_cuda
   // store the weights on gpu memo
   thrust::device_vector<T> _d_src_emb_wei;
   thrust::device_vector<T> _d_trg_emb_wei;
@@ -53,6 +42,7 @@ class TransformerWeight {
   thrust::device_vector<T> _d_dec_wei;
   thrust::device_vector<T> _d_src_lang_emb;
   thrust::device_vector<T> _d_trg_lang_emb;
+#endif
 
  public:
   std::string initializing(std::string proto_path, bool only_decoder = false);

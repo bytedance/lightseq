@@ -24,7 +24,7 @@ void BiasActDropoutOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
@@ -53,7 +53,7 @@ void BiasActDropoutOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
     launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(

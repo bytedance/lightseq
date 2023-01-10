@@ -13,7 +13,10 @@ set(PROTO_FILES bert.proto bert_crf.proto transformer.proto)
 set(WEIGHT_FILES bert_weight.cc bert_crf_weight.cc transformer_weight.cc)
 
 protobuf_generate_cpp(PROTO_SRC PROTO_HEADER ${PROTO_FILES})
-add_library(weight_lib STATIC ${WEIGHT_FILES} ${PROTO_SRC} ${PROTO_HEADER})
-target_link_libraries(weight_lib PUBLIC cuda_kernels ${Protobuf_LIBRARIES})
+add_library(weight_lib STATIC ${WEIGHT_FILES} ${PROTO_SRC} ${PROTO_HEADER}
+                              proto_util.cc)
+target_link_libraries(weight_lib PRIVATE ${HDF5_LIBRARIES})
+target_link_libraries(weight_lib PUBLIC lightseq_kernels ${Protobuf_LIBRARIES})
 target_include_directories(weight_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(weight_lib PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(weight_lib PUBLIC ${HDF5_INCLUDE_DIRS})

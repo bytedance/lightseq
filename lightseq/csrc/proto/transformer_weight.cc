@@ -19,6 +19,7 @@ float TransformerWeight<float>::float2required(float value) {
   return value;
 }
 
+#ifdef LIGHTSEQ_cuda
 /**
 fp16 version, cast fp32 into fp16
 */
@@ -26,6 +27,7 @@ template <>
 __half TransformerWeight<__half>::float2required(float value) {
   return __float2half_rn(value);
 }
+#endif
 
 /**
 Read model config stored in custom proto file.
@@ -124,10 +126,14 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
   if (source == "src") {
     std::vector<T> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
     _d_src_emb_wei = raw_value;
     for (int e : offset)
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+#else
+    _p_d_src_emb_wei = raw_value;
+#endif
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -158,10 +164,15 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
 
     std::vector<T> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
+#else
+
+    _p_d_trg_emb_wei = raw_value;
+#endif
     }
   }  // trg
 
@@ -1102,7 +1113,9 @@ std::string TransformerWeight<T>::initializing(std::string weight_path,
   }
 }
 
+#ifdef LIGHTSEQ_cuda
 template class TransformerWeight<__half>;
+#endif
 template class TransformerWeight<float>;
 
 }  // namespace lightseq

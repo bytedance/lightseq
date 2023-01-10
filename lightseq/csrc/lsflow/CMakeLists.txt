@@ -10,7 +10,7 @@ include_directories(includes)
 
 add_library(lsflow STATIC context.cpp node.cpp manager.cpp layer.cpp tensor.cpp)
 
-target_link_libraries(lsflow PUBLIC cuda_kernels)
+target_link_libraries(lsflow PUBLIC lightseq_kernels)
 
 if(DEBUG)
   add_subdirectory(example)

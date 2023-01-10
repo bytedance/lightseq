@@ -29,7 +29,7 @@ void LaunchEncEmbOp<T>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   cuda::launch_enc_emb<T>(token_emb, pos_emb, inp_tokens, output_ptr, pad_mask,
                           _pad_id, _batch_size, _seq_len, _hidden_dim, _stream,

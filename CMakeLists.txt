@@ -37,15 +37,18 @@ if(USE_NEW_ARCH)
   set(CMAKE_CXX_STANDARD 14)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-  set(DEVICE_ARCHITECTURE cuda)
-  if(DEVICE_ARCH) # The value of DEVICE should be in cuda/x86/arm
-    set(DEVICE_ARCHITECTURE ${DEVICE_ARCH})
-  endif()
   set(DEVICE_ARCHITECTURES_LIST cuda x86 arm)
-  list(FIND DEVICE_ARCHITECTURES_LIST ${DEVICE_ARCHITECTURE} index)
-  if(index GREATER -1)
-    message(STATUS "compile with device ${DEVICE_ARCHITECTURE} ${index}")
-    add_definitions(-DDEVICE_ARCHITECTURE=index)
+  list(FIND DEVICE_ARCHITECTURES_LIST ${DEVICE_ARCH} index)
+
+  if(index EQUAL 0)
+    add_definitions(-DLIGHTSEQ_cuda)
+    set(DEVICE_ARCHITECTURE cuda)
+  elseif(index EQUAL 1)
+    add_definitions(-DLIGHTSEQ_x86)
+    set(DEVICE_ARCHITECTURE x86)
+  elseif(index EQUAL 2)
+    add_definitions(-DLIGHTSEQ_arm)
+    set(DEVICE_ARCHITECTURE arm)
   else()
     message(
       WARNING "compiled with -DDEVICE_ARCHITECTURE=${DEVICE_ARCHITECTURE}")
@@ -53,6 +56,12 @@ if(USE_NEW_ARCH)
       FATAL_ERROR
         "-DDEVICE_ARCHITECTURE=\$\{device\} must in value of list [${DEVICE_ARCHITECTURES_LIST}]"
     )
+    return()
+  endif()
+  message(STATUS "compile with device ${DEVICE_ARCHITECTURE} ${index}")
+
+  if(index GREATER 0 AND FP16_MODE)
+    message(FATAL_ERROR "CPU device does not have fp16 version")
     return()
   endif()
 

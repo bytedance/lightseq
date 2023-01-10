@@ -23,8 +23,8 @@ set(cuda_kernel_files
     crf.cu
     transformerKernels.cc.cu)
 
-add_library(cuda_kernels STATIC ${cuda_kernel_files})
-target_include_directories(cuda_kernels PUBLIC ${HDF5_INCLUDE_DIRS})
-target_include_directories(cuda_kernels INTERFACE includes)
-target_link_libraries(cuda_kernels PRIVATE ${HDF5_LIBRARIES})
-target_link_libraries(cuda_kernels PUBLIC -lcublas)
+add_library(lightseq_kernels STATIC ${cuda_kernel_files})
+target_include_directories(lightseq_kernels PUBLIC ${HDF5_INCLUDE_DIRS})
+target_include_directories(lightseq_kernels INTERFACE includes)
+target_link_libraries(lightseq_kernels PRIVATE ${HDF5_LIBRARIES})
+target_link_libraries(lightseq_kernels PUBLIC -lcublas)

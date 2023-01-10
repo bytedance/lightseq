@@ -21,7 +21,7 @@ void Transform0213<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   //   [b, nh, s, ad] -> [b, s, nh, ad]
   launch_transform4d_0213<T1>(res_ptr, inp_ptr, _batch, _seq_len, _hidden_size,
@@ -38,7 +38,7 @@ void Transform0213<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   launch_transform_0213<T2>(inp_grad, out_grad, _batch, _seq_len, _hidden_size,
                             _heads, _stream);

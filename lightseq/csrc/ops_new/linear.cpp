@@ -24,15 +24,11 @@ void LinearOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
                  _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                  cublasGemmAlgo_t(_gemm_algos[0]));
-#elif DEVICE_ARCHITECTURE == ls_x86
-
-#elif DEVICE_ARCHITECTURE == ls_arm
-
 #endif
 }
 
@@ -56,7 +52,7 @@ void LinearOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   // Q: how to adpat _opA & _opB
   // calculate weights_grad
@@ -68,10 +64,6 @@ void LinearOp<T1, T2>::backward() {
   cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
                  _batch_tokens, _output_size, &bw_alpha, &inp_beta, weights,
                  out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
-#elif DEVICE_ARCHITECTURE == ls_x86
-
-#elif DEVICE_ARCHITECTURE == ls_arm
-
 #endif
 }
 

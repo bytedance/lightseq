@@ -25,7 +25,7 @@ void BiasDropoutResOp<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
                                  _rows * _cols, _cols, RATIO(), stream);
@@ -48,7 +48,7 @@ void BiasDropoutResOp<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad, mask_ptr,
                                  _rows, _cols, RATIO(), stream);

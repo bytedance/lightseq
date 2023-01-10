@@ -30,7 +30,7 @@ void Concat3Dim1<T1, T2>::forward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   if (_is_skip) {
     CHECK_GPU_ERROR(cudaMemcpyAsync((void*)real_val, (void*)inp_ptr,
@@ -58,7 +58,7 @@ void Concat3Dim1<T1, T2>::backward() {
     return;
   }
 
-#if DEVICE_ARCHITECTURE == ls_cuda
+#ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   if (!_is_continuous_cache)
     printf("Model infer does not have backward() function\n");
@@ -73,6 +73,8 @@ void Concat3Dim1<T1, T2>::backward() {
 }
 
 template class Concat3Dim1<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class Concat3Dim1<__half, __half>;
+#endif
 
 }  // namespace lightseq
