@@ -1,7 +1,4 @@
 #pragma once
-#define ls_cuda 0
-#define ls_x86 1
-#define ls_arm 2
 
 #include "memory"
 #include "thread"
@@ -10,7 +7,7 @@
 #include "unordered_set"
 #include <unistd.h>
 
-#include "headers.h"
+#include "kernel_headers.h"
 
 namespace lightseq {
 
@@ -42,6 +39,9 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
+
+class Allocator;
+using AllocatorPtr = std::shared_ptr<Allocator>;
 
 const int MB_SIZE = 1024 * 1024;
 

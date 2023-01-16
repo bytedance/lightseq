@@ -5,7 +5,9 @@ namespace lightseq {
 Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()),
       _device_id(device_id),
-      _status_type(status_type) {
+      _status_type(status_type),
+      _allocator_ptr(new Allocator()) {
+  _mm_ptr->set_allocator(_allocator_ptr);
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
 #ifdef LIGHTSEQ_cuda
   if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
@@ -116,11 +118,7 @@ void Context::build() {
     exit(-1);
   }
 
-#ifdef LIGHTSEQ_cuda
-  temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
-#else
-  temporary_buffer_ = (char*)malloc(mx_tensor_size);
-#endif
+  temporary_buffer_ = _allocator_ptr->malloc(mx_tensor_size);
 
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
@@ -160,11 +158,7 @@ void Context::build() {
     }
   }
 
-#ifdef LIGHTSEQ_cuda
-  cuda_free(temporary_buffer_);
-#else
-  free(temporary_buffer_);
-#endif
+  _allocator_ptr->free(temporary_buffer_);
 
   _mm_ptr->calculate_buffer_();
   _built = true;

@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "declaration.h"
+#include "allocator.h"
 
 namespace lightseq {
 enum LSMemoryType { FixedMemory, SharedMemory, OffsetMemory };
@@ -28,18 +29,11 @@ class MemoryManager {
   std::map<int, TensorUsage> tensor_usages_;
   size_t buffer_size_;
   std::map<int, char*> tensor_ptr;
+  AllocatorPtr _allocator_ptr;
 
  public:
   MemoryManager() {}
-  virtual ~MemoryManager() {
-    if (buffer_ != nullptr) {
-#ifdef LIGHTSEQ_cuda
-      cudaFree(buffer_);
-#else
-      free(buffer_);
-#endif
-    }
-  }
+  virtual ~MemoryManager() {}
 
   char* get_memory(int unique_id) { return tensor_ptr.find(unique_id)->second; }
 
@@ -51,5 +45,9 @@ class MemoryManager {
   void calculate_buffer_();
 
   size_t buffer_size() { return buffer_size_; }
+
+  void set_allocator(AllocatorPtr allocator_ptr) {
+    _allocator_ptr = allocator_ptr;
+  }
 };
 }  // namespace lightseq

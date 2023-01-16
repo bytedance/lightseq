@@ -15,5 +15,5 @@ set(operator_files
     beam_search_topk.cu)
 
 add_library(lightseq_operators STATIC ${operator_files})
-target_link_libraries(lightseq_operators PUBLIC lightseq_kernels lsflow)
+target_link_libraries(lightseq_operators PUBLIC lsflow)
 target_include_directories(lightseq_operators PUBLIC includes)

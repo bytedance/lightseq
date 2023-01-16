@@ -10,6 +10,7 @@
 #include "manager.h"
 #include "layer.h"
 #include "node.h"
+#include "allocator.h"
 
 namespace lightseq {
 
@@ -32,6 +33,7 @@ class Context {  // model only
   bool _building = false;
   int _node_idx = 0;
   MemoryManagerPtr _mm_ptr;
+  AllocatorPtr _allocator_ptr;
 
   int _device_id;
 
@@ -54,6 +56,8 @@ class Context {  // model only
  public:
   Context(StatusType status_type = StatusType::Inference, int device_id = 0);
   virtual ~Context();
+
+  AllocatorPtr allocator() { return _allocator_ptr; }
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t get_stream() { return _stream; }

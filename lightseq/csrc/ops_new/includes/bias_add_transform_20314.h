@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "headers.h"
 #include "tuple"
 
 namespace lightseq {

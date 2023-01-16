@@ -114,7 +114,6 @@ target_link_libraries(
 
 target_link_libraries(
   triton-minimal-backend PUBLIC liblightseq # from pywrapper
-                                lightseq_kernels # from tools
 )
 
 target_include_directories(triton-minimal-backend
