@@ -118,7 +118,7 @@ void Context::build() {
     exit(-1);
   }
 
-  temporary_buffer_ = _allocator_ptr->malloc(mx_tensor_size);
+  temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
 
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
@@ -158,7 +158,7 @@ void Context::build() {
     }
   }
 
-  _allocator_ptr->free(temporary_buffer_);
+  _allocator_ptr->free_mem(temporary_buffer_);
 
   _mm_ptr->calculate_buffer_();
   _built = true;

@@ -6,6 +6,7 @@
 #include <fstream>
 #include "unordered_set"
 #include <unistd.h>
+#include "cmath"
 
 #include "kernel_headers.h"
 
@@ -21,6 +22,11 @@ enum VariableType {
 };
 const std::string VariableTypeString[] = {
     "FixedVariable", "SharedVariable", "OffsetVariable", "RegressiveVariable"};
+
+enum class MATRIX_OP {
+  Transpose,
+  NonTranspose,
+};
 
 class Node;
 

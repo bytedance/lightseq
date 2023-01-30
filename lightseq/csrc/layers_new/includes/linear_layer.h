@@ -21,8 +21,8 @@ class LinearLayer : public Layer {
 
  public:
   LinearLayer(int max_batch_tokens, int input_size, int output_size,
-              cublasOperation_t opA = CUBLAS_OP_T,
-              cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.));
+              MATRIX_OP opA = MATRIX_OP::Transpose,
+              MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.));
 
   virtual ~LinearLayer() {}
 
@@ -37,8 +37,10 @@ class LinearLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class LinearLayer<__half, __half>;
 template class LinearLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class LinearLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using LinearLayerPtr = std::shared_ptr<LinearLayer<T1, T2>>;

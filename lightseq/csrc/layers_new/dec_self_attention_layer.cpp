@@ -32,14 +32,14 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
           is_continuous_cache)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
-          (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
-          CUBLAS_OP_N)),
+          (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0),
+          MATRIX_OP::Transpose, MATRIX_OP::NonTranspose)),
       _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(
           attn_prob_dropout_ratio, max_batch_tokens * num_heads * max_seq_len)),
       _attn_context(new StridedBatchGemmOp<T1, T2>(
-          max_batch_tokens * hidden_size, T1(1.0), T1(0.0), CUBLAS_OP_N,
-          CUBLAS_OP_N)),
+          max_batch_tokens * hidden_size, T1(1.0), T1(0.0),
+          MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose)),
       _transform_0213(
           new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
       _attn_out_linear(

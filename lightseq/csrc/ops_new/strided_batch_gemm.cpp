@@ -15,20 +15,19 @@ Variable* StridedBatchGemmOp<T1, T2>::operator()(Variable* inpA,
 
 template <typename T1, typename T2>
 void StridedBatchGemmOp<T1, T2>::forward() {
-  int stride_a = _m * _k;
-  int stride_b = _n * _k;
-  int stride_c = _m * _n;
-
   T1* _buffer_a = (T1*)parent(0)->value();
   T1* _buffer_b = (T1*)parent(1)->value();
   T1* output = (T1*)child(0)->value();
 
-  if (_max_seq > 0) {
-    stride_a = _max_seq * ((_op_A == CUBLAS_OP_N) ? _m : _k);
-  }
-
   if (!_context_ptr->is_built()) {
     return;
+  }
+
+  int stride_a = _m * _k;
+  int stride_b = _n * _k;
+  int stride_c = _m * _n;
+  if (_max_seq > 0) {
+    stride_a = _max_seq * ((_op_AA == MATRIX_OP::NonTranspose) ? _m : _k);
   }
 
 #ifdef LIGHTSEQ_cuda
@@ -42,15 +41,12 @@ void StridedBatchGemmOp<T1, T2>::forward() {
 
 template <typename T1, typename T2>
 void StridedBatchGemmOp<T1, T2>::backward() {
-  int mb = (_op_A == CUBLAS_OP_T ? _k : _m);
-  int kb = (_op_A == CUBLAS_OP_T ? _m : _k);
+  int mb = (_op_AA == MATRIX_OP::Transpose ? _k : _m);
+  int kb = (_op_AA == MATRIX_OP::Transpose ? _m : _k);
 
   int stride_a = mb * _n;
   int stride_b = _n * kb;
   int stride_c = _m * _k;
-
-  // B need to transpose.
-  cublasOperation_t op_b = (_op_B == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
 
   T1* _buffer_a = (T1*)parent(0)->value();
   T1* _buffer_b = (T1*)parent(1)->value();
@@ -65,6 +61,9 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   }
 
 #ifdef LIGHTSEQ_cuda
+  // B need to transpose.
+  cublasOperation_t op_b = (_op_B == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
+
   cublasHandle_t handle = _context_ptr->get_cublashandle();
   // Calculate d_A.
   cublas_strided_batched_gemm(handle, mb, kb, _n, &_alpha, &_beta,
@@ -90,6 +89,7 @@ void StridedBatchGemmOp<T1, T2>::backward() {
 }
 
 template class StridedBatchGemmOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class StridedBatchGemmOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

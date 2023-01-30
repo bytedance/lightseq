@@ -38,6 +38,7 @@ void LaunchEncEmbOp<T>::forward() {
 }
 
 template class LaunchEncEmbOp<float>;
+#ifdef LIGHTSEQ_cuda
 template class LaunchEncEmbOp<__half>;
-
+#endif
 }  // namespace lightseq

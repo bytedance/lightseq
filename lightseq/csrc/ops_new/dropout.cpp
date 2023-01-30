@@ -29,13 +29,13 @@ void DropoutOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
+#elif LIGHTSEQ_x86
+  //.....
 #endif
 }
 
 template <typename T1, typename T2>
 void DropoutOp<T1, T2>::backward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T2* input_grad = (T2*)parent(0)->grad();
   T2* output_grad = (T2*)child(0)->grad();
   uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
@@ -49,12 +49,14 @@ void DropoutOp<T1, T2>::backward() {
   }
 
 #ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count, RATIO(),
                         stream, true);
 #endif
 }
 
 template class DropoutOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class DropoutOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

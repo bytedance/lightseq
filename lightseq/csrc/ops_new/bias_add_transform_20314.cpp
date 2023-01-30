@@ -53,6 +53,7 @@ void BiasAddTrans20314<T1, T2>::backward() {
 }
 
 template class BiasAddTrans20314<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class BiasAddTrans20314<__half, __half>;
-
+#endif
 }  // namespace lightseq

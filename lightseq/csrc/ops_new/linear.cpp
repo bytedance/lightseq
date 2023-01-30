@@ -29,6 +29,10 @@ void LinearOp<T1, T2>::forward() {
   cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
                  _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                  cublasGemmAlgo_t(_gemm_algos[0]));
+#elif defined LIGHTSEQ_x86
+
+  x86::matrix_gemm(weights, input_ptr, out_ptr, _output_size, _batch_tokens,
+                   _input_size);
 #endif
 }
 
@@ -68,6 +72,7 @@ void LinearOp<T1, T2>::backward() {
 }
 
 template class LinearOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class LinearOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

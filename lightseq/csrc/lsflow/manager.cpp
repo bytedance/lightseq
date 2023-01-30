@@ -95,7 +95,7 @@ void MemoryManager::calculate_buffer_() {
 #endif
 
   for (auto iter : buffer_vec_) {
-    _allocator_ptr->free(iter);
+    _allocator_ptr->free_mem(iter);
   }
   buffer_vec_.clear();
 
@@ -112,7 +112,7 @@ void MemoryManager::calculate_buffer_() {
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
       char *current_buffer =
-          _allocator_ptr->malloc(max_last_addr - record_last_addr);
+          _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
 
       buffer_vec_.push_back(current_buffer);
 #ifdef MEM_DEBUG

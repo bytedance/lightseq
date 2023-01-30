@@ -69,8 +69,10 @@ class DecEncAttentionLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class DecEncAttentionLayer<__half, __half>;
 template class DecEncAttentionLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class DecEncAttentionLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using DecEncAttentionLayerPtr = std::shared_ptr<DecEncAttentionLayer<T1, T2>>;

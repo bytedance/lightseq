@@ -4,8 +4,8 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 LinearLayer<T1, T2>::LinearLayer(int max_batch_tokens, int input_size,
-                                 int output_size, cublasOperation_t opA,
-                                 cublasOperation_t opB, float alpha)
+                                 int output_size, MATRIX_OP opA, MATRIX_OP opB,
+                                 float alpha)
     : Layer("LinearLayer"),
       _max_batch_tokens(max_batch_tokens),
       _input_size(input_size),

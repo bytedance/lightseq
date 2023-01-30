@@ -53,6 +53,7 @@ void SoftmaxOp<T1, T2>::backward() {
 }
 
 template class SoftmaxOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class SoftmaxOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

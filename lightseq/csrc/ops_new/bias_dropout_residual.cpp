@@ -65,6 +65,7 @@ void BiasDropoutResOp<T1, T2>::backward() {
 }
 
 template class BiasDropoutResOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class BiasDropoutResOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

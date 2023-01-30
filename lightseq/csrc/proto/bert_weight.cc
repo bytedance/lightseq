@@ -90,7 +90,7 @@ std::string BertWeight<T>::proto_parse_emb_wei(
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
 #else
-  _p_d_src_emb_wei = raw_value;
+  for (int e : offset) _p_d_src_emb_wei.push_back(raw_value.data() + e);
 #endif
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
@@ -208,7 +208,7 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
 #else
-  _p_d_enc_wei = raw_value;
+  for (int e : offset) _p_d_enc_wei.push_back(raw_value.data() + e);
 #endif
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
   return "";
@@ -315,7 +315,7 @@ void BertWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
 #else
-  _p_d_src_emb_wei = raw_value;
+  for (int e : offset) _p_d_src_emb_wei.push_back(raw_value.data() + e);
 #endif
 
   std::cout << "Finish loading src_emb_wei from host to device" << std::endl;
@@ -454,7 +454,7 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
 #else
-  _p_d_enc_wei = raw_value;
+  for (int e : offset) _p_d_enc_wei.push_back(raw_value.data() + e);
 #endif
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
 }

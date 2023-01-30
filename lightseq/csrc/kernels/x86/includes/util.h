@@ -10,4 +10,14 @@
 #include <stdexcept>
 #include <functional>
 
-namespace lightseq {}  // namespace lightseq
+namespace lightseq {
+namespace x86 {
+
+enum class MATRIX_OP {
+  Transpose,
+  NonTranspose,
+};
+
+}
+
+}  // namespace lightseq

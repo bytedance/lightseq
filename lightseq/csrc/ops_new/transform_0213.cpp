@@ -46,6 +46,7 @@ void Transform0213<T1, T2>::backward() {
 }
 
 template class Transform0213<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class Transform0213<__half, __half>;
-
+#endif
 }  // namespace lightseq

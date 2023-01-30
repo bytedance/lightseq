@@ -79,7 +79,8 @@ void LayerNormalizeOp<T1, T2>::backward() {
 #endif
 }
 
-template class LayerNormalizeOp<__half, __half>;
 template class LayerNormalizeOp<float, float>;
-
+#ifdef LIGHTSEQ_cuda
+template class LayerNormalizeOp<__half, __half>;
+#endif
 }  // namespace lightseq

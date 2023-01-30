@@ -85,6 +85,7 @@ void CRFOP<T>::backward() {
 }
 
 template class CRFOP<float>;
+#ifdef LIGHTSEQ_cuda
 template class CRFOP<__half>;
-
+#endif
 }  // namespace lightseq

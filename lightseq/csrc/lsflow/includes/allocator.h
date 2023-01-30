@@ -11,8 +11,8 @@ class Allocator {
  public:
   Allocator();
   ~Allocator();
-  char* malloc(size_t size);
-  void free(char* ptr);
+  char* malloc_mem(size_t size);
+  void free_mem(char* ptr);
 };
 
 }  // namespace lightseq

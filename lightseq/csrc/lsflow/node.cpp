@@ -299,12 +299,12 @@ void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
   _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
 
-  char* value_ptr = _context_ptr->allocator()->malloc(value_byte_size);
+  char* value_ptr = _context_ptr->allocator()->malloc_mem(value_byte_size);
 
   _value->remove_life_cycle();
   _value->set_tensor(value_ptr);
   if (_context_ptr->is_training() && grad_byte_size) {
-    char* grad_ptr = _context_ptr->allocator()->malloc(grad_byte_size);
+    char* grad_ptr = _context_ptr->allocator()->malloc_mem(grad_byte_size);
     _grad->remove_life_cycle();
     _grad->set_tensor(grad_ptr);
   }

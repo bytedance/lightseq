@@ -69,8 +69,10 @@ class LyrNormalizeLayer : public Layer {
   }
 };
 
-template class LyrNormalizeLayer<__half, __half>;
 template class LyrNormalizeLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class LyrNormalizeLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using LyrNormalizeLayerPtr = std::shared_ptr<LyrNormalizeLayer<T1, T2>>;

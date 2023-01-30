@@ -34,7 +34,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
 
   if (length_penalty >= 0) {
     for (int i = 0; i < _host_length_norm.size(); i++) {
-      _host_length_norm[i] = length_norm(i + 1, length_penalty);
+      _host_length_norm[i] = host_length_norm(i + 1, length_penalty);
     }
   }
 }
@@ -207,6 +207,8 @@ void BeamSearchTopOp<T>::forward() {
 }
 
 template class BeamSearchTopOp<float>;
+#ifdef LIGHTSEQ_cuda
 template class BeamSearchTopOp<__half>;
+#endif
 
 }  // namespace lightseq

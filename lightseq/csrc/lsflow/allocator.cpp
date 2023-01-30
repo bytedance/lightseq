@@ -6,12 +6,12 @@ Allocator::Allocator() { _ptr_set.clear(); }
 
 Allocator::~Allocator() {
   for (auto iter : _ptr_set) {
-    Allocator::free(iter);
+    Allocator::free_mem(iter);
   }
   _ptr_set.clear();
 }
 
-char* Allocator::malloc(size_t size) {
+char* Allocator::malloc_mem(size_t size) {
   char* ptr = nullptr;
 #ifdef LIGHTSEQ_cuda
   ptr = cuda_malloc<char>(size);
@@ -22,7 +22,7 @@ char* Allocator::malloc(size_t size) {
   return ptr;
 }
 
-void Allocator::free(char* ptr) {
+void Allocator::free_mem(char* ptr) {
   if (_ptr_set.find(ptr) != _ptr_set.end()) {
     _ptr_set.erase(ptr);
   }

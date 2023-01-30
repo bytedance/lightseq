@@ -86,9 +86,9 @@ void Bert::Infer() {
     iter->forward();
   }
   lyr_norm_layer->forward();
-
+#ifdef LIGHTSEQ_cuda
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-
+#endif
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 

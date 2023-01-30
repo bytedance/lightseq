@@ -169,11 +169,10 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
+    }
 #else
-
     _p_d_trg_emb_wei = raw_value;
 #endif
-    }
   }  // trg
 
   temp_buffer.clear();
@@ -186,13 +185,21 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
     }
 
     if (source == "src") {
+#ifdef LIGHTSEQ_cuda
       _d_src_lang_emb = raw_value;
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+#else
+      _p_d_src_emb_wei = raw_value;
+#endif
     } else {
+#ifdef LIGHTSEQ_cuda
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+#else
+      _p_d_trg_emb_wei = raw_value;
+#endif
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"
