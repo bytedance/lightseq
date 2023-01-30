@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 cmake_minimum_required(VERSION 3.18)
-# (default) use C API for HDF5 library
-find_package(HDF5 REQUIRED)
 
 set(lightseq_kernel_files util.cc gemm.cpp)
 

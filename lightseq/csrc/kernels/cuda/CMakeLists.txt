@@ -1,7 +1,5 @@
 find_package(CUDAToolkit)
 cmake_minimum_required(VERSION 3.18)
-# (default) use C API for HDF5 library
-find_package(HDF5 REQUIRED)
 
 find_package(CUDA 11 REQUIRED)
 
