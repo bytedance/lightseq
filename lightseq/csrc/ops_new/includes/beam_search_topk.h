@@ -3,7 +3,7 @@
 #include "node.h"
 
 namespace lightseq {
-const float min_log_probability = -2000.f;
+const float host_min_log_probability = -2000.f;
 
 float host_length_norm(int length, float alpha) {
   if (alpha < 0.f) return 1.f / length;

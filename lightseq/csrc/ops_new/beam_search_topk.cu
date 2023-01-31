@@ -26,7 +26,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
                              sizeof(T)),
       _cache_size(max_batch_size * max_step * hidden_size * beam_size),
       _host_alive_seq_probs(max_batch_size * beam_size,
-                            min_log_probability / 2),
+                            host_min_log_probability / 2),
       _host_length_norm(max_step, 1.f) {
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;

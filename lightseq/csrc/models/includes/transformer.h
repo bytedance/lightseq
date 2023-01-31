@@ -19,7 +19,6 @@ typedef float OpType_;
 #endif
 
 namespace lightseq {
-namespace cuda {
 
 class Transformer : public LSModel {
  private:
@@ -81,5 +80,4 @@ class Transformer : public LSModel {
 
 LSMODEL_REGISTER(Transformer);
 
-}  // namespace cuda
 }  // namespace lightseq

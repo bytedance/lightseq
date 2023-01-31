@@ -1,7 +1,6 @@
 #include "transformer.h"
 
 namespace lightseq {
-namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
@@ -360,5 +359,4 @@ DataType Transformer::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

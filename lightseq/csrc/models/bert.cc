@@ -1,7 +1,6 @@
 #include "bert.h"
 
 namespace lightseq {
-namespace cuda {
 
 Bert::Bert(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
@@ -176,5 +175,4 @@ DataType Bert::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

@@ -2,7 +2,6 @@
 #include "linear_layer.h"
 
 namespace lightseq {
-namespace cuda {
 
 void test_func() {
   Context::create_global_context(StatusType::Inference);
@@ -74,7 +73,6 @@ void test_func() {
 
   printf("==========\n");
 }
-}  // namespace cuda
 }  // namespace lightseq
 
-int main() { lightseq::cuda::test_func(); }
+int main() { lightseq::test_func(); }

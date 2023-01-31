@@ -1,7 +1,6 @@
 #include "bert_crf.h"
 
 namespace lightseq {
-namespace cuda {
 
 BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
@@ -188,5 +187,4 @@ DataType BertCrf::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

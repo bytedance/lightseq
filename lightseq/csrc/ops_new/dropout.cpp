@@ -29,7 +29,7 @@ void DropoutOp<T1, T2>::forward() {
   cudaStream_t stream = _context_ptr->get_stream();
   launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
                         false);
-#elif LIGHTSEQ_x86
+#elif defined LIGHTSEQ_x86
   //.....
 #endif
 }
