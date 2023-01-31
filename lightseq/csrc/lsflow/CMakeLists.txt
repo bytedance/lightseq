@@ -16,7 +16,9 @@ add_library(
   layer.cpp
   tensor.cpp
   allocator.cpp
-  lsflow_util.cpp)
+  lsflow_util.cpp
+  operator.cpp
+  variable.cpp)
 
 target_link_libraries(lsflow PUBLIC lightseq_kernels)
 

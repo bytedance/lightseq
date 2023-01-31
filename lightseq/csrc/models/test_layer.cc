@@ -48,7 +48,7 @@ void test_func() {
   //
   for (int i = 0; i < output_size; i++) {
     for (int j = 0; j < input_size; j++) {
-      printf("%f, ", input_ptr[i * input_size + j]);
+      printf("%f, ", wei_emb[i * input_size + j]);
     }
     printf("\n");
   }
@@ -57,7 +57,7 @@ void test_func() {
 
   for (int i = 0; i < input_size; i++) {
     for (int j = 0; j < batch_tokens; j++) {
-      printf("%f, ", wei_emb[i * batch_tokens + j]);
+      printf("%f, ", input_ptr[i * batch_tokens + j]);
     }
     printf("\n");
   }
