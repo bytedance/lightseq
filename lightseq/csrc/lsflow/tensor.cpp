@@ -118,4 +118,11 @@ std::string Tensor::memory_type() {
   return "Undefined";
 }
 
+void Tensor::print_tensor(int size) {
+#ifdef LIGHTSEQ_cuda
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+#endif
+  print_vec((TENSOR_TYPE*)tensor(), _name, 10);
+}
+
 }  // namespace lightseq

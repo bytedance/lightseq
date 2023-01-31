@@ -9,13 +9,9 @@
 #include "declaration.h"
 #include "manager.h"
 #include "layer.h"
-#include "node.h"
 #include "allocator.h"
 
 namespace lightseq {
-
-enum StatusType { Training, Inference, Evaluation };
-const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 
 class Context {  // model only
  private:
@@ -100,13 +96,8 @@ class Context {  // model only
 
   void draw_all_context();
 
-  Layer* last_layer() {
-    return _layer_context.size() ? _layer_context.back() : nullptr;
-  }
-  Node* last_node() {
-    return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
-                                : nullptr;
-  }
+  Layer* last_layer();
+  Node* last_node();
 
   void regress_begin() { _in_regress = true; }
   void regress_end() { _in_regress = false; }

@@ -318,15 +318,3 @@ std::string getGPUName() {
   }
   return "";
 }
-
-void print_time_duration(
-    const std::chrono::high_resolution_clock::time_point &start,
-    std::string duration_name, cudaStream_t stream) {
-  CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
-  auto finish = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> elapsed = finish - start;
-  std::cout << duration_name
-            << " duration time is: " << (elapsed).count() * 1000 << " ms"
-            << std::endl;
-  return;
-}

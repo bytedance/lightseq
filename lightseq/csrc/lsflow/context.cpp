@@ -194,6 +194,15 @@ bool Context::check_validate() {
 
 void Context::draw_all_context() {}
 
+Layer* Context::last_layer() {
+  return _layer_context.size() ? _layer_context.back() : nullptr;
+}
+
+Node* Context::last_node() {
+  return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
+                              : nullptr;
+}
+
 void Context::regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr) {
   std::string full_name = layer_name + std::to_string(layer_id);

@@ -7,6 +7,14 @@
 #include "unordered_set"
 #include <unistd.h>
 #include "cmath"
+#include <math_constants.h>
+#include <type_traits>
+#include <chrono>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <functional>
 
 #include "kernel_headers.h"
 
@@ -27,6 +35,9 @@ enum class MATRIX_OP {
   Transpose,
   NonTranspose,
 };
+
+enum StatusType { Training, Inference, Evaluation };
+const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 
 class Node;
 

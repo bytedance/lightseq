@@ -7,6 +7,7 @@
 #include "tensor.h"
 #include "context.h"
 #include "manager.h"
+#include "lsflow_util.h"
 
 namespace lightseq {
 
@@ -117,7 +118,7 @@ class Variable : public Node {
   friend class Node;
 
 #ifdef DEBUG_MODE
-  void debug_var();
+  void print_var(bool is_fw = true);
 #endif
 };
 

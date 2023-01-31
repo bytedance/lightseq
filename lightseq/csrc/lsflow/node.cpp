@@ -1,11 +1,5 @@
 #include "node.h"
 
-#ifdef FP16_MODE
-typedef __half TENSOR_TYPE;
-#else
-typedef float TENSOR_TYPE;
-#endif
-
 namespace lightseq {
 
 Node::Node(std::string name, NodeType nt_)
@@ -62,10 +56,6 @@ void Node::recursive_forward() {
   }
   if (!_context_ptr->is_built()) {
     _fw_node_idx = _context_ptr->node_idx();
-    // #ifdef MEM_DEBUG
-    //     printf("### node %s forward node idx: %d, _in_regress_scope: %d
-    //     ###\n", name().c_str(), _context_ptr->node_idx(), _in_regress_scope);
-    // #endif
     if (_in_regress_scope) {
       _context_ptr->update_regr_begin(_fw_node_idx);
       _context_ptr->update_regr_end(_fw_node_idx);
@@ -73,45 +63,44 @@ void Node::recursive_forward() {
   }
 
 #ifdef DEBUG_MODE
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-  auto start = std::chrono::high_resolution_clock::now();
   if (node_type() == NodeType::Operator) {
     printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
            _fw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_parents.size(): %zu\n", _parents.size());
     for (int idx = 0; idx < _parents.size(); idx++) {
-      if (_parents[idx] == nullptr ||
-          this_op->parent(idx)->value() == nullptr) {
+      if (_parents[idx] == nullptr) {
         printf("nullptr!\n");
       } else {
-        print_vec((TENSOR_TYPE*)this_op->parent(idx)->value(),
-                  this_op->parent(idx)->name() + ":value", 10);
+        this_op->parent(idx)->print_var(true);
       }
     }
   }
+#ifdef LIGHTSEQ_cuda
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+#endif
+  auto start = std::chrono::high_resolution_clock::now();
 #endif
 
   forward();
 
 #ifdef DEBUG_MODE
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() != NodeType::Operator) {
     return;
   }
-  print_time_duration(start, "time cost", 0);
+#ifdef LIGHTSEQ_cuda
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+#endif
+  print_time_duration(start, "time cost");
   Operator* this_op = static_cast<Operator*>(this);
   printf("_children.size(): %zu\n", _children.size());
   for (int idx = 0; idx < _children.size(); idx++) {
-    if (_children[idx] != nullptr && this_op->child(idx)->value() != nullptr)
-      print_vec((TENSOR_TYPE*)this_op->child(idx)->value(),
-                this_op->child(idx)->name() + ":value", 10);
-    else
+    if (_children[idx] == nullptr)
       printf("nullptr\n");
+    else
+      this_op->child(idx)->print_var(true);
   }
   printf("\n");
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
 #endif
 }
 
@@ -141,44 +130,43 @@ void Node::recursive_backward() {
   }
 
 #ifdef DEBUG_MODE
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   if (node_type() == NodeType::Operator) {
     printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
            _bw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
     printf("_children.size(): %zu\n", _children.size());
     for (int idx = 0; idx < _children.size(); idx++) {
-      if (_children[idx] != nullptr && this_op->child(idx)->grad() != nullptr)
-        print_vec((TENSOR_TYPE*)this_op->child(idx)->grad(),
-                  this_op->child(idx)->name() + ":grad", 10);
-      else
+      if (_children[idx] == nullptr)
         printf("nullptr\n");
+      else
+        this_op->child(idx)->print_var(false);
     }
   }
+#ifdef LIGHTSEQ_cuda
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+#endif
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
   backward();
 
 #ifdef DEBUG_MODE
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
   if (node_type() != NodeType::Operator) {
     return;
   }
-  print_time_duration(start, "time cost", 0);
+#ifdef LIGHTSEQ_cuda
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+#endif
+  print_time_duration(start, "time cost");
   Operator* this_op = static_cast<Operator*>(this);
   printf("_parents.size(): %zu\n", _parents.size());
   for (int idx = 0; idx < _parents.size(); idx++) {
-    if (_parents[idx] != nullptr && this_op->parent(idx)->grad() != nullptr)
-      print_vec((TENSOR_TYPE*)this_op->parent(idx)->grad(),
-                this_op->parent(idx)->name() + ":grad", 10);
-    else
+    if (_parents[idx] == nullptr)
       printf("nullptr\n");
+    else
+      this_op->parent(idx)->print_var(false);
   }
   printf("\n");
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
 #endif
 }
 
@@ -385,19 +373,19 @@ void Variable::set_offset(size_t offset_value, size_t offset_grad) {
 }
 
 #ifdef DEBUG_MODE
-void Variable::debug_var() {
-  printf("++++++++++ debug var %s ++++++++++\n", name().c_str());
-  printf("variable type: %s\n", variable_type_str().c_str());
-  printf("node: %s, value type: %s, value_byte_size: %zu\n", name().c_str(),
-         _value->memory_type().c_str(), _value_byte_size);
-  if (value() == nullptr) {
-    printf("value address is nullptr\n");
-  } else
-    print_vec((TENSOR_TYPE*)value(), name() + ":value", 10);
-  if (_context_ptr->is_training()) {
-    printf("node: %s, grad_byte_size: %zu\n", name().c_str(), _grad_byte_size);
-    print_vec((TENSOR_TYPE*)grad(), name() + ":grad", 10);
+void Variable::print_var(bool is_fw) {
+  if (is_fw) {
+    if (value() == nullptr)
+      printf("value address is nullptr\n");
+    else
+      _value->print_tensor(10);
+  } else {
+    if (grad() == nullptr)
+      printf("grad address is nullptr\n");
+    else
+      _grad->print_tensor(10);
   }
+
   printf("\n");
 }
 #endif

@@ -8,8 +8,15 @@ set(CMAKE_CXX_STANDARD 14)
 
 include_directories(includes)
 
-add_library(lsflow STATIC context.cpp node.cpp manager.cpp layer.cpp tensor.cpp
-                          allocator.cpp)
+add_library(
+  lsflow STATIC
+  context.cpp
+  node.cpp
+  manager.cpp
+  layer.cpp
+  tensor.cpp
+  allocator.cpp
+  lsflow_util.cpp)
 
 target_link_libraries(lsflow PUBLIC lightseq_kernels)
 

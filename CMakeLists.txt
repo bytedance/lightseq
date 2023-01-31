@@ -67,7 +67,7 @@ if(USE_NEW_ARCH)
 
   if(DEBUG_MODE)
     add_definitions(-DDEBUG_MODE)
-    set_option(MEM_DEBUG ON)
+    set(MEM_DEBUG ON)
     message(STATUS "Build using debug mode")
   endif()
 

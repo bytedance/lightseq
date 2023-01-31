@@ -5,6 +5,12 @@
 
 namespace lightseq {
 
+#ifdef FP16_MODE
+typedef __half TENSOR_TYPE;
+#else
+typedef float TENSOR_TYPE;
+#endif
+
 class Tensor {
  private:
   LSMemoryType _mtype;
@@ -43,6 +49,8 @@ class Tensor {
   void reset_fixed();
   std::string memory_type();
   friend class Variable;
+
+  void print_tensor(int size);
 };
 
 }  // namespace lightseq
