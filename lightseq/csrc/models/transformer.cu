@@ -138,10 +138,11 @@ Transformer::Transformer(const std::string weight_path,
   }
   Variable *dec_out = (*dec_norm_layer)(dec_emb);
   dec_out = (*linear_layer)(dec_out);
-  _context_ptr->regress_end();
 
   std::tuple<Variable *, Variable *> sample_outs =
       (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
+  _context_ptr->regress_end();
+
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
