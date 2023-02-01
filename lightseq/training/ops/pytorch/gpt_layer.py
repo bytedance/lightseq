@@ -26,8 +26,6 @@ class LSGptEncoderLayer(LSTransformerEncoderLayer):
         initial_biases: Optional: Only used for unit test
     """
 
-    layer_id = 0
-
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSGptEncoderLayer, self).__init__(
             config, initial_weights=initial_weights, initial_biases=initial_biases

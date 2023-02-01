@@ -1,4 +1,5 @@
 import math
+import copy
 
 import torch
 from torch import nn
@@ -87,7 +88,7 @@ class LSTransformerEncoderLayerNew(TransformerEncoderLayerBase):
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSTransformerEncoderLayerNew, self).__init__()
 
-        self.config = config
+        self.config = copy.deepcopy(config)
         self.config.layer_id = LSTransformerEncoderLayerNew.layer_id
         LSTransformerEncoderLayerNew.layer_id = (
             LSTransformerEncoderLayerNew.layer_id + 1
