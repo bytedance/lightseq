@@ -1,6 +1,5 @@
 #pragma once
 
-#include <math_constants.h>
 #include <type_traits>
 #include <chrono>
 #include <fstream>
@@ -11,13 +10,9 @@
 #include <functional>
 
 namespace lightseq {
-namespace x86 {
+namespace x86 {}
 
-enum class MATRIX_OP {
-  Transpose,
-  NonTranspose,
-};
-
-}
+template <typename T>
+void print_vec(const T *outv, std::string outn, int num_output_ele);
 
 }  // namespace lightseq

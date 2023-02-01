@@ -108,7 +108,7 @@ if(USE_NEW_ARCH)
   add_subdirectory(lightseq/csrc/models)
   add_subdirectory(lightseq/csrc/ops_new)
   add_subdirectory(lightseq/csrc/proto)
-  # add_subdirectory(lightseq/csrc/pybind)
+  add_subdirectory(lightseq/csrc/pybind)
   # add_subdirectory(lightseq/csrc/example) if(USE_TRITONBACKEND)
   # add_subdirectory(lightseq/csrc/triton_backend) endif()
 

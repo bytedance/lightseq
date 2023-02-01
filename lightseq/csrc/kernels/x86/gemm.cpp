@@ -12,7 +12,7 @@ int matrix_gemm(const T* inpA, const T* inpB, T* outC, int m, int n, int k) {
       for (int it = 0; it < k; it++) {
         T a = *(inpA + i * k + it);
         T b = *(inpB + it * n + j);
-        *(outC + i * n + it) += a * b;
+        *(outC + i * n + j) += a * b;
       }
     }
   }
