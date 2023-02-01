@@ -1,3 +1,5 @@
+import copy
+
 import torch
 from torch import nn
 from torch.autograd import Function
@@ -78,7 +80,7 @@ class LSTransformerEmbeddingLayer(TransformerEmbeddingLayerBase):
     ):
         super(LSTransformerEmbeddingLayer, self).__init__()
 
-        self.config = config
+        self.config = copy.deepcopy(config)
         self.config.layer_id = LSTransformerEmbeddingLayer.layer_id
         LSTransformerEmbeddingLayer.layer_id = LSTransformerEmbeddingLayer.layer_id + 1
 
