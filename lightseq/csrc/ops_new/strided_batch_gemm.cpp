@@ -32,10 +32,10 @@ void StridedBatchGemmOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t handle = _context_ptr->get_cublashandle();
-  cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta, _buffer_a,
-                              _buffer_b, output, _op_A, _op_B, stride_a,
-                              stride_b, stride_c, _batch_heads,
-                              cublasGemmAlgo_t(_gemm_algos[0]));
+  cuda::cublas_strided_batched_gemm(handle, _m, _n, _k, &_alpha, &_beta,
+                                    _buffer_a, _buffer_b, output, _op_A, _op_B,
+                                    stride_a, stride_b, stride_c, _batch_heads,
+                                    cublasGemmAlgo_t(_gemm_algos[0]));
 #endif
 }
 
@@ -66,12 +66,12 @@ void StridedBatchGemmOp<T1, T2>::backward() {
 
   cublasHandle_t handle = _context_ptr->get_cublashandle();
   // Calculate d_A.
-  cublas_strided_batched_gemm(handle, mb, kb, _n, &_alpha, &_beta,
-                              (_op_A == CUBLAS_OP_T ? _buffer_b : d_output),
-                              (_op_A == CUBLAS_OP_T ? d_output : _buffer_b),
-                              inpGradA, CUBLAS_OP_N, op_b, stride_a, stride_b,
-                              stride_c, _batch_heads,
-                              cublasGemmAlgo_t(_gemm_algos[1]));
+  cuda::cublas_strided_batched_gemm(
+      handle, mb, kb, _n, &_alpha, &_beta,
+      (_op_A == CUBLAS_OP_T ? _buffer_b : d_output),
+      (_op_A == CUBLAS_OP_T ? d_output : _buffer_b), inpGradA, CUBLAS_OP_N,
+      op_b, stride_a, stride_b, stride_c, _batch_heads,
+      cublasGemmAlgo_t(_gemm_algos[1]));
 
   // A need to transpose.
   cublasOperation_t op_a = (_op_A == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
@@ -81,10 +81,10 @@ void StridedBatchGemmOp<T1, T2>::backward() {
   stride_c = _n * _k;
 
   // Calculate d_B.
-  cublas_strided_batched_gemm(handle, _k, _n, _m, &_alpha, &_beta, _buffer_a,
-                              d_output, inpGradB, op_a, CUBLAS_OP_N, stride_a,
-                              stride_b, stride_c, _batch_heads,
-                              cublasGemmAlgo_t(_gemm_algos[2]));
+  cuda::cublas_strided_batched_gemm(
+      handle, _k, _n, _m, &_alpha, &_beta, _buffer_a, d_output, inpGradB, op_a,
+      CUBLAS_OP_N, stride_a, stride_b, stride_c, _batch_heads,
+      cublasGemmAlgo_t(_gemm_algos[2]));
 #endif
 }
 

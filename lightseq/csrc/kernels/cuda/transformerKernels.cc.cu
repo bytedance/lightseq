@@ -13,7 +13,7 @@ that required by transformer model.
 Currently, fp16 and fp32 versions are provided
 */
 namespace lightseq {
-
+namespace cuda {
 template <typename T>
 __global__ void scaled_colsum_reduce_kernel(const T* __restrict__ inp,
                                             T* __restrict__ out, int rows,
@@ -2271,5 +2271,5 @@ __global__ void ker_curand_setup(curandState* state) {
      number, no offset */
   curand_init(clock(), blockIdx.x, 0, &state[blockIdx.x]);
 }
-
+}  // namespace cuda
 }  // namespace lightseq

@@ -6,6 +6,8 @@
 
 using namespace cub;
 
+namespace lightseq {
+namespace cuda {
 /**
 @brief: transform_0213
 Split the attention heads and reshape input
@@ -847,3 +849,5 @@ void launch_transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
   transform_0213_dcmax<__half><<<grid_dim, block_dim, 0, stream>>>(
       output, grad_cmax, input, clip_mask, hidden_dim, head_dim);
 }
+}  // namespace cuda
+}  // namespace lightseq

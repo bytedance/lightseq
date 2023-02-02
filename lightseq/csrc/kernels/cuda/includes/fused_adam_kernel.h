@@ -4,7 +4,8 @@
 */
 #include <ATen/ATen.h>
 #include <torch/extension.h>
-
+namespace lightseq {
+namespace cuda {
 #define DISPATCH_FLOAT_AND_HALF(TYPE, LEVEL, NAME, ...)               \
   switch (TYPE) {                                                     \
     case at::ScalarType::Float: {                                     \
@@ -68,3 +69,5 @@ void apex_fused_adam_cuda(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m,
                           at::Tensor& v, at::Tensor& g, float lr, float beta1,
                           float beta2, float eps, float grad_scale, int step,
                           int mode, int bias_correction, float decay);
+}  // namespace cuda
+}  // namespace lightseq

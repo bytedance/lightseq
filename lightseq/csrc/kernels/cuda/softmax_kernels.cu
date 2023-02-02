@@ -11,6 +11,8 @@
 namespace cg = cooperative_groups;
 const float EPSILON = 1e-8f;
 
+namespace lightseq {
+namespace cuda {
 /**
 @brief: softmax_kernel
 Softmax forward kernel for
@@ -374,3 +376,5 @@ template void launch_attn_softmax_bw<float>(float *out_grad,
                                             const float *soft_inp, int rows,
                                             int softmax_len,
                                             cudaStream_t stream);
+}  // namespace cuda
+}  // namespace lightseq

@@ -6,36 +6,13 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_runtime.h>
-
+#include "common.h"
+namespace lightseq {
+namespace cuda {
 enum class ReduceType { kMax = 0, kSum };
-const unsigned int WARP_REDUCE_MASK = 0xffffffff;
 const float REDUCE_FLOAT_INF_NEG = -100000000.f;
 const float REDUCE_FLOAT_INF_POS = 100000000.f;
 const unsigned int WARP_REDUCE_SIZE = 32;
-
-template <typename T>
-__forceinline__ __device__ T warpReduceSum(T val) {
-  for (int mask = (WARP_REDUCE_SIZE >> 1); mask > 0; mask >>= 1)
-    val += __shfl_xor_sync(WARP_REDUCE_MASK, val, mask, WARP_REDUCE_SIZE);
-  return val;
-}
-
-/* Calculate the sum of all elements in a block */
-template <typename T>
-__forceinline__ __device__ T blockReduceSum(T val) {
-  static __shared__ T shared[32];
-  int lane = threadIdx.x & 0x1f;
-  int wid = threadIdx.x >> 5;
-
-  val = warpReduceSum<T>(val);
-
-  if (lane == 0) shared[wid] = val;
-  __syncthreads();
-
-  val = (threadIdx.x < (blockDim.x >> 5)) ? shared[lane] : (T)0.0f;
-  val = warpReduceSum<T>(val);
-  return val;
-}
 
 template <ReduceType Rtype, int Num>
 __inline__ __device__ void blockReduce(float *pval);
@@ -310,3 +287,5 @@ __inline__ __device__ void blockReduce<ReduceType::kMax, 4>(float *pval) {
   }
   warpReduce<ReduceType::kMax, num>(pval);
 }
+}  // namespace cuda
+}  // namespace lightseq

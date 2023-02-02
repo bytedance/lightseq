@@ -1,7 +1,7 @@
 #include "util.h"
 
 namespace lightseq {
-
+namespace cuda {
 struct prg_uniform {
   float a, b;
 
@@ -66,5 +66,5 @@ void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
     f[i] = dequantize(i8[i], quant_range, clip_max);
   }
 }
-
+}  // namespace cuda
 }  // namespace lightseq

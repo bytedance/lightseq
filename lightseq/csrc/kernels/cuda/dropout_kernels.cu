@@ -6,6 +6,8 @@
 #include <cooperative_groups.h>
 
 namespace cg = cooperative_groups;
+namespace lightseq {
+namespace cuda {
 
 curandStatePhilox4_32_10_t *curandstate;
 
@@ -1963,3 +1965,5 @@ void launch_ls_quant_dropout_res_bias<__half>(
           .count(),
       dim, in_col32);
 }
+}  // namespace cuda
+}  // namespace lightseq

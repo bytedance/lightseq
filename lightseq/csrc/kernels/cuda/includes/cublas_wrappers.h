@@ -13,7 +13,8 @@
 #include <mma.h>
 #include <stdio.h>
 #include "cublas_algo_map.h"
-
+namespace lightseq {
+namespace cuda {
 int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
                    cublasOperation_t transb, int m, int n, int k,
                    const float *alpha, const float *beta, const float *A,
@@ -74,3 +75,5 @@ void cublasLtMM_withAlgo_i8IO(int8_t *res, int batchCount, int m, int n, int k,
                               cudaStream_t stream,
                               cublasLtMatmulAlgo_info &algo_info,
                               cublasAlgoMap &algo_map);
+}  // namespace cuda
+}  // namespace lightseq

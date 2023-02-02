@@ -8,7 +8,8 @@
 #include "cuda_util.h"
 
 namespace cg = cooperative_groups;
-
+namespace lightseq {
+namespace cuda {
 /**
 @brief: get_tokens_position
 get tokens position in sequences that the padding tokens are ignored.
@@ -788,3 +789,5 @@ void launch_d_lookup_scale_pos_dropout<__half>(
         seq_len, embedding_dim, padding_idx, dropout_ratio, emb_scale);
   }
 }
+}  // namespace cuda
+}  // namespace lightseq

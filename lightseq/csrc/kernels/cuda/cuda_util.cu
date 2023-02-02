@@ -2,65 +2,7 @@
 #include <thrust/reduce.h>
 
 #include "cuda_util.h"
-
-/* GPU function guard */
-std::string _cudaGetErrorString(cudaError_t error) {
-  return cudaGetErrorString(error);
-}
-
-std::string _cudaGetErrorString(cublasStatus_t error) {
-  switch (error) {
-    case CUBLAS_STATUS_SUCCESS:
-      return "CUBLAS_STATUS_SUCCESS";
-
-    case CUBLAS_STATUS_NOT_INITIALIZED:
-      return "CUBLAS_STATUS_NOT_INITIALIZED";
-
-    case CUBLAS_STATUS_ALLOC_FAILED:
-      return "CUBLAS_STATUS_ALLOC_FAILED";
-
-    case CUBLAS_STATUS_INVALID_VALUE:
-      return "CUBLAS_STATUS_INVALID_VALUE";
-
-    case CUBLAS_STATUS_ARCH_MISMATCH:
-      return "CUBLAS_STATUS_ARCH_MISMATCH";
-
-    case CUBLAS_STATUS_MAPPING_ERROR:
-      return "CUBLAS_STATUS_MAPPING_ERROR";
-
-    case CUBLAS_STATUS_EXECUTION_FAILED:
-      return "CUBLAS_STATUS_EXECUTION_FAILED";
-
-    case CUBLAS_STATUS_INTERNAL_ERROR:
-      return "CUBLAS_STATUS_INTERNAL_ERROR";
-
-    case CUBLAS_STATUS_NOT_SUPPORTED:
-      return "CUBLAS_STATUS_NOT_SUPPORTED";
-
-    case CUBLAS_STATUS_LICENSE_ERROR:
-      return "CUBLAS_STATUS_LICENSE_ERROR";
-  }
-  return "CUBLAS_UNKNOW";
-}
-
-template <typename T>
-void check_gpu_error(T result, char const *const func, const char *const file,
-                     int const line) {
-  if (result) {
-    throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
-                             std::to_string(line) +
-                             "): " + (_cudaGetErrorString(result)) + "\n");
-  }
-}
-
-template void check_gpu_error<cudaError_t>(cudaError_t result,
-                                           char const *const func,
-                                           const char *const file,
-                                           int const line);
-template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
-                                              char const *const func,
-                                              const char *const file,
-                                              int const line);
+namespace lightseq {
 
 template <typename T>
 void print_vec(const T *outv, std::string outn, int num_output_ele) {
@@ -168,6 +110,66 @@ template void print_vec<float>(const float *outv, std::string outn, int start,
 
 template void print_vec<int>(const int *outv, std::string outn, int start,
                              int end);
+
+namespace cuda {
+/* GPU function guard */
+std::string _cudaGetErrorString(cudaError_t error) {
+  return cudaGetErrorString(error);
+}
+
+std::string _cudaGetErrorString(cublasStatus_t error) {
+  switch (error) {
+    case CUBLAS_STATUS_SUCCESS:
+      return "CUBLAS_STATUS_SUCCESS";
+
+    case CUBLAS_STATUS_NOT_INITIALIZED:
+      return "CUBLAS_STATUS_NOT_INITIALIZED";
+
+    case CUBLAS_STATUS_ALLOC_FAILED:
+      return "CUBLAS_STATUS_ALLOC_FAILED";
+
+    case CUBLAS_STATUS_INVALID_VALUE:
+      return "CUBLAS_STATUS_INVALID_VALUE";
+
+    case CUBLAS_STATUS_ARCH_MISMATCH:
+      return "CUBLAS_STATUS_ARCH_MISMATCH";
+
+    case CUBLAS_STATUS_MAPPING_ERROR:
+      return "CUBLAS_STATUS_MAPPING_ERROR";
+
+    case CUBLAS_STATUS_EXECUTION_FAILED:
+      return "CUBLAS_STATUS_EXECUTION_FAILED";
+
+    case CUBLAS_STATUS_INTERNAL_ERROR:
+      return "CUBLAS_STATUS_INTERNAL_ERROR";
+
+    case CUBLAS_STATUS_NOT_SUPPORTED:
+      return "CUBLAS_STATUS_NOT_SUPPORTED";
+
+    case CUBLAS_STATUS_LICENSE_ERROR:
+      return "CUBLAS_STATUS_LICENSE_ERROR";
+  }
+  return "CUBLAS_UNKNOW";
+}
+
+template <typename T>
+void check_gpu_error(T result, char const *const func, const char *const file,
+                     int const line) {
+  if (result) {
+    throw std::runtime_error(std::string("[CUDA][ERROR] ") + +file + "(" +
+                             std::to_string(line) +
+                             "): " + (_cudaGetErrorString(result)) + "\n");
+  }
+}
+
+template void check_gpu_error<cudaError_t>(cudaError_t result,
+                                           char const *const func,
+                                           const char *const file,
+                                           int const line);
+template void check_gpu_error<cublasStatus_t>(cublasStatus_t result,
+                                              char const *const func,
+                                              const char *const file,
+                                              int const line);
 
 template <typename T>
 T *cuda_malloc(size_t ele_num) {
@@ -318,3 +320,5 @@ std::string getGPUName() {
   }
   return "";
 }
+}  // namespace cuda
+}  // namespace lightseq

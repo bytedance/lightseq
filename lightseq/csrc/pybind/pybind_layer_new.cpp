@@ -28,15 +28,16 @@ T *rptr(torch::Tensor &tensor) {
 }
 
 int create_global_context(bool is_training = true) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-
   int context_id;
   if (is_training)
     context_id = Context::create_global_context(StatusType::Training);
   else
     context_id = Context::create_global_context(StatusType::Inference);
 
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::global_instance()->set_stream(stream);
+#endif
   return context_id;
 }
 
@@ -286,9 +287,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   // create default context
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   lightseq::Context::create_global_context(lightseq::StatusType::Training);
-  lightseq::Context::global_instance()->set_stream(stream);
 
   m.def("create_global_context", &lightseq::create_global_context,
         "Create Lightseq Context");

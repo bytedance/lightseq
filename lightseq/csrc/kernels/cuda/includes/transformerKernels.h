@@ -5,7 +5,7 @@
 #include "kernels.h"
 
 namespace lightseq {
-
+namespace cuda {
 const float logit_thresh_max = 64.f;
 const float logit_thresh_min = -64.f;
 const float min_log_probability = -2000.f;
@@ -164,5 +164,5 @@ void ker_bias_gelu_launcher(int batch_token_num, int block_dim,
                             int feature_dim);
 
 __global__ void ker_curand_setup(curandState* state);
-
+}  // namespace cuda
 }  // namespace lightseq

@@ -18,7 +18,8 @@
 
 #define STRIDE 32
 #define BORDER 512
-
+namespace lightseq {
+namespace cuda {
 static std::string DEFAULT_URL =
     "http://lf3-nlp-opensource.bytetos.com/obj/nlp-opensource/lightseq/"
     "igemm_configs/";
@@ -61,3 +62,5 @@ class cublasAlgoMap {
   void* get_workspace();
   int get_workspace_size();
 };
+}  // namespace cuda
+}  // namespace lightseq

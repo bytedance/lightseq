@@ -3,7 +3,8 @@
    This file is adapted from Microsoft DeepSpeed
 */
 #include "cublas_wrappers.h"
-
+namespace lightseq {
+namespace cuda {
 int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transa,
                    cublasOperation_t transb, int m, int n, int k,
                    const float *alpha, const float *beta, const float *A,
@@ -89,3 +90,5 @@ int cublas_strided_batched_gemm(cublasHandle_t handle, int m, int n, int k,
 
   return 0;
 }
+}  // namespace cuda
+}  // namespace lightseq

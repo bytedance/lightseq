@@ -40,11 +40,11 @@ void Concat3Dim1<T1, T2>::forward() {
   }
 
   if (!_is_continuous_cache) {
-    launch_filling_concat3_dim1(cache_ptr, inp_ptr, _sz0, _mx_sz1, _mx_sz2,
-                                _sz1_0, _sz1_1, _stream);
+    cuda::launch_filling_concat3_dim1(cache_ptr, inp_ptr, _sz0, _mx_sz1,
+                                      _mx_sz2, _sz1_0, _sz1_1, _stream);
   } else {
-    launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _sz0, _mx_sz2, _sz1_0,
-                        _sz1_1, _stream);
+    cuda::launch_concat3_dim1(cache_ptr, inp_ptr, real_val, _sz0, _mx_sz2,
+                              _sz1_0, _sz1_1, _stream);
   }
 #endif
 }

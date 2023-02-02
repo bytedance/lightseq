@@ -4,7 +4,8 @@
 #include <cooperative_groups.h>
 
 namespace cg = cooperative_groups;
-
+namespace lightseq {
+namespace cuda {
 static const int invalid_tag = -1;
 
 __device__ void warp_reduce_max(cg::thread_block_tile<WARP_SIZE> g, float* val,
@@ -176,3 +177,5 @@ void launch_viterbi<float>(const float* start_transition,
           start_transition, end_transition, transition, emission, mask, bias,
           best_score, history, best_tags, num_tags, seq_len);
 }
+}  // namespace cuda
+}  // namespace lightseq

@@ -119,7 +119,7 @@ void BeamSearchTopOp<T>::forward() {
 
   cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream);
 
-  select_beam_rough_topk_launcher(
+  cuda::select_beam_rough_topk_launcher(
       logits_ptr, logits_bias_ptr, seq_probs_ptr, seq_score_ptr, alive_seq_ptr,
       can_idx_ptr, can_score_ptr, num_beam_can_ptr, _trg_vocab_size, _max_step,
       _host_length_norm[_cur_step], _cur_step, _step_token_num,
@@ -145,10 +145,10 @@ void BeamSearchTopOp<T>::forward() {
                           can_score_ptr + _host_can_num_batch, can_idx_ptr,
                           thrust::greater<float>());
     }
-    ker_diverse_beam_search_launcher(can_score_ptr, can_idx_ptr,
-                                     num_beam_can_ptr, _step_token_num,
-                                     _max_thread_per_block, stream, _beam_size,
-                                     _diverse_lambda, _trg_vocab_size);
+    cuda::ker_diverse_beam_search_launcher(
+        can_score_ptr, can_idx_ptr, num_beam_can_ptr, _step_token_num,
+        _max_thread_per_block, stream, _beam_size, _diverse_lambda,
+        _trg_vocab_size);
   }
 
   thrust::sort_by_key(thrust::cuda::par.on(stream), can_score_ptr,
@@ -161,7 +161,8 @@ void BeamSearchTopOp<T>::forward() {
       Deciding whether early stop based on num_finish_beam
   */
   CHECK_GPU_ERROR(cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream));
-  ker_refresh_result<<<dim3(_batch_size, _beam_size), _max_step, 0, stream>>>(
+  cuda::ker_refresh_result<<<dim3(_batch_size, _beam_size), _max_step, 0,
+                             stream>>>(
       can_idx_ptr, can_score_ptr, num_beam_can_ptr + 1, alive_seq_ptr,
       alive_seq_out, seq_probs_ptr, seq_score_ptr, num_beam_can_ptr,
       _trg_vocab_size, _cur_step, _host_length_norm[_cur_step], _diverse_lambda,
@@ -194,7 +195,7 @@ void BeamSearchTopOp<T>::forward() {
 
   /* ---step 4. refresh cache: k, v for decoder self attention--- */
   if (_cur_step > 0) {
-    ker_refresh_cache_launcher<T>(
+    cuda::ker_refresh_cache_launcher<T>(
         _nshared_dec_layer * (_cur_step + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
         (T*)caches_k_ptr, (T*)caches_v_ptr, (T*)caches_k_buf_ptr,

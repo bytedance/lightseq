@@ -26,9 +26,9 @@ void BiasAddTrans20314<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  launch_bias_add_transform_20314<T1>(res_ptr, inp_ptr, bias_ptr, _batch,
-                                      _seq_len, _trans_count, _heads,
-                                      _hidden_size / _heads, _stream);
+  cuda::launch_bias_add_transform_20314<T1>(res_ptr, inp_ptr, bias_ptr, _batch,
+                                            _seq_len, _trans_count, _heads,
+                                            _hidden_size / _heads, _stream);
 #endif
 }
 
@@ -44,10 +44,11 @@ void BiasAddTrans20314<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  launch_transform4d_0213<T2>(inp_grad, res_grad, _batch, _seq_len,
-                              _hidden_size, _heads, _trans_count, _stream);
+  cuda::launch_transform4d_0213<T2>(inp_grad, res_grad, _batch, _seq_len,
+                                    _hidden_size, _heads, _trans_count,
+                                    _stream);
   // calculate bias
-  launch_fuse_transpose_bias_kernel<T2>(
+  cuda::launch_fuse_transpose_bias_kernel<T2>(
       inp_grad, qkv_bias_grad, _batch * _seq_len, 3 * _hidden_size, _stream);
 #endif
 }

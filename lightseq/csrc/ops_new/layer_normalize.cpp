@@ -36,8 +36,8 @@ void LayerNormalizeOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
-                    betta_val, _batch_tokens, _hidden_dim, stream);
+  cuda::launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
+                          betta_val, _batch_tokens, _hidden_dim, stream);
 #endif
 }
 
@@ -73,9 +73,9 @@ void LayerNormalizeOp<T1, T2>::backward() {
 #ifdef LIGHTSEQ_cuda
   cudaStream_t streams[2] = {_context_ptr->get_stream(),
                              _context_ptr->get_stream()};
-  launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
-               out_val, gamma_val, betta_val, vars_val, means_val,
-               _batch_tokens, _hidden_dim, streams);
+  cuda::launch_ln_bw(gamma_grad, betta_grad, inp_grad, out_grad, residual_grad,
+                     out_val, gamma_val, betta_val, vars_val, means_val,
+                     _batch_tokens, _hidden_dim, streams);
 #endif
 }
 

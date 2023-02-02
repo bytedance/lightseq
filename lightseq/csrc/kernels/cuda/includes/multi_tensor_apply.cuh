@@ -26,7 +26,8 @@ constexpr int depth_to_max_blocks[5] = {320, 320, 320, 320, 320};
 #else
 #define DATA_PTR data
 #endif
-
+namespace lightseq {
+namespace cuda {
 template <int n>
 struct TensorListMetadata {
   void* addresses[n][depth_to_max_tensors[n - 1]];
@@ -133,3 +134,5 @@ void multi_tensor_apply(
     }
   }
 }
+}  // namespace cuda
+}  // namespace lightseq

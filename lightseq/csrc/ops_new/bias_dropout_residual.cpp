@@ -27,8 +27,8 @@ void BiasDropoutResOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
-                                 _rows * _cols, _cols, RATIO(), stream);
+  cuda::launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
+                                       _rows * _cols, _cols, RATIO(), stream);
 #endif
 }
 
@@ -50,16 +50,16 @@ void BiasDropoutResOp<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad, mask_ptr,
-                                 _rows, _cols, RATIO(), stream);
+  cuda::launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad,
+                                       mask_ptr, _rows, _cols, RATIO(), stream);
 
   if (is_res_cover) {  // cover
     CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
                                     _cols * _rows * sizeof(T2),
                                     cudaMemcpyDefault, stream));
   } else {
-    launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
-                      _cols, stream);
+    cuda::launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
+                            _cols, stream);
   }
 #endif
 }

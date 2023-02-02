@@ -29,9 +29,9 @@ void SoftmaxOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_attn_softmax_new<T1>(out_ptr, inp_ptr, mask_ptr, _batchs, _nhead,
-                              _from_len, _to_len,
-                              _config_mask_future | _mask_future, stream);
+  cuda::launch_attn_softmax_new<T1>(out_ptr, inp_ptr, mask_ptr, _batchs, _nhead,
+                                    _from_len, _to_len,
+                                    _config_mask_future | _mask_future, stream);
 #endif
 }
 
@@ -47,8 +47,9 @@ void SoftmaxOp<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_attn_softmax_bw_new<T2>(inp_grad, out_grad, soft_out,
-                                 _batchs * _nhead * _from_len, _to_len, stream);
+  cuda::launch_attn_softmax_bw_new<T2>(inp_grad, out_grad, soft_out,
+                                       _batchs * _nhead * _from_len, _to_len,
+                                       stream);
 #endif
 }
 

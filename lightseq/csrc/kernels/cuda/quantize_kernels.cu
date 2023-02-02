@@ -4,7 +4,8 @@
 #include <cooperative_groups/reduce.h>
 
 namespace cg = cooperative_groups;
-
+namespace lightseq {
+namespace cuda {
 __device__ __host__ int row_major2cublaslt_weight(int col_id, int row_id,
                                                   int m_32,
                                                   bool use_col32_2r_4r4) {
@@ -857,3 +858,5 @@ void launch_dequantize<__half>(__half *f_ptr, const int8_t *q_ptr,
       f_ptr, q_ptr, clip_max_ptr, batch_tokens, hidden_size, mask_start_bit,
       in_col32);
 }
+}  // namespace cuda
+}  // namespace lightseq

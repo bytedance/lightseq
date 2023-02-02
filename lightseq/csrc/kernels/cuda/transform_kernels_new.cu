@@ -7,6 +7,8 @@
 
 using namespace cub;
 
+namespace lightseq {
+namespace cuda {
 /**
 @brief: bias_add_transform_20314_new
 Add bias to input, transform from
@@ -279,3 +281,5 @@ __global__ void transform_20314_bwd_new(T *output, const T *q_inp,
   else
     res4[trg_offset] = q_inp4[offset];
 }
+}  // namespace cuda
+}  // namespace lightseq

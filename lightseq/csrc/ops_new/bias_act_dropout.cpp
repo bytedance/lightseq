@@ -27,10 +27,10 @@ void BiasActDropoutOp<T1, T2>::forward() {
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
-    launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
+    cuda::launch_ls_dropout_act_bias<ActivationType::kRelu, T1>(
         output, input, mask_ptr, bias, _rows * _cols, _cols, RATIO(), stream);
   } else if (_activation_fn == "gelu") {
-    launch_ls_dropout_act_bias<ActivationType::kGelu, T1>(
+    cuda::launch_ls_dropout_act_bias<ActivationType::kGelu, T1>(
         output, input, mask_ptr, bias, _rows * _cols, _cols, RATIO(), stream);
   } else {
     throw std::runtime_error("not supported activation: " + _activation_fn);
@@ -56,11 +56,11 @@ void BiasActDropoutOp<T1, T2>::backward() {
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   if (_activation_fn == "relu") {
-    launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(
+    cuda::launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, T1>(
         grad_inp, grad_bias, input, bias, grad_out, mask_ptr, _rows, _cols,
         RATIO(), stream);
   } else if (_activation_fn == "gelu") {
-    launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, T1>(
+    cuda::launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, T1>(
         grad_inp, grad_bias, input, bias, grad_out, mask_ptr, _rows, _cols,
         RATIO(), stream);
   } else {

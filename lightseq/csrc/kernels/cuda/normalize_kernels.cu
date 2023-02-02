@@ -7,6 +7,8 @@
 #include <cstddef>
 
 namespace cg = cooperative_groups;
+namespace lightseq {
+namespace cuda {
 const float LN_EPSILON = 1e-8f;
 #define TILE_DIM 32
 
@@ -854,3 +856,5 @@ void launch_quant_ln_bw<__half>(
       inp_grad, out_grad, residual_grad, inp_or_out, gamma, betta, vars, means,
       cmask, hidden_dim);
 }
+}  // namespace cuda
+}  // namespace lightseq

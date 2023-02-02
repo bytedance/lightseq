@@ -3,7 +3,8 @@
    This file is adapted from NVIDIA FasterTransformer
 */
 #include "cublas_algo_map.h"
-
+namespace lightseq {
+namespace cuda {
 cublasAlgoMap::cublasAlgoMap() {
   std::string gpu_name = getGPUName();
   if (gpu_name == "T4") {
@@ -177,3 +178,5 @@ cublasLtMatmulAlgo_info cublasAlgoMap::getAlgo(int m, int n, int k,
 void* cublasAlgoMap::get_workspace() { return _workspace; }
 
 int cublasAlgoMap::get_workspace_size() { return _workspace_size; }
+}  // namespace cuda
+}  // namespace lightseq

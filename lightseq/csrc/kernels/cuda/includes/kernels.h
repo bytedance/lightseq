@@ -10,12 +10,13 @@
 
 #define MAX_THREADS 1024
 #define WARP_SIZE 32
-
-const float kQuantRangeI8 = 127.0f;
+namespace lightseq {
 
 enum class ActivationType { kRelu, kGelu };
-
 enum LSLayout { kRowMajor, kColMajor, kCol32, kCOL4_4R2_8C, kCOL32_2R_4R4 };
+
+namespace cuda {
+const float kQuantRangeI8 = 127.0f;
 
 void launch_curand_init(int total_count, int dim, cudaStream_t stream);
 
@@ -541,3 +542,5 @@ __inline__ std::vector<LSLayout> getLSLayout(std::string layout) {
   else
     return {kRowMajor, kRowMajor, kRowMajor};
 }
+}  // namespace cuda
+}  // namespace lightseq

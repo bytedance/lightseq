@@ -27,8 +27,8 @@ void DropoutOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
-                        false);
+  cuda::launch_ls_dropout<T1>(output, input, mask_ptr, _count, RATIO(), stream,
+                              false);
 #elif defined LIGHTSEQ_x86
   //.....
 #endif
@@ -50,8 +50,8 @@ void DropoutOp<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count, RATIO(),
-                        stream, true);
+  cuda::launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count,
+                              RATIO(), stream, true);
 #endif
 }
 

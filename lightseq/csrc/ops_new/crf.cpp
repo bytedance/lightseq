@@ -68,9 +68,9 @@ void CRFOP<T>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  launch_viterbi<T>(start_transition, end_transition, transition, emission,
-                    mask, best_score, history, best_tags, _num_tags, _seq_len,
-                    _batch_size, stream, bias);
+  cuda::launch_viterbi<T>(start_transition, end_transition, transition,
+                          emission, mask, best_score, history, best_tags,
+                          _num_tags, _seq_len, _batch_size, stream, bias);
 #endif
 }
 

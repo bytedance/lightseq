@@ -26,9 +26,9 @@ void LinearOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-  cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
-                 _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
-                 cublasGemmAlgo_t(_gemm_algos[0]));
+  cuda::cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
+                       _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
+                       cublasGemmAlgo_t(_gemm_algos[0]));
 #elif defined LIGHTSEQ_x86
 
   x86::matrix_gemm(weights, input_ptr, out_ptr, _output_size, _batch_tokens,
@@ -60,14 +60,16 @@ void LinearOp<T1, T2>::backward() {
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   // Q: how to adpat _opA & _opB
   // calculate weights_grad
-  cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                 _output_size, _batch_tokens, &bw_alpha, &w_beta, input_ptr,
-                 out_grad, weights_grad, cublasGemmAlgo_t(_gemm_algos[1]));
+  cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
+                       _output_size, _batch_tokens, &bw_alpha, &w_beta,
+                       input_ptr, out_grad, weights_grad,
+                       cublasGemmAlgo_t(_gemm_algos[1]));
 
   // calculate inp_grad
-  cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
-                 _batch_tokens, _output_size, &bw_alpha, &inp_beta, weights,
-                 out_grad, inp_grad, cublasGemmAlgo_t(_gemm_algos[2]));
+  cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
+                       _batch_tokens, _output_size, &bw_alpha, &inp_beta,
+                       weights, out_grad, inp_grad,
+                       cublasGemmAlgo_t(_gemm_algos[2]));
 #endif
 }
 

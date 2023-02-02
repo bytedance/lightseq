@@ -1,5 +1,6 @@
 #include "common.h"
 #include "embKernels.h"
+#include "kernels.h"
 
 /**
 @file

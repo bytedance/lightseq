@@ -23,7 +23,7 @@ Util functions
 */
 
 namespace lightseq {
-
+namespace cuda {
 /* GPU function guard */
 static std::string _cudaGetErrorString(cudaError_t error) {
   return std::string(cudaGetErrorName(error)) +
@@ -98,4 +98,5 @@ float dequantize(unsigned char i, float scale, float clip_max);
 void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
                       float clip_max, float quant_range, int start, int num);
 
+}  // namespace cuda
 }  // namespace lightseq

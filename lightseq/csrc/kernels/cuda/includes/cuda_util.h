@@ -12,11 +12,7 @@
 #include <type_traits>
 #include <vector>
 
-template <typename T>
-void check_gpu_error(T result, char const *const func, const char *const file,
-                     int const line);
-
-#define CHECK_GPU_ERROR(val) check_gpu_error((val), #val, __FILE__, __LINE__)
+namespace lightseq {
 
 /* Print vector stored in GPU memory, for debug */
 template <typename T>
@@ -24,6 +20,14 @@ void print_vec(const T *outv, std::string outn, int num_output_ele);
 
 template <typename T>
 void print_vec(const T *outv, std::string outn, int start, int end);
+
+namespace cuda {
+template <typename T>
+void check_gpu_error(T result, char const *const func, const char *const file,
+                     int const line);
+
+#define CHECK_GPU_ERROR(val) \
+  ::lightseq::cuda::check_gpu_error((val), #val, __FILE__, __LINE__)
 
 template <typename T>
 T *cuda_malloc(size_t ele_num);
@@ -48,3 +52,5 @@ void check_2norm(const T *data_ptr, std::string tensor_name, int dsize,
 int getSMVersion();
 
 std::string getGPUName();
+}  // namespace cuda
+}  // namespace lightseq

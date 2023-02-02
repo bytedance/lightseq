@@ -3,6 +3,8 @@
 #include <cooperative_groups.h>
 
 namespace cg = cooperative_groups;
+namespace lightseq {
+namespace cuda {
 
 /**
 @brief: fuse_transpose_bias
@@ -272,3 +274,5 @@ void launch_filling_concat3_dim1<__half>(__half *output, const __half *inp,
   kernel_filling_concat3_dim1<<<nblock, MAX_THREADS, 0, stream>>>(
       output, inp, sz0, mx_sz1, sz2, sz1_0, sz1_1);
 }
+}  // namespace cuda
+}  // namespace lightseq

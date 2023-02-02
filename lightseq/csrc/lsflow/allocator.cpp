@@ -14,7 +14,7 @@ Allocator::~Allocator() {
 char* Allocator::malloc_mem(size_t size) {
   char* ptr = nullptr;
 #ifdef LIGHTSEQ_cuda
-  ptr = cuda_malloc<char>(size);
+  ptr = cuda::cuda_malloc<char>(size);
 #else
   ptr = (char*)malloc(size);
 #endif
@@ -27,7 +27,7 @@ void Allocator::free_mem(char* ptr) {
     _ptr_set.erase(ptr);
   }
 #ifdef LIGHTSEQ_cuda
-  cuda_free(ptr);
+  cuda::cuda_free(ptr);
 #else
   if (ptr != nullptr) {
     free(ptr);

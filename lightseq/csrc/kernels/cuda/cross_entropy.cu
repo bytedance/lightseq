@@ -4,7 +4,8 @@
 #include "ls_cub.cuh"
 
 ls::cub::CachingDeviceAllocator g_allocator(true);
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 __global__ void ls_cross_entropy_fw_kernel(
     const T *__restrict__ inputs, const int *__restrict__ targets,
@@ -189,3 +190,5 @@ template void launch_cross_entropy_bw<__half>(
     const int *targets_ptr, __half *grad_inputs_ptr, const int padding_idx,
     const float epsilon, const int batch_size, const int seq_len,
     const int vocab_size, cudaStream_t stream);
+}  // namespace cuda
+}  // namespace lightseq
