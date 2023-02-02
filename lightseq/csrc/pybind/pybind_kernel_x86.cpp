@@ -35,8 +35,8 @@ py::array_t<float> test_gemm(
 }  // namespace x86
 }  // namespace lightseq
 
-PYBIND11_MODULE(kernel, m) {
-  m.attr("__name__") = "lightseq.kernel";
+PYBIND11_MODULE(inference, m) {
+  // m.attr("__name__") = "lightseq.inference";
 
   m.def("test_gemm", &lightseq::x86::test_gemm,
         "LightSeq test gemm with fp32 (x86 CPU)");

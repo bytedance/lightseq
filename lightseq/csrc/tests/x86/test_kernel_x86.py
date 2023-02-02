@@ -5,7 +5,7 @@ par_dir = os.path.dirname(cur_dir)
 sys.path.insert(0, par_dir)
 
 import torch
-import lightseq.kernel as lsk
+import lightseq.inference as lsi
 from util import TestDecorator
 
 kt = TestDecorator()
@@ -19,7 +19,7 @@ def test_gemm_case():
     def custom():
         cus_inpA = inpA.clone().cpu().numpy()
         cus_inpB = inpB.clone().cpu().numpy()
-        cus_out = lsk.test_gemm(cus_inpA, cus_inpB)
+        cus_out = lsi.test_gemm(cus_inpA, cus_inpB)
         return [torch.from_numpy(cus_out).contiguous()]
 
     def baseline():
