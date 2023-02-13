@@ -20,7 +20,7 @@ namespace lightseq {
   - Class:  Node
   - Description:
       We abstract the entire calculation process into a network structure,
-      and regard the operation unit and input and output as nodes in the graph.
+      which regard the operation unit and IO as nodes in the graph.
       Node class is the base class representation of nodes and is a virtual base
       class.
   - Implementation file: node.cpp
@@ -76,10 +76,10 @@ class Node {
   - Class:  Variable
   - Description:
     The Variable class is used to encapsulate the input and output tensors in
-    the calculation graph. Since this project considers the automatic
-    backpropagation mechanism, two tensors are recorded in a variable object:
-    value and grad. Represents the forward-propagated value and the gradient of
-    the back-propagated.
+    the calculation graph. Lightseq considers the automatic backpropagation
+    mechanism, two tensors are recorded in a variable object: value and grad.
+    Represents the forward-propagated value and the gradient of the
+  back-propagated.
   - implementation file: variable.cpp
 */
 class Variable : public Node {
@@ -179,11 +179,11 @@ class Variable : public Node {
 
   template <typename T>
   T* value(bool is_open_interval = false) {
-    return nullptr;
+    return (T*)value(is_open_interval);
   }
   template <typename T>
   T* grad(bool is_open_interval = false) {
-    return nullptr;
+    return (T*)grad(is_open_interval);
   }
 
   // For tensors that need to be passed across steps in the autoregressive

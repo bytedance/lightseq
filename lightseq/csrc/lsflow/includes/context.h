@@ -15,9 +15,30 @@
 
 namespace lightseq {
 
-class Context {  // model only
+/*
+  - Class:  Context
+  - Description:
+      Context is an object that manages model information, and each model
+  instance corresponds to a context object. The context class mainly needs to
+  play a role in the following scenarios:
+        1. Record the hierarchical relationship between layer and node.
+        2. Holds some global information about the model. eg. cudaStream,
+  cublasHandle..
+        3. Hold some global resources and retrieve them by unique key.
+        4. *Obtain the life cycle and max shape information of tensors in the
+  model, which will be used by MemoryManager for shared video memory resource
+  planning.
+
+      At the same time, a context object also corresponds to a MemoryManager
+  object and an Allocator object, which manages the memory development and
+  allocation of the entire model.
+*/
+class Context {
  private:
+  // just for pybind interface.
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
+
+  // Hold some model global resources and retrieve them by unique key.
   std::unordered_map<std::string, void*> _resources_pool;
 
   std::vector<Node*> _all_node_vec{};
@@ -55,10 +76,11 @@ class Context {  // model only
   void convert_into_train();
   void convert_into_eval();
 
+  // Create a process-level global object
   static int create_global_context(
       StatusType status_type = StatusType::Inference, int device_id = -1);
-  static void set_global_context(int context_id);
   static std::shared_ptr<Context> global_instance();
+  static void set_global_context(int context_id);
 
   // for initial calculation
   size_t mx_tensor_size = 0;

@@ -78,6 +78,11 @@ class Tensor {
   // address.
   char* tensor(bool is_open_interval = false);
 
+  template <typename T>
+  T* tensor(bool is_open_interval = false) {
+    return (T*)tensor(is_open_interval);
+  }
+
   size_t dim_t() { return _shape.view().size(); }
   int element_size() { return _shape.element_size(); }
   int mx_element_size() { return _mx_shape.element_size(); }
