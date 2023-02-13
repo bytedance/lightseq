@@ -4,8 +4,8 @@
 
 #include "declaration.h"
 #include "context.h"
-#include "normalize_layer.h"
-#include "feed_forward.h"
+
+#include "split_head_op.h"
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
@@ -18,131 +18,48 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-void layer_normalize_fw(const torch::Tensor& ln_res, const torch::Tensor& inp,
-                        const torch::Tensor& gamma, const torch::Tensor& betta,
-                        int hidden_dim, int batch_tokens) {
-  Context::new_thread_context();
+void torch_split_head_op(const torch::Tensor& input, const torch::Tensor& bias,
+                         torch::Tensor& query, torch::Tensor& key,
+                         torch::Tensor& value, int batch_size, int hidden_dim,
+                         int num_heads, int seq_len, int qkv_num) {
+  Context::create_global_context(StatusType::Inference);
+  std::shared_ptr<Context> context_ptr = Context::global_instance();
 
-  T1* ln_res_ptr = (T1*)ln_res.data_ptr();
-  T1* inp_ptr = (T1*)inp.data_ptr();
-  T1* gamma_ptr = (T1*)gamma.data_ptr();
-  T1* betta_ptr = (T1*)betta.data_ptr();
+  char* input_ptr = (char*)input.data_ptr();
+  char* bias_ptr = (char*)bias.data_ptr();
+  char* query_ptr = (char*)query.data_ptr();
+  char* key_ptr = (char*)key.data_ptr();
+  char* value_ptr = (char*)value.data_ptr();
 
-  Variable* inp_var = new Variable("inp", (char*)inp_ptr);
-  Variable* gamma_var = new Variable("gamma", (char*)gamma_ptr);
-  Variable* betta_var = new Variable("betta", (char*)betta_ptr);
+  Variable* input_var = new Variable("input", input_ptr);
+  Variable* bias_var = new Variable("bias", bias_ptr);
+  SplitHeadOp<T1, T2>* op = new SplitHeadOp<T1, T2>(
+      batch_size * seq_len, num_heads, hidden_dim, qkv_num);
 
-  NormalizeLayerOp<T1, T2>* op =
-      new NormalizeLayerOp<T1, T2>(batch_tokens, hidden_dim);
+  std::tuple<Variable*, Variable*, Variable*> qkv = (*op)(input_var, bias_var);
 
-  Variable* out = (*op)(inp_var, gamma_var, betta_var);
+  std::get<0>(qkv)->set_value(query_ptr);
+  if (qkv_num == 3) {
+    std::get<1>(qkv)->set_value(key_ptr);
+    std::get<2>(qkv)->set_value(value_ptr);
+  }
 
-  out->set_value((char*)ln_res_ptr);
+  op->before_forward(batch_size, seq_len);
 
-  op->before_forward(batch_tokens);
-
-  thread_context_ptr->build();
-
+  context_ptr->build();
+  auto start = std::chrono::high_resolution_clock::now();
   op->forward();
-
-  // Context::remove_thread_context();
-}
-
-template <typename T1, typename T2>
-void layer_normalize_bw(const torch::Tensor& ln_res,
-                        const torch::Tensor& ln_res_grad,
-                        const torch::Tensor& inp, const torch::Tensor& inp_grad,
-                        const torch::Tensor& gamma,
-                        const torch::Tensor& gamma_grad,
-                        const torch::Tensor& betta,
-                        const torch::Tensor& betta_grad, int hidden_dim,
-                        int batch_tokens) {
-  Context::new_thread_context();
-
-  T1* ln_res_ptr = (T1*)ln_res.data_ptr();
-  T2* ln_res_grad_ptr = (T2*)ln_res_grad.data_ptr();
-
-  T1* inp_ptr = (T1*)inp.data_ptr();
-  T2* inp_grad_ptr = (T2*)inp_grad.data_ptr();
-
-  T1* gamma_ptr = (T1*)gamma.data_ptr();
-  T2* gamma_grad_ptr = (T2*)gamma_grad.data_ptr();
-
-  T1* betta_ptr = (T1*)betta.data_ptr();
-  T2* betta_grad_ptr = (T2*)betta_grad.data_ptr();
-
-  Variable* inp_var = new Variable("inp", (char*)inp_ptr, (char*)inp_grad_ptr);
-  Variable* gamma_var =
-      new Variable("gamma", (char*)gamma_ptr, (char*)gamma_grad_ptr);
-  Variable* betta_var =
-      new Variable("betta", (char*)betta_ptr, (char*)betta_grad_ptr);
-
-  NormalizeLayerOp<T1, T2>* op =
-      new NormalizeLayerOp<T1, T2>(batch_tokens, hidden_dim);
-
-  Variable* out = (*op)(inp_var, gamma_var, betta_var);
-
-  out->set_value((char*)ln_res_ptr);
-  out->set_grad((char*)ln_res_grad_ptr);
-
-  op->before_forward(batch_tokens);
-
-  thread_context_ptr->build();
-
-  op->forward();
-
-  op->backward();
-
-  // Context::remove_thread_context();
-}
-
-template <typename T1, typename T2>
-void feed_forward_fw(const torch::Tensor& inp, const torch::Tensor& weights,
-                     const torch::Tensor& out, int output_dim, int input_dim,
-                     int batch_tokens) {
-  Context::new_thread_context();
-
-  T1* inp_ptr = (T1*)inp.data_ptr();
-  T1* weights_ptr = (T1*)weights.data_ptr();
-  T1* out_ptr = (T1*)out.data_ptr();
-
-  Variable* inp_var = new Variable("inp", (char*)inp_ptr);
-  Variable* weight_var = new Variable("weights", (char*)weights_ptr);
-
-  LinearOp<T1, T2>* op =
-      new LinearOp<T1, T2>(batch_tokens, output_dim, input_dim);
-
-  Variable* op_out = (*op)(inp_var, weight_var);
-
-  op_out->set_value((char*)out_ptr);
-
-  op->before_forward(batch_tokens);
-
-  // printf("Running Step.0\n");
-  thread_context_ptr->build();
-
-  op->forward();
-
-  // Context::remove_thread_context();
+  CHECK_GPU_ERROR(cudaGetLastError());
+  print_time_duration(start, "op cost", 0);
 }
 
 }  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("layer_normalize_fw_fp32", &lightseq::layer_normalize_fw<float, float>,
-        "Calculate LightSeq Layer Normalize  with fp32 (CUDA)");
-  m.def("layer_normalize_fw_fp16",
-        &lightseq::layer_normalize_fw<__half, __half>,
-        "Calculate LightSeq Layer Normalize  with fp16 (CUDA)");
-
-  m.def("layer_normalize_bw_fp32", &lightseq::layer_normalize_bw<float, float>,
-        "Calculate LightSeq Layer Normalize  with fp32 (CUDA)");
-  m.def("layer_normalize_bw_fp16",
-        &lightseq::layer_normalize_bw<__half, __half>,
-        "Calculate LightSeq Layer Normalize  with fp16 (CUDA)");
-
-  m.def("feed_forward_fw_fp32", &lightseq::feed_forward_fw<float, float>,
-        "Calculate LightSeq FeedForward with fp32 (CUDA)");
-  m.def("feed_forward_fw_fp16", &lightseq::feed_forward_fw<__half, __half>,
-        "Calculate LightSeq FeedForward with fp16 (CUDA)");
+  m.def("torch_split_head_op_fp32",
+        &lightseq::torch_split_head_op<float, float>,
+        "note: torch_split_head_op_fp32");
+  m.def("torch_split_head_op_fp16",
+        &lightseq::torch_split_head_op<__half, __half>,
+        "note: torch_split_head_op_fp32");
 }

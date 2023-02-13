@@ -58,7 +58,7 @@ class TestDecorator(object):
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)
 
-    def norm_res_list(self, rlist):
+    def norm_res_list(self, *rlist):
         return [ele.to(dtype=self.dtype).contiguous() for ele in rlist]
 
     def get_cmask(self, x, cmax):

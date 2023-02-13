@@ -249,11 +249,7 @@ def test_launch_attn_softmax():
             res = functional.softmax(f_inp + f_mask, dim=-1, dtype=torch.float32)
         else:
             res = functional.softmax(f_inp, dim=-1, dtype=torch.float32)
-        return kt.norm_res_list(
-            [
-                res,
-            ]
-        )
+        return kt.norm_res_list(res)
 
     return custom, baseline
 
@@ -372,11 +368,7 @@ def test_launch_attn_softmax_bw():
         # [b, nh, s, 1]
         tsum = tsum.sum(dim=-1, keepdim=True)
         res = f_soft_inp * (f_out_grad - tsum)
-        return kt.norm_res_list(
-            [
-                res,
-            ]
-        )
+        return kt.norm_res_list(res)
 
     return custom, baseline
 
@@ -654,7 +646,7 @@ def test_launch_ln_bw():
         dinp = dinp * f_vars.rsqrt().unsqueeze(1)
         if fuse_add:
             dinp = dinp + residual_grad
-        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp])
+        return kt.norm_res_list(f_gamma_grad, f_betta_grad, dinp)
 
     return custom, baseline
 
@@ -746,7 +738,7 @@ def test_launch_ln_i8O_bw():
         dinp = dinp * f_vars.rsqrt().unsqueeze(1)
         if fuse_add:
             dinp = dinp + residual_grad
-        return kt.norm_res_list([f_gamma_grad, f_betta_grad, dinp, f_cmax_grad])
+        return kt.norm_res_list(f_gamma_grad, f_betta_grad, dinp, f_cmax_grad)
 
     return custom, baseline
 
@@ -812,11 +804,11 @@ def test_launch_concat3_dim1():
 
     def custom():
         func(inp1, inp2, custom_res, batch_size * beam_size * nhead, head_dim, sl1, sl2)
-        return kt.norm_res_list([custom_res])
+        return kt.norm_res_list(custom_res)
 
     def baseline():
         res = torch.cat((inp1, inp2), dim=3)
-        return kt.norm_res_list([res])
+        return kt.norm_res_list(res)
 
     return custom, baseline
 
