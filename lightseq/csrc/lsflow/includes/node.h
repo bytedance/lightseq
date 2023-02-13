@@ -109,17 +109,21 @@ class Variable : public Node {
   /*
     Applicable to the situation of self-developed memory.
     Parameters:
-      std::string   name      Indicates the node name, usually named according
-    to the op node that produces the var node. Shape   shape     Represents the
-    shape of the tensor recorded by the var node. DataType      fw_dtype  Data
-    type representing the forward pass tensor. DataType      bw_dtype  Data type
-    representing the backward pass tensor. VariableType  vt        This
-    parameter can be three cases: FixedVariable, SharedVariable,
-    RegressiveVariable FixedVariable - The memory is allocated by the var node
-    itself. SharedVariable - The memory space is managed uniformly by
+      std::string   name
+        Indicates the node name, usually named according
+        to the op node that produces the var node.
+      Shape   shape
+        Represents the shape of the tensor recorded by the var node.
+      DataType      fw_dtype
+        Data type representing the forward pass tensor.
+      DataType      bw_dtype
+        Data type representing the backward pass tensor.
+      VariableType  vt
+        FixedVariable   - The memory is allocated by the var node itself.
+        SharedVariable  - The memory space is managed uniformly by
     MemoryManager, which is the core of memory sharing management.
-                              RegressVariable - Only applicable to tensors that
-    need to be passed across steps in autoregressive models
+        RegressVariable - Only applicable to tensors that need to be passed
+    across steps in autoregressive models.
   */
   Variable(
       std::string name, Shape mx_shape, DataType fw_dtype,
