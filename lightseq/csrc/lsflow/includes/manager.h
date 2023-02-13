@@ -37,7 +37,7 @@ class MemoryManager {
   AllocatorPtr _allocator_ptr;
 
  public:
-  MemoryManager() {}
+  MemoryManager() : _allocator_ptr(new Allocator()) {}
   virtual ~MemoryManager() {}
 
   char* get_memory(int unique_id) { return tensor_ptr.find(unique_id)->second; }
@@ -51,8 +51,6 @@ class MemoryManager {
 
   size_t buffer_size() { return buffer_size_; }
 
-  void set_allocator(AllocatorPtr allocator_ptr) {
-    _allocator_ptr = allocator_ptr;
-  }
+  AllocatorPtr allocator() { return _allocator_ptr; }
 };
 }  // namespace lightseq

@@ -4,7 +4,7 @@ namespace lightseq {
 
 Variable::Variable(std::string name, DataType fw_dtype, DataType bw_dtype)
     : Node(name, NodeType::Variable),
-      _shape(Shape()),
+      _mx_shape(Shape()),
       _fw_dtype(fw_dtype),
       _bw_dtype(bw_dtype),
       _variable_type(VariableType::FixedVariable) {
@@ -12,20 +12,20 @@ Variable::Variable(std::string name, DataType fw_dtype, DataType bw_dtype)
   if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", bw_dtype));
 }
 
-Variable::Variable(std::string name, Shape shape, DataType fw_dtype,
+Variable::Variable(std::string name, Shape mx_shape, DataType fw_dtype,
                    DataType bw_dtype, VariableType vt)
     : Node(name, NodeType::Variable),
-      _shape(shape),
+      _mx_shape(mx_shape),
       _fw_dtype(fw_dtype),
       _bw_dtype(bw_dtype),
       _variable_type(vt) {
-  _value.reset(new Tensor("value", _fw_dtype, _shape));
-  if (_context_ptr->is_training())
-    _grad.reset(new Tensor("grad", _bw_dtype, _shape));
+  _value.reset(new Tensor("value", _fw_dtype, _mx_shape));
+  if (_context_ptr->is_training() && bw_dtype != DataType::kNotSupported)
+    _grad.reset(new Tensor("grad", _bw_dtype, _mx_shape));
   if (vt == VariableType::SharedVariable) {
     return;
   } else if (vt == VariableType::FixedVariable) {
-    malloc_memory(_shape);
+    malloc_memory(_mx_shape);
   } else if (vt == VariableType::RegressiveVariable) {
     return;
   } else {
@@ -36,6 +36,7 @@ Variable::Variable(std::string name, Shape shape, DataType fw_dtype,
 
 Variable::Variable(std::string name, Variable* parent_variable)
     : Node(name, NodeType::Variable),
+      _mx_shape(Shape()),
       _parent_variable(parent_variable),
       _variable_type(VariableType::OffsetVariable) {
   _value.reset(new Tensor("value", parent_variable->_value));
@@ -47,6 +48,8 @@ Variable::Variable(std::string name, Variable* parent_variable)
 
 void Variable::fixed_memory() {
   if (_variable_type == VariableType::OffsetVariable) {
+    throw std::runtime_error(
+        "OffsetVariable should not execute fixed_memory() func!");
     return;
   }
   if (_children_variable.size() && parents().size() > 0) {
@@ -73,32 +76,29 @@ void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
   }
 }
 
-void Variable::set_value(char* value_ptr, Shape shape) {
+void Variable::set_value(char* value_ptr) {
   _value->reset_fixed();
-  _shape = shape;
-  _value->set_tensor(value_ptr, shape);
+  _value->set_tensor(value_ptr);
 }
 
-void Variable::set_value(const char* value_ptr, Shape shape) {
+void Variable::set_value(const char* value_ptr) {
   _value->reset_fixed();
-  _shape = shape;
-  _value->set_tensor(value_ptr, shape);
+  _value->set_tensor(value_ptr);
 }
 
-void Variable::set_grad(char* grad_ptr, Shape shape) {
+void Variable::set_grad(char* grad_ptr) {
   if (_context_ptr->is_training()) {
     _grad->reset_fixed();
-    _shape = shape;
-    _grad->set_tensor(grad_ptr, shape);
+    _grad->set_tensor(grad_ptr);
   }
 }
 
 void Variable::set_shape(Shape shape) { _shape = shape; }
 
-void Variable::malloc_memory(Shape shape) {
-  int ele_size = shape.element_size();
-  int value_byte_size = ele_size * dtype_size(_fw_dtype);
-  int grad_byte_size = ele_size * dtype_size(_bw_dtype);
+void Variable::malloc_memory(Shape mx_shape) {
+  int mx_ele_size = mx_shape.element_size();
+  int value_byte_size = mx_ele_size * dtype_size(_fw_dtype);
+  int grad_byte_size = mx_ele_size * dtype_size(_bw_dtype);
 #ifdef MEM_DEBUG
   printf(
       "Varaible %s malloc memory, value size: %zu "

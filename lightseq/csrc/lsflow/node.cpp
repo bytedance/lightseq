@@ -76,9 +76,7 @@ void Node::recursive_forward() {
       }
     }
   }
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-#endif
+  _context_ptr->synchronize();
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -88,9 +86,7 @@ void Node::recursive_forward() {
   if (node_type() != NodeType::Operator) {
     return;
   }
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-#endif
+  _context_ptr->synchronize();
   print_time_duration(start, "time cost");
   Operator* this_op = static_cast<Operator*>(this);
   printf("_children.size(): %zu\n", _children.size());
@@ -142,9 +138,7 @@ void Node::recursive_backward() {
         this_op->child(idx)->print_var(false);
     }
   }
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-#endif
+  _context_ptr->synchronize();
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 
@@ -154,9 +148,7 @@ void Node::recursive_backward() {
   if (node_type() != NodeType::Operator) {
     return;
   }
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-#endif
+  _context_ptr->synchronize();
   print_time_duration(start, "time cost");
   Operator* this_op = static_cast<Operator*>(this);
   printf("_parents.size(): %zu\n", _parents.size());

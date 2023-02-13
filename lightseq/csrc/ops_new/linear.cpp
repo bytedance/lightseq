@@ -4,9 +4,10 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
-  size_t max_size = _max_batch_tokens * _output_size;
-  Variable* result = new Variable("LinearOp_out", max_size * sizeof(T1),
-                                  max_size * sizeof(T2));
+  // size_t max_size = _max_batch_tokens * _output_size;
+  Variable* result =
+      new Variable("LinearOp_out", {_max_batch_tokens, _output_size},
+                   g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, weight});
   this->set_children({result});
   return result;
@@ -26,7 +27,8 @@ void LinearOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-  cuda::cublas_gemm_ex(_cublasHandle, _opA, _opB, _output_size, _batch_tokens,
+  cuda::cublas_gemm_ex(_cublasHandle, op_from_custom(_opA),
+                       op_from_custom(_opB), _output_size, _batch_tokens,
                        _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                        cublasGemmAlgo_t(_gemm_algos[0]));
 #elif defined LIGHTSEQ_x86

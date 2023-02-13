@@ -10,9 +10,10 @@ class BiasActDropoutOp : public Operator {
  private:
   float ratio;
 
-  size_t _max_ele_num;
-  int _count;
-  int _cols, _rows;
+  int _mx_cols;
+  int _mx_rows;
+  int _cols;
+  int _rows;
 
   std::string _activation_fn;
 
@@ -25,8 +26,9 @@ class BiasActDropoutOp : public Operator {
       : Operator("BiasActDropoutOp"),
         ratio(r),
         _activation_fn(activation_fn),
-        _max_ele_num(max_ele_num) {
-    _mask.reset(new Tensor("_mask", max_ele_num * sizeof(uint8_t)));
+        _mx_rows(mx_rows),
+        _mx_cols(mx_cols) {
+    _mask.reset(new Tensor("_mask", g_dtype<T1>(), {_mx_rows, _mx_cols}));
   }
 
   virtual ~BiasActDropoutOp() {}

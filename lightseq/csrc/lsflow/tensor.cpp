@@ -69,12 +69,25 @@ int dtype_size(DataType dtype) {
       return 4;
     case DataType::kInt64:
       return 8;
+    case DataType::kByte:
+      return 1;
+    case DataType::kUInt8:
+      return 1;
+    case DataType::kUInt16:
+      return 2;
+    case DataType::kUInt32:
+      return 4;
+    case DataType::kUInt64:
+      return 8;
     case DataType::kNotSupported: {
       throw std::runtime_error(
           "call dtype_size(DataType ) with kNotSupported DataType");
       return 0;
     }
   }
+  throw std::runtime_error(
+      "call dtype_size(DataType ) with undecalared DataType.");
+  exit(-1);
 }
 
 int Tensor::global_tensor_id = 0;
@@ -103,18 +116,22 @@ Tensor::Tensor(std::string name, TensorPtr ori_tensor)
   _mtype = LSMemoryType::OffsetMemory;
 }
 
-void Tensor::set_tensor(char* inp, Shape mx_shape) {
+void Tensor::set_tensor(char* inp) {
+  if (_mtype == LSMemoryType::FixedMemory) {
+    _ptr = inp;
+    return;
+  }
   if (_mtype == LSMemoryType::SharedMemory) {
     printf("set_tensor for %s, which is SharedMemory!\n", _name.c_str());
-    exit(-1);
+    return;
   }
-  _ptr = inp;
-  _mx_shape = mx_shape;
+  if (_mtype == LSMemoryType::OffsetMemory) {
+    printf("set_tensor for %s, which is OffsetMemory!\n", _name.c_str());
+    return;
+  }
 }
 
-void Tensor::set_tensor(const char* inp, Shape mx_shape) {
-  set_tensor(const_cast<char*>(inp), mx_shape);
-}
+void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
 void Tensor::set_shape(Shape shape) { _shape = shape; }
 
@@ -162,11 +179,11 @@ void Tensor::update_life_idx(int node_idx) {
   if (_mtype == LSMemoryType::FixedMemory) {
     return;
   }
-  if (element_size() == 0) {
+  if (_mx_shape.element_size() == 0) {
     return;
   }
   _mm_ptr->update_tensor_life_idx(
-      _id, node_idx, _shape.element_size() * dtype_size(_dtype), _name);
+      _id, node_idx, _mx_shape.element_size() * dtype_size(_dtype), _name);
 }
 
 void Tensor::remove_life_cycle() {
@@ -180,7 +197,7 @@ void Tensor::reset_fixed() {
   }
   this->remove_life_cycle();
   _mtype = LSMemoryType::FixedMemory;
-  _shape = Shape();
+  _mx_shape = Shape();
 }
 
 std::string Tensor::memory_type() {
@@ -195,9 +212,7 @@ std::string Tensor::memory_type() {
 }
 
 void Tensor::print_tensor(int size) {
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-#endif
+  _ctx_ptr->synchronize();
   int ele_siz = element_size();
   size = std::min(size, ele_siz);
   switch (_dtype) {

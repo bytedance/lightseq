@@ -3,7 +3,6 @@
 */
 
 #pragma once
-
 #include "memory"
 #include "thread"
 #include <stdio.h>
@@ -20,7 +19,7 @@
 #include <functional>
 #include "model_base.h"
 
-// #include "kernel_headers.h"
+#include "kernel_headers.h"
 
 namespace lightseq {
 

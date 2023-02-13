@@ -1,7 +1,6 @@
 /*
   Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
 */
-
 #pragma once
 #include "cstdio"
 #include "queue"
@@ -36,11 +35,6 @@ class Context {  // model only
 
   int _device_id;
 
-#ifdef LIGHTSEQ_cuda
-  cudaStream_t _stream;
-  cublasHandle_t _cublasHandle;
-#endif
-
   static std::shared_ptr<Context> _global_context_ptr;
 
   bool check_validate();
@@ -57,12 +51,6 @@ class Context {  // model only
   virtual ~Context();
 
   AllocatorPtr allocator() { return _allocator_ptr; }
-
-#ifdef LIGHTSEQ_cuda
-  cudaStream_t get_stream() { return _stream; }
-  cublasHandle_t get_cublashandle() { return _cublasHandle; }
-  void set_stream(cudaStream_t stream);
-#endif
 
   void convert_into_train();
   void convert_into_eval();
@@ -121,9 +109,17 @@ class Context {  // model only
                                   std::shared_ptr<void> layer_ptr);
   static std::shared_ptr<void> get_pybind_layer(std::string layer_name,
                                                 int layer_id);
-};
 
-#define REGISTER_OBJECT(objname) register_object_func(#objname, objname)
-#define GET_OBJECT(objname) get_object_func(#objname)
+#ifdef LIGHTSEQ_cuda
+ private:
+  cudaStream_t _stream;
+  cublasHandle_t _cublasHandle;
+
+ public:
+  const cudaStream_t& get_stream() const { return _stream; }
+  const cublasHandle_t& get_cublashandle() const { return _cublasHandle; }
+  void set_stream(cudaStream_t stream);
+#endif
+};
 
 }  // namespace lightseq

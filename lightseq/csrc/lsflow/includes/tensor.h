@@ -22,6 +22,9 @@ class Tensor {
   LSMemoryType _mtype;
   char* _ptr = nullptr;
   DataType _dtype;
+
+  // If mx_shape is constructed by default, then tensor's memory type is
+  // FixedMemory or OffsetMemory.
   Shape _mx_shape;
   Shape _shape;
 
@@ -52,8 +55,8 @@ class Tensor {
   // Set the specific memory space address and max tensor shape for the tensor
   // object. After setting, the memory space type of the tensor object is
   // changed to FixedMemroy.
-  void set_tensor(char* inp, Shape mx_shape = Shape());
-  void set_tensor(const char* inp, Shape mx_shape = Shape());
+  void set_tensor(char* inp);
+  void set_tensor(const char* inp);
 
   // Just only set tensor shape for tensor object.
   void set_shape(Shape shape);

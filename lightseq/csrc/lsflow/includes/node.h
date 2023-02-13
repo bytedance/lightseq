@@ -22,7 +22,7 @@ namespace lightseq {
       We abstract the entire calculation process into a network structure,
       and regard the operation unit and input and output as nodes in the graph.
       Node class is the base class representation of nodes and is a virtual base
-  class.
+      class.
   - Implementation file: node.cpp
 */
 class Node {
@@ -77,9 +77,9 @@ class Node {
   - Description:
     The Variable class is used to encapsulate the input and output tensors in
     the calculation graph. Since this project considers the automatic
-  backpropagation mechanism, two tensors are recorded in a variable object:
-  value and grad. Represents the forward-propagated value and the gradient of
-  the back-propagated.
+    backpropagation mechanism, two tensors are recorded in a variable object:
+    value and grad. Represents the forward-propagated value and the gradient of
+    the back-propagated.
   - implementation file: variable.cpp
 */
 class Variable : public Node {
@@ -90,8 +90,11 @@ class Variable : public Node {
 
   DataType _fw_dtype;
   DataType _bw_dtype;
-  Shape _shape;
+
+  // If mx_shape is constructed by default, then tensor's memory type is
+  // FixedMemory or OffsetMemory.
   Shape _mx_shape;
+  Shape _shape;
 
  protected:
   TensorPtr _value = nullptr;
@@ -146,12 +149,12 @@ class Variable : public Node {
 
   // Set the value pointer and shape information for the variable node,
   // usually used for IO type variable nodes.
-  void set_value(char* value_ptr, Shape shape = Shape());
-  void set_value(const char* value_ptr, Shape shape = Shape());
+  void set_value(char* value_ptr);
+  void set_value(const char* value_ptr);
 
   // Set the grad pointer and shape information for the variable node,
   // usually used for IO type variable nodes.
-  void set_grad(char* grad_ptr, Shape shape = Shape());
+  void set_grad(char* grad_ptr);
 
   // Just only set shape for variable object.
   void set_shape(Shape shape);
