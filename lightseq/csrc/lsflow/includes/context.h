@@ -37,8 +37,6 @@ class Context {
  private:
   // just for pybind interface.
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
-
-  // Hold some model global resources and retrieve them by unique key.
   std::unordered_map<std::string, void*> _resources_pool;
 
   std::vector<Node*> _all_node_vec{};
@@ -82,7 +80,9 @@ class Context {
   static std::shared_ptr<Context> global_instance();
   static void set_global_context(int context_id);
 
-  // for initial calculation
+  // Before the memory allocation, the tensor is not allocated the actual
+  // effective address space, so it is necessary to give a temporary space for
+  // some steps to test.
   size_t mx_tensor_size = 0;
   char* temporary_buffer_ = nullptr;
 
@@ -112,19 +112,32 @@ class Context {
   Layer* last_layer();
   Node* last_node();
 
+  // During the model network construction process, mark the start and end
+  // positions of the autoregressive part.
   void regress_begin() { _in_regress = true; }
   void regress_end() { _in_regress = false; }
+
+  // Get the start and end timestamps of the autoregressive part of the network
+  // structure.
   int regress_begin_idx() { return _regress_begin_idx; }
   int regress_end_idx() { return _regress_end_idx; }
+
   void update_regr_begin(int node_idx);
   void update_regr_end(int node_idx);
   bool in_regress() { return _in_regress; }
 
   std::string status_type_str() { return StatusTypeString[_status_type]; }
 
-  //
+  // Register model-level global resources in the context object, which is
+  // stored in _resources_pool as untyped.
   void register_object(std::string object_name, void* object);
+
+  // Obtain the untyped object registered globally by the model from
+  // _resources_pool, and then the user converts it to the required type
   void* get_object(std::string object_name);
+
+  // Synchronous processing of asynchronous operations, usually used for IO
+  // processing or debug mode.
   void synchronize();
 
   static void regist_pybind_layer(std::string layer_name, int layer_id,
