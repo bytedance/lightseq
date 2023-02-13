@@ -263,6 +263,11 @@ template <typename T>
 void launch_d_cmax(T *grad_ptr, T *grad_cmax_ptr, const uint8_t *clip_mask_ptr,
                    int numel, int mask_start_bit, cudaStream_t stream);
 
+template <typename T>
+void launch_split_head(const T *inp, const T *bias, T *query, T *key, T *value,
+                       int batch_size, int hidden_dim, int head_dim,
+                       int seq_len, int qkv_num, cudaStream_t stream);
+
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {
   return id1 * dim2 + id2;

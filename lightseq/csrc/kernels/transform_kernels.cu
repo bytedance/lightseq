@@ -847,3 +847,121 @@ void launch_transform_0213_dcmax<__half>(__half *output, __half *grad_cmax,
   transform_0213_dcmax<__half><<<grid_dim, block_dim, 0, stream>>>(
       output, grad_cmax, input, clip_mask, hidden_dim, head_dim);
 }
+
+template <typename T>
+__device__ void add_float4(float4 *a, float4 *b) {
+  a[0].x += b[0].x;
+  a[0].y += b[0].y;
+  a[0].z += b[0].z;
+  a[0].w += b[0].w;
+}
+
+template <>
+__device__ void add_float4<__half>(float4 *a, float4 *b) {
+  __half2 *a_h2 = reinterpret_cast<__half2 *>(a);
+  __half2 *b_h2 = reinterpret_cast<__half2 *>(b);
+  ;
+#pragma unroll
+  for (int i = 0; i < 4; i++) {
+    float2 a_f2 = __half22float2(a_h2[i]);
+    float2 b_f2 = __half22float2(b_h2[i]);
+    a_f2.x += b_f2.x;
+    a_f2.y += b_f2.y;
+    a_h2[i] = __float22half2_rn(a_f2);
+  }
+}
+/**
+@brief: ker_split_head
+add bias to input,
+and split it into query, key, value
+
+@thread
+gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
+blockDim.x = max_block_thread
+
+@param
+input: [batch_size, seq_len, qkv_num, hidden_size]
+  qkv_num = 1 or 3, 1 for enc-dec cross attn, 3 for other attn
+bias: [hidden_size]
+query: [batch_size, nhead, seq_len, head_dim]
+key: [batch_size, nhead, seq_len, head_dim]
+value: [batch_size, nhead, seq_len, head_dim]
+
+let's explain the SplitHeadOp by PyTorch:
+input = input + bias
+if qkv_num == 3:
+  q, k, v = input.split(1, dim=2)
+if qkv_num == 1:
+  q = input
+query = q.squeeze().reshape((batch_size, seq_len,
+  nhead, head_dim)).permute(0, 2, 1, 3)
+if qkv_num == 3:
+  key = k.squeeze().reshape((batch_size, seq_len,
+    nhead, head_dim)).permute(0, 2, 1, 3)
+  value = v.squeeze().reshape((batch_size, seq_len,
+    nhead, head_dim)).permute(0, 2, 1, 3)
+*/
+template <typename T>
+__global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
+                               T *value, int batch_size, int hidden_dim,
+                               int head_dim, int seq_len, int qkv_num,
+                               int num_all) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int nhead = hidden_dim / head_dim;
+  int batch_id, token_id, qkv_id, head_id, dim_id;
+  decompose_5dim(offset, seq_len, qkv_num, nhead, head_dim, &batch_id,
+                 &token_id, &qkv_id, &head_id, &dim_id);
+  int bias_id = flat_2dim(head_id, dim_id, head_dim);
+
+  float4 res4 = (reinterpret_cast<const float4 *>(inp))[offset];
+  float4 bias4 = (reinterpret_cast<const float4 *>(bias))[bias_id];
+  add_float4<T>(&res4, &bias4);
+
+  float4 *trg = reinterpret_cast<float4 *>(query);
+  if (qkv_id == 1) {
+    trg = reinterpret_cast<float4 *>(key);
+  }
+  if (qkv_id == 2) {
+    trg = reinterpret_cast<float4 *>(value);
+  }
+  trg +=
+      flat_4dim(batch_id, head_id, token_id, dim_id, nhead, seq_len, head_dim);
+  *trg = res4;
+}
+
+template <>
+void launch_split_head<float>(const float *inp, const float *bias, float *query,
+                              float *key, float *value, int batch_size,
+                              int hidden_dim, int head_dim, int seq_len,
+                              int qkv_num, cudaStream_t stream) {
+  if ((head_dim) % 4 != 0) {
+    throw std::runtime_error("head_dim needs to be a multiple of 4");
+  }
+  hidden_dim >>= 2;
+  head_dim >>= 2;
+  int num_all = batch_size * seq_len * qkv_num * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  ker_split_head<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, seq_len,
+      qkv_num, num_all);
+}
+
+template <>
+void launch_split_head<__half>(const __half *inp, const __half *bias,
+                               __half *query, __half *key, __half *value,
+                               int batch_size, int hidden_dim, int head_dim,
+                               int seq_len, int qkv_num, cudaStream_t stream) {
+  if ((head_dim) % 8 != 0) {
+    throw std::runtime_error("head_dim needs to be a multiple of 4");
+  }
+  hidden_dim >>= 3;
+  head_dim >>= 3;
+  int num_all = batch_size * seq_len * qkv_num * hidden_dim;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  ker_split_head<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, seq_len,
+      qkv_num, num_all);
+}
