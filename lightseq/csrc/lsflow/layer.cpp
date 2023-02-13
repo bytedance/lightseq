@@ -99,7 +99,8 @@ void Layer::clear_bw_flag() {
     op->clear_bw_flag();
     for (Node* var : op->parents()) {
       Variable* this_var = static_cast<Variable*>(var);
-      if (this_var->is_descendants()) this_var->ancestor()->clear_bw_flag();
+      if (this_var->variable_type() == VariableType::OffsetVariable)
+        this_var->ancestor()->clear_bw_flag();
       var->clear_bw_flag();
     }
   }

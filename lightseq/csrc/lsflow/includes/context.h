@@ -1,4 +1,7 @@
-/* Copyright 2022 The LightSeq Team */
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
+
 #pragma once
 #include "cstdio"
 #include "queue"
@@ -109,8 +112,10 @@ class Context {  // model only
 
   std::string status_type_str() { return StatusTypeString[_status_type]; }
 
+  //
   void register_object(std::string object_name, void* object);
   void* get_object(std::string object_name);
+  void synchronize();
 
   static void regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr);

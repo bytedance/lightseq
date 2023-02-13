@@ -45,7 +45,7 @@ void Node::recursive_forward() {
 
   if (node_type() == NodeType::Variable) {
     Variable* this_var = static_cast<Variable*>(this);
-    if (this_var->_is_descendants) {
+    if (this_var->variable_type() == VariableType::OffsetVariable) {
       this_var->_parent_variable->recursive_forward();
     }
   }

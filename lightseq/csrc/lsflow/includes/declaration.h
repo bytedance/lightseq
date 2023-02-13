@@ -1,3 +1,7 @@
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
+
 #pragma once
 
 #include "memory"
@@ -14,8 +18,9 @@
 #include <vector>
 #include <stdexcept>
 #include <functional>
+#include "model_base.h"
 
-#include "kernel_headers.h"
+// #include "kernel_headers.h"
 
 namespace lightseq {
 
@@ -55,6 +60,8 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
+
+class Shape;
 
 class Allocator;
 using AllocatorPtr = std::shared_ptr<Allocator>;

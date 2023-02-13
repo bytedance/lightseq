@@ -2,28 +2,30 @@
 
 namespace lightseq {
 
-Variable::Variable(std::string name)
+Variable::Variable(std::string name, DataType fw_dtype, DataType bw_dtype)
     : Node(name, NodeType::Variable),
-      _value_byte_size(0),
-      _grad_byte_size(0),
+      _shape(Shape()),
+      _fw_dtype(fw_dtype),
+      _bw_dtype(bw_dtype),
       _variable_type(VariableType::FixedVariable) {
-  _value.reset(new Tensor("value", 0));
-  if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", 0));
+  _value.reset(new Tensor("value", fw_dtype));
+  if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", bw_dtype));
 }
 
-Variable::Variable(std::string name, size_t value_byte_size,
-                   size_t grad_byte_size, VariableType vt)
+Variable::Variable(std::string name, Shape shape, DataType fw_dtype,
+                   DataType bw_dtype, VariableType vt)
     : Node(name, NodeType::Variable),
-      _value_byte_size(value_byte_size),
-      _grad_byte_size(grad_byte_size),
+      _shape(shape),
+      _fw_dtype(fw_dtype),
+      _bw_dtype(bw_dtype),
       _variable_type(vt) {
-  _value.reset(new Tensor("value", _value_byte_size));
+  _value.reset(new Tensor("value", _fw_dtype, _shape));
   if (_context_ptr->is_training())
-    _grad.reset(new Tensor("grad", _grad_byte_size));
+    _grad.reset(new Tensor("grad", _bw_dtype, _shape));
   if (vt == VariableType::SharedVariable) {
     return;
   } else if (vt == VariableType::FixedVariable) {
-    malloc_memory(_value_byte_size, _grad_byte_size);
+    malloc_memory(_shape);
   } else if (vt == VariableType::RegressiveVariable) {
     return;
   } else {
@@ -32,23 +34,13 @@ Variable::Variable(std::string name, size_t value_byte_size,
   }
 }
 
-Variable::Variable(std::string name, const char* para_ptr, char* grad_ptr)
-    : Variable(name, (size_t)0, (size_t)0, VariableType::FixedVariable) {
-  _value->set_tensor(para_ptr);
-  if (_grad) {
-    _grad->set_tensor(grad_ptr);
-  }
-}
-
-Variable::Variable(std::string name, Variable* parent_variable,
-                   size_t offset_value, size_t offset_grad)
+Variable::Variable(std::string name, Variable* parent_variable)
     : Node(name, NodeType::Variable),
-      _is_descendants(true),
       _parent_variable(parent_variable),
       _variable_type(VariableType::OffsetVariable) {
-  _value.reset(new Tensor("value", parent_variable->_value, offset_value));
+  _value.reset(new Tensor("value", parent_variable->_value));
   if (_context_ptr->is_training()) {
-    _grad.reset(new Tensor("grad", parent_variable->_grad, offset_grad));
+    _grad.reset(new Tensor("grad", parent_variable->_grad));
   }
   parent_variable->add_descendants(this);
 }
@@ -61,8 +53,7 @@ void Variable::fixed_memory() {
     return;
   }
   if (parents().size() > 0 && children().size() > 0) {
-    printf("ERROR! this node is not a IONode!\n");
-    exit(-1);
+    throw std::runtime_error("ERROR! this node is not a IONode!\n");
   }
   _value->reset_fixed();
   if (_grad) {
@@ -82,33 +73,38 @@ void Variable::swap_tensor(Variable* var_a, Variable* var_b) {
   }
 }
 
-void Variable::set_value(char* value_ptr) {
-  remove_ancestor();
+void Variable::set_value(char* value_ptr, Shape shape) {
   _value->reset_fixed();
-  _value->set_tensor(value_ptr);
+  _shape = shape;
+  _value->set_tensor(value_ptr, shape);
 }
 
-void Variable::set_value(const char* value_ptr) {
-  remove_ancestor();
+void Variable::set_value(const char* value_ptr, Shape shape) {
   _value->reset_fixed();
-  _value->set_tensor(value_ptr);
+  _shape = shape;
+  _value->set_tensor(value_ptr, shape);
 }
 
-void Variable::set_grad(char* grad_ptr) {
-  remove_ancestor();
+void Variable::set_grad(char* grad_ptr, Shape shape) {
   if (_context_ptr->is_training()) {
     _grad->reset_fixed();
-    _grad->set_tensor(grad_ptr);
+    _shape = shape;
+    _grad->set_tensor(grad_ptr, shape);
   }
 }
 
-void Variable::malloc_memory(size_t value_byte_size, size_t grad_byte_size) {
+void Variable::set_shape(Shape shape) { _shape = shape; }
+
+void Variable::malloc_memory(Shape shape) {
+  int ele_size = shape.element_size();
+  int value_byte_size = ele_size * dtype_size(_fw_dtype);
+  int grad_byte_size = ele_size * dtype_size(_bw_dtype);
 #ifdef MEM_DEBUG
-  printf("Varaible %s malloc memory, value size: %zu MB, grad size: %zu MB\n",
-         name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
+  printf(
+      "Varaible %s malloc memory, value size: %zu "
+      "MB, grad size: %zu MB\n",
+      name().c_str(), value_byte_size / MB_SIZE, grad_byte_size / MB_SIZE);
 #endif
-  _value_byte_size = value_byte_size;
-  _grad_byte_size = grad_byte_size;
   _variable_type = VariableType::FixedVariable;
 
   char* value_ptr = _context_ptr->allocator()->malloc_mem(value_byte_size);
@@ -153,46 +149,11 @@ bool Variable::enable_override_grad() {
 void Variable::add_descendants(Variable* var) {
   _children_variable.insert(var);
 }
-void Variable::remove_descendants(Variable* var) {
-  _children_variable.erase(var);
-}
 
-void Variable::set_ancestor(Variable* parent_variable, size_t offset_value,
-                            size_t offset_grad) {
-  if (_parent_variable != nullptr && _parent_variable != parent_variable) {
-    printf("error! var %s with two ancestor!\n", name().c_str());
-    printf("new parent_variable: %s\n", parent_variable->_name.c_str());
-    printf("original parent_variable: %s\n", _parent_variable->_name.c_str());
-    exit(-1);
-  } else if (_parent_variable == parent_variable) {
-    return;
-  }
-  _is_descendants = true;
-  _parent_variable = parent_variable;
-  _variable_type = VariableType::OffsetVariable;
-  _value->set_offset(parent_variable->_value, offset_value);
-  if (_context_ptr->is_training()) {
-    _grad->set_offset(parent_variable->_grad, offset_grad);
-  }
-  parent_variable->add_descendants(this);
-}
-
-void Variable::remove_ancestor() {
-  if (_is_descendants) {
-    _is_descendants = false;
-    _parent_variable->remove_descendants(this);
-    _parent_variable = nullptr;
-    _value->remove_offset();
-    if (_grad) {
-      _grad->remove_offset();
-    }
-  }
-}
-
-void Variable::set_offset(size_t offset_value, size_t offset_grad) {
-  _value->set_offset(offset_value);
+void Variable::set_offset(int offset, Shape shape) {
+  _value->set_offset(offset, shape);
   if (_grad != nullptr) {
-    _grad->set_offset(offset_grad);
+    _grad->set_offset(offset, shape);
   }
 }
 

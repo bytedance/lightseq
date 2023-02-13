@@ -1,5 +1,7 @@
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
 #pragma once
-
 #include "declaration.h"
 
 namespace lightseq {
@@ -10,7 +12,7 @@ class Allocator {
 
  public:
   Allocator();
-  ~Allocator();
+  virtual ~Allocator();
   char* malloc_mem(size_t size);
   void free_mem(char* ptr);
 };

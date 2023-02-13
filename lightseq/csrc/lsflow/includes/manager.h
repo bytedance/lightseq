@@ -1,3 +1,7 @@
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
+
 #pragma once
 #include <string>
 #include <memory>
@@ -20,6 +24,7 @@ class TensorUsage {
   std::string _name;
   TensorUsage(int uid, int fidx, int lidx, size_t s, std::string name)
       : first_idx(fidx), last_idx(lidx), unique_id(uid), size(s), _name(name) {}
+  ~TensorUsage() = default;
 };
 
 class MemoryManager {

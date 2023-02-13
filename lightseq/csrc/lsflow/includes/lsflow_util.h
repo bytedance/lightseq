@@ -1,3 +1,7 @@
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
+
 #pragma once
 #include "declaration.h"
 
