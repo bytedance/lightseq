@@ -115,27 +115,4 @@ void Layer::tag_bw_flag() {
   }
 }
 
-// void Layer::gather_root_leaf_var() {
-//   _leaf_var_vec.clear();
-//   _root_var_vec.clear();
-//   for (Operator* op : _op_vec) {
-//     // gather leaf var
-//     for (Node* var : op->children()) {
-//       Variable* vvar = static_cast<Variable*>(var);
-//       if (var->children().size() == 0) {
-//         _leaf_var_vec.push_back(vvar);
-//         vvar->fixed_memory();
-//       }
-//     }
-//     // gather root var
-//     for (Node* var : op->parents()) {
-//       Variable* vvar = static_cast<Variable*>(var);
-//       if (var->parents().size() == 0) {
-//         _root_var_vec.push_back(vvar);
-//         vvar->fixed_memory();
-//       }
-//     }
-//   }  // each op
-// }
-
 }  // namespace lightseq

@@ -16,6 +16,13 @@
 namespace lightseq {
 enum LSMemoryType { FixedMemory, SharedMemory, OffsetMemory };
 
+/*
+  Class: TensorUsage
+  Description:
+    Records the tensor's unique_id, life cycle and size information. This
+    information will be recorded in the MemoryManager for memory sharing
+    allocation.
+*/
 class TensorUsage {
  public:
   int first_idx, last_idx;
@@ -27,12 +34,26 @@ class TensorUsage {
   ~TensorUsage() = default;
 };
 
+/*
+  Class: MemoryManager
+  Description:
+    MemoryManager manages all tensor memory available for sharing. MemoryManager
+    performs memory allocation planning based on the information provided by
+    TensorUsage. The basic idea is to perform greedy filling. For more details,
+    please refer to: https://arxiv.org/abs/2001.03288 - Algorithm.3: Greedy by
+    Size for Offset Calculation
+
+    Furthermore, considering the phenomenon of memory fragmentation, directly
+    applying for a whole buffer may cause memory allocation failure. On the
+    premise of ensuring that the memory of each tensor is continuous, we open up
+    several small buffers to avoid the above phenomenon.
+*/
 class MemoryManager {
  private:
   std::vector<char*> buffer_vec_;
+  std::vector<size_t> buffer_size_vec_;
   char* buffer_ = nullptr;
   std::map<int, TensorUsage> tensor_usages_;
-  size_t buffer_size_;
   std::map<int, char*> tensor_ptr;
   AllocatorPtr _allocator_ptr;
 
