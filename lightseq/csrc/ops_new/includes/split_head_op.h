@@ -146,7 +146,7 @@ class SplitHeadWithBeamOp : public Operator {
     _batch_size = batch_size;
     _q_len = q_len;
     _step = step;
-    if (_step + _q_len >= _cache_len) {
+    if (_step + _q_len > _cache_len) {
       throw std::runtime_error("Exceed cache len.");
     }
   }
