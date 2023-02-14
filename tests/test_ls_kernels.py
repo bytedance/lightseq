@@ -1639,7 +1639,7 @@ def test_torch_launch_fake_quantize():
 
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
-    kernel_list = [
+    kt.run(
         # "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
@@ -1671,5 +1671,4 @@ if __name__ == "__main__":
         # "test_torch_launch_ls_dequantize",
         # "test_torch_launch_fake_quantize",
         "test_crf",
-    ]
-    kt.run(kernel_list)
+    )

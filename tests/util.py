@@ -217,8 +217,8 @@ class TestDecorator(object):
             % (custom_time, baseline_time, baseline_time / custom_time)
         )
 
-    def run(self, case_names=None):
-        if case_names is None:
+    def run(self, *case_names):
+        if not case_names:
             case_names = self.all_case.keys()
         for cn in case_names:
             assert cn in self.all_case, "Illegal case name to be tested."

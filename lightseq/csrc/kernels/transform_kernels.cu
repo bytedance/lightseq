@@ -965,3 +965,122 @@ void launch_split_head<__half>(const __half *inp, const __half *bias,
       inp, bias, query, key, value, batch_size, hidden_dim, head_dim, seq_len,
       qkv_num, num_all);
 }
+
+/*
+@brief: ker_split_head_with_beam
+add bias to input,
+and split it into query, key, value
+
+@thread
+gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
+blockDim.x = max_block_thread
+
+@param
+input: [query_beam, batch_size, q_len, 3, hidden_size]
+bias: [hidden_size]
+query: [query_beam, batch_size, nhead, q_len, head_dim]
+key: [beam_size, batch_size, nhead, cache_len, head_dim]
+value: [beam_size, batch_size, nhead, cache_len, head_dim]
+query_beam=beam_size if step>0 else 1
+
+let's explain the SplitHeadOp by PyTorch:
+input = input + bias
+q, k, v = input.split(3, dim=2)
+lambda func = x, size: x.squeeze().reshape(
+  (size, batch_size, q_len, nhead, head_dim)).permute(
+  (0, 1, 3, 2, 4))
+query_beam=beam_size if step>0 else 1
+query = func(q, query_beam)
+k = func(k, query_beam)
+v = func(v, query_beam)
+if step == 0:
+  k = k.repeat((beam_size, 1, 1, 1, 1))
+  v = v.repeat((beam_size, 1, 1, 1, 1))
+key[:, :, :, step:step+q_len, :] = k
+value[:, :, :, step:step+q_len, :] = v
+*/
+template <typename T>
+__global__ void ker_split_head_with_beam(const T *inp, const T *bias, T *query,
+                                         T *key, T *value, int batch_size,
+                                         int hidden_dim, int head_dim,
+                                         int q_len, int step, int cache_len,
+                                         int num_all) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int nhead = hidden_dim / head_dim;
+  int beam_id, batch_id, token_id, qkv_id, head_id, dim_id;
+  // [beam_size, batch_size, q_len, 3, hidden_size]
+  decompose_6dim(offset, batch_size, q_len, 3, nhead, head_dim, &beam_id,
+                 &batch_id, &token_id, &qkv_id, &head_id, &dim_id);
+  int bias_offset = flat_2dim(head_id, dim_id, head_dim);
+
+  float4 res4 = (reinterpret_cast<const float4 *>(inp))[offset];
+  float4 bias4 = (reinterpret_cast<const float4 *>(bias))[bias_offset];
+  add_float4<T>(&res4, &bias4);
+
+  float4 *trg = reinterpret_cast<float4 *>(query);
+  if (qkv_id == 1) {
+    trg = reinterpret_cast<float4 *>(key);
+  }
+  if (qkv_id == 2) {
+    trg = reinterpret_cast<float4 *>(value);
+  }
+  if (qkv_id == 0) {
+    // [query_beam, batch_size, nhead, q_len, head_dim]
+    trg += flat_5dim(beam_id, batch_id, head_id, token_id, dim_id, batch_size,
+                     nhead, q_len, head_dim);
+  } else {
+    // [beam_size, batch_size, nhead, cache_len, head_dim]
+    trg += flat_5dim(beam_id, batch_id, head_id, token_id + step, dim_id,
+                     batch_size, nhead, cache_len, head_dim);
+  }
+  *trg = res4;
+}
+
+template <>
+void launch_split_head_with_beam<float>(const float *inp, const float *bias,
+                                        float *query, float *key, float *value,
+                                        int batch_size, int hidden_dim,
+                                        int head_dim, int beam_size, int q_len,
+                                        int step, int cache_len,
+                                        cudaStream_t stream) {
+  if ((head_dim) % 4 != 0) {
+    throw std::runtime_error("head_dim needs to be a multiple of 4");
+  }
+  hidden_dim >>= 2;
+  head_dim >>= 2;
+  int num_all = batch_size * q_len * 3 * hidden_dim;
+  if (step > 0) {
+    num_all *= beam_size;
+  }
+
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  ker_split_head_with_beam<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
+      step, cache_len, num_all);
+}
+
+template <>
+void launch_split_head_with_beam<__half>(const __half *inp, const __half *bias,
+                                         __half *query, __half *key,
+                                         __half *value, int batch_size,
+                                         int hidden_dim, int head_dim,
+                                         int beam_size, int q_len, int step,
+                                         int cache_len, cudaStream_t stream) {
+  if ((head_dim) % 8 != 0) {
+    throw std::runtime_error("head_dim needs to be a multiple of 4");
+  }
+  hidden_dim >>= 3;
+  head_dim >>= 3;
+  int num_all = batch_size * q_len * 3 * hidden_dim;
+  if (step > 0) {
+    num_all *= beam_size;
+  }
+
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  ker_split_head_with_beam<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
+      step, cache_len, num_all);
+}
