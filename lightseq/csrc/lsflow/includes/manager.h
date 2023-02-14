@@ -52,6 +52,7 @@ class MemoryManager {
  private:
   std::vector<char*> buffer_vec_;
   std::vector<size_t> buffer_size_vec_;
+  size_t _total_buffer_size;
   char* buffer_ = nullptr;
   std::map<int, TensorUsage> tensor_usages_;
   std::map<int, char*> tensor_ptr;
@@ -70,7 +71,7 @@ class MemoryManager {
 
   void calculate_buffer_();
 
-  size_t buffer_size() { return buffer_size_; }
+  size_t total_buffer_size() { return _total_buffer_size; }
 
   AllocatorPtr allocator() { return _allocator_ptr; }
 };

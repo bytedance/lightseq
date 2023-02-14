@@ -4,21 +4,20 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
-  Variable* result =
-      new Variable("BiasActDropoutOp_output", _max_ele_num * sizeof(T1),
-                   _max_ele_num * sizeof(T2));
+  _result = new Variable("BiasActDropoutOp_output", {_mx_rows, _mx_cols},
+                         g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, bias});
-  this->set_children({result});
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>
 void BiasActDropoutOp<T1, T2>::forward() {
-  T1* input = (T1*)parent(0)->value();
-  T1* bias = (T1*)parent(1)->value();
-  T1* output = (T1*)child(0)->value();
+  T1* input = parent(0)->value<T1>();
+  T1* bias = parent(1)->value<T1>();
+  T1* output = child(0)->value<T1>();
 
-  uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+  uint8_t* mask_ptr = _mask->tensor<uint8_t>();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -40,14 +39,14 @@ void BiasActDropoutOp<T1, T2>::forward() {
 
 template <typename T1, typename T2>
 void BiasActDropoutOp<T1, T2>::backward() {
-  T1* input = (T1*)parent(0)->value();
-  T1* bias = (T1*)parent(1)->value();
+  T1* input = parent(0)->value<T1>();
+  T1* bias = parent(1)->value<T1>();
 
-  T2* grad_inp = (T2*)parent(0)->grad();
-  T2* grad_bias = (T2*)parent(1)->grad();
-  T2* grad_out = (T2*)child(0)->grad();
+  T2* grad_inp = parent(0)->grad<T2>();
+  T2* grad_bias = parent(1)->grad<T2>();
+  T2* grad_out = child(0)->grad<T2>();
 
-  uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+  uint8_t* mask_ptr = _mask->tensor<uint8_t>();
 
   if (!_context_ptr->is_built()) {
     return;

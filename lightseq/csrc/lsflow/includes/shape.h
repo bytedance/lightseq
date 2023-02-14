@@ -1,5 +1,6 @@
 #pragma once
 #include "declaration.h"
+#include "initializer_list"
 
 namespace lightseq {
 
@@ -16,6 +17,7 @@ class Shape {
   Shape() : _shape_vec({-1}), _element_size(0), _is_calculated(false) {}
   Shape(std::vector<int> shape)
       : _shape_vec(shape), _element_size(0), _is_calculated(false) {}
+  Shape(std::initializer_list<int> list) : Shape(std::vector<int>(list)) {}
   Shape(const Shape& lx) = default;
   virtual ~Shape() = default;
   const std::vector<int>& view() const { return _shape_vec; }

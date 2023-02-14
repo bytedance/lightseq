@@ -88,6 +88,7 @@ void MemoryManager::calculate_buffer_() {
     total_consumption =
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
+  _total_buffer_size = total_consumption;
 
 #ifdef MEM_DEBUG
   printf("**** shared buffer memory size: %zu MB ****\n",

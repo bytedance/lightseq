@@ -141,6 +141,9 @@ class Variable : public Node {
 
   virtual ~Variable() {}
 
+  virtual void forward() {}
+  virtual void backward() {}
+
   // This method is to switch the current VariableType to FixedMemory.
   // This method will not execute the memory development logic internally,
   // but will only clear the tensor life cycle information originally
