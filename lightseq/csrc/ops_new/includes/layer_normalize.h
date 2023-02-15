@@ -16,6 +16,8 @@ class LayerNormalizeOp : public Operator {
   TensorPtr means_;
   TensorPtr vars_;
 
+  Variable* _result;
+
  public:
   LayerNormalizeOp(uint32_t max_batch_tokens, uint32_t hidden_dim,
                    bool use_mean = false)
@@ -23,9 +25,9 @@ class LayerNormalizeOp : public Operator {
         _max_batch_tokens(max_batch_tokens),
         _hidden_dim(hidden_dim),
         _use_mean(use_mean) {
-    vars_.reset(new Tensor("vars", max_batch_tokens * sizeof(T1)));
+    vars_.reset(new Tensor("vars", g_dtype<T1>(), {max_batch_tokens}));
     if (use_mean)
-      means_.reset(new Tensor("means", max_batch_tokens * sizeof(T1)));
+      means_.reset(new Tensor("means", g_dtype<T1>(), {max_batch_tokens}));
   }
 
   Variable* operator()(Variable* inp, Variable* gamma, Variable* betta);

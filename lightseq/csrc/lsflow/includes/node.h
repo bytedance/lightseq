@@ -144,6 +144,9 @@ class Variable : public Node {
   virtual void forward() {}
   virtual void backward() {}
 
+  const DataType& fw_dtype() const { return _fw_dtype; }
+  const DataType& bw_dtype() const { return _bw_dtype; }
+
   // This method is to switch the current VariableType to FixedMemory.
   // This method will not execute the memory development logic internally,
   // but will only clear the tensor life cycle information originally

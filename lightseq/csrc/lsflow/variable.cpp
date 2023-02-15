@@ -37,6 +37,8 @@ Variable::Variable(std::string name, Shape mx_shape, DataType fw_dtype,
 Variable::Variable(std::string name, Variable* parent_variable)
     : Node(name, NodeType::Variable),
       _mx_shape(Shape()),
+      _fw_dtype(parent_variable->fw_dtype()),
+      _bw_dtype(parent_variable->bw_dtype()),
       _parent_variable(parent_variable),
       _variable_type(VariableType::OffsetVariable) {
   _value.reset(new Tensor("value", parent_variable->_value));

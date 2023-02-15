@@ -91,10 +91,10 @@ class Context {
 
   // property field
   bool is_training() { return _status_type == StatusType::Training; }
-  int node_idx() { return _node_idx; }
+  const int& node_idx() const { return _node_idx; }
   void update_node_idx();
-  bool is_built() { return _built; }
-  bool is_building() { return _building; }
+  const bool& is_built() const { return _built; }
+  const bool& is_building() const { return _building; }
   MemoryManagerPtr memory_manager_ptr() { return _mm_ptr; }
 
   void add_op(Operator* op);

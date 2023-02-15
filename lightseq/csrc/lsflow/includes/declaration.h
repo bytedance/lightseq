@@ -67,4 +67,6 @@ using AllocatorPtr = std::shared_ptr<Allocator>;
 
 const int MB_SIZE = 1024 * 1024;
 
+#define CHECK_DTYPE(dtype, base_type) (dtype == g_dtype<base_type>())
+
 }  // namespace lightseq

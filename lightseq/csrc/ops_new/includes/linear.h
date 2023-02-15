@@ -17,6 +17,8 @@ class LinearOp : public Operator {
   MATRIX_OP _opA;
   MATRIX_OP _opB;
 
+  Variable* _result;
+
  public:
   LinearOp(int max_batch_tokens, int output_size, int input_size,
            MATRIX_OP opA = MATRIX_OP::Transpose,
@@ -36,7 +38,10 @@ class LinearOp : public Operator {
 
   void forward() override;
 
-  void before_forward(int batch_tokens) { _batch_tokens = batch_tokens; }
+  void before_forward(int batch_tokens) {
+    _batch_tokens = batch_tokens;
+    _result->set_shape({batch_tokens, _output_size});
+  }
 
   void backward() override;
 

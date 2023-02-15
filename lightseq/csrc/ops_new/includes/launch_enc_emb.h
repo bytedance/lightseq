@@ -16,6 +16,9 @@ class LaunchEncEmbOp : public Operator {
   int _batch_size;
   int _seq_len;
 
+  Variable* _result;
+  Variable* _pad_mask;
+
  public:
   LaunchEncEmbOp(int max_batch_tokens, int pad_id, int hidden_dim,
                  int multilg_type)
