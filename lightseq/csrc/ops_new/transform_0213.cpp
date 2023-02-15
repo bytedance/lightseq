@@ -3,17 +3,16 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-Variable* Transform0213<T1, T2>::operator()(Variable* inp) {
-  size_t trans_size = _max_batch_tokens * _hidden_size;
-  Variable* res = new Variable("Transform0213_res", trans_size * sizeof(T1),
-                               trans_size * sizeof(T2));
+Variable* Transform0213OP<T1, T2>::operator()(Variable* inp) {
+  Variable* res = new Variable("Transform0213_res", _max_numel * sizeof(T1),
+                               _max_numel * sizeof(T2));
   set_parents({inp});
   this->set_children({res});
   return res;
 }
 
 template <typename T1, typename T2>
-void Transform0213<T1, T2>::forward() {
+void Transform0213OP<T1, T2>::forward() {
   cudaStream_t _stream = _context_ptr->get_stream();
 
   T1* inp_ptr = (T1*)parent(0)->value();
@@ -23,13 +22,12 @@ void Transform0213<T1, T2>::forward() {
     return;
   }
 
-  //   [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T1>(res_ptr, inp_ptr, _batch, _seq_len, _hidden_size,
-                              _heads, 1, _stream);
+  // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
+  launch_transform_0213<T2>(inp_ptr, res_ptr, _sz0, _sz1, _sz2, _sz3, _stream);
 }
 
 template <typename T1, typename T2>
-void Transform0213<T1, T2>::backward() {
+void Transform0213OP<T1, T2>::backward() {
   cudaStream_t _stream = _context_ptr->get_stream();
   T2* inp_grad = (T1*)parent(0)->grad();
   T2* out_grad = (T1*)child(0)->grad();
@@ -38,11 +36,12 @@ void Transform0213<T1, T2>::backward() {
     return;
   }
 
-  launch_transform_0213<T2>(out_grad, inp_grad, _batch, _seq_len, _heads,
-                            _hidden_size / _heads, _stream);
+  // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
+  launch_transform_0213<T2>(out_grad, inp_grad, _sz0, _sz1, _sz2, _sz3,
+                            _stream);
 }
 
-template class Transform0213<float, float>;
-template class Transform0213<__half, __half>;
+template class Transform0213OP<float, float>;
+template class Transform0213OP<__half, __half>;
 
 }  // namespace lightseq

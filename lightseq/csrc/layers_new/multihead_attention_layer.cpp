@@ -35,7 +35,7 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
           max_batch_tokens * hidden_size, T1(1.0), T1(0.0), CUBLAS_OP_N,
           CUBLAS_OP_N)),
       _transform_0213(
-          new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
+          new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size)),
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
@@ -130,7 +130,8 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);
 
-  _transform_0213->before_forward(batch_size, seq_len);
+  _transform_0213->before_forward(batch_size, seq_len, _heads,
+                                  _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_batch_tokens);
 
