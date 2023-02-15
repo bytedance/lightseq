@@ -25,7 +25,7 @@ class BiasDropoutResOp : public Operator {
         ratio(r),
         _max_rows(max_rows),
         _max_cols(max_cols) {
-    _mask.reset(new Tensor("mask", g_dtype<uint8_t>(), {_max_rows, _max_cols}));
+    _mask.reset(new Tensor("mask", g_dtype<uint8_t>(), _max_rows * _max_cols));
   }
 
   virtual ~BiasDropoutResOp() {}

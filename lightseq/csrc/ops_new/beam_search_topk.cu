@@ -45,38 +45,43 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
     Variable* caches_k, Variable* caches_v) {
   set_parents({logits, logit_bias, alive_seq, caches_k, caches_v});
 
-  Variable* alive_seq_out = new Variable(
-      "alive_seq_out", _max_batch_size * _beam_size * _max_step * sizeof(int));
+  _alive_seq_out =
+      new Variable("alive_seq_out", _max_batch_size * _beam_size * _max_step,
+                   g_dtype<int>());
 
-  seq_score = new Variable(
-      "seq_score", _max_batch_size * _beam_size * _max_step * sizeof(float), 0,
-      VariableType::RegressiveVariable);
+  _seq_score = new Variable(
+      "seq_score", _max_batch_size * _beam_size * _max_step, g_dtype<int>(),
+      DataType::kNotSupported, VariableType::RegressiveVariable);
 
   // initial own variable
 
-  num_beam_can = new Variable("num_beam_can",
-                              (_max_batch_size * _beam_size + 1) * sizeof(int),
-                              0, VariableType::RegressiveVariable);
-  can_idx = new Variable(
-      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int),
-      0, VariableType::RegressiveVariable);
-  can_score = new Variable(
-      "can_score",
-      _max_batch_size * _beam_size * _trg_vocab_size * sizeof(float), 0,
-      VariableType::RegressiveVariable);
-  seq_prob =
-      new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
+  _num_beam_can = new Variable("num_beam_can", _max_batch_size * _beam_size + 1,
+                               g_dtype<int>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  _can_idx = new Variable(
+      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size, g_dtype<int>(),
+      DataType::kNotSupported, VariableType::RegressiveVariable);
+  _can_score =
+      new Variable("can_score", _max_batch_size * _beam_size * _trg_vocab_size,
+                   g_dtype<float>(), DataType::kNotSupported,
                    VariableType::RegressiveVariable);
+  _seq_prob =
+      new Variable("seq_prob", _max_batch_size * _beam_size, g_dtype<float>(),
+                   DataType::kNotSupported, VariableType::RegressiveVariable);
 
-  int cache_size =
-      _max_batch_size * _max_step * _beam_size * _hidden_size * sizeof(T);
-  caches_k_buf = new Variable("caches_k_buf", cache_size * _nshared_dec_layer,
-                              0, VariableType::RegressiveVariable);
-  caches_v_buf = new Variable("caches_v_buf", cache_size * _nshared_dec_layer,
-                              0, VariableType::RegressiveVariable);
+  _caches_k_buf = new Variable("caches_k_buf",
+                               _nshared_dec_layer * _max_batch_size *
+                                   _max_step * _beam_size * _hidden_size,
+                               g_dtype<T>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  _caches_v_buf = new Variable("caches_v_buf",
+                               _nshared_dec_layer * _max_batch_size *
+                                   _max_step * _beam_size * _hidden_size,
+                               g_dtype<T>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
 
-  set_children({alive_seq_out, seq_score});
-  return std::make_tuple(alive_seq_out, seq_score);
+  set_children({_alive_seq_out, _seq_score});
+  return std::make_tuple(_alive_seq_out, _seq_score);
 }
 
 template <typename T>
@@ -88,16 +93,16 @@ void BeamSearchTopOp<T>::forward() {
   T* caches_k_ptr = (T*)caches_k->value();
   Variable* caches_v = parent(4);
   T* caches_v_ptr = (T*)caches_v->value();
-  T* caches_k_buf_ptr = (T*)caches_k_buf->value();
-  T* caches_v_buf_ptr = (T*)caches_v_buf->value();
+  T* caches_k_buf_ptr = (T*)_caches_k_buf->value();
+  T* caches_v_buf_ptr = (T*)_caches_v_buf->value();
 
   int* alive_seq_out = (int*)child(0)->value();
   float* seq_score_ptr = (float*)child(1)->value();
 
-  float* seq_probs_ptr = (float*)seq_prob->value();
-  int* can_idx_ptr = (int*)can_idx->value();
-  float* can_score_ptr = (float*)can_score->value();
-  int* num_beam_can_ptr = (int*)num_beam_can->value();
+  float* seq_probs_ptr = (float*)_seq_prob->value();
+  int* can_idx_ptr = (int*)_can_idx->value();
+  float* can_score_ptr = (float*)_can_score->value();
+  int* num_beam_can_ptr = (int*)_num_beam_can->value();
 
   if (!_context_ptr->is_built()) {
     return;
@@ -201,8 +206,8 @@ void BeamSearchTopOp<T>::forward() {
         (T*)caches_k_ptr, (T*)caches_v_ptr, (T*)caches_k_buf_ptr,
         (T*)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head, _head_num,
         _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0, _end_id);
-    Variable::swap_tensor(caches_k, caches_k_buf);
-    Variable::swap_tensor(caches_v, caches_v_buf);
+    Variable::swap_tensor(caches_k, _caches_k_buf);
+    Variable::swap_tensor(caches_v, _caches_v_buf);
   }
 #endif
 }

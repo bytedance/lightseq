@@ -23,9 +23,8 @@ class Tensor {
   char* _ptr = nullptr;
   DataType _dtype;
 
-  // If mx_shape is constructed by default, then tensor's memory type is
-  // FixedMemory or OffsetMemory.
-  Shape _mx_shape;
+  // If mx_shape is 0, then tensor's memory type is FixedMemory or OffsetMemory.
+  size_t _mx_shape_size;
   Shape _shape;
 
   int _id = -1;
@@ -42,7 +41,7 @@ class Tensor {
   // When the mx_shape parameter is empty, it means that the tensor uses the
   // FixedMemory memory type, and then manually set the specific pointer address
   // and tensor shape.
-  Tensor(std::string name, DataType dtype, Shape mx_shape = Shape());
+  Tensor(std::string name, DataType dtype, size_t mx_shape_size = 0);
 
   // Applicable to tensors whose video memory type is OffsetMemory.
   // In this case the initialized tensor is a partial fragment of the original
@@ -85,9 +84,8 @@ class Tensor {
 
   size_t dim_t() { return _shape.view().size(); }
   int element_size() { return _shape.element_size(); }
-  int mx_element_size() { return _mx_shape.element_size(); }
+  const size_t& mx_shape_size() const { return _mx_shape_size; }
   const std::vector<int>& shape() const { return _shape.view(); }
-  const std::vector<int>& mx_shape() const { return _mx_shape.view(); }
   const DataType& dtype() const { return _dtype; }
 
   // unique id of the tensor.

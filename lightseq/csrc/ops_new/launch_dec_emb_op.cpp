@@ -10,7 +10,7 @@ Variable* LaunchDecEmbOp<T>::operator()(Variable* inp_tokens,
 
   _result =
       new Variable("LaunchDecEmbOp_out",
-                   {_max_batch_tokens, _hidden_size, _beam_size}, g_dtype<T>());
+                   _max_batch_tokens * _hidden_size * _beam_size, g_dtype<T>());
 
   set_parents({inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
 

@@ -91,22 +91,21 @@ int dtype_size(DataType dtype) {
 }
 
 int Tensor::global_tensor_id = 0;
-Tensor::Tensor(std::string name, DataType dtype, Shape mx_shape)
+Tensor::Tensor(std::string name, DataType dtype, size_t mx_shape_size)
     : _id(global_tensor_id++),
       _ctx_ptr(Context::global_instance().get()),
       _dtype(dtype),
-      _mx_shape(mx_shape) {
+      _mx_shape_size(mx_shape_size) {
   std::string prefix_name =
       _ctx_ptr->last_node() ? (_ctx_ptr->last_node()->name() + ":") : "";
 
   _name = prefix_name + name;
-  int mx_ele_sz = _mx_shape.element_size();
-  _mtype =
-      mx_ele_sz > 0 ? LSMemoryType::SharedMemory : LSMemoryType::FixedMemory;
+  _mtype = _mx_shape_size > 0 ? LSMemoryType::SharedMemory
+                              : LSMemoryType::FixedMemory;
   if (_mtype == LSMemoryType::SharedMemory) {
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
-    _ctx_ptr->mx_tensor_size = std::max(_ctx_ptr->mx_tensor_size,
-                                        (size_t)mx_ele_sz * dtype_size(_dtype));
+    _ctx_ptr->mx_tensor_size =
+        std::max(_ctx_ptr->mx_tensor_size, _mx_shape_size * dtype_size(_dtype));
   }
 }
 
@@ -179,11 +178,8 @@ void Tensor::update_life_idx(int node_idx) {
   if (_mtype == LSMemoryType::FixedMemory) {
     return;
   }
-  if (_mx_shape.element_size() == 0) {
-    return;
-  }
-  _mm_ptr->update_tensor_life_idx(
-      _id, node_idx, _mx_shape.element_size() * dtype_size(_dtype), _name);
+  _mm_ptr->update_tensor_life_idx(_id, node_idx,
+                                  _mx_shape_size * dtype_size(_dtype), _name);
 }
 
 void Tensor::remove_life_cycle() {
@@ -197,7 +193,7 @@ void Tensor::reset_fixed() {
   }
   this->remove_life_cycle();
   _mtype = LSMemoryType::FixedMemory;
-  _mx_shape = Shape();
+  _mx_shape_size = 0;
 }
 
 std::string Tensor::memory_type() {

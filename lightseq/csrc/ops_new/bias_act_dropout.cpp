@@ -4,7 +4,7 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* BiasActDropoutOp<T1, T2>::operator()(Variable* inp, Variable* bias) {
-  _result = new Variable("BiasActDropoutOp_output", {_mx_rows, _mx_cols},
+  _result = new Variable("BiasActDropoutOp_output", _mx_rows * _mx_cols,
                          g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, bias});
   this->set_children({_result});

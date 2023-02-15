@@ -93,7 +93,7 @@ class Variable : public Node {
 
   // If mx_shape is constructed by default, then tensor's memory type is
   // FixedMemory or OffsetMemory.
-  Shape _mx_shape;
+  size_t _mx_shape_size;
   Shape _shape;
 
  protected:
@@ -126,7 +126,7 @@ class Variable : public Node {
     across steps in autoregressive models.
   */
   Variable(
-      std::string name, Shape mx_shape, DataType fw_dtype,
+      std::string name, size_t mx_shape_size, DataType fw_dtype,
       DataType bw_dtype = DataType::kNotSupported,
       VariableType vt = VariableType::SharedVariable);  // for Shared memory
 
@@ -170,7 +170,7 @@ class Variable : public Node {
   void set_shape(Shape shape);
 
   // Malloc memory space by itself
-  void malloc_memory(Shape shape);
+  void malloc_memory(size_t size);
 
   VariableType variable_type() { return _variable_type; }
   std::string variable_type_str() { return VariableTypeString[_variable_type]; }

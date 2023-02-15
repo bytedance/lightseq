@@ -4,17 +4,17 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* SoftmaxOp<T1, T2>::operator()(Variable* inp, Variable* mask) {
-  size_t max_ele_num = _max_batch_tokens * _max_seq_len * _nhead;
-  Variable* result = new Variable("SoftmaxOp_out", max_ele_num * sizeof(T1),
-                                  max_ele_num * sizeof(T2));
+  _result =
+      new Variable("SoftmaxOp_out", _max_batch_tokens * _max_seq_len * _nhead,
+                   g_dtype<T1>(), g_dtype<T2>());
 
   if (mask != nullptr)
     set_parents({inp, mask});
   else
     set_parents({inp});
 
-  this->set_children({result});
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>

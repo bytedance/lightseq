@@ -30,7 +30,7 @@ class BiasActDropoutOp : public Operator {
         _activation_fn(activation_fn),
         _mx_rows(mx_rows),
         _mx_cols(mx_cols) {
-    _mask.reset(new Tensor("_mask", g_dtype<uint8_t>(), {_mx_rows, _mx_cols}));
+    _mask.reset(new Tensor("_mask", g_dtype<uint8_t>(), _mx_rows * _mx_cols));
   }
 
   virtual ~BiasActDropoutOp() {}

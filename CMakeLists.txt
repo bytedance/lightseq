@@ -102,7 +102,6 @@ if(USE_NEW_ARCH)
   link_directories(${COMMON_LIB_DIRS})
 
   add_subdirectory(3rdparty/pybind11)
-  # add_subdirectory(lightseq/csrc/tools)
   add_subdirectory(lightseq/csrc/kernels/${DEVICE_ARCHITECTURE})
   add_subdirectory(lightseq/csrc/lsflow)
   add_subdirectory(lightseq/csrc/ops_new)

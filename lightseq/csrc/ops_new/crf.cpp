@@ -9,7 +9,7 @@ CRFOP<T>::CRFOP(int max_batch_tokens, int max_batch_size, int num_tags)
       _max_batch_size(max_batch_size),
       _num_tags(num_tags) {
   _history.reset(
-      new Tensor("history", g_dtype<int>(), {_max_batch_tokens, _num_tags}));
+      new Tensor("history", g_dtype<int>(), _max_batch_tokens * _num_tags));
 }
 
 template <typename T>
@@ -17,7 +17,7 @@ Variable* CRFOP<T>::operator()(Variable* start_transition,
                                Variable* end_transition, Variable* transition,
                                Variable* emission, Variable* mask,
                                Variable* bias) {
-  _best_tags = new Variable("best_tags", {_max_batch_tokens}, g_dtype<int>());
+  _best_tags = new Variable("best_tags", _max_batch_tokens, g_dtype<int>());
   set_parents(
       {start_transition, end_transition, transition, emission, mask, bias});
   if (!_output_decode_score) {

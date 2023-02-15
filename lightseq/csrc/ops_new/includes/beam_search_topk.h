@@ -36,13 +36,14 @@ class BeamSearchTopOp : public Operator {
   std::vector<float> _host_alive_seq_probs;
   std::vector<float> _host_length_norm;
 
-  Variable* num_beam_can;
-  Variable* can_idx;
-  Variable* can_score;
-  Variable* seq_prob;
-  Variable* seq_score;
-  Variable* caches_k_buf;
-  Variable* caches_v_buf;
+  Variable* _num_beam_can;
+  Variable* _can_idx;
+  Variable* _can_score;
+  Variable* _seq_prob;
+  Variable* _seq_score;
+  Variable* _alive_seq_out;
+  Variable* _caches_k_buf;
+  Variable* _caches_v_buf;
 
  public:
   BeamSearchTopOp(int nshared_dec_layer, int max_batch_size, int max_step,
@@ -65,6 +66,9 @@ class BeamSearchTopOp : public Operator {
     _batch_size = batch_size;
     _cur_step = cur_step;
     _step_token_num = batch_size * _beam_size;
+
+    _alive_seq_out->set_shape({_batch_size, _beam_size, _cur_step + 1});
+    _seq_score->set_shape({_batch_size, _beam_size, _cur_step + 1});
   }
 
   void backward() override {}

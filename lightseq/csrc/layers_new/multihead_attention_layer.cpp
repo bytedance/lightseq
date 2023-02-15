@@ -40,16 +40,16 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
-          hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
+          hidden_output_dropout_ratio, max_batch_tokens, hidden_size)) {
   // parameters
-  _attn_qkvw = new Variable("_attn_qkvw");
-  _attn_qkvb = new Variable("_attn_qkvb");
+  _attn_qkvw = new Variable("_attn_qkvw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_qkvb = new Variable("_attn_qkvb", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_ow = new Variable("_attn_ow");
-  _attn_ob = new Variable("_attn_ob");
+  _attn_ow = new Variable("_attn_ow", g_dtype<T1>(), g_dtype<T2>());
+  _attn_ob = new Variable("_attn_ob", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_nw = new Variable("_attn_nw");
-  _attn_nb = new Variable("_attn_nb");
+  _attn_nw = new Variable("_attn_nw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -119,14 +119,13 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
                                _batch_heads);
 
-  q_out->set_offset(0, 0);
-  k_out->set_offset(_batch_dim * sizeof(T1), _batch_dim * sizeof(T2));
-  v_out->set_offset(2 * _batch_dim * sizeof(T1), 2 * _batch_dim * sizeof(T2));
+  q_out->set_offset(0, {_batch_tokens, _hidden_size});
+  k_out->set_offset(_batch_dim, {_batch_tokens, _hidden_size});
+  v_out->set_offset(2 * _batch_dim, {_batch_tokens, _hidden_size});
 
   _softmax->before_forward(batch_size, seq_len, seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len,
-                                     !_context_ptr->is_training());
+  _attn_prob_dropout->before_forward(_batch_heads * seq_len * seq_len);
 
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);
@@ -147,26 +146,32 @@ int MultiheadAttentionLayer<T1, T2>::load_para_and_grad(
   int offset = 0;
   _attn_qkvw->set_value((char*)(para_ptr + offset));
   _attn_qkvw->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvw->set_shape({3, _hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size * 3;
 
   _attn_qkvb->set_value((char*)(para_ptr + offset));
   _attn_qkvb->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvb->set_shape({3, _hidden_size});
   offset += _hidden_size * 3;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_ob->set_value((char*)(para_ptr + offset));
   _attn_ob->set_grad((char*)(grad_ptr + offset));
+  _attn_ob->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nw->set_value((char*)(para_ptr + offset));
   _attn_nw->set_grad((char*)(grad_ptr + offset));
+  _attn_nw->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nb->set_value((char*)(para_ptr + offset));
   _attn_nb->set_grad((char*)(grad_ptr + offset));
+  _attn_nb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   return offset;
@@ -180,7 +185,9 @@ int MultiheadAttentionLayer<T1, T2>::load_params(
   _attn_nb->set_value((char*)para_vec[offset + size]), size++;
 
   _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvw->set_shape({3, _hidden_size, _hidden_size});
   _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_shape({3, _hidden_size});
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
   _attn_ob->set_value((char*)para_vec[offset + size]), size++;

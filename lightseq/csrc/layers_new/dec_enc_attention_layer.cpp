@@ -40,14 +40,14 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
           hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
   // parameters
-  _attn_qw = new Variable("_attn_qw");
-  _attn_qb = new Variable("_attn_qb");
+  _attn_qw = new Variable("_attn_qw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_qb = new Variable("_attn_qb", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_ow = new Variable("_attn_ow");
-  _attn_ob = new Variable("_attn_ob");
+  _attn_ow = new Variable("_attn_ow", g_dtype<T1>(), g_dtype<T2>());
+  _attn_ob = new Variable("_attn_ob", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_nw = new Variable("_attn_nw");
-  _attn_nb = new Variable("_attn_nb");
+  _attn_nw = new Variable("_attn_nw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -141,14 +141,17 @@ int DecEncAttentionLayer<T1, T2>::load_para_and_grad(
   int offset = 0;
   _attn_qw->set_value((char*)(para_ptr + offset));
   _attn_qw->set_grad((char*)(grad_ptr + offset));
+  _attn_qw->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_qb->set_value((char*)(para_ptr + offset));
   _attn_qb->set_grad((char*)(grad_ptr + offset));
+  _attn_qb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_ob->set_value((char*)(para_ptr + offset));

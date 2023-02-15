@@ -4,7 +4,7 @@ namespace lightseq {
 
 Variable::Variable(std::string name, DataType fw_dtype, DataType bw_dtype)
     : Node(name, NodeType::Variable),
-      _mx_shape(Shape()),
+      _mx_shape_size(0),
       _fw_dtype(fw_dtype),
       _bw_dtype(bw_dtype),
       _variable_type(VariableType::FixedVariable) {
@@ -12,20 +12,20 @@ Variable::Variable(std::string name, DataType fw_dtype, DataType bw_dtype)
   if (_context_ptr->is_training()) _grad.reset(new Tensor("grad", bw_dtype));
 }
 
-Variable::Variable(std::string name, Shape mx_shape, DataType fw_dtype,
+Variable::Variable(std::string name, size_t mx_shape_size, DataType fw_dtype,
                    DataType bw_dtype, VariableType vt)
     : Node(name, NodeType::Variable),
-      _mx_shape(mx_shape),
+      _mx_shape_size(mx_shape_size),
       _fw_dtype(fw_dtype),
       _bw_dtype(bw_dtype),
       _variable_type(vt) {
-  _value.reset(new Tensor("value", _fw_dtype, _mx_shape));
+  _value.reset(new Tensor("value", _fw_dtype, _mx_shape_size));
   if (_context_ptr->is_training() && bw_dtype != DataType::kNotSupported)
-    _grad.reset(new Tensor("grad", _bw_dtype, _mx_shape));
+    _grad.reset(new Tensor("grad", _bw_dtype, _mx_shape_size));
   if (vt == VariableType::SharedVariable) {
     return;
   } else if (vt == VariableType::FixedVariable) {
-    malloc_memory(_mx_shape);
+    malloc_memory(_mx_shape_size);
   } else if (vt == VariableType::RegressiveVariable) {
     return;
   } else {
@@ -36,7 +36,7 @@ Variable::Variable(std::string name, Shape mx_shape, DataType fw_dtype,
 
 Variable::Variable(std::string name, Variable* parent_variable)
     : Node(name, NodeType::Variable),
-      _mx_shape(Shape()),
+      _mx_shape_size(0),
       _fw_dtype(parent_variable->fw_dtype()),
       _bw_dtype(parent_variable->bw_dtype()),
       _parent_variable(parent_variable),
@@ -97,10 +97,9 @@ void Variable::set_grad(char* grad_ptr) {
 
 void Variable::set_shape(Shape shape) { _shape = shape; }
 
-void Variable::malloc_memory(Shape mx_shape) {
-  int mx_ele_size = mx_shape.element_size();
-  int value_byte_size = mx_ele_size * dtype_size(_fw_dtype);
-  int grad_byte_size = mx_ele_size * dtype_size(_bw_dtype);
+void Variable::malloc_memory(size_t size) {
+  int value_byte_size = size * dtype_size(_fw_dtype);
+  int grad_byte_size = size * dtype_size(_bw_dtype);
 #ifdef MEM_DEBUG
   printf(
       "Varaible %s malloc memory, value size: %zu "

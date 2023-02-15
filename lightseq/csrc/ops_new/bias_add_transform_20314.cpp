@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 Variable* BiasAddTrans20314<T1, T2>::operator()(Variable* inp, Variable* bias) {
   // size_t trans_size = _max_batch_tokens * _hidden_size;
   _res = new Variable("BiasAddTrans20314_res",
-                      {_trans_count, _max_batch_tokens, _hidden_size},
+                      _trans_count * _max_batch_tokens * _hidden_size,
                       g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, bias});
   this->set_children({_res});
