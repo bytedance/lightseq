@@ -130,20 +130,14 @@ def test_launch_transform_0213():
     else:
         func = cuda_module.torch_launch_transform_0213_fp16
 
-    # [batch_size, seq_len, hidden_dim] ->
-    # [batch_size, nhead, seq_len, head_dim]
-
+    # [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
     def custom():
-        func(custom_res, vals, batch_size, seq_len, hidden_dim, nhead)
-        return [
-            custom_res,
-        ]
+        func(vals, custom_res, batch_size, seq_len, nhead, head_dim)
+        return kt.norm_res_list(custom_res)
 
     def baseline():
         base = vals.reshape((batch_size, seq_len, nhead, head_dim)).transpose(1, 2)
-        return [
-            base.contiguous(),
-        ]
+        return kt.norm_res_list(base)
 
     return custom, baseline
 
@@ -1640,7 +1634,7 @@ def test_torch_launch_fake_quantize():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
-        # "test_launch_transform_0213",
+        "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
         # "test_launch_bias_add_transform_20314_new",
@@ -1670,5 +1664,5 @@ if __name__ == "__main__":
         # "test_torch_launch_ls_quantize",
         # "test_torch_launch_ls_dequantize",
         # "test_torch_launch_fake_quantize",
-        "test_crf",
+        # "test_crf",
     )

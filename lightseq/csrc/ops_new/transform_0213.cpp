@@ -38,8 +38,8 @@ void Transform0213<T1, T2>::backward() {
     return;
   }
 
-  launch_transform_0213<T2>(inp_grad, out_grad, _batch, _seq_len, _hidden_size,
-                            _heads, _stream);
+  launch_transform_0213<T2>(out_grad, inp_grad, _batch, _seq_len, _heads,
+                            _hidden_size / _heads, _stream);
 }
 
 template class Transform0213<float, float>;

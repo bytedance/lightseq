@@ -105,10 +105,11 @@ query = func(q, query_beam)
 k = func(k, query_beam)
 v = func(v, query_beam)
 if step == 0:
-  k = k.repeat((beam_size, 1, 1, 1, 1))
-  v = v.repeat((beam_size, 1, 1, 1, 1))
-key[:, :, :, step:step+q_len, :] = k
-value[:, :, :, step:step+q_len, :] = v
+  key[0:1, :, :, step:step+q_len, :] = k
+  value[0:1, :, :, step:step+q_len, :] = v
+else:
+  key[:, :, :, step:step+q_len, :] = k
+  value[:, :, :, step:step+q_len, :] = v
 */
 template <typename T1, typename T2>
 class SplitHeadWithBeamOp : public Operator {
