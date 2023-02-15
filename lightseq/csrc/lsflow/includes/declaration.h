@@ -1,28 +1,25 @@
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
+
 #pragma once
 #include "memory"
 #include "thread"
 #include <stdio.h>
 #include <fstream>
 #include "unordered_set"
-
-#include <cuda.h>
-#include <cuda_fp16.h>
-#include <cuda_runtime_api.h>
-#include <cublas_v2.h>
-#include <type_traits>
-
-#include <thrust/copy.h>
-#include <thrust/device_vector.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/random.h>
-#include <curand_kernel.h>
-#include <thrust/functional.h>
-#include <thrust/sequence.h>
-#include <thrust/scan.h>
-
 #include <unistd.h>
-#include "cuda_util.h"
-#include "cublas_wrappers.h"
+#include "cmath"
+#include <type_traits>
+#include <chrono>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <functional>
+#include "model_base.h"
+
+#include "kernel_headers.h"
 
 namespace lightseq {
 
@@ -36,6 +33,14 @@ enum VariableType {
 };
 const std::string VariableTypeString[] = {
     "FixedVariable", "SharedVariable", "OffsetVariable", "RegressiveVariable"};
+
+enum class MATRIX_OP {
+  Transpose,
+  NonTranspose,
+};
+
+enum StatusType { Training, Inference, Evaluation };
+const std::string StatusTypeString[] = {"Training", "Inference", "Evaluation"};
 
 class Node;
 
@@ -54,6 +59,11 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
+
+class Shape;
+
+class Allocator;
+using AllocatorPtr = std::shared_ptr<Allocator>;
 
 const int MB_SIZE = 1024 * 1024;
 

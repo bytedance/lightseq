@@ -1,8 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
-#include "embKernels.h"
 
 namespace lightseq {
 

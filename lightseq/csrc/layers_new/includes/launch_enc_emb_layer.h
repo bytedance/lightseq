@@ -57,8 +57,10 @@ class LaunchEncEmbLayer : public Layer {
   }
 };
 
-template class LaunchEncEmbLayer<__half>;
 template class LaunchEncEmbLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class LaunchEncEmbLayer<__half>;
+#endif
 
 template <class T>
 using LaunchEncEmbLayerPtr = std::shared_ptr<LaunchEncEmbLayer<T>>;

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 ENABLE_FP32 = int(os.environ.get("ENABLE_FP32", 0))
 ENABLE_DEBUG = int(os.environ.get("ENABLE_DEBUG", 0))
 ENABLE_NEW_ARCH = int(os.environ.get("ENABLE_NEW_ARCH", 0))
+DEVICE_ARCH = str(os.environ.get("DEVICE_ARCH", "cuda"))  # DEVICE_ARCH can be x86/cuda
 
 
 class CMakeExtension(Extension):
@@ -76,6 +77,8 @@ class CMakeBuild(build_ext):
             cmake_args += (
                 ["-DUSE_NEW_ARCH=ON"] if ENABLE_NEW_ARCH else ["-DUSE_NEW_ARCH=OFF"]
             )
+            cmake_args += ["-DUSE_PYBIND=1"]
+            cmake_args += ["-DDEVICE_ARCH={}".format(DEVICE_ARCH)]
             cmake_args += ["-DDYNAMIC_API=OFF"]
             build_args += ["--target", "lightseq"]
             build_args += ["--", "-j{}".format(multiprocessing.cpu_count())]
@@ -105,6 +108,7 @@ setup_kwargs = dict(
     author_email=(
         "wangxiaohui.neo@bytedance.com, xiongying.taka@bytedance.com"
         ", qian.xian@bytedance.com, weiyang.god@bytedance.com"
+        ", zhoubofan@bytedance.com, zhangzhexi@bytedance.com"
     ),
     description=(
         "LightSeq is a high performance library for sequence processing and generation"

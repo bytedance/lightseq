@@ -1,7 +1,6 @@
 #include "bert.h"
 
 namespace lightseq {
-namespace cuda {
 
 Bert::Bert(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
@@ -86,9 +85,9 @@ void Bert::Infer() {
     iter->forward();
   }
   lyr_norm_layer->forward();
-
+#ifdef LIGHTSEQ_cuda
   CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-
+#endif
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 
@@ -176,5 +175,4 @@ DataType Bert::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

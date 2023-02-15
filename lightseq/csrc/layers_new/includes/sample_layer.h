@@ -36,8 +36,10 @@ class SampleLayer : public Layer {
   bool is_stop() { return _beam_search->is_stop(); }
 };
 
-template class SampleLayer<__half>;
 template class SampleLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class SampleLayer<__half>;
+#endif
 
 template <typename T>
 using SampleLayerPtr = std::shared_ptr<SampleLayer<T>>;

@@ -7,6 +7,7 @@
 #include "triton/backend/backend_output_responder.h"
 #include "triton/core/tritonbackend.h"
 #include "triton_model.h"
+#include "cstring"
 #include "triton_utils.h"
 
 namespace triton {
@@ -237,13 +238,15 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
   int device_id;
   TRITONBACKEND_ModelInstanceDeviceId(instance, &device_id);
+#ifdef LIGHTSEQ_cuda
   int devicedChoosed;
   cudaGetDevice(&devicedChoosed);
   if (device_id != devicedChoosed) {
     cudaSetDevice(device_id);
   }
+#endif
 
-  std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr =
+  std::shared_ptr<::lightseq::LSModel> lightseq_model_ptr =
       instance_state->LightseqModel();
 
   // 'responses' is initialized as a parallel array to 'requests',
@@ -311,9 +314,12 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
                          input, buffer_idx, &partial_buffer, &buffer_byte_size,
                          &memory_type, &memory_type_id),
                      "failed get input buffer");
-
+#ifdef LIGHTSEQ_cuda
         cudaMemcpy(moved_d_input, partial_buffer, buffer_byte_size,
                    cudaMemcpyHostToDevice);
+#else
+        memcpy((char*)moved_d_input, (char*)partial_buffer, buffer_byte_size);
+#endif
         moved_d_input = (void*)(reinterpret_cast<uint64_t>(moved_d_input) +
                                 buffer_byte_size);
       }
@@ -377,9 +383,12 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
 
         const void* d_output = static_cast<const void*>(
             lightseq_model_ptr->get_output_ptr(output_idx));
-
+#ifdef LIGHTSEQ_cuda
         cudaMemcpy(single_output_buffer, d_output, buffer_byte_size,
                    cudaMemcpyDeviceToHost);
+#else
+        memcpy((char*)single_output_buffer, (char*)d_output, buffer_byte_size);
+#endif
       }
     }
   }

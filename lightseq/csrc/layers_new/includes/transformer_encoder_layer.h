@@ -36,7 +36,9 @@ class TransformerEncoderLayer : public Layer {
 };
 
 template class TransformerEncoderLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class TransformerEncoderLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using TransformerEncoderLayerPtr =

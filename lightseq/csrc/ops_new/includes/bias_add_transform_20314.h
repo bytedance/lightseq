@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 #include "tuple"
 
 namespace lightseq {
@@ -16,6 +15,8 @@ class BiasAddTrans20314 : public Operator {
   int _heads;
   int _hidden_size;
   int _trans_count;
+
+  Variable* _res;
 
  public:
   BiasAddTrans20314(int max_batch_tokens, int heads, int hidden_size,
@@ -32,13 +33,10 @@ class BiasAddTrans20314 : public Operator {
 
   void before_forward(int batch, int seq_len) {
     _batch = batch, _seq_len = seq_len;
+    _res->set_shape({_trans_count, _batch * _seq_len, _hidden_size});
   }
 
   void forward() override;
-
-  void before_backward(int batch, int seq_len) {
-    _batch = batch, _seq_len = seq_len;
-  }
 
   void backward() override;
 };

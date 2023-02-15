@@ -1,8 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
-#include "cublas_wrappers.h"
 
 namespace lightseq {
 
@@ -14,14 +12,15 @@ class LinearOp : public Operator {
   int _max_batch_tokens;
   int _batch_tokens;
   std::array<int, 3> _gemm_algos;
-  cublasOperation_t _opA;
-  cublasOperation_t _opB;
+
   float _alpha;
+  MATRIX_OP _opA;
+  MATRIX_OP _opB;
 
  public:
   LinearOp(int max_batch_tokens, int output_size, int input_size,
-           cublasOperation_t opA = CUBLAS_OP_T,
-           cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.))
+           MATRIX_OP opA = MATRIX_OP::Transpose,
+           MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.))
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),

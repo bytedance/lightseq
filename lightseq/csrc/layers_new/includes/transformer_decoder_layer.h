@@ -68,7 +68,9 @@ class TransformerDecoderLayer : public Layer {
 };
 
 template class TransformerDecoderLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class TransformerDecoderLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using TransformerDecoderLayerPtr =
@@ -130,7 +132,9 @@ class TransformerDecoderLayerV2 : public Layer {
 };
 
 template class TransformerDecoderLayerV2<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class TransformerDecoderLayerV2<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using TransformerDecoderLayerV2Ptr =

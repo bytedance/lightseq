@@ -40,8 +40,10 @@ class EncDecKvLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class EncDecKvLayer<__half, __half>;
 template class EncDecKvLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class EncDecKvLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using EncDecKvLayerPtr = std::shared_ptr<EncDecKvLayer<T1, T2>>;

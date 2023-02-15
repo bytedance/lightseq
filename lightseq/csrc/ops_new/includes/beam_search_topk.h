@@ -1,9 +1,14 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "transformerKernels.h"
 
 namespace lightseq {
+const float host_min_log_probability = -2000.f;
+
+float host_length_norm(int length, float alpha) {
+  if (alpha < 0.f) return 1.f / length;
+  return std::pow((5.f + length) / 6.f, -alpha);
+}
 
 template <typename T>
 class BeamSearchTopOp : public Operator {

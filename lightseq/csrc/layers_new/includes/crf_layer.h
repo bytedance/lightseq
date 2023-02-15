@@ -42,8 +42,10 @@ class CRFLayer : public Layer {
   int load_params(const std::vector<const T*>& para_vec, int offset);
 };
 
-template class CRFLayer<__half>;
 template class CRFLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class CRFLayer<__half>;
+#endif
 
 template <class T>
 using CRFLayerPtr = std::shared_ptr<CRFLayer<T>>;

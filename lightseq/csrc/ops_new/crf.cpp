@@ -51,8 +51,6 @@ void CRFOP<T>::before_forward(int batch_size, int seq_len,
 
 template <typename T>
 void CRFOP<T>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   const T* start_transition = (const T*)parent(0)->value();
   const T* end_transition = (const T*)parent(1)->value();
   const T* transition = (const T*)parent(2)->value();
@@ -68,9 +66,12 @@ void CRFOP<T>::forward() {
     return;
   }
 
-  launch_viterbi<T>(start_transition, end_transition, transition, emission,
-                    mask, best_score, history, best_tags, _num_tags, _seq_len,
-                    _batch_size, stream, bias);
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
+  cuda::launch_viterbi<T>(start_transition, end_transition, transition,
+                          emission, mask, best_score, history, best_tags,
+                          _num_tags, _seq_len, _batch_size, stream, bias);
+#endif
 }
 
 template <typename T>
@@ -84,6 +85,7 @@ void CRFOP<T>::backward() {
 }
 
 template class CRFOP<float>;
+#ifdef LIGHTSEQ_cuda
 template class CRFOP<__half>;
-
+#endif
 }  // namespace lightseq

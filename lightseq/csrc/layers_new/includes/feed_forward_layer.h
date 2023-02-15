@@ -60,8 +60,10 @@ class FeedForwardLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class FeedForwardLayer<__half, __half>;
 template class FeedForwardLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class FeedForwardLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using FeedForwardLayerPtr = std::shared_ptr<FeedForwardLayer<T1, T2>>;
