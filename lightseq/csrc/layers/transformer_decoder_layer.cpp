@@ -600,8 +600,9 @@ void TransformerDecoderLayer<T>::self_attn_layer_bw(const T *input_ptr,
                                    _batch_size, _trg_seq_len, _hidden_size,
                                    _heads, _stream);
   } else {
-    launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
-                             _trg_seq_len, _hidden_size, _heads, _stream);
+    launch_transform_0213<T>(grad_input_buf_ptr, grad_input_ptr, _batch_size,
+                             _trg_seq_len, _heads, _hidden_size / _heads,
+                             _stream);
   }
   // bw of score * v
   _attn_context.Backward(_batch_heads, grad_input_ptr, v_tf_ptr,
@@ -720,8 +721,9 @@ void TransformerDecoderLayer<T>::encdec_attn_layer_bw(const T *output_ptr,
                                    _encdec_attn_dropout.get_mask(), _batch_size,
                                    _trg_seq_len, _hidden_size, _heads, _stream);
   } else {
-    launch_transform_0213<T>(grad_input_ptr, grad_input_buf_ptr, _batch_size,
-                             _trg_seq_len, _hidden_size, _heads, _stream);
+    launch_transform_0213<T>(grad_input_buf_ptr, grad_input_ptr, _batch_size,
+                             _trg_seq_len, _heads, _hidden_size / _heads,
+                             _stream);
   }
   // bw of score * v
   _encdec_attn_context.Backward(_batch_heads, grad_input_ptr, v_ptr,

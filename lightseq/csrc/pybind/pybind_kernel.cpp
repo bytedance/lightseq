@@ -21,13 +21,12 @@ T *rptr(torch::Tensor &tensor) {
 }
 
 template <typename T>
-void torch_launch_transform_0213(torch::Tensor &output,
-                                 const torch::Tensor &vals, int batch_size,
-                                 int seq_len, int hidden_dim, int nhead) {
+void torch_launch_transform_0213(const torch::Tensor &input,
+                                 torch::Tensor &output, int sz0, int sz1,
+                                 int sz2, int sz3) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_transform_0213(rptr<T>(output), rptr<T>(vals), batch_size, seq_len,
-                        hidden_dim, nhead, stream);
-  //   cudaStreamSynchronize(stream);
+  launch_transform_0213(rptr<T>(input), rptr<T>(output), sz0, sz1, sz2, sz3,
+                        stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
