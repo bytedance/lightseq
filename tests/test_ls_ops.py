@@ -27,7 +27,7 @@ def test_split_head_op():
     )
 
     input = kt.rand((batch_size, seq_len, qkv_num, hidden_dim))
-    bias = kt.rand((hidden_dim))
+    bias = kt.rand((1, 1, qkv_num, hidden_dim))
     query = kt.rand((batch_size, seq_len, hidden_dim))
     key = kt.rand((batch_size, seq_len, hidden_dim))
     value = kt.rand((batch_size, seq_len, hidden_dim))
@@ -94,7 +94,7 @@ def test_split_head_with_beam_op():
     query_beam = 1 if step == 0 else beam_size
 
     input = kt.rand((query_beam, batch_size, q_len, 3, hidden_dim))
-    bias = kt.rand((hidden_dim))
+    bias = kt.rand((1, 1, 1, 3, hidden_dim))
     query = kt.rand((query_beam, batch_size, nhead, q_len, head_dim))
     key_cus = kt.rand((beam_size, batch_size, nhead, cache_len, head_dim))
     value_cus = kt.rand((beam_size, batch_size, nhead, cache_len, head_dim))

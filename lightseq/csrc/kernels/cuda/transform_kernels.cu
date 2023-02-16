@@ -8,113 +8,69 @@ using namespace cub;
 
 namespace lightseq {
 namespace cuda {
-/**
-@brief: transform_0213
-Split the attention heads and reshape input
-during backward progress of encoder self-attention
-
-@thread
-gridDim.x = batch_size
-gridDim.y = seq_len
-blockDim.x = min(hidden_dim, MAX_THREADS)
-
-@param
-input: [batch_size, seq_len, hidden_dim]
-output: [batch_size, nhead, seq_len, head_dim]
-batch_size: the size of the current batch
-seq_len: the sequence length of the current batch
-hidden_dim: dim of the hidden tensor
-nhead: number of attention heads
-*/
 
 template <typename T>
-__global__ void transform_0213(T *output, const T *input, int hidden_dim,
-                               int head_dim);
-
-template <>
-__global__ void transform_0213<float>(float *output, const float *input,
-                                      int hidden_dim, int head_dim) {
-  int batch_id = blockIdx.x;
-  int token_id = blockIdx.y;
-  int seq_len = gridDim.y;
-  int nhead = hidden_dim / head_dim;
-
-  // [b, s, h]
-  int src_offset = flat_3dim(batch_id, token_id, 0, seq_len, hidden_dim);
-  // [b, nh, s, ad]
-  int trg_offset =
-      flat_4dim(batch_id, 0, token_id, 0, nhead, seq_len, head_dim);
-
-  const float4 *input4 = reinterpret_cast<const float4 *>(input);
-  float4 *res4 = reinterpret_cast<float4 *>(output);
-  float4 vinput4;
-
-  for (std::size_t i = threadIdx.x; i < hidden_dim; i += blockDim.x) {
-    vinput4 = input4[src_offset + i];
-
-    int head_id = i / head_dim;
-    int dim_id = i % head_dim;
-    int cur_trg_offset = flat_3dim(head_id, 0, dim_id, seq_len, head_dim);
-    res4[trg_offset + cur_trg_offset] = vinput4;
+void divide_float4(int *sz) {
+  if ((*sz) % 4 != 0) {
+    throw std::runtime_error("size need to be a multiple of 4 when use float4");
   }
+  (*sz) >>= 2;
 }
 
 template <>
-__global__ void transform_0213<__half>(__half *output, const __half *input,
-                                       int hidden_dim, int head_dim) {
-  int batch_id = blockIdx.x;
-  int token_id = blockIdx.y;
-  int seq_len = gridDim.y;
-  int nhead = hidden_dim / head_dim;
-
-  // [b, s, h]
-  int src_offset = flat_3dim(batch_id, token_id, 0, seq_len, hidden_dim);
-  // [b, nh, s, ad]
-  int trg_offset =
-      flat_4dim(batch_id, 0, token_id, 0, nhead, seq_len, head_dim);
-
-  const float4 *input4 = reinterpret_cast<const float4 *>(input);
-  float4 *res4 = reinterpret_cast<float4 *>(output);
-  float4 vinput4;
-
-  for (std::size_t i = threadIdx.x; i < hidden_dim; i += blockDim.x) {
-    vinput4 = input4[src_offset + i];
-
-    int head_id = i / head_dim;
-    int dim_id = i % head_dim;
-    int cur_trg_offset = flat_3dim(head_id, 0, dim_id, seq_len, head_dim);
-    res4[trg_offset + cur_trg_offset] = vinput4;
+void divide_float4<__half>(int *sz) {
+  if ((*sz) % 8 != 0) {
+    throw std::runtime_error("size need to be a multiple of 8 when use float4");
   }
+  (*sz) >>= 3;
 }
 
-// [b, s, h] -> [b, nh, s, ad]
-template <>
-void launch_transform_0213<float>(float *output, const float *input,
-                                  int batch_size, int seq_len, int hidden_dim,
-                                  int nhead, cudaStream_t stream) {
-  hidden_dim >>= 2;
-  int head_dim = hidden_dim / nhead;
+/**
+@brief: transform_0213
+transform a tensor from
+[sz0, sz1, sz2, sz3] to [sz0, sz2, sz1, sz3]
 
-  dim3 grid_dim(batch_size, seq_len);
-  dim3 block_dim(min(hidden_dim, MAX_THREADS));
+@thread
+gridDim.x = (num_all + max_block_thread - 1) / max_block_thread
+blockDim.x = max_block_thread
 
-  transform_0213<float>
-      <<<grid_dim, block_dim, 0, stream>>>(output, input, hidden_dim, head_dim);
+@param
+input: [sz0, sz1, sz2, sz3]
+output: [sz0, sz2, sz1, sz3]
+*/
+template <typename T>
+__global__ void ker_transform_0213(const T *input, T *output, int sz0, int sz1,
+                                   int sz2, int sz3) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  int num_all = sz0 * sz1 * sz2 * sz3;
+  if (offset >= num_all) {
+    return;
+  }
+  int id0, id1, id2, id3;
+  decompose_4dim(offset, sz1, sz2, sz3, &id0, &id1, &id2, &id3);
+  int trg_offset = flat_4dim(id0, id2, id1, id3, sz2, sz1, sz3);
+  const float4 *src = reinterpret_cast<const float4 *>(input);
+  float4 *trg = reinterpret_cast<float4 *>(output);
+  trg[trg_offset] = src[offset];
 }
 
-template <>
-void launch_transform_0213<__half>(__half *output, const __half *input,
-                                   int batch_size, int seq_len, int hidden_dim,
-                                   int nhead, cudaStream_t stream) {
-  hidden_dim >>= 3;
-  int head_dim = hidden_dim / nhead;
-
-  dim3 grid_dim(batch_size, seq_len);
-  dim3 block_dim(min(hidden_dim, MAX_THREADS));
-
-  transform_0213<__half>
-      <<<grid_dim, block_dim, 0, stream>>>(output, input, hidden_dim, head_dim);
+//[sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
+template <typename T>
+void launch_transform_0213(const T *input, T *output, int sz0, int sz1, int sz2,
+                           int sz3, cudaStream_t stream) {
+  divide_float4<T>(&sz3);
+  int num_all = sz0 * sz1 * sz2 * sz3;
+  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+  ker_transform_0213<T>
+      <<<nblock, MAX_THREADS, 0, stream>>>(input, output, sz0, sz1, sz2, sz3);
 }
+
+template void launch_transform_0213<float>(const float *input, float *output,
+                                           int sz0, int sz1, int sz2, int sz3,
+                                           cudaStream_t stream);
+template void launch_transform_0213<__half>(const __half *input, __half *output,
+                                            int sz0, int sz1, int sz2, int sz3,
+                                            cudaStream_t stream);
 
 /**
 @brief: bias_add_transform_20314
@@ -916,7 +872,7 @@ __global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
   int batch_id, token_id, qkv_id, head_id, dim_id;
   decompose_5dim(offset, seq_len, qkv_num, nhead, head_dim, &batch_id,
                  &token_id, &qkv_id, &head_id, &dim_id);
-  int bias_id = flat_2dim(head_id, dim_id, head_dim);
+  int bias_id = flat_3dim(qkv_id, head_id, dim_id, nhead, head_dim);
 
   float4 res4 = (reinterpret_cast<const float4 *>(inp))[offset];
   float4 bias4 = (reinterpret_cast<const float4 *>(bias))[bias_id];
@@ -934,39 +890,31 @@ __global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
   *trg = res4;
 }
 
-template <>
-void launch_split_head<float>(const float *inp, const float *bias, float *query,
-                              float *key, float *value, int batch_size,
-                              int hidden_dim, int head_dim, int seq_len,
-                              int qkv_num, cudaStream_t stream) {
-  if ((head_dim) % 4 != 0) {
-    throw std::runtime_error("head_dim needs to be a multiple of 4");
-  }
-  hidden_dim >>= 2;
-  head_dim >>= 2;
+template <typename T>
+void launch_split_head(const T *inp, const T *bias, T *query, T *key, T *value,
+                       int batch_size, int hidden_dim, int head_dim,
+                       int seq_len, int qkv_num, cudaStream_t stream) {
+  divide_float4<T>(&hidden_dim);
+  divide_float4<T>(&head_dim);
   int num_all = batch_size * seq_len * qkv_num * hidden_dim;
   int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_split_head<float><<<nblock, MAX_THREADS, 0, stream>>>(
+  ker_split_head<T><<<nblock, MAX_THREADS, 0, stream>>>(
       inp, bias, query, key, value, batch_size, hidden_dim, head_dim, seq_len,
       qkv_num, num_all);
 }
 
-template <>
-void launch_split_head<__half>(const __half *inp, const __half *bias,
-                               __half *query, __half *key, __half *value,
-                               int batch_size, int hidden_dim, int head_dim,
-                               int seq_len, int qkv_num, cudaStream_t stream) {
-  if ((head_dim) % 8 != 0) {
-    throw std::runtime_error("head_dim needs to be a multiple of 4");
-  }
-  hidden_dim >>= 3;
-  head_dim >>= 3;
-  int num_all = batch_size * seq_len * qkv_num * hidden_dim;
-  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_split_head<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, seq_len,
-      qkv_num, num_all);
-}
+template void launch_split_head<float>(const float *inp, const float *bias,
+                                       float *query, float *key, float *value,
+                                       int batch_size, int hidden_dim,
+                                       int head_dim, int seq_len, int qkv_num,
+                                       cudaStream_t stream);
+
+template void launch_split_head<__half>(const __half *inp, const __half *bias,
+                                        __half *query, __half *key,
+                                        __half *value, int batch_size,
+                                        int hidden_dim, int head_dim,
+                                        int seq_len, int qkv_num,
+                                        cudaStream_t stream);
 
 /*
 @brief: ker_split_head_with_beam
@@ -1016,7 +964,7 @@ __global__ void ker_split_head_with_beam(const T *inp, const T *bias, T *query,
   // [beam_size, batch_size, q_len, 3, hidden_size]
   decompose_6dim(offset, batch_size, q_len, 3, nhead, head_dim, &beam_id,
                  &batch_id, &token_id, &qkv_id, &head_id, &dim_id);
-  int bias_offset = flat_2dim(head_id, dim_id, head_dim);
+  int bias_offset = flat_3dim(qkv_id, head_id, dim_id, nhead, head_dim);
 
   float4 res4 = (reinterpret_cast<const float4 *>(inp))[offset];
   float4 bias4 = (reinterpret_cast<const float4 *>(bias))[bias_offset];
@@ -1041,48 +989,31 @@ __global__ void ker_split_head_with_beam(const T *inp, const T *bias, T *query,
   *trg = res4;
 }
 
-template <>
-void launch_split_head_with_beam<float>(const float *inp, const float *bias,
-                                        float *query, float *key, float *value,
-                                        int batch_size, int hidden_dim,
-                                        int head_dim, int beam_size, int q_len,
-                                        int step, int cache_len,
-                                        cudaStream_t stream) {
-  if ((head_dim) % 4 != 0) {
-    throw std::runtime_error("head_dim needs to be a multiple of 4");
-  }
-  hidden_dim >>= 2;
-  head_dim >>= 2;
+template <typename T>
+void launch_split_head_with_beam(const T *inp, const T *bias, T *query, T *key,
+                                 T *value, int batch_size, int hidden_dim,
+                                 int head_dim, int beam_size, int q_len,
+                                 int step, int cache_len, cudaStream_t stream) {
+  divide_float4<T>(&hidden_dim);
+  divide_float4<T>(&head_dim);
+
   int num_all = batch_size * q_len * 3 * hidden_dim;
   if (step > 0) {
     num_all *= beam_size;
   }
 
   int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_split_head_with_beam<float><<<nblock, MAX_THREADS, 0, stream>>>(
+  ker_split_head_with_beam<T><<<nblock, MAX_THREADS, 0, stream>>>(
       inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
       step, cache_len, num_all);
 }
 
-template <>
-void launch_split_head_with_beam<__half>(const __half *inp, const __half *bias,
-                                         __half *query, __half *key,
-                                         __half *value, int batch_size,
-                                         int hidden_dim, int head_dim,
-                                         int beam_size, int q_len, int step,
-                                         int cache_len, cudaStream_t stream) {
-  if ((head_dim) % 8 != 0) {
-    throw std::runtime_error("head_dim needs to be a multiple of 4");
-  }
-  hidden_dim >>= 3;
-  head_dim >>= 3;
-  int num_all = batch_size * q_len * 3 * hidden_dim;
-  if (step > 0) {
-    num_all *= beam_size;
-  }
+template void launch_split_head_with_beam<float>(
+    const float *inp, const float *bias, float *query, float *key, float *value,
+    int batch_size, int hidden_dim, int head_dim, int beam_size, int q_len,
+    int step, int cache_len, cudaStream_t stream);
 
-  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_split_head_with_beam<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
-      step, cache_len, num_all);
-}
+template void launch_split_head_with_beam<__half>(
+    const __half *inp, const __half *bias, __half *query, __half *key,
+    __half *value, int batch_size, int hidden_dim, int head_dim, int beam_size,
+    int q_len, int step, int cache_len, cudaStream_t stream);

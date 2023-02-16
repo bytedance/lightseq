@@ -34,7 +34,7 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
           max_batch_tokens * hidden_size, T1(1.0), T1(0.0),
           MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose)),
       _transform_0213(
-          new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
+          new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size)),
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
@@ -125,7 +125,8 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
                                 _batch_heads);
 
-  _transform_0213->before_forward(batch_size, trg_seq_len);
+  _transform_0213->before_forward(batch_size, trg_seq_len, _heads,
+                                  _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_batch_tokens);
 

@@ -13,7 +13,7 @@ and split it into query, key, value
 @param
 input: [batch_size, seq_len, qkv_num, hidden_size]
   qkv_num = 1 or 3, 1 for enc-dec cross attn, 3 for other attn
-bias: [hidden_size]
+bias: [1, 1, qkv_num, hidden_size]
 query: [batch_size, nhead, seq_len, head_dim]
 key: [batch_size, nhead, seq_len, head_dim]
 value: [batch_size, nhead, seq_len, head_dim]
@@ -88,7 +88,7 @@ and split it into query, key, value
 
 @param
 input: [query_beam, batch_size, q_len, 3, hidden_size]
-bias: [hidden_size]
+bias: [1, 1, 1, 3, hidden_size]
 query: [query_beam, batch_size, nhead, q_len, head_dim]
 key: [beam_size, batch_size, nhead, cache_len, head_dim]
 value: [beam_size, batch_size, nhead, cache_len, head_dim]
@@ -105,10 +105,11 @@ query = func(q, query_beam)
 k = func(k, query_beam)
 v = func(v, query_beam)
 if step == 0:
-  k = k.repeat((beam_size, 1, 1, 1, 1))
-  v = v.repeat((beam_size, 1, 1, 1, 1))
-key[:, :, :, step:step+q_len, :] = k
-value[:, :, :, step:step+q_len, :] = v
+  key[0:1, :, :, step:step+q_len, :] = k
+  value[0:1, :, :, step:step+q_len, :] = v
+else:
+  key[:, :, :, step:step+q_len, :] = k
+  value[:, :, :, step:step+q_len, :] = v
 */
 template <typename T1, typename T2>
 class SplitHeadWithBeamOp : public Operator {
