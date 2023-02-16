@@ -130,7 +130,7 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);
 
-  _transform_0213->before_forward(batch_size, seq_len, _heads,
+  _transform_0213->before_forward(batch_size, _heads, seq_len,
                                   _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_batch_tokens);
