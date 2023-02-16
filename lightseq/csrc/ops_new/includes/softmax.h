@@ -18,6 +18,8 @@ class SoftmaxOp : public Operator {
   bool _config_mask_future;
   bool _mask_future;
 
+  Variable* _result;
+
  public:
   SoftmaxOp(int max_batch_tokens, int max_seq_len, int nhead,
             bool mask_future = false)
@@ -39,6 +41,7 @@ class SoftmaxOp : public Operator {
     _from_len = from_len;
     _to_len = to_len;
     _mask_future = mask_future;
+    _result->set_shape({_batchs, _from_len, _to_len});
   }
 
   void backward() override;

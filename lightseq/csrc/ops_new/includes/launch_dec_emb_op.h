@@ -18,6 +18,8 @@ class LaunchDecEmbOp : public Operator {
   int _batch_size;
   int _cur_step;
 
+  Variable* _result;
+
  public:
   LaunchDecEmbOp(int max_batch_tokens, int beam_size, int hidden_size,
                  int trg_vocab_size, int max_step, int multilg_type)
@@ -37,11 +39,10 @@ class LaunchDecEmbOp : public Operator {
 
   void before_forward(int batch_size, int cur_step) {
     _batch_size = batch_size, _cur_step = cur_step;
+    _result->set_shape({batch_size, cur_step + 1, _beam_size});
   }
 
   void forward() override;
-
-  void before_backward() {}
 
   void backward() override {
     printf("ERROR! LaunchDecEmbOp can't cal backward()\n");

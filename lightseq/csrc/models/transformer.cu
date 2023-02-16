@@ -123,16 +123,16 @@ Transformer::Transformer(const std::string weight_path,
 
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
-    Variable *cache_k = new Variable("cache_k");
-    Variable *cache_v = new Variable("cache_v");
+    Variable *cache_k =
+        new Variable("cache_k", total_cache_k, cache_size * dec_layer_idx);
+    Variable *cache_v =
+        new Variable("cache_v", total_cache_v, cache_size * dec_layer_idx);
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
         (*iter)(dec_emb, total_enc_kv, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
     Variable *cache_k_out = std::get<1>(dec_outs);
     Variable *cache_v_out = std::get<2>(dec_outs);
 
-    cache_k->set_ancestor(total_cache_k, cache_size * dec_layer_idx);
-    cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
     dec_layer_idx++;
   }
   Variable *dec_out = (*dec_norm_layer)(dec_emb);

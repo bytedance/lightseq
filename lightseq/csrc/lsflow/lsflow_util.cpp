@@ -15,4 +15,19 @@ void print_time_duration(
             << std::endl;
   return;
 }
+
+#ifdef LIGHTSEQ_cuda
+cublasOperation_t op_from_custom(MATRIX_OP op_type) {
+  switch (op_type) {
+    case MATRIX_OP::Transpose:
+      return CUBLAS_OP_T;
+    case MATRIX_OP::NonTranspose:
+      return CUBLAS_OP_N;
+    default: {
+      throw std::runtime_error("undefined custom MATRIX_OP");
+    }
+  }
+  return;
+}
+#endif
 }  // namespace lightseq

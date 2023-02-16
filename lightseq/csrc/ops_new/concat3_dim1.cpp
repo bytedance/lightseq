@@ -4,24 +4,20 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
-  Variable* new_cache;
   if (!_is_continuous_cache) {
-    new_cache = new Variable("cache_out", cache);
+    _new_cache = new Variable("cache_out", cache);
   } else {
-    new_cache = new Variable("cache_out");
+    _new_cache = new Variable("cache_out", _mx_sz0 * _mx_sz1 * _mx_sz2,
+                              g_dtype<T1>(), g_dtype<T2>());
   }
 
   set_parents({inp, cache});
-  this->set_children({new_cache});
-  return new_cache;
+  this->set_children({_new_cache});
+  return _new_cache;
 }
 
 template <typename T1, typename T2>
 void Concat3Dim1<T1, T2>::forward() {
-  if (!_context_ptr->is_built() && _is_skip) {
-    child(0)->set_ancestor(parent(0));
-  }
-
   T1* inp_ptr = (T1*)parent(0)->value();
   T1* cache_ptr = (T1*)parent(1)->value();
   T1* real_val = (T1*)child(0)->value();

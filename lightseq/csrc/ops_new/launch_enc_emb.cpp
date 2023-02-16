@@ -7,11 +7,13 @@ std::tuple<Variable*, Variable*> LaunchEncEmbOp<T>::operator()(
     Variable* inp_tokens, Variable* token_emb, Variable* pos_emb,
     Variable* lang_emb, Variable* lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
-  Variable* result = new Variable("LaunchEncEmbOp_out", max_size * sizeof(T));
-  Variable* pad_mask = new Variable("pad_mask", _max_batch_tokens * sizeof(T));
+
+  _result = new Variable("LaunchEncEmbOp_out", _max_batch_tokens * _hidden_dim,
+                         g_dtype<T>());
+  _pad_mask = new Variable("pad_mask", _max_batch_tokens, g_dtype<T>());
   set_parents({inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
-  this->set_children({result, pad_mask});
-  return std::make_tuple(result, pad_mask);
+  this->set_children({_result, _pad_mask});
+  return std::make_tuple(_result, _pad_mask);
 }
 
 template <typename T>

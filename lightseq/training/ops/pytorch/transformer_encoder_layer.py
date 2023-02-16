@@ -1,5 +1,6 @@
 from itertools import zip_longest
 import math
+import copy
 
 import torch
 from torch import nn
@@ -102,7 +103,7 @@ class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
     def __init__(self, config, initial_weights=None, initial_biases=None):
         super(LSTransformerEncoderLayer, self).__init__()
 
-        self.config = config
+        self.config = copy.deepcopy(config)
         self.config.layer_id = LSTransformerEncoderLayer.layer_id
         LSTransformerEncoderLayer.layer_id = LSTransformerEncoderLayer.layer_id + 1
 

@@ -58,7 +58,7 @@ class TestDecorator(object):
     def move(self, data):
         return data.to(self.device, dtype=self.dtype)
 
-    def norm_res_list(self, rlist):
+    def norm_res_list(self, *rlist):
         return [ele.to(dtype=self.dtype).contiguous() for ele in rlist]
 
     def get_cmask(self, x, cmax):
@@ -217,8 +217,8 @@ class TestDecorator(object):
             % (custom_time, baseline_time, baseline_time / custom_time)
         )
 
-    def run(self, case_names=None):
-        if case_names is None:
+    def run(self, *case_names):
+        if not case_names:
             case_names = self.all_case.keys()
         for cn in case_names:
             assert cn in self.all_case, "Illegal case name to be tested."

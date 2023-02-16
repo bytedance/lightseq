@@ -18,6 +18,7 @@ add_library(
   allocator.cpp
   lsflow_util.cpp
   operator.cpp
+  shape.cpp
   variable.cpp)
 
 target_link_libraries(lsflow PUBLIC lightseq_kernels)

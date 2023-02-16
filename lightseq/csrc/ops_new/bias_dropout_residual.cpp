@@ -5,12 +5,11 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* BiasDropoutResOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                                Variable* residual) {
-  Variable* result =
-      new Variable("BiasDropoutResOp_out", _max_ele_num * sizeof(T1),
-                   _max_ele_num * sizeof(T2));
+  _result = new Variable("BiasDropoutResOp_out", _max_rows * _max_cols,
+                         g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, bias, residual});
-  this->set_children({result});
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>

@@ -1,5 +1,8 @@
-#pragma once
+/*
+  Copyright (c) 2022 - 2023, Bytedance, The LightSeq Team
+*/
 
+#pragma once
 #include "memory"
 #include "thread"
 #include <stdio.h>
@@ -14,6 +17,7 @@
 #include <vector>
 #include <stdexcept>
 #include <functional>
+#include "model_base.h"
 
 #include "kernel_headers.h"
 
@@ -56,9 +60,13 @@ using MemoryManagerPtr = std::shared_ptr<MemoryManager>;
 class Tensor;
 using TensorPtr = std::shared_ptr<Tensor>;
 
+class Shape;
+
 class Allocator;
 using AllocatorPtr = std::shared_ptr<Allocator>;
 
 const int MB_SIZE = 1024 * 1024;
+
+#define CHECK_DTYPE(dtype, base_type) (dtype == g_dtype<base_type>())
 
 }  // namespace lightseq

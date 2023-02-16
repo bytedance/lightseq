@@ -21,6 +21,7 @@ class TestDecorator(object):
     def init(self, device, nhead):
         # device: str. e.g. "cuda:0"
         self.device = torch.device(device)
+        self._device_str = device
         assert nhead % 4 == 0
         self.nhead = nhead
 
@@ -160,8 +161,15 @@ class TestDecorator(object):
         passed = True
         assert len(tlist1) == len(tlist2)
         for i in range(len(tlist1)):
-            t1 = tlist1[i]
-            t2 = tlist2[i]
+
+            def convert_tensor(obj):
+                if torch.is_tensor(obj):
+                    return obj
+                return torch.from_numpy(obj)
+
+            t1 = convert_tensor(tlist1[i])
+            t2 = convert_tensor(tlist2[i])
+
             # fast allclose
             res = torch.allclose(
                 t1.flatten(), t2.flatten(), rtol=rtol, atol=atol, equal_nan=False
@@ -196,10 +204,12 @@ class TestDecorator(object):
             self.assert_allclose(res, res, rtol, atol)
             timing = list()
             for i in range(nrepeat):
-                torch.cuda.synchronize(device=self.device)
+                if self._device_str != "cpu":
+                    torch.cuda.synchronize(device=self.device)
                 begin = time.time()
                 cur_res = func()
-                torch.cuda.synchronize(device=self.device)
+                if self._device_str != "cpu":
+                    torch.cuda.synchronize(device=self.device)
                 # In seconds
                 timing.append(time.time() - begin)
                 self.assert_allclose(cur_res, res, rtol, atol)
@@ -221,14 +231,15 @@ class TestDecorator(object):
         if case_names is None:
             case_names = self.all_case.keys()
         for cn in case_names:
-            assert cn in self.all_case, "Illegal case name to be tested."
+            assert cn in self.all_case, f"name: {cn}, Illegal case name to be tested"
             func, dtypes, ntest, nrepeat, rtol, atol = self.all_case[cn]
             for i in range(ntest):
                 for dtype in dtypes:
                     self.dtype = dtype
                     print(f">>>>>>>>>>>>>>>>>>>>>>{cn}, ntest [{i}], dtype [{dtype}]:")
                     custom, baseline = func()
-                    torch.cuda.synchronize(device=self.device)
+                    if self._device_str != "cpu":
+                        torch.cuda.synchronize(device=self.device)
                     self.test(custom, baseline, nrepeat, rtol, atol)
 
 

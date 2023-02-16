@@ -35,7 +35,8 @@ int SM_GREATER_THAN_80 = 1;
 string gemm_test_result = "";
 char tmp_cstr[1024];
 string tmp_str;
-
+namespace lightseq {
+namespace cuda {
 // mat is column-major
 template <typename T>
 void transpose(T* matT, T* mat, int rows, int cols) {
@@ -1429,3 +1430,5 @@ string launch_gemm_test(int m, int n, int k) {
 
   return gemm_test_result;
 }
+}  // namespace cuda
+}  // namespace lightseq

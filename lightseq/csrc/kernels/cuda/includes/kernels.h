@@ -62,11 +62,10 @@ void launch_attn_softmax_bw_new(T *inp_grad, const T *out_grad,
                                 const T *soft_inp, int rows, int softmax_len,
                                 cudaStream_t stream);
 
-// [b, s, h] -> [b, nh, s, ad]
+//[sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
 template <typename T>
-void launch_transform_0213(T *output, const T *vals, int batch_size,
-                           int seq_length, int hidden_dim, int nhead,
-                           cudaStream_t stream);
+void launch_transform_0213(const T *input, T *output, int sz0, int sz1, int sz2,
+                           int sz3, cudaStream_t stream);
 
 // [b, s, 3, h] -> [3, b, nh, s, ad]
 template <typename T>
@@ -263,6 +262,17 @@ void launch_quantize_bwd(T *grad_ptr, T *cmax_grad_ptr,
 template <typename T>
 void launch_d_cmax(T *grad_ptr, T *grad_cmax_ptr, const uint8_t *clip_mask_ptr,
                    int numel, int mask_start_bit, cudaStream_t stream);
+
+template <typename T>
+void launch_split_head(const T *inp, const T *bias, T *query, T *key, T *value,
+                       int batch_size, int hidden_dim, int head_dim,
+                       int seq_len, int qkv_num, cudaStream_t stream);
+
+template <typename T>
+void launch_split_head_with_beam(const T *inp, const T *bias, T *query, T *key,
+                                 T *value, int batch_size, int hidden_dim,
+                                 int head_dim, int beam_size, int q_len,
+                                 int step, int cache_len, cudaStream_t stream);
 
 /* Convert 2-dim tensor index into vector index */
 __forceinline__ __host__ __device__ int flat_2dim(int id1, int id2, int dim2) {

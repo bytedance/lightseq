@@ -5,9 +5,8 @@ namespace lightseq {
 Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()),
       _device_id(device_id),
-      _status_type(status_type),
-      _allocator_ptr(new Allocator()) {
-  _mm_ptr->set_allocator(_allocator_ptr);
+      _status_type(status_type) {
+  _allocator_ptr = _mm_ptr->allocator();
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
 #ifdef LIGHTSEQ_cuda
   if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
@@ -84,6 +83,7 @@ void Context::add_op(Operator* op) {
   exit(-1);
 #endif
 }
+
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
@@ -163,9 +163,7 @@ void Context::build() {
   _mm_ptr->calculate_buffer_();
   _built = true;
 
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
-#endif
+  synchronize();
 
 #ifdef DEBUG_MODE
   draw_all_context();
@@ -255,6 +253,13 @@ void* Context::get_object(std::string object_name) {
     exit(-1);
   }
   return iter->second;
+}
+
+void Context::synchronize() {
+#ifdef LIGHTSEQ_cuda
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
+#endif
+  return;
 }
 
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,

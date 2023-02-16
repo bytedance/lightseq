@@ -41,7 +41,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
           max_batch_tokens * hidden_size, T1(1.0), T1(0.0),
           MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose)),
       _transform_0213(
-          new Transform0213<T1, T2>(max_batch_tokens, num_heads, hidden_size)),
+          new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size)),
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
@@ -149,7 +149,8 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len,
                                      !_context_ptr->is_training());
 
-  _transform_0213->before_forward(_batch_size, from_len);
+  _transform_0213->before_forward(_batch_size, from_len, _heads,
+                                  _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_trg_batch_tokens);
 

@@ -88,6 +88,7 @@ void MemoryManager::calculate_buffer_() {
     total_consumption =
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
+  _total_buffer_size = total_consumption;
 
 #ifdef MEM_DEBUG
   printf("**** shared buffer memory size: %zu MB ****\n",
@@ -115,12 +116,15 @@ void MemoryManager::calculate_buffer_() {
           _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
 
       buffer_vec_.push_back(current_buffer);
+      buffer_size_vec_.push_back(max_last_addr - record_last_addr);
+
 #ifdef MEM_DEBUG
       printf(
           "*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n",
           buffer_idx, (max_last_addr - record_last_addr),
           float(max_last_addr - record_last_addr) / MB_SIZE);
 #endif
+
       buffer_idx++;
       for (auto iter : temp_usages_vec) {
         int unique_id = iter.first.unique_id;

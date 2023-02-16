@@ -6,168 +6,142 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 
-
-from tests.util import TestDecorator, copy_grad_from_paras
-
-# from lightseq.training.ops.pytorch import util
-
+from tests.util import TestDecorator
 from lightseq.training.ops.pytorch import OperatorBuilder
 
 kt = TestDecorator()
 op_module = OperatorBuilder().load()
 
-# def copy_para(x):
-#     return torch.nn.Parameter(torch.empty_like(x).copy_(x))
 
-
-def copy_para(x, fp16):
-    y = torch.nn.Parameter(torch.empty_like(x).copy_(x)).to(x.device)
-    return y.half() if fp16 else y.float()
-
-
-@kt.case(dtypes=[torch.float], rtol=1e-3, atol=1e-2, ntest=10)
-def test_layer_normalize_fw():
+@kt.case()
+def test_split_head_op():
     batch_size, seq_len = kt.bs_sl()
-    hidden_dim = 512
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    qkv_num = random.choice([1, 3])
 
-    hidden_states = kt.rand((batch_size, seq_len, hidden_dim))
-    ln_res = torch.empty_like(hidden_states)
-    gamma = kt.rand((hidden_dim))
-    betta = kt.rand((hidden_dim))
+    print(
+        "(batch_size, seq_len, qkv_num, nhead, head_dim): "
+        f"({batch_size}, {seq_len}, {qkv_num}, {nhead}, {head_dim})"
+    )
 
-    # torch.cuda.set_stream(torch.cuda.Stream())
+    input = kt.rand((batch_size, seq_len, qkv_num, hidden_dim))
+    bias = kt.rand((1, 1, qkv_num, hidden_dim))
+    query = kt.rand((batch_size, seq_len, hidden_dim))
+    key = kt.rand((batch_size, seq_len, hidden_dim))
+    value = kt.rand((batch_size, seq_len, hidden_dim))
+
+    if kt.dtype == torch.float:
+        func = op_module.torch_split_head_op_fp32
+    else:
+        func = op_module.torch_split_head_op_fp16
 
     def custom():
-        res = hidden_states.clone()
-
-        if kt.dtype == torch.float:
-            func = op_module.layer_normalize_fw_fp32
-        else:
-            func = op_module.layer_normalize_fw_fp16
-
-        func(ln_res, res, gamma, betta, hidden_dim, batch_size * seq_len)
-
-        return [
-            ln_res.contiguous().detach(),
-        ]
-
-    def baseline():
-        layer_norm = nn.LayerNorm(hidden_dim).to("cuda:0")
-        layer_norm.weight.data.copy_(copy_para(gamma, kt.dtype))
-        layer_norm.bias.data.copy_(copy_para(betta, kt.dtype))
-
-        baseline_out = layer_norm(hidden_states)
-        return [
-            baseline_out.contiguous().detach(),
-        ]
-
-    return custom, baseline
-
-
-@kt.case(dtypes=[torch.float], rtol=1e-3, atol=1e-2, ntest=10)
-def test_layer_normalize_bw():
-    batch_size, seq_len = kt.bs_sl()
-    hidden_dim = 512
-
-    hidden_states = kt.rand((batch_size, seq_len, hidden_dim))
-    ln_res = torch.empty_like(hidden_states)
-    gamma = kt.rand((hidden_dim))
-    betta = kt.rand((hidden_dim))
-    loss_data = torch.randn(1, dtype=hidden_states.dtype).sum()
-
-    def custom():
-        ln_res_grad = torch.empty_like(ln_res)
-        res = hidden_states.clone()
-        res_grad = torch.empty_like(res)
-        gamma_grad = torch.empty_like(gamma)
-        betta_grad = torch.empty_like(betta)
-
-        if kt.dtype == torch.float:
-            func = op_module.layer_normalize_bw_fp32
-        else:
-            func = op_module.layer_normalize_bw_fp16
-
         func(
-            ln_res,
-            ln_res_grad,
-            res,
-            res_grad,
-            gamma,
-            gamma_grad,
-            betta,
-            betta_grad,
+            input,
+            bias,
+            query,
+            key,
+            value,
+            batch_size,
             hidden_dim,
-            batch_size * seq_len,
+            nhead,
+            seq_len,
+            qkv_num,
         )
-
-        return [
-            ln_res.contiguous().detach(),
-            res_grad.contiguous().detach(),
-            gamma_grad.contiguous().detach(),
-            betta_grad.contiguous().detach(),
-        ]
+        if qkv_num == 3:
+            return kt.norm_res_list(query, key, value)
+        else:
+            return kt.norm_res_list(query)
 
     def baseline():
-        layer_norm = nn.LayerNorm(hidden_dim).to("cuda:0")
-        layer_norm.weight.data.copy_(copy_para(gamma, kt.dtype))
-        layer_norm.bias.data.copy_(copy_para(betta, kt.dtype))
-
-        baseline_out = layer_norm(hidden_states)
-        layer_norm.zero_grad()
-        baseline_loss = (baseline_out / 1000.0).sum()
-        baseline_loss.data_.copy(loss_data)
-        baseline_loss.backward()
-
-        all_tensor = [
-            baseline_out.contiguous().detach(),
-        ]
-        grads = copy_grad_from_paras(
-            [hidden_states, layer_norm.weight, layer_norm.bias]
+        q, k, v = None, None, None
+        func = lambda x: x.reshape((batch_size, seq_len, nhead, head_dim)).permute(
+            0, 2, 1, 3
         )
-        all_tensor.extend(grads)
-        return all_tensor
+        inp = input + bias
+        if qkv_num == 3:
+            q, k, v = inp.split(1, dim=2)
+            q = func(q.squeeze())
+            k = func(k.squeeze())
+            v = func(v.squeeze())
+            return kt.norm_res_list(query, key, value)
+        else:
+            q = func(inp.squeeze())
+            return kt.norm_res_list(query)
 
     return custom, baseline
 
 
-@kt.case(dtypes=[torch.float], rtol=1e-3, atol=1e-2, ntest=10)
-def test_feedforward_fw():
-    batch_size, seq_len = kt.bs_sl()
-    input_dim = 512
-    output_dim = 768
+@kt.case()
+def test_split_head_with_beam_op():
+    batch_size, q_len = kt.bs_sl()
+    hidden_dim = kt.hidden_dim
+    nhead = kt.nhead
+    head_dim = int(hidden_dim / nhead)
+    beam_size = random.randint(1, 5)
+    cache_len = random.randint(q_len, q_len + 30)
+    step = random.choice([0, 1])
+    if step == 1:
+        step = random.randint(0, cache_len - q_len)
 
-    hidden_states = kt.rand((batch_size, seq_len, input_dim))
-    weights = kt.rand((output_dim, input_dim))
+    print(
+        "(batch_size, q_len, step, beam_size): "
+        f"({batch_size}, {q_len}, {step}, {beam_size})"
+    )
+
+    query_beam = 1 if step == 0 else beam_size
+
+    input = kt.rand((query_beam, batch_size, q_len, 3, hidden_dim))
+    bias = kt.rand((1, 1, 1, 3, hidden_dim))
+    query = kt.rand((query_beam, batch_size, nhead, q_len, head_dim))
+    key_cus = kt.rand((beam_size, batch_size, nhead, cache_len, head_dim))
+    value_cus = kt.rand((beam_size, batch_size, nhead, cache_len, head_dim))
+    key_baseline = key_cus.clone()
+    value_baseline = value_cus.clone()
+
+    if kt.dtype == torch.float:
+        func = op_module.torch_split_head_with_beam_op_fp32
+    else:
+        func = op_module.torch_split_head_with_beam_op_fp16
 
     def custom():
-        res = kt.zeros((batch_size, seq_len, output_dim))
-
-        if kt.dtype == torch.float:
-            func = op_module.feed_forward_fw_fp32
-        else:
-            func = op_module.feed_forward_fw_fp16
-
         func(
-            hidden_states,
-            weights.clone(),
-            res,
-            output_dim,
-            input_dim,
-            batch_size * seq_len,
+            input,
+            bias,
+            query,
+            key_cus,
+            value_cus,
+            batch_size,
+            hidden_dim,
+            nhead,
+            beam_size,
+            q_len,
+            cache_len,
+            step,
         )
-
-        return [
-            res.contiguous().detach(),
-        ]
+        return kt.norm_res_list(query, key_cus, value_cus)
 
     def baseline():
-        feed_forward = nn.Linear(input_dim, output_dim, bias=False).to("cuda:0")
-        feed_forward.weight.data.copy_(copy_para(weights, kt.dtype))
-        baseline_out = feed_forward(hidden_states)
-
-        return [
-            baseline_out.contiguous().detach(),
-        ]
+        # [query_beam, batch_size, nhead, q_len, head_dim]
+        func = (
+            lambda x: x.squeeze()
+            .reshape((query_beam, batch_size, q_len, nhead, head_dim))
+            .permute(0, 1, 3, 2, 4)
+        )
+        inp = input + bias
+        q, k, v = inp.split(1, dim=3)
+        q = func(q)
+        k = func(k)
+        v = func(v)
+        if step == 0:
+            key_baseline[0:1, :, :, step : step + q_len, :] = k
+            value_baseline[0:1, :, :, step : step + q_len, :] = v
+        else:
+            key_baseline[:, :, :, step : step + q_len, :] = k
+            value_baseline[:, :, :, step : step + q_len, :] = v
+        return kt.norm_res_list(q, key_baseline, value_baseline)
 
     return custom, baseline
 
@@ -175,9 +149,6 @@ def test_feedforward_fw():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
-        [
-            "test_layer_normalize_fw",
-            # "test_layer_normalize_bw",
-            "test_feedforward_fw",
-        ]
+        "test_split_head_op",
+        "test_split_head_with_beam_op",
     )

@@ -8,13 +8,14 @@ Variable* LaunchDecEmbOp<T>::operator()(Variable* inp_tokens,
                                         Variable* lang_emb, Variable* lang_id) {
   size_t max_size = _max_batch_tokens * _hidden_size * _beam_size;
 
-  Variable* result = new Variable("LaunchDecEmbOp_out", max_size * sizeof(T));
+  _result =
+      new Variable("LaunchDecEmbOp_out",
+                   _max_batch_tokens * _hidden_size * _beam_size, g_dtype<T>());
 
   set_parents({inp_tokens, token_emb, pos_emb, lang_emb, lang_id});
 
-  this->set_children({result});
-
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T>

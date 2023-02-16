@@ -10,6 +10,8 @@
 typedef const torch::Tensor cts;
 typedef torch::Tensor ts;
 
+namespace lightseq {
+namespace cuda {
 template <typename T>
 const T *rptr(const torch::Tensor &tensor) {
   return reinterpret_cast<const T *>(tensor.data_ptr());
@@ -21,13 +23,12 @@ T *rptr(torch::Tensor &tensor) {
 }
 
 template <typename T>
-void torch_launch_transform_0213(torch::Tensor &output,
-                                 const torch::Tensor &vals, int batch_size,
-                                 int seq_len, int hidden_dim, int nhead) {
+void torch_launch_transform_0213(const torch::Tensor &input,
+                                 torch::Tensor &output, int sz0, int sz1,
+                                 int sz2, int sz3) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_transform_0213(rptr<T>(output), rptr<T>(vals), batch_size, seq_len,
-                        hidden_dim, nhead, stream);
-  //   cudaStreamSynchronize(stream);
+  launch_transform_0213(rptr<T>(input), rptr<T>(output), sz0, sz1, sz2, sz3,
+                        stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -419,161 +420,164 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
+}
+}
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("torch_launch_transform_0213_fp32", &torch_launch_transform_0213<float>,
+
+  m.def("torch_launch_transform_0213_fp32", &lightseq::cuda::torch_launch_transform_0213<float>,
         "Test kernel wrapper");
   m.def("torch_launch_transform_0213_fp16",
-        &torch_launch_transform_0213<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_transform_0213<__half>, "Test kernel wrapper");
   m.def("torch_launch_bias_add_transform_20314_fp32",
-        &torch_launch_bias_add_transform_20314<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_bias_add_transform_20314<float>, "Test kernel wrapper");
   m.def("torch_launch_bias_add_transform_20314_fp16",
-        &torch_launch_bias_add_transform_20314<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_bias_add_transform_20314<__half>, "Test kernel wrapper");
 
   m.def("torch_launch_transform4d_0213_fp32",
-        &torch_launch_transform4d_0213<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_transform4d_0213<float>, "Test kernel wrapper");
   m.def("torch_launch_transform4d_0213_fp16",
-        &torch_launch_transform4d_0213<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_transform4d_0213<__half>, "Test kernel wrapper");
 
   m.def("torch_launch_bias_add_transform_20314_new_fp32",
-        &torch_launch_bias_add_transform_20314_new<float>,
+        &lightseq::cuda::torch_launch_bias_add_transform_20314_new<float>,
         "Test kernel wrapper");
   m.def("torch_launch_bias_add_transform_20314_new_fp16",
-        &torch_launch_bias_add_transform_20314_new<__half>,
+        &lightseq::cuda::torch_launch_bias_add_transform_20314_new<__half>,
         "Test kernel wrapper");
 
-  m.def("torch_launch_fused_add2_fp32", &torch_launch_fused_add2<float>,
+  m.def("torch_launch_fused_add2_fp32", &lightseq::cuda::torch_launch_fused_add2<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_fused_add2_fp16", &torch_launch_fused_add2<__half>,
+  m.def("torch_launch_fused_add2_fp16", &lightseq::cuda::torch_launch_fused_add2<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_ffn_bias_bwd_fp32", &torch_launch_ffn_bias_bwd<float>,
+  m.def("torch_launch_ffn_bias_bwd_fp32", &lightseq::cuda::torch_launch_ffn_bias_bwd<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_ffn_bias_bwd_fp16", &torch_launch_ffn_bias_bwd<__half>,
+  m.def("torch_launch_ffn_bias_bwd_fp16", &lightseq::cuda::torch_launch_ffn_bias_bwd<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_attn_softmax_fp32", &torch_launch_attn_softmax<float>,
+  m.def("torch_launch_attn_softmax_fp32", &lightseq::cuda::torch_launch_attn_softmax<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_attn_softmax_fp16", &torch_launch_attn_softmax<__half>,
+  m.def("torch_launch_attn_softmax_fp16", &lightseq::cuda::torch_launch_attn_softmax<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_new_fp32",
-        &torch_launch_attn_softmax_new<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_new<float>, "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_new_fp16",
-        &torch_launch_attn_softmax_new<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_new<__half>, "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_fp32",
-        &torch_launch_attn_softmax_bw<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_bw<float>, "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_fp16",
-        &torch_launch_attn_softmax_bw<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_bw<__half>, "Test kernel wrapper");
 
   m.def("torch_launch_attn_softmax_bw_new_fp32",
-        &torch_launch_attn_softmax_bw_new<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_bw_new<float>, "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_new_fp16",
-        &torch_launch_attn_softmax_bw_new<__half>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_attn_softmax_bw_new<__half>, "Test kernel wrapper");
 
-  m.def("torch_launch_layer_norm_fp32", &torch_launch_layer_norm<float>,
+  m.def("torch_launch_layer_norm_fp32", &lightseq::cuda::torch_launch_layer_norm<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_layer_norm_fp16", &torch_launch_layer_norm<__half>,
+  m.def("torch_launch_layer_norm_fp16", &lightseq::cuda::torch_launch_layer_norm<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_layer_norm_i8_fp32", &torch_launch_layer_norm_i8<float>,
+  m.def("torch_launch_layer_norm_i8_fp32", &lightseq::cuda::torch_launch_layer_norm_i8<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_layer_norm_i8_fp16", &torch_launch_layer_norm_i8<__half>,
+  m.def("torch_launch_layer_norm_i8_fp16", &lightseq::cuda::torch_launch_layer_norm_i8<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_ln_bw_fp32", &torch_launch_ln_bw<float>,
+  m.def("torch_launch_ln_bw_fp32", &lightseq::cuda::torch_launch_ln_bw<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_ln_bw_fp16", &torch_launch_ln_bw<__half>,
+  m.def("torch_launch_ln_bw_fp16", &lightseq::cuda::torch_launch_ln_bw<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_ln_bw_i8_fp32", &torch_launch_ln_bw_i8<float>,
+  m.def("torch_launch_ln_bw_i8_fp32", &lightseq::cuda::torch_launch_ln_bw_i8<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_ln_bw_i8_fp16", &torch_launch_ln_bw_i8<__half>,
+  m.def("torch_launch_ln_bw_i8_fp16", &lightseq::cuda::torch_launch_ln_bw_i8<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_curand_init", &torch_curand_init, "Test kernel wrapper");
-  m.def("torch_launch_concat3_dim1_fp32", &torch_launch_concat3_dim1<float>,
+  m.def("torch_launch_curand_init", &lightseq::cuda::torch_curand_init, "Test kernel wrapper");
+  m.def("torch_launch_concat3_dim1_fp32", &lightseq::cuda::torch_launch_concat3_dim1<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_concat3_dim1_fp16", &torch_launch_concat3_dim1<__half>,
+  m.def("torch_launch_concat3_dim1_fp16", &lightseq::cuda::torch_launch_concat3_dim1<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_fp32",
-        &torch_launch_ls_dropout_act_bias<ActivationType::kRelu, float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_fp16",
-        &torch_launch_ls_dropout_act_bias<ActivationType::kRelu, __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_fp32",
-        &torch_launch_ls_dropout_act_bias<ActivationType::kGelu, float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_fp16",
-        &torch_launch_ls_dropout_act_bias<ActivationType::kGelu, __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_bwd_fp32",
-        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_bwd_fp16",
-        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp32",
-        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp16",
-        &torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_fp32",
-        &torch_launch_ls_quant_dropout_act_bias<ActivationType::kRelu, float>,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_fp16",
-        &torch_launch_ls_quant_dropout_act_bias<ActivationType::kRelu, __half>,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_fp32",
-        &torch_launch_ls_quant_dropout_act_bias<ActivationType::kGelu, float>,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_fp16",
-        &torch_launch_ls_quant_dropout_act_bias<ActivationType::kGelu, __half>,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def(
       "torch_launch_ls_quant_dropout_relu_bias_bwd_fp32",
-      &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, float>,
+      &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu, float>,
       "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_bwd_fp16",
-        &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kRelu,
                                                     __half>,
         "Test kernel wrapper");
   m.def(
       "torch_launch_ls_quant_dropout_gelu_bias_bwd_fp32",
-      &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, float>,
+      &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu, float>,
       "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_bwd_fp16",
-        &torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu,
+        &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<ActivationType::kGelu,
                                                     __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_bias_dropout_residual_fp32",
-        &torch_launch_ls_quant_bias_dropout_residual<float>,
+        &lightseq::cuda::torch_launch_ls_quant_bias_dropout_residual<float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_bias_dropout_residual_fp16",
-        &torch_launch_ls_quant_bias_dropout_residual<__half>,
+        &lightseq::cuda::torch_launch_ls_quant_bias_dropout_residual<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_quant_bias_add_transform_20314_fp32",
-        &torch_launch_quant_bias_add_transform_20314<float>,
+        &lightseq::cuda::torch_launch_quant_bias_add_transform_20314<float>,
         "Test kernel wrapper");
   m.def("torch_launch_quant_bias_add_transform_20314_fp16",
-        &torch_launch_quant_bias_add_transform_20314<__half>,
+        &lightseq::cuda::torch_launch_quant_bias_add_transform_20314<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_quant_transform4d_0213_fp32",
-        &torch_launch_quant_transform4d_0213<float>, "Test kernel wrapper");
+        &lightseq::cuda::torch_launch_quant_transform4d_0213<float>, "Test kernel wrapper");
   m.def("torch_launch_quant_transform4d_0213_fp16",
-        &torch_launch_quant_transform4d_0213<__half>, "Test kernel wrapper");
-  m.def("torch_launch_ls_quantize_fp32", &torch_launch_ls_quantize<float>,
+        &lightseq::cuda::torch_launch_quant_transform4d_0213<__half>, "Test kernel wrapper");
+  m.def("torch_launch_ls_quantize_fp32", &lightseq::cuda::torch_launch_ls_quantize<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_ls_quantize_fp16", &torch_launch_ls_quantize<__half>,
+  m.def("torch_launch_ls_quantize_fp16", &lightseq::cuda::torch_launch_ls_quantize<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_ls_dequantize_fp32", &torch_launch_ls_dequantize<float>,
+  m.def("torch_launch_ls_dequantize_fp32", &lightseq::cuda::torch_launch_ls_dequantize<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_ls_dequantize_fp16", &torch_launch_ls_dequantize<__half>,
+  m.def("torch_launch_ls_dequantize_fp16", &lightseq::cuda::torch_launch_ls_dequantize<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_fake_quantize_fp32", &torch_launch_fake_quantize<float>,
+  m.def("torch_launch_fake_quantize_fp32", &lightseq::cuda::torch_launch_fake_quantize<float>,
         "Test kernel wrapper");
-  m.def("torch_launch_fake_quantize_fp16", &torch_launch_fake_quantize<__half>,
+  m.def("torch_launch_fake_quantize_fp16", &lightseq::cuda::torch_launch_fake_quantize<__half>,
         "Test kernel wrapper");
-  m.def("get_sm_version", &get_sm_version, "Test kernel wrapper");
-  m.def("get_gpu_name", &get_gpu_name, "Test kernel wrapper");
-  m.def("gemm_test", &gemm_test, "Test kernel wrapper");
-  m.def("torch_launch_viterbi_fp16", &torch_launch_viterbi<__half>,
+  m.def("get_sm_version", &lightseq::cuda::get_sm_version, "Test kernel wrapper");
+  m.def("get_gpu_name", &lightseq::cuda::get_gpu_name, "Test kernel wrapper");
+  m.def("gemm_test", &lightseq::cuda::gemm_test, "Test kernel wrapper");
+  m.def("torch_launch_viterbi_fp16", &lightseq::cuda::torch_launch_viterbi<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_viterbi_fp32", &torch_launch_viterbi<float>,
+  m.def("torch_launch_viterbi_fp32", &lightseq::cuda::torch_launch_viterbi<float>,
         "Test kernel wrapper");
 }

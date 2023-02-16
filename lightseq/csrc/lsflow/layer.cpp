@@ -99,7 +99,8 @@ void Layer::clear_bw_flag() {
     op->clear_bw_flag();
     for (Node* var : op->parents()) {
       Variable* this_var = static_cast<Variable*>(var);
-      if (this_var->is_descendants()) this_var->ancestor()->clear_bw_flag();
+      if (this_var->variable_type() == VariableType::OffsetVariable)
+        this_var->ancestor()->clear_bw_flag();
       var->clear_bw_flag();
     }
   }
@@ -113,28 +114,5 @@ void Layer::tag_bw_flag() {
     }
   }
 }
-
-// void Layer::gather_root_leaf_var() {
-//   _leaf_var_vec.clear();
-//   _root_var_vec.clear();
-//   for (Operator* op : _op_vec) {
-//     // gather leaf var
-//     for (Node* var : op->children()) {
-//       Variable* vvar = static_cast<Variable*>(var);
-//       if (var->children().size() == 0) {
-//         _leaf_var_vec.push_back(vvar);
-//         vvar->fixed_memory();
-//       }
-//     }
-//     // gather root var
-//     for (Node* var : op->parents()) {
-//       Variable* vvar = static_cast<Variable*>(var);
-//       if (var->parents().size() == 0) {
-//         _root_var_vec.push_back(vvar);
-//         vvar->fixed_memory();
-//       }
-//     }
-//   }  // each op
-// }
 
 }  // namespace lightseq

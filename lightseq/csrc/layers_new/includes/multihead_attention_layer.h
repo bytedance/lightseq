@@ -23,7 +23,7 @@ class MultiheadAttentionLayer : public Layer {
   SoftmaxOp<T1, T2>* _softmax = nullptr;
   DropoutOp<T1, T2>* _attn_prob_dropout = nullptr;
   StridedBatchGemmOp<T1, T2>* _attn_context = nullptr;
-  Transform0213<T1, T2>* _transform_0213 = nullptr;
+  Transform0213OP<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
 

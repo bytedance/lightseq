@@ -9,11 +9,12 @@ template <typename T1, typename T2>
 Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
                                                Variable* betta) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
-  Variable* result = new Variable("LayerNormalizeOp_out", max_size * sizeof(T1),
-                                  max_size * sizeof(T2));
+  _result =
+      new Variable("LayerNormalizeOp_out", _max_batch_tokens * _hidden_dim,
+                   g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, gamma, betta});
-  this->set_children({result});
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>
