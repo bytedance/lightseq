@@ -4,11 +4,11 @@
 
 import torch
 import pathlib
-from .builder import CUDAOpBuilder
+from .builder import OpBuilder
 from .builder import installed_cuda_version
 
 
-class X86KernelBuilder(CUDAOpBuilder):
+class X86KernelBuilder(OpBuilder):
     NAME = "lightseq_kernels"
 
     def __init__(self, name=None):
@@ -27,6 +27,7 @@ class X86KernelBuilder(CUDAOpBuilder):
     def include_paths(self):
         paths = [
             "csrc/kernels/x86/includes",
+            "/opt/intel/oneapi/mkl/latest/include/",
         ]
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
@@ -35,6 +36,9 @@ class X86KernelBuilder(CUDAOpBuilder):
                 str(pathlib.Path(__file__).parents[5] / "3rdparty" / "pybind11")
             )
         return paths
+
+    def library_dirs(self):
+        return ["/opt/intel/oneapi/mkl/latest/lib/intel64"]
 
     def nvcc_args(self):
         args = [
@@ -47,7 +51,7 @@ class X86KernelBuilder(CUDAOpBuilder):
             "-DTHRUST_IGNORE_CUB_VERSION_CHECK",
         ]
 
-        return args + self.compute_capability_args()
+        return args
 
     def cxx_args(self):
         return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]
