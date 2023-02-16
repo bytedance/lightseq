@@ -273,7 +273,8 @@ class CUDAOpBuilder(OpBuilder):
                 if cc not in ccs:
                     ccs.append(cc)
             ccs = sorted(ccs)
-            ccs[-1] += "+PTX"
+            if ccs:
+                ccs[-1] += "+PTX"
         else:
             # Cross-compile mode, compile for various architectures
             # env override takes priority
