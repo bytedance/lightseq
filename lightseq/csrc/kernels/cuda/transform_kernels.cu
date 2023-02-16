@@ -1017,3 +1017,6 @@ template void launch_split_head_with_beam<__half>(
     const __half *inp, const __half *bias, __half *query, __half *key,
     __half *value, int batch_size, int hidden_dim, int head_dim, int beam_size,
     int q_len, int step, int cache_len, cudaStream_t stream);
+
+}  // namespace cuda
+}  // namespace lightseq

@@ -4,12 +4,11 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* Transform0213OP<T1, T2>::operator()(Variable* inp) {
-  Variable* res =
-      new Variable("Transform0213_res", _max_numel,
-                   g_dtype<T1>(), g_dtype<T2>());
+  _result = new Variable("Transform0213_res", _max_numel, g_dtype<T1>(),
+                         g_dtype<T2>());
   set_parents({inp});
-  this->set_children({res});
-  return res;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>
@@ -20,10 +19,11 @@ void Transform0213OP<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-
-  //   [b, nh, s, ad] -> [b, s, nh, ad]
-  launch_transform4d_0213<T1>(res_ptr, inp_ptr, _batch, _seq_len, _hidden_size,
-                              _heads, 1, _stream);
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t _stream = _context_ptr->get_stream();
+  cuda::launch_transform_0213<T1>(inp_ptr, res_ptr, _sz0, _sz1, _sz2, _sz3,
+                                  _stream);
+#endif
 }
 
 template <typename T1, typename T2>
@@ -37,7 +37,8 @@ void Transform0213OP<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  cuda::launch_transform_0213<T2>(out_grad, inp_grad, _sz0, _sz1, _sz2, _sz3, _stream);
+  cuda::launch_transform_0213<T2>(out_grad, inp_grad, _sz0, _sz1, _sz2, _sz3,
+                                  _stream);
 #endif
 }
 

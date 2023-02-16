@@ -1,4 +1,3 @@
-#include "context.h"
 #include "kernel_headers.h"
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -35,9 +34,7 @@ py::array_t<float> test_gemm(
 }  // namespace x86
 }  // namespace lightseq
 
-PYBIND11_MODULE(inference, m) {
-  // m.attr("__name__") = "lightseq.inference";
-
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("test_gemm", &lightseq::x86::test_gemm,
         "LightSeq test gemm with fp32 (x86 CPU)");
 }
