@@ -116,6 +116,9 @@ class OpBuilder(ABC):
         """
         return []
 
+    def library_dirs(self):
+        return []
+
     def nvcc_args(self):
         """
         Returns optional list of compiler flags to forward to nvcc when building CUDA sources
@@ -185,6 +188,7 @@ class OpBuilder(ABC):
             sources=self.sources(),
             include_dirs=self.include_paths(),
             extra_compile_args={"cxx": self.cxx_args()},
+            library_dirs=self.library_dirs(),
         )
 
     def load(self, verbose=True):
@@ -267,14 +271,15 @@ class CUDAOpBuilder(OpBuilder):
         ccs = []
         if self.jit_mode:
             # Compile for underlying architectures since we know those at runtime
+            if not torch.cuda.device_count():
+                raise RuntimeError("Can't find gpu to build lightseq cuda op")
             for i in range(torch.cuda.device_count()):
                 CC_MAJOR, CC_MINOR = torch.cuda.get_device_capability(i)
                 cc = f"{CC_MAJOR}.{CC_MINOR}"
                 if cc not in ccs:
                     ccs.append(cc)
             ccs = sorted(ccs)
-            if ccs:
-                ccs[-1] += "+PTX"
+            ccs[-1] += "+PTX"
         else:
             # Cross-compile mode, compile for various architectures
             # env override takes priority
