@@ -21,6 +21,8 @@ set(cuda_kernel_files
     crf.cu
     transformerKernels.cc.cu)
 
+list(APPEND CMAKE_MODULE_PATH ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
+
 add_library(lightseq_kernels STATIC ${cuda_kernel_files})
 target_include_directories(lightseq_kernels PUBLIC ${HDF5_INCLUDE_DIRS})
 target_include_directories(lightseq_kernels INTERFACE includes)

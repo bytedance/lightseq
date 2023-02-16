@@ -83,7 +83,7 @@ Transformer::Transformer(const std::string weight_path,
   // // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
-      CUBLAS_OP_N, CUBLAS_OP_N,
+      MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose,
       tw_._no_scale_embedding ? 1.f : sqrt(1.f / tw_._hidden_size)));
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
@@ -94,7 +94,7 @@ Transformer::Transformer(const std::string weight_path,
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
-  inp_tokens = new Variable("inp_tokens");
+  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
   dec_tokens = new Variable("dec_tokens",
                             max_batch_tokens * tw_._beam_size * sizeof(int), 0,
                             VariableType::FixedVariable);
@@ -255,7 +255,7 @@ void Transformer::Infer() {
   }
   /* ---step3. output the decoding result--- */
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  _context_ptr->synchronize();
 
   set_output_shape(0,
                    {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});

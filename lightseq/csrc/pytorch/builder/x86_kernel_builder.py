@@ -31,7 +31,9 @@ class X86KernelBuilder(CUDAOpBuilder):
         cuda_major, cuda_minor = installed_cuda_version()
         if cuda_major < 11:
             paths.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "cub"))
-            paths.append(str(pathlib.Path(__file__).parents[5] / "3rdparty" / "pybind11"))
+            paths.append(
+                str(pathlib.Path(__file__).parents[5] / "3rdparty" / "pybind11")
+            )
         return paths
 
     def nvcc_args(self):

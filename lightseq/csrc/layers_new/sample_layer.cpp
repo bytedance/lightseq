@@ -13,7 +13,7 @@ SampleLayer<T>::SampleLayer(int nshared_dec_layer, int max_batch_size,
           nshared_dec_layer, max_batch_size, max_step, trg_vocab_size,
           hidden_size, max_thread_per_block, beam_size, diverse_lambda,
           dim_per_head, end_id, head_num, length_penalty)) {
-  _logit_bias = new Variable("logits_bias");
+  _logit_bias = new Variable("logits_bias", g_dtype<T>());
 
   this->_context_ptr->exit_layer();  // necessary
 }

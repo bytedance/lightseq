@@ -19,7 +19,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
-  inp_tokens = new Variable("inp_tokens");
+  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -85,9 +85,9 @@ void Bert::Infer() {
     iter->forward();
   }
   lyr_norm_layer->forward();
-#ifdef LIGHTSEQ_cuda
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
-#endif
+
+  _context_ptr->synchronize();
+
   set_output_shape(0, {batch_size, seq_len, tw_._hidden_size});
 }
 

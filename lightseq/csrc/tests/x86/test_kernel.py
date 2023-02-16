@@ -1,4 +1,5 @@
 import os, sys
+
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 par_dir = os.path.dirname(cur_dir)
 sys.path.insert(0, par_dir)
@@ -22,12 +23,14 @@ def test_gemm_case():
 
     cus_inpA = inpA.clone().cpu().numpy()
     cus_inpB = inpB.clone().cpu().numpy()
+
     def custom():
         cus_out = x86_kernel_module.test_gemm(cus_inpA, cus_inpB)
         return [cus_out]
 
     base_inpA = inpA.clone()
     base_inpB = inpB.clone()
+
     def baseline():
         base_out = torch.mm(base_inpA, base_inpB)
         return [base_out]

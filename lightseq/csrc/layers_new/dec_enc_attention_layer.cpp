@@ -38,7 +38,7 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
-          hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
+          hidden_output_dropout_ratio, max_batch_tokens, hidden_size)) {
   // parameters
   _attn_qw = new Variable("_attn_qw", g_dtype<T1>(), g_dtype<T2>());
   _attn_qb = new Variable("_attn_qb", g_dtype<T1>(), g_dtype<T2>());
@@ -119,8 +119,7 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len,
-                                     !_context_ptr->is_training());
+  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
 
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
                                 _batch_heads);

@@ -28,7 +28,7 @@ void test_func() {
   linear_layer->load_params(_p_wei_emb, 0);
 
   // construct network
-  Variable* inp(new Variable("input"));
+  Variable* inp(new Variable("input", g_dtype<float>()));
   Variable* out = (*linear_layer)(inp);
 
   // set input_ptr & output_ptr

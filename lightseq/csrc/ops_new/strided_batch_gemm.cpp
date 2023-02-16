@@ -61,7 +61,8 @@ void StridedBatchGemmOp<T1, T2>::backward() {
 
 #ifdef LIGHTSEQ_cuda
   // B need to transpose.
-  cublasOperation_t op_b = (_op_B == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
+  cublasOperation_t op_b =
+      (op_from_custom(_opB) == CUBLAS_OP_T ? CUBLAS_OP_N : CUBLAS_OP_T);
 
   cublasHandle_t handle = _context_ptr->get_cublashandle();
   // Calculate d_A.

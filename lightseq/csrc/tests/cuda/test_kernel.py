@@ -1,4 +1,5 @@
 import os, sys
+
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 par_dir = os.path.dirname(cur_dir)
 sys.path.insert(0, par_dir)
@@ -1579,37 +1580,38 @@ def test_torch_launch_fake_quantize():
 
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
-    kt.run([
-        "test_launch_transform_0213",
-        # "test_launch_bias_add_transform_20314",
-        # "test_launch_transform4d_0213",
-        # "test_launch_bias_add_transform_20314_new",
-        # "test_launch_fused_add2",
-        # "test_launch_ffn_bias_bwd",
-        # "test_launch_attn_softmax",
-        # "test_launch_attn_softmax_new",
-        # "test_launch_attn_softmax_bw",
-        # "test_launch_attn_softmax_bw_new",
-        # "test_launch_layer_norm",
-        # "test_launch_ln_bw",
-        # "test_launch_concat3_dim1",
-        # "test_adam",
-        # "test_launch_dropout_relu_bias",
-        # "test_launch_dropout_relu_bias_bwd",
-        # "test_launch_dropout_gelu_bias",
-        # "test_launch_dropout_gelu_bias_bwd",
-        # "test_launch_layer_norm_i8O",
-        # "test_launch_ln_i8O_bw",
-        # "test_launch_dropout_relu_bias_i8I_i8O",
-        # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-        # "test_launch_dropout_gelu_bias_i8I_i8O",
-        # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
-        # "test_launch_quant_bias_dropout_residual",
-        # "test_launch_quant_bias_add_transform_20314",
-        # "test_launch_quant_transform4d_0213",
-        # "test_torch_launch_ls_quantize",
-        # "test_torch_launch_ls_dequantize",
-        # "test_torch_launch_fake_quantize",
-        # "test_crf",
-    ]
+    kt.run(
+        [
+            "test_launch_transform_0213",
+            # "test_launch_bias_add_transform_20314",
+            # "test_launch_transform4d_0213",
+            # "test_launch_bias_add_transform_20314_new",
+            # "test_launch_fused_add2",
+            # "test_launch_ffn_bias_bwd",
+            # "test_launch_attn_softmax",
+            # "test_launch_attn_softmax_new",
+            # "test_launch_attn_softmax_bw",
+            # "test_launch_attn_softmax_bw_new",
+            # "test_launch_layer_norm",
+            # "test_launch_ln_bw",
+            # "test_launch_concat3_dim1",
+            # "test_adam",
+            # "test_launch_dropout_relu_bias",
+            # "test_launch_dropout_relu_bias_bwd",
+            # "test_launch_dropout_gelu_bias",
+            # "test_launch_dropout_gelu_bias_bwd",
+            # "test_launch_layer_norm_i8O",
+            # "test_launch_ln_i8O_bw",
+            # "test_launch_dropout_relu_bias_i8I_i8O",
+            # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
+            # "test_launch_dropout_gelu_bias_i8I_i8O",
+            # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
+            # "test_launch_quant_bias_dropout_residual",
+            # "test_launch_quant_bias_add_transform_20314",
+            # "test_launch_quant_transform4d_0213",
+            # "test_torch_launch_ls_quantize",
+            # "test_torch_launch_ls_dequantize",
+            # "test_torch_launch_fake_quantize",
+            # "test_crf",
+        ]
     )

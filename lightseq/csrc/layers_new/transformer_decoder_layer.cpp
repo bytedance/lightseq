@@ -105,14 +105,12 @@ void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
   _batch_size = batch_size;
   _batch_tokens = batch_size * trg_seq_len;
 
-  enc_k->set_offset(
-      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T1),
-      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T2));
+  enc_k->set_offset(2 * _layer_id * _hidden_size * batch_size * src_seq_len,
+                    {_batch_size, src_seq_len, _hidden_size});
 
-  enc_v->set_offset((2 * _layer_id + 1) * _hidden_size * batch_size *
-                        src_seq_len * sizeof(T1),
-                    (2 * _layer_id + 1) * _hidden_size * batch_size *
-                        src_seq_len * sizeof(T2));
+  enc_v->set_offset(
+      (2 * _layer_id + 1) * _hidden_size * batch_size * src_seq_len,
+      {_batch_size, src_seq_len, _hidden_size});
 
   if (_layer_id == 0 && step <= 0) {
     _enc_kv_layer->before_forward(batch_size, src_seq_len);
@@ -254,14 +252,12 @@ void TransformerDecoderLayerV2<T1, T2>::before_forward(int batch_size,
   _batch_size = batch_size;
   _batch_tokens = batch_size * trg_seq_len;
 
-  enc_k->set_offset(
-      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T1),
-      2 * _layer_id * _hidden_size * batch_size * src_seq_len * sizeof(T2));
+  enc_k->set_offset(2 * _layer_id * _hidden_size * batch_size * src_seq_len,
+                    {batch_size, src_seq_len, _hidden_size});
 
-  enc_v->set_offset((2 * _layer_id + 1) * _hidden_size * batch_size *
-                        src_seq_len * sizeof(T1),
-                    (2 * _layer_id + 1) * _hidden_size * batch_size *
-                        src_seq_len * sizeof(T2));
+  enc_v->set_offset(
+      (2 * _layer_id + 1) * _hidden_size * batch_size * src_seq_len,
+      {batch_size, src_seq_len, _hidden_size});
 
   _self_attn_layer->before_forward(batch_size, trg_seq_len, step);
 

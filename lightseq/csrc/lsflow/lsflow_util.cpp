@@ -27,7 +27,7 @@ cublasOperation_t op_from_custom(MATRIX_OP op_type) {
       throw std::runtime_error("undefined custom MATRIX_OP");
     }
   }
-  return;
+  exit(-1);
 }
 #endif
 }  // namespace lightseq
