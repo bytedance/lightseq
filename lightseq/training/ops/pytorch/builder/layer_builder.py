@@ -58,6 +58,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/dec_enc_attention_layer.cpp",
             "csrc/layers_new/transformer_decoder_layer.cpp",
             "csrc/layers_new/crf_layer.cpp",
+            # "csrc/layers_new/gpt_attention_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
