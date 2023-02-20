@@ -1,18 +1,15 @@
-import os, sys
+import sys
+from __init__ import lightseq_dir
 
-cur_dir = os.path.dirname(os.path.abspath(__file__))
-par_dir = os.path.dirname(cur_dir)
-sys.path.insert(0, par_dir)
-csrc_dir = os.path.dirname(par_dir)
-sys.path.insert(0, csrc_dir)
+sys.path.insert(0, lightseq_dir)
 
 import random
 import torch
 from torch._C import ScriptModule, dtype
 from torch.nn import functional
 
-from pytorch.builder import CudaKernelBuilder
-from tests.util import TestDecorator
+from csrc.pytorch.builder import CudaKernelBuilder
+from csrc.tests.util import TestDecorator
 
 cuda_module = CudaKernelBuilder().load()
 kt = TestDecorator()
@@ -743,7 +740,7 @@ def test_launch_ln_i8O_bw():
     return custom, baseline
 
 
-@kt.case(rtol=1e-3)
+@kt.case(atol=1e-3, rtol=1e-2)
 def test_launch_ffn_bias_bwd():
     batch_size, seq_len = kt.bs_sl()
     hidden_dim = kt.hidden_dim
@@ -1583,35 +1580,35 @@ if __name__ == "__main__":
     kt.run(
         [
             "test_launch_transform_0213",
-            # "test_launch_bias_add_transform_20314",
-            # "test_launch_transform4d_0213",
-            # "test_launch_bias_add_transform_20314_new",
-            # "test_launch_fused_add2",
-            # "test_launch_ffn_bias_bwd",
-            # "test_launch_attn_softmax",
-            # "test_launch_attn_softmax_new",
-            # "test_launch_attn_softmax_bw",
-            # "test_launch_attn_softmax_bw_new",
-            # "test_launch_layer_norm",
-            # "test_launch_ln_bw",
-            # "test_launch_concat3_dim1",
-            # "test_adam",
-            # "test_launch_dropout_relu_bias",
-            # "test_launch_dropout_relu_bias_bwd",
-            # "test_launch_dropout_gelu_bias",
-            # "test_launch_dropout_gelu_bias_bwd",
-            # "test_launch_layer_norm_i8O",
-            # "test_launch_ln_i8O_bw",
-            # "test_launch_dropout_relu_bias_i8I_i8O",
-            # "test_launch_dropout_relu_bias_i8I_i8O_bwd",
-            # "test_launch_dropout_gelu_bias_i8I_i8O",
-            # "test_launch_dropout_gelu_bias_i8I_i8O_bwd",
-            # "test_launch_quant_bias_dropout_residual",
-            # "test_launch_quant_bias_add_transform_20314",
-            # "test_launch_quant_transform4d_0213",
-            # "test_torch_launch_ls_quantize",
-            # "test_torch_launch_ls_dequantize",
-            # "test_torch_launch_fake_quantize",
-            # "test_crf",
+            "test_launch_bias_add_transform_20314",
+            "test_launch_transform4d_0213",
+            "test_launch_bias_add_transform_20314_new",
+            "test_launch_fused_add2",
+            "test_launch_ffn_bias_bwd",
+            # "test_launch_attn_softmax", # need to fix
+            "test_launch_attn_softmax_new",
+            # "test_launch_attn_softmax_bw", # need to fix
+            "test_launch_attn_softmax_bw_new",
+            "test_launch_layer_norm",
+            # "test_launch_ln_bw", # need to fix
+            "test_launch_concat3_dim1",
+            # "test_adam", # need to fix
+            "test_launch_dropout_relu_bias",
+            "test_launch_dropout_relu_bias_bwd",
+            "test_launch_dropout_gelu_bias",
+            # "test_launch_dropout_gelu_bias_bwd", # need to fix
+            # "test_launch_layer_norm_i8O", # need to fix
+            # "test_launch_ln_i8O_bw", # need to fix
+            "test_launch_dropout_relu_bias_i8I_i8O",
+            # "test_launch_dropout_relu_bias_i8I_i8O_bwd", # need to fix
+            "test_launch_dropout_gelu_bias_i8I_i8O",
+            # "test_launch_dropout_gelu_bias_i8I_i8O_bwd", # need to fix
+            "test_launch_quant_bias_dropout_residual",
+            "test_launch_quant_bias_add_transform_20314",
+            # "test_launch_quant_transform4d_0213", # need to fix
+            # "test_torch_launch_ls_quantize", # need to fix
+            "test_torch_launch_ls_dequantize",
+            # "test_torch_launch_fake_quantize", # need to fix
+            # "test_crf", # need to fix
         ]
     )

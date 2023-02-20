@@ -516,68 +516,68 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &lightseq::cuda::torch_launch_concat3_dim1<__half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_fp32",
-        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kRelu,
-                                                          float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<
+            lightseq::ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_fp16",
-        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kRelu,
-                                                          __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<
+            lightseq::ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_fp32",
-        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kGelu,
-                                                          float>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<
+            lightseq::ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_fp16",
-        &lightseq::cuda::torch_launch_ls_dropout_act_bias<ActivationType::kGelu,
-                                                          __half>,
+        &lightseq::cuda::torch_launch_ls_dropout_act_bias<
+            lightseq::ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_bwd_fp32",
         &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<
-            ActivationType::kRelu, float>,
+            lightseq::ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_relu_bias_bwd_fp16",
         &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<
-            ActivationType::kRelu, __half>,
+            lightseq::ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp32",
         &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<
-            ActivationType::kGelu, float>,
+            lightseq::ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_dropout_gelu_bias_bwd_fp16",
         &lightseq::cuda::torch_launch_ls_dropout_act_bias_bwd<
-            ActivationType::kGelu, __half>,
+            lightseq::ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_fp32",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<
-            ActivationType::kRelu, float>,
+            lightseq::ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_fp16",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<
-            ActivationType::kRelu, __half>,
+            lightseq::ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_fp32",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<
-            ActivationType::kGelu, float>,
+            lightseq::ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_fp16",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias<
-            ActivationType::kGelu, __half>,
+            lightseq::ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_bwd_fp32",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<
-            ActivationType::kRelu, float>,
+            lightseq::ActivationType::kRelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_relu_bias_bwd_fp16",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<
-            ActivationType::kRelu, __half>,
+            lightseq::ActivationType::kRelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_bwd_fp32",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<
-            ActivationType::kGelu, float>,
+            lightseq::ActivationType::kGelu, float>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_dropout_gelu_bias_bwd_fp16",
         &lightseq::cuda::torch_launch_ls_quant_dropout_act_bias_bwd<
-            ActivationType::kGelu, __half>,
+            lightseq::ActivationType::kGelu, __half>,
         "Test kernel wrapper");
   m.def("torch_launch_ls_quant_bias_dropout_residual_fp32",
         &lightseq::cuda::torch_launch_ls_quant_bias_dropout_residual<float>,
