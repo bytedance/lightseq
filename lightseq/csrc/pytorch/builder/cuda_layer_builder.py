@@ -7,6 +7,7 @@ import pathlib
 from .builder import CUDAOpBuilder
 from .builder import installed_cuda_version
 
+
 class CudaLayerBuilder(CUDAOpBuilder):
     NAME = "lightseq_layers_new"
 

@@ -5,7 +5,7 @@ from builder.cuda_layer_builder import CudaLayerBuilder
 cuda_layer_module = CudaLayerBuilder().load()
 
 
-class LSTransformerEncoderFuncNew( torch.autograd.Function):
+class LSTransformerEncoderFuncNew(torch.autograd.Function):
     @staticmethod
     def forward(
         ctx,
@@ -53,7 +53,6 @@ class LSTransformerEncoderFuncNew( torch.autograd.Function):
         # grad = _all_layer_grads[ctx.config.layer_id]
 
         # return (grad_input, None, grad, None)
-
 
 
 if __name__ == "__main__":
