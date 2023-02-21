@@ -23,9 +23,10 @@ char* Allocator::malloc_mem(size_t size) {
 }
 
 void Allocator::free_mem(char* ptr) {
-  if (_ptr_set.find(ptr) != _ptr_set.end()) {
-    _ptr_set.erase(ptr);
+  if (_ptr_set.find(ptr) == _ptr_set.end()) {
+    return;
   }
+  _ptr_set.erase(ptr);
 #ifdef LIGHTSEQ_cuda
   cuda::cuda_free(ptr);
 #else

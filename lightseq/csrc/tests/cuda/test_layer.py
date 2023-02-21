@@ -82,7 +82,7 @@ def gen_enc_layer_pair():
     return custom_enc_layer_base, custom_enc_layer_new
 
 
-NUM_LAYERS = 1
+NUM_LAYERS = 4
 
 custom_enc_layers = []
 base_enc_layers = []

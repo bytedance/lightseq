@@ -154,7 +154,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);
 
-  _transform_0213->before_forward(_batch_size, from_len, _heads,
+  _transform_0213->before_forward(_batch_size, _heads, from_len,
                                   _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_trg_batch_tokens);
