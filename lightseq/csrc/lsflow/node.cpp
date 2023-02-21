@@ -63,7 +63,7 @@ void Node::recursive_forward() {
   }
 
 #ifdef DEBUG_MODE
-  if (node_type() == NodeType::Operator) {
+  if (node_type() == NodeType::Operator && _context_ptr->is_built()) {
     printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
            _fw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
@@ -83,7 +83,7 @@ void Node::recursive_forward() {
   forward();
 
 #ifdef DEBUG_MODE
-  if (node_type() != NodeType::Operator) {
+  if (node_type() != NodeType::Operator || !_context_ptr->is_built()) {
     return;
   }
   _context_ptr->synchronize();
@@ -126,7 +126,7 @@ void Node::recursive_backward() {
   }
 
 #ifdef DEBUG_MODE
-  if (node_type() == NodeType::Operator) {
+  if (node_type() == NodeType::Operator && _context_ptr->is_built()) {
     printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
            _bw_node_idx);
     Operator* this_op = static_cast<Operator*>(this);
@@ -145,7 +145,7 @@ void Node::recursive_backward() {
   backward();
 
 #ifdef DEBUG_MODE
-  if (node_type() != NodeType::Operator) {
+  if (node_type() != NodeType::Operator || !_context_ptr->is_built()) {
     return;
   }
   _context_ptr->synchronize();

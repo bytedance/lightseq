@@ -13,15 +13,11 @@ Variable* DropoutOp<T1, T2>::operator()(Variable* inp) {
 
 template <typename T1, typename T2>
 void DropoutOp<T1, T2>::forward() {
-  T1* input = (T1*)parent(0)->value();
-  T1* output = (T1*)child(0)->value();
-  uint8_t* mask_ptr = (uint8_t*)_mask->tensor();
+  T1* input = parent(0)->value<T1>();
+  T1* output = child(0)->value<T1>();
+  uint8_t* mask_ptr = _mask->tensor<uint8_t>();
 
   if (!_context_ptr->is_built()) {
-    return;
-  }
-
-  if (_is_skip) {
     return;
   }
 

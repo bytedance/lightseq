@@ -18,8 +18,9 @@ Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 }
 
 template <typename T1, typename T2>
-void LayerNormalizeOp<T1, T2>::before_forward(size_t batch_tokens) {
-  _batch_tokens = batch_tokens;
+void LayerNormalizeOp<T1, T2>::before_forward(int batch_size, int seq_len) {
+  _batch_tokens = batch_size * seq_len;
+  _result->set_shape({batch_size, seq_len, _hidden_dim});
 }
 
 template <typename T1, typename T2>
@@ -40,11 +41,6 @@ void LayerNormalizeOp<T1, T2>::forward() {
   cuda::launch_layer_norm(ln_res_val, vars_val, means_val, inp_val, gamma_val,
                           betta_val, _batch_tokens, _hidden_dim, stream);
 #endif
-}
-
-template <typename T1, typename T2>
-void LayerNormalizeOp<T1, T2>::before_backward(size_t batch_tokens) {
-  _batch_tokens = batch_tokens;
 }
 
 template <typename T1, typename T2>

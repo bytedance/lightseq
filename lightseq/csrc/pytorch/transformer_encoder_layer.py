@@ -15,7 +15,7 @@ from training.ops.pytorch.util import (
     calc_offset,
 )
 
-from builder.cuda_layer_builder import CudaLayerBuilder
+from csrc.pytorch.builder.cuda_layer_builder import CudaLayerBuilder
 
 cuda_layer_module = CudaLayerBuilder().load()
 
@@ -40,11 +40,11 @@ class LSTransformerEncoderFunc(torch.autograd.Function):
             input = input.to(torch.half)
             input_mask = input_mask.to(torch.half)
 
-        (output,) = forward_func(config.layer_id, input, input_mask, config.training)
+        (output,) = forward_func(config.layer_id, input, input_mask)
 
-        if config.is_grad_enabled and config.training:
-            ctx.save_for_backward(output, input, input_mask)
-            ctx.config = config
+        # if config.is_grad_enabled and config.training:
+        #     ctx.save_for_backward(output, input, input_mask)
+        #     ctx.config = config
         return output
 
 
@@ -114,6 +114,8 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
             assert cur_para.numel() == b.numel()
             cur_para.copy_(b.view(-1))
             idx += 1
+
+        self.to(torch.device("cuda:0"), dtype=torch.half)
 
         if self.config.fp16 and self.para.dtype != torch.half:
             if hasattr(self, "para_16"):

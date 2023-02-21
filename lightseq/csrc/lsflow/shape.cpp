@@ -4,7 +4,7 @@ namespace lightseq {
 
 int Shape::element_size() {
   if (_shape_vec.size() == 1 && _shape_vec[0] == -1) {
-    throw std::runtime_error("this tensor without shape");
+    printf("this tensor without shape\n");
     return 0;
   }
   if (_is_calculated) {

@@ -110,7 +110,7 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
 
-  _attn_ln->before_forward(_batch_tokens);
+  _attn_ln->before_forward(batch_size, seq_len);
 
   _qkv_linear->before_forward(_batch_tokens);
 
@@ -119,9 +119,11 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_scores->before_forward(seq_len, seq_len, _hidden_size / _heads,
                                _batch_heads);
 
-  q_out->set_offset(0, {_batch_tokens, _hidden_size});
-  k_out->set_offset(_batch_dim, {_batch_tokens, _hidden_size});
-  v_out->set_offset(2 * _batch_dim, {_batch_tokens, _hidden_size});
+  q_out->set_offset(0, {batch_size, _heads, seq_len, _hidden_size / _heads});
+  k_out->set_offset(_batch_dim,
+                    {batch_size, _heads, seq_len, _hidden_size / _heads});
+  v_out->set_offset(2 * _batch_dim,
+                    {batch_size, _heads, seq_len, _hidden_size / _heads});
 
   _softmax->before_forward(batch_size, seq_len, seq_len);
 
@@ -130,7 +132,7 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
   _attn_context->before_forward(_hidden_size / _heads, seq_len, seq_len,
                                 _batch_heads);
 
-  _transform_0213->before_forward(batch_size, seq_len, _heads,
+  _transform_0213->before_forward(batch_size, _heads, seq_len,
                                   _hidden_size / _heads);
 
   _attn_out_linear->before_forward(_batch_tokens);

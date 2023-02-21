@@ -41,7 +41,7 @@ class SoftmaxOp : public Operator {
     _from_len = from_len;
     _to_len = to_len;
     _mask_future = mask_future;
-    _result->set_shape({_batchs, _from_len, _to_len});
+    _result->set_shape({_batchs, _nhead, _from_len, _to_len});
   }
 
   void backward() override;
