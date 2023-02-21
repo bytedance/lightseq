@@ -40,10 +40,6 @@ void DropoutOp<T1, T2>::backward() {
     return;
   }
 
-  if (_is_skip) {
-    return;
-  }
-
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
   cuda::launch_ls_dropout<T2>(input_grad, output_grad, mask_ptr, _count,
