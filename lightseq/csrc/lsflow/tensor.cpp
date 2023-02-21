@@ -152,7 +152,7 @@ void Tensor::set_offset(int offset, Shape shape) {
 char* Tensor::tensor(bool is_open_interval) {
   if (_mtype == LSMemoryType::OffsetMemory) {
     return _original_tensor->tensor(is_open_interval) +
-           _offset * sizeof(dtype_size(_dtype));
+           _offset * dtype_size(_dtype);
   }
   if (_mtype == LSMemoryType::FixedMemory) {
     if (!_ctx_ptr->is_built() && _ptr == nullptr) {
@@ -210,25 +210,41 @@ std::string Tensor::memory_type() {
 void Tensor::print_tensor(int size) {
   _ctx_ptr->synchronize();
   int ele_siz = element_size();
+  if (ele_siz == 0) {
+    printf("error occurred! this tensor is %s\n", _name.c_str());
+  } else {
+    printf("tensor shape: ");
+    for (int iter = 0; iter < shape().size(); iter++) {
+      printf("%d ", shape()[iter]);
+    }
+    printf(", tensor dtype: %d", _dtype);
+
+    if (_mtype == LSMemoryType::OffsetMemory) {
+      printf(", offset is %d\n", _offset);
+    } else {
+      printf("\n");
+    }
+  }
+
   size = std::min(size, ele_siz);
   switch (_dtype) {
     case DataType::kFloat16: {
 #ifdef LIGHTSEQ_cuda
-      print_vec((__half*)tensor(), _name, size);
-      print_vec((__half*)tensor() + ele_siz - size, _name, size);
+      print_vec((__half*)tensor(), _name + " head", size);
+      print_vec((__half*)tensor() + ele_siz - size, _name + " tail", size);
 #else
       throw std::runtime_error("error! float16 can not be used without cuda!");
 #endif
       break;
     }
     case DataType::kFloat32: {
-      print_vec((float*)tensor(), _name, size);
-      print_vec((float*)tensor() + ele_siz - size, _name, size);
+      print_vec((float*)tensor(), _name + " head", size);
+      print_vec((float*)tensor() + ele_siz - size, _name + " tail", size);
       break;
     }
     case DataType::kInt32: {
-      print_vec((int*)tensor(), _name, size);
-      print_vec((int*)tensor() + ele_siz - size, _name, size);
+      print_vec((int*)tensor(), _name + " head", size);
+      print_vec((int*)tensor() + ele_siz - size, _name + " tail", size);
       break;
     }
     case DataType::kNotSupported: {

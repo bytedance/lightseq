@@ -28,7 +28,10 @@ class DropoutOp : public Operator {
 
   Variable* operator()(Variable* inp);
 
-  void before_forward(int count) { _result->set_shape({count}); }
+  void before_forward(int count) {
+    _count = count;
+    _result->set_shape({count});
+  }
 
   void forward() override;
 

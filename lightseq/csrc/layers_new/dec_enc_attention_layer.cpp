@@ -108,7 +108,7 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
 
-  _attn_ln->before_forward(_batch_tokens);
+  _attn_ln->before_forward(batch_size, trg_seq_len);
 
   _q_linear->before_forward(_batch_tokens);
 

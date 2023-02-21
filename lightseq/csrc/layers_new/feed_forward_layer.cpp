@@ -80,7 +80,7 @@ template <typename T1, typename T2>
 void FeedForwardLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   int batch_tokens = batch_size * seq_len;
 
-  _ffn_ln->before_forward(batch_tokens);
+  _ffn_ln->before_forward(batch_size, seq_len);
 
   _ff1->before_forward(batch_tokens);
 

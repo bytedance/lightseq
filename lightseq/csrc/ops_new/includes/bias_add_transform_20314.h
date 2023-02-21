@@ -33,7 +33,8 @@ class BiasAddTrans20314 : public Operator {
 
   void before_forward(int batch, int seq_len) {
     _batch = batch, _seq_len = seq_len;
-    _res->set_shape({_trans_count, _batch * _seq_len, _hidden_size});
+    _res->set_shape(
+        {_trans_count, _batch, _heads, _seq_len, _hidden_size / _heads});
   }
 
   void forward() override;

@@ -34,11 +34,9 @@ class LayerNormalizeOp : public Operator {
 
   virtual ~LayerNormalizeOp();
 
-  void before_forward(size_t batch_tokens);
+  void before_forward(int batch_size, int seq_len);
 
   void forward() override;
-
-  void before_backward(size_t batch_tokens);
 
   void backward() override;
 };

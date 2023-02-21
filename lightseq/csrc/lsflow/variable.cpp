@@ -95,7 +95,11 @@ void Variable::set_grad(char* grad_ptr) {
   }
 }
 
-void Variable::set_shape(Shape shape) { _shape = shape; }
+void Variable::set_shape(Shape shape) {
+  _shape = shape;
+  _value->set_shape(shape);
+  if (_grad != nullptr) _grad->set_shape(shape);
+}
 
 void Variable::malloc_memory(size_t size) {
   int value_byte_size = size * dtype_size(_fw_dtype);
@@ -152,6 +156,7 @@ void Variable::add_descendants(Variable* var) {
 }
 
 void Variable::set_offset(int offset, Shape shape) {
+  _shape = shape;
   _value->set_offset(offset, shape);
   if (_grad != nullptr) {
     _grad->set_offset(offset, shape);
@@ -160,6 +165,9 @@ void Variable::set_offset(int offset, Shape shape) {
 
 #ifdef DEBUG_MODE
 void Variable::print_var(bool is_fw) {
+  if (!_context_ptr->is_built()) {
+    return;
+  }
   if (is_fw) {
     if (value() == nullptr)
       printf("value address is nullptr\n");

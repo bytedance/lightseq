@@ -95,8 +95,11 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
+  inp_node->set_shape(
+      {(int)input.size(0), (int)input.size(1), (int)input.size(2)});
   Variable *inp_mask_node = layer->input(1);
   inp_mask_node->set_value(input_mask_ptr);
+  inp_mask_node->set_shape({(int)input_mask.size(0), (int)input_mask.size(1)});
 
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
@@ -294,7 +297,7 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 
 PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   // create default context
-  lightseq::Context::create_global_context(lightseq::StatusType::Training);
+  lightseq::Context::create_global_context(lightseq::StatusType::Inference);
 
   m.def("create_global_context", &lightseq::create_global_context,
         "Create Lightseq Context");
