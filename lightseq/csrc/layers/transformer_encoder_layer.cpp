@@ -3,7 +3,8 @@
 #include "context.h"
 #include "kernels.h"
 #include "cuda_util.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 TransformerEncoderLayer<T>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
@@ -554,3 +555,5 @@ int8_t *TransformerEncoderLayer<T>::_shared_quant_mem_ptr = nullptr;
 
 template class TransformerEncoderLayer<float>;
 template class TransformerEncoderLayer<__half>;
+}  // namespace cuda
+}  // namespace lightseq

@@ -10,7 +10,7 @@
 #include "bert_crf.h"
 
 namespace py = pybind11;
-
+namespace lightseq {
 class PyTransformer {
  private:
   lightseq::cuda::LSModel *model_;
@@ -224,6 +224,7 @@ class PyBertCrf {
     return output;
   }
 };
+}  // namespace lightseq
 
 PYBIND11_MODULE(inference, m) {
   m.attr("__name__") = "lightseq.inference";

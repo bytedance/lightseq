@@ -9,7 +9,8 @@
 #include "kernels.h"
 
 using namespace std;
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class Normalize_Layer {
  public:
@@ -79,3 +80,5 @@ class Normalize_Layer {
   T *vars_;
   T *means_;
 };
+}  // namespace cuda
+}  // namespace lightseq

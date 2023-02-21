@@ -7,6 +7,8 @@
 #include <string>
 
 #include "cuda_util.h"
+namespace lightseq {
+namespace cuda {
 
 class Context {
  public:
@@ -37,3 +39,6 @@ class Context {
   cublasHandle_t _cublasHandle;
   cublasLtHandle_t _cublasLtHandle;
 };
+
+}  // namespace cuda
+}  // namespace lightseq

@@ -7,7 +7,8 @@
 #include <type_traits>
 
 #include "cuda_util.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class CrossEntropyLayer {
  public:
@@ -44,3 +45,5 @@ class CrossEntropyLayer {
 
   float *_loss_buffer;
 };
+}  // namespace cuda
+}  // namespace lightseq

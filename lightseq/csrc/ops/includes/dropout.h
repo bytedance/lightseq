@@ -6,7 +6,8 @@
 #include <stdio.h>
 
 #include "kernels.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class Dropout {
  public:
@@ -195,3 +196,5 @@ class Dropout {
   Config _config;
   int _max_ele_num;
 };
+}  // namespace cuda
+}  // namespace lightseq

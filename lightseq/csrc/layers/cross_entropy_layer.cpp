@@ -2,7 +2,8 @@
 
 #include "context.h"
 #include "kernels.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 CrossEntropyLayer<T>::CrossEntropyLayer(float epsilon, int padding_idx,
                                         int max_batch_tokens)
@@ -48,3 +49,5 @@ void CrossEntropyLayer<T>::set_cur_batch_shape(int batch_size, int seq_len,
 
 template class CrossEntropyLayer<float>;
 template class CrossEntropyLayer<__half>;
+}  // namespace cuda
+}  // namespace lightseq

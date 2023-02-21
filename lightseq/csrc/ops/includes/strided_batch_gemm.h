@@ -12,6 +12,8 @@
 
 #include "cublas_wrappers.h"
 
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class StridedBatchGemm {
  public:
@@ -97,3 +99,5 @@ class StridedBatchGemm {
  private:
   Config _config;
 };
+}  // namespace cuda
+}  // namespace lightseq
