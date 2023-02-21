@@ -119,6 +119,12 @@ class OpBuilder(ABC):
     def library_dirs(self):
         return []
 
+    def dynamic_libraries(self):
+        return []
+
+    def static_libraries(self):
+        return []
+
     def nvcc_args(self):
         """
         Returns optional list of compiler flags to forward to nvcc when building CUDA sources
@@ -189,6 +195,7 @@ class OpBuilder(ABC):
             include_dirs=self.include_paths(),
             extra_compile_args={"cxx": self.cxx_args()},
             library_dirs=self.library_dirs(),
+            libraries=self.libraries(),
         )
 
     def load(self, verbose=True):
@@ -240,6 +247,11 @@ class OpBuilder(ABC):
             ],
             extra_cflags=self.cxx_args(),
             extra_cuda_cflags=self.nvcc_args(),
+            extra_ldflags=["-L" + path for path in self.library_dirs()]
+            + ["-l" + path for path in self.dynamic_libraries()]
+            + ["-Wl,--start-group"]
+            + self.static_libraries()
+            + ["-Wl,--end-group"],
             verbose=verbose,
         )
         build_duration = time.time() - start_build

@@ -4,6 +4,7 @@
 
 import torch
 import pathlib
+import os
 from .builder import OpBuilder
 from .builder import installed_cuda_version
 
@@ -20,6 +21,7 @@ class X86KernelBuilder(OpBuilder):
 
     def sources(self):
         return [
+            "csrc/kernels/x86/util.cc",
             "csrc/kernels/x86/gemm.cpp",
             "csrc/pybind/pybind_kernel_x86.cpp",
         ]
@@ -37,8 +39,38 @@ class X86KernelBuilder(OpBuilder):
             )
         return paths
 
-    def library_dirs(self):
-        return ["/opt/intel/oneapi/mkl/latest/lib/intel64"]
+    # def library_dirs(self):
+    #     return [
+    #         "/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/",
+    #     ]
+
+    def dynamic_libraries(self):
+        # TODO: need to support dynamic lib
+        return ["pthread", "m", "dl"]
+
+    def static_libraries(self):
+        mkl_root = pathlib.Path(os.getenv("MKLROOT", "/opt/intel/oneapi/mkl/latest/"))
+        iomp_root = pathlib.Path(
+            os.getenv(
+                "IOMPROOT",
+                "/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/",
+            )
+        )
+        if not mkl_root.exists:
+            raise ValueError(
+                "Can't find MKL root, please set MKLROOT or install, default /opt/intel/oneapi/mkl/latest/"
+            )
+        if not mkl_root.exists:
+            raise ValueError(
+                "Can't find MKL root, please set IOMPROOT or install, "
+                "default /opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/"
+            )
+
+        return [
+            str(mkl_root.joinpath("lib/intel64/libmkl_intel_ilp64.a")),
+            str(mkl_root.joinpath("lib/intel64/libmkl_gnu_thread.a")),
+            str(mkl_root.joinpath("lib/intel64/libmkl_core.a")),
+        ]
 
     def nvcc_args(self):
         args = [
@@ -49,9 +81,18 @@ class X86KernelBuilder(OpBuilder):
             "-U__CUDA_NO_HALF_CONVERSIONS__",
             "-U__CUDA_NO_HALF2_OPERATORS__",
             "-DTHRUST_IGNORE_CUB_VERSION_CHECK",
+            "-Xcompiler=-fopenmp",
         ]
 
         return args
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+            "-DMKL_ILP64",
+            "-m64",
+            "-fopenmp",
+        ]
