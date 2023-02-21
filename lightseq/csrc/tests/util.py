@@ -236,7 +236,9 @@ class TestDecorator(object):
             for i in range(ntest):
                 for dtype in dtypes:
                     self.dtype = dtype
-                    print(f">>>>>>>>>>>>>>>>>>>>>>{cn}, ntest [{i}], dtype [{dtype}]:")
+                    print(
+                        f">>>>>>>>>>>>>>>>>>>>>>{cn}, ntest [{i}], dtype [{dtype}], shape {self.bs_sl() + (self.hidden_dim,)}:"
+                    )
                     custom, baseline = func()
                     if self._device_str != "cpu":
                         torch.cuda.synchronize(device=self.device)
