@@ -16,7 +16,6 @@ typedef float OpType_;
 #endif
 
 namespace lightseq {
-namespace cuda {
 
 class BertCrf : public LSModel {
  private:
@@ -54,5 +53,4 @@ class BertCrf : public LSModel {
 
 LSMODEL_REGISTER(BertCrf);
 
-}  // namespace cuda
 }  // namespace lightseq

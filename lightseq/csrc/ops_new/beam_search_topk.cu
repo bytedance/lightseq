@@ -26,7 +26,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
                              sizeof(T)),
       _cache_size(max_batch_size * max_step * hidden_size * beam_size),
       _host_alive_seq_probs(max_batch_size * beam_size,
-                            min_log_probability / 2),
+                            host_min_log_probability / 2),
       _host_length_norm(max_step, 1.f) {
   for (int i = 0; i < _host_alive_seq_probs.size(); i += beam_size) {
     _host_alive_seq_probs[i] = 0.f;
@@ -34,7 +34,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
 
   if (length_penalty >= 0) {
     for (int i = 0; i < _host_length_norm.size(); i++) {
-      _host_length_norm[i] = length_norm(i + 1, length_penalty);
+      _host_length_norm[i] = host_length_norm(i + 1, length_penalty);
     }
   }
 }
@@ -45,43 +45,47 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
     Variable* caches_k, Variable* caches_v) {
   set_parents({logits, logit_bias, alive_seq, caches_k, caches_v});
 
-  Variable* alive_seq_out = new Variable(
-      "alive_seq_out", _max_batch_size * _beam_size * _max_step * sizeof(int));
+  _alive_seq_out =
+      new Variable("alive_seq_out", _max_batch_size * _beam_size * _max_step,
+                   g_dtype<int>());
 
-  seq_score = new Variable(
-      "seq_score", _max_batch_size * _beam_size * _max_step * sizeof(float), 0,
-      VariableType::RegressiveVariable);
+  _seq_score = new Variable(
+      "seq_score", _max_batch_size * _beam_size * _max_step, g_dtype<int>(),
+      DataType::kNotSupported, VariableType::RegressiveVariable);
 
   // initial own variable
 
-  num_beam_can = new Variable("num_beam_can",
-                              (_max_batch_size * _beam_size + 1) * sizeof(int),
-                              0, VariableType::RegressiveVariable);
-  can_idx = new Variable(
-      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size * sizeof(int),
-      0, VariableType::RegressiveVariable);
-  can_score = new Variable(
-      "can_score",
-      _max_batch_size * _beam_size * _trg_vocab_size * sizeof(float), 0,
-      VariableType::RegressiveVariable);
-  seq_prob =
-      new Variable("seq_prob", _max_batch_size * _beam_size * sizeof(float), 0,
+  _num_beam_can = new Variable("num_beam_can", _max_batch_size * _beam_size + 1,
+                               g_dtype<int>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  _can_idx = new Variable(
+      "can_idx", _max_batch_size * _beam_size * _trg_vocab_size, g_dtype<int>(),
+      DataType::kNotSupported, VariableType::RegressiveVariable);
+  _can_score =
+      new Variable("can_score", _max_batch_size * _beam_size * _trg_vocab_size,
+                   g_dtype<float>(), DataType::kNotSupported,
                    VariableType::RegressiveVariable);
+  _seq_prob =
+      new Variable("seq_prob", _max_batch_size * _beam_size, g_dtype<float>(),
+                   DataType::kNotSupported, VariableType::RegressiveVariable);
 
-  int cache_size =
-      _max_batch_size * _max_step * _beam_size * _hidden_size * sizeof(T);
-  caches_k_buf = new Variable("caches_k_buf", cache_size * _nshared_dec_layer,
-                              0, VariableType::RegressiveVariable);
-  caches_v_buf = new Variable("caches_v_buf", cache_size * _nshared_dec_layer,
-                              0, VariableType::RegressiveVariable);
+  _caches_k_buf = new Variable("caches_k_buf",
+                               _nshared_dec_layer * _max_batch_size *
+                                   _max_step * _beam_size * _hidden_size,
+                               g_dtype<T>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  _caches_v_buf = new Variable("caches_v_buf",
+                               _nshared_dec_layer * _max_batch_size *
+                                   _max_step * _beam_size * _hidden_size,
+                               g_dtype<T>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
 
-  set_children({alive_seq_out, seq_score});
-  return std::make_tuple(alive_seq_out, seq_score);
+  set_children({_alive_seq_out, _seq_score});
+  return std::make_tuple(_alive_seq_out, _seq_score);
 }
 
 template <typename T>
 void BeamSearchTopOp<T>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
   T* logits_ptr = (T*)parent(0)->value();
   T* logits_bias_ptr = (T*)parent(1)->value();
   int* alive_seq_ptr = (int*)parent(2)->value();
@@ -89,21 +93,23 @@ void BeamSearchTopOp<T>::forward() {
   T* caches_k_ptr = (T*)caches_k->value();
   Variable* caches_v = parent(4);
   T* caches_v_ptr = (T*)caches_v->value();
-  T* caches_k_buf_ptr = (T*)caches_k_buf->value();
-  T* caches_v_buf_ptr = (T*)caches_v_buf->value();
+  T* caches_k_buf_ptr = (T*)_caches_k_buf->value();
+  T* caches_v_buf_ptr = (T*)_caches_v_buf->value();
 
   int* alive_seq_out = (int*)child(0)->value();
   float* seq_score_ptr = (float*)child(1)->value();
 
-  float* seq_probs_ptr = (float*)seq_prob->value();
-  int* can_idx_ptr = (int*)can_idx->value();
-  float* can_score_ptr = (float*)can_score->value();
-  int* num_beam_can_ptr = (int*)num_beam_can->value();
+  float* seq_probs_ptr = (float*)_seq_prob->value();
+  int* can_idx_ptr = (int*)_can_idx->value();
+  float* can_score_ptr = (float*)_can_score->value();
+  int* num_beam_can_ptr = (int*)_num_beam_can->value();
 
   if (!_context_ptr->is_built()) {
     return;
   }
 
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
   if (_cur_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(
         (void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
@@ -118,7 +124,7 @@ void BeamSearchTopOp<T>::forward() {
 
   cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream);
 
-  select_beam_rough_topk_launcher(
+  cuda::select_beam_rough_topk_launcher(
       logits_ptr, logits_bias_ptr, seq_probs_ptr, seq_score_ptr, alive_seq_ptr,
       can_idx_ptr, can_score_ptr, num_beam_can_ptr, _trg_vocab_size, _max_step,
       _host_length_norm[_cur_step], _cur_step, _step_token_num,
@@ -144,10 +150,10 @@ void BeamSearchTopOp<T>::forward() {
                           can_score_ptr + _host_can_num_batch, can_idx_ptr,
                           thrust::greater<float>());
     }
-    ker_diverse_beam_search_launcher(can_score_ptr, can_idx_ptr,
-                                     num_beam_can_ptr, _step_token_num,
-                                     _max_thread_per_block, stream, _beam_size,
-                                     _diverse_lambda, _trg_vocab_size);
+    cuda::ker_diverse_beam_search_launcher(
+        can_score_ptr, can_idx_ptr, num_beam_can_ptr, _step_token_num,
+        _max_thread_per_block, stream, _beam_size, _diverse_lambda,
+        _trg_vocab_size);
   }
 
   thrust::sort_by_key(thrust::cuda::par.on(stream), can_score_ptr,
@@ -160,7 +166,8 @@ void BeamSearchTopOp<T>::forward() {
       Deciding whether early stop based on num_finish_beam
   */
   CHECK_GPU_ERROR(cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream));
-  ker_refresh_result<<<dim3(_batch_size, _beam_size), _max_step, 0, stream>>>(
+  cuda::ker_refresh_result<<<dim3(_batch_size, _beam_size), _max_step, 0,
+                             stream>>>(
       can_idx_ptr, can_score_ptr, num_beam_can_ptr + 1, alive_seq_ptr,
       alive_seq_out, seq_probs_ptr, seq_score_ptr, num_beam_can_ptr,
       _trg_vocab_size, _cur_step, _host_length_norm[_cur_step], _diverse_lambda,
@@ -193,18 +200,21 @@ void BeamSearchTopOp<T>::forward() {
 
   /* ---step 4. refresh cache: k, v for decoder self attention--- */
   if (_cur_step > 0) {
-    ker_refresh_cache_launcher<T>(
+    cuda::ker_refresh_cache_launcher<T>(
         _nshared_dec_layer * (_cur_step + 1), _step_token_num * 2,
         _max_thread_per_block, stream, num_beam_can_ptr + 1, can_idx_ptr,
         (T*)caches_k_ptr, (T*)caches_v_ptr, (T*)caches_k_buf_ptr,
         (T*)caches_v_buf_ptr, _cache_size, _beam_size, _dim_per_head, _head_num,
         _trg_vocab_size, _cur_step, _max_step, _diverse_lambda != 0, _end_id);
-    Variable::swap_tensor(caches_k, caches_k_buf);
-    Variable::swap_tensor(caches_v, caches_v_buf);
+    Variable::swap_tensor(caches_k, _caches_k_buf);
+    Variable::swap_tensor(caches_v, _caches_v_buf);
   }
+#endif
 }
 
 template class BeamSearchTopOp<float>;
+#ifdef LIGHTSEQ_cuda
 template class BeamSearchTopOp<__half>;
+#endif
 
 }  // namespace lightseq

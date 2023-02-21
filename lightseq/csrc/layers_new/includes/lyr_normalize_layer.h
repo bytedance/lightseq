@@ -24,8 +24,10 @@ class LyrNormalizeLayer : public Layer {
         _max_batch_tokens(max_batch_tokens),
         _lyr_norm_op(
             new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
-    _norm_gamma = new Variable("layer_norm_gamma");
-    _norm_betta = new Variable("layer_norm_betta");
+    _norm_gamma =
+        new Variable("layer_norm_gamma", g_dtype<T1>(), g_dtype<T2>());
+    _norm_betta =
+        new Variable("layer_norm_betta", g_dtype<T1>(), g_dtype<T2>());
 
     this->_context_ptr->exit_layer();  // necessary
   }
@@ -69,8 +71,10 @@ class LyrNormalizeLayer : public Layer {
   }
 };
 
-template class LyrNormalizeLayer<__half, __half>;
 template class LyrNormalizeLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class LyrNormalizeLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using LyrNormalizeLayerPtr = std::shared_ptr<LyrNormalizeLayer<T1, T2>>;

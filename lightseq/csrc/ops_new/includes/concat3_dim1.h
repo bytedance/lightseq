@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 #include "tuple"
 
 namespace lightseq {
@@ -9,15 +8,18 @@ namespace lightseq {
 template <typename T1, typename T2>
 class Concat3Dim1 : public Operator {
  private:
+  bool _is_skip = false;
+  bool _is_continuous_cache;
+
   int _mx_sz0;
   int _mx_sz1;
   int _mx_sz2;
-  bool _is_skip = false;
-  bool _is_continuous_cache;
 
   int _sz0;
   int _sz1_0;
   int _sz1_1;
+
+  Variable* _new_cache;
 
  public:
   Concat3Dim1(int mx_sz0, int mx_sz1, int mx_sz2, bool is_continuous_cache)
@@ -33,6 +35,9 @@ class Concat3Dim1 : public Operator {
 
   void before_forward(int sz0, int sz1_0, int sz1_1, bool is_skip = false) {
     _sz0 = sz0, _sz1_0 = sz1_0, _sz1_1 = sz1_1, _is_skip = is_skip;
+    if (_is_continuous_cache) {
+      _new_cache->set_shape({_sz0, _sz1_0 + _sz1_1, _mx_sz2});
+    }
   }
 
   void forward() override;

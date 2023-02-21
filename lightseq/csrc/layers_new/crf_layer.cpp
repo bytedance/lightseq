@@ -11,10 +11,10 @@ CRFLayer<T>::CRFLayer(int num_tags, int max_batch_tokens, int max_batch_size)
   // operators node
   _crf_op = new CRFOP<T>(max_batch_tokens, max_batch_size, num_tags);
   // parameters node
-  _linear_b = new Variable("linear_b");
-  _start_transition = new Variable("start_transition");
-  _end_transition = new Variable("end_transition");
-  _transition = new Variable("transition");
+  _linear_b = new Variable("linear_b", g_dtype<T>());
+  _start_transition = new Variable("start_transition", g_dtype<T>());
+  _end_transition = new Variable("end_transition", g_dtype<T>());
+  _transition = new Variable("transition", g_dtype<T>());
 
   this->_context_ptr->exit_layer();  // necessary
 }

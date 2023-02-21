@@ -28,15 +28,16 @@ T *rptr(torch::Tensor &tensor) {
 }
 
 int create_global_context(bool is_training = true) {
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-
   int context_id;
   if (is_training)
     context_id = Context::create_global_context(StatusType::Training);
   else
     context_id = Context::create_global_context(StatusType::Inference);
 
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::global_instance()->set_stream(stream);
+#endif
   return context_id;
 }
 
@@ -57,8 +58,8 @@ int create_transformer_encoder_layer_new(
       hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
       mask_future_tokens);
 
-  Variable *inp(new Variable("input"));
-  Variable *inp_mask(new Variable("inp_mask"));
+  Variable *inp(new Variable("input", g_dtype<T1>(), g_dtype<T2>()));
+  Variable *inp_mask(new Variable("inp_mask", g_dtype<T1>()));
 
   (*layer)(inp, inp_mask);
 
@@ -77,8 +78,7 @@ int create_transformer_encoder_layer_new(
 
 template <typename T1, typename T2>
 std::vector<torch::Tensor> transformer_encoder_layer_fw(
-    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask,
-    bool training_mode) {
+    int layer_id, const torch::Tensor &input, const torch::Tensor &input_mask) {
   CHECK_INPUT(input);
   CHECK_INPUT(input_mask);
 
@@ -95,8 +95,11 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
+  inp_node->set_shape(
+      {(int)input.size(0), (int)input.size(1), (int)input.size(2)});
   Variable *inp_mask_node = layer->input(1);
   inp_mask_node->set_value(input_mask_ptr);
+  inp_mask_node->set_shape({(int)input_mask.size(0), (int)input_mask.size(1)});
 
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
@@ -163,11 +166,14 @@ int create_transformer_decoder_layer(
 
   Context::regist_pybind_layer("TransformerDecoderLayer", layer_id, layer);
 
-  Variable *dec_inp = new Variable("decoder_input");
-  Variable *enc_out = new Variable("encoder_out");
-  Variable *enc_mask = new Variable("encoder_mask");
-  Variable *cache_self_k = new Variable("cache_self_k");
-  Variable *cache_self_v = new Variable("cache_self_v");
+  Variable *dec_inp =
+      new Variable("decoder_input", g_dtype<T1>(), g_dtype<T2>());
+  Variable *enc_out = new Variable("encoder_out", g_dtype<T1>(), g_dtype<T2>());
+  Variable *enc_mask = new Variable("encoder_mask", g_dtype<T1>());
+  Variable *cache_self_k =
+      new Variable("cache_self_k", g_dtype<T1>(), g_dtype<T2>());
+  Variable *cache_self_v =
+      new Variable("cache_self_v", g_dtype<T1>(), g_dtype<T2>());
 
   (*layer)(dec_inp, enc_out, enc_mask, cache_self_k, cache_self_v);
 
@@ -188,8 +194,7 @@ template <typename T1, typename T2>
 std::vector<torch::Tensor> transformer_decoder_layer_fw(
     int layer_id, const torch::Tensor &dec_input,
     const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
-    bool training_mode, bool prelayernorm, bool quant_mode,
-    std::vector<torch::Tensor> &cache) {
+    bool prelayernorm, bool quant_mode, std::vector<torch::Tensor> &cache) {
   CHECK_INPUT(dec_input);
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
@@ -284,11 +289,15 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
 
 }  // namespace lightseq
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+#ifdef PYBIND_INTERFACE
+#define PYBIND_MODULE_NAME TORCH_EXTENSION_NAME
+#else
+#define PYBIND_MODULE_NAME inference
+#endif
+
+PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   // create default context
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  lightseq::Context::create_global_context(lightseq::StatusType::Training);
-  lightseq::Context::global_instance()->set_stream(stream);
+  lightseq::Context::create_global_context(lightseq::StatusType::Inference);
 
   m.def("create_global_context", &lightseq::create_global_context,
         "Create Lightseq Context");
@@ -297,43 +306,51 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
   m.def("create_transformer_encoder_layer_new_fp32",
         &lightseq::create_transformer_encoder_layer_new<float, float>,
-        "Create LightSeq Transformer Encoder Layer with fp32 (CUDA)");
-  m.def("create_transformer_encoder_layer_new_fp16",
-        &lightseq::create_transformer_encoder_layer_new<__half, __half>,
-        "Create LightSeq Transformer Encoder Layer with fp16 (CUDA)");
+        "Create LightSeq Transformer Encoder Layer with fp32");
 
   m.def("transformer_encoder_layer_fw_fp32",
         &lightseq::transformer_encoder_layer_fw<float, float>,
-        "LightSeq Transformer Encoder forward with fp32 (CUDA)");
-  m.def("transformer_encoder_layer_fw_fp16",
-        &lightseq::transformer_encoder_layer_fw<__half, __half>,
-        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+        "LightSeq Transformer Encoder forward with fp32");
 
   m.def("transformer_encoder_layer_bw_fp32",
         &lightseq::transformer_encoder_layer_bw<float, float>,
-        "LightSeq Transformer Encoder forward with fp32 (CUDA)");
-  m.def("transformer_encoder_layer_bw_fp16",
-        &lightseq::transformer_encoder_layer_bw<__half, __half>,
-        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+        "LightSeq Transformer Encoder forward with fp32");
 
   m.def("create_transformer_decoder_layer_new_fp32",
         &lightseq::create_transformer_decoder_layer<float, float>,
-        "Create LightSeq Transformer Decoder Layer with fp32 (CUDA)");
-  m.def("create_transformer_decoder_layer_new_fp16",
-        &lightseq::create_transformer_decoder_layer<__half, __half>,
-        "Create LightSeq Transformer Decoder Layer with fp16 (CUDA)");
+        "Create LightSeq Transformer Decoder Layer with fp32");
 
   m.def("transformer_decoder_layer_fw_fp32",
         &lightseq::transformer_decoder_layer_fw<float, float>,
-        "LightSeq Transformer Decoder forward with fp32 (CUDA)");
-  m.def("transformer_decoder_layer_fw_fp16",
-        &lightseq::transformer_decoder_layer_fw<__half, __half>,
-        "LightSeq Transformer Decoder forward with fp16 (CUDA)");
+        "LightSeq Transformer Decoder forward with fp32");
 
   m.def("assign_layer_weight_grad_fp32",
         &lightseq::assign_layer_weight_grad<float, float>,
         "Bind layer weights and grads");
+
+#ifdef LIGHTSEQ_cuda
+  m.def("create_transformer_encoder_layer_new_fp16",
+        &lightseq::create_transformer_encoder_layer_new<__half, __half>,
+        "Create LightSeq Transformer Encoder Layer with fp16 (CUDA)");
+
+  m.def("transformer_encoder_layer_fw_fp16",
+        &lightseq::transformer_encoder_layer_fw<__half, __half>,
+        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
+  m.def("transformer_encoder_layer_bw_fp16",
+        &lightseq::transformer_encoder_layer_bw<__half, __half>,
+        "LightSeq Transformer Encoder forward with fp16 (CUDA)");
+
+  m.def("create_transformer_decoder_layer_new_fp16",
+        &lightseq::create_transformer_decoder_layer<__half, __half>,
+        "Create LightSeq Transformer Decoder Layer with fp16 (CUDA)");
+
+  m.def("transformer_decoder_layer_fw_fp16",
+        &lightseq::transformer_decoder_layer_fw<__half, __half>,
+        "LightSeq Transformer Decoder forward with fp16 (CUDA)");
+
   m.def("assign_layer_weight_grad_fp16",
         &lightseq::assign_layer_weight_grad<__half, __half>,
         "Bind layer weights and grads");
+#endif
 }

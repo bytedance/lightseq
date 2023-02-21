@@ -6,11 +6,14 @@ Context::Context(StatusType status_type, int device_id)
     : _mm_ptr(new MemoryManager()),
       _device_id(device_id),
       _status_type(status_type) {
+  _allocator_ptr = _mm_ptr->allocator();
   printf("Initial Context, status_type: %s\n", status_type_str().c_str());
+#ifdef LIGHTSEQ_cuda
   if (device_id >= 0) CHECK_GPU_ERROR(cudaSetDevice(device_id));
   CHECK_GPU_ERROR(cudaStreamCreate(&_stream));
   CHECK_GPU_ERROR(cublasCreate(&_cublasHandle));
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
+#endif
 }
 
 Context::~Context() {
@@ -19,10 +22,12 @@ Context::~Context() {
   }
 }
 
+#ifdef LIGHTSEQ_cuda
 void Context::set_stream(cudaStream_t stream) {
   _stream = stream;
   CHECK_GPU_ERROR(cublasSetStream(_cublasHandle, _stream));
 }
+#endif
 
 void Context::convert_into_train() { _status_type = StatusType::Training; }
 
@@ -78,6 +83,7 @@ void Context::add_op(Operator* op) {
   exit(-1);
 #endif
 }
+
 void Context::add_node(Node* node) { _all_node_vec.push_back(node); }
 
 void Context::enter_layer(Layer* cur_layer, bool is_initial) {
@@ -112,7 +118,7 @@ void Context::build() {
     exit(-1);
   }
 
-  temporary_buffer_ = cuda_malloc<char>(mx_tensor_size);
+  temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
 
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
@@ -152,11 +158,12 @@ void Context::build() {
     }
   }
 
-  cuda_free(temporary_buffer_);
+  _allocator_ptr->free_mem(temporary_buffer_);
+
   _mm_ptr->calculate_buffer_();
   _built = true;
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
+  synchronize();
 
 #ifdef DEBUG_MODE
   draw_all_context();
@@ -184,6 +191,15 @@ bool Context::check_validate() {
 }
 
 void Context::draw_all_context() {}
+
+Layer* Context::last_layer() {
+  return _layer_context.size() ? _layer_context.back() : nullptr;
+}
+
+Node* Context::last_node() {
+  return _all_node_vec.size() ? _all_node_vec[_all_node_vec.size() - 1]
+                              : nullptr;
+}
 
 void Context::regist_pybind_layer(std::string layer_name, int layer_id,
                                   std::shared_ptr<void> layer_ptr) {
@@ -237,6 +253,13 @@ void* Context::get_object(std::string object_name) {
     exit(-1);
   }
   return iter->second;
+}
+
+void Context::synchronize() {
+#ifdef LIGHTSEQ_cuda
+  CHECK_GPU_ERROR(cudaStreamSynchronize(get_stream()));
+#endif
+  return;
 }
 
 std::shared_ptr<void> Context::get_pybind_layer(std::string layer_name,

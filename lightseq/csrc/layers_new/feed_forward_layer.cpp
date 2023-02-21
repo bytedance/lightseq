@@ -24,21 +24,21 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
       _ff1(new LinearOp<T1, T2>(max_batch_tokens, intermediate_size,
                                 hidden_size)),
       _ffn_activation_dropout(new BiasActDropoutOp<T1, T2>(
-          activation_dropout_ratio, max_batch_tokens * intermediate_size,
+          activation_dropout_ratio, max_batch_tokens, intermediate_size,
           activation_fn)),
       _ff2(new LinearOp<T1, T2>(max_batch_tokens, hidden_size,
                                 intermediate_size)),
       _ffn_dropout(new BiasDropoutResOp<T1, T2>(
-          hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
+          hidden_output_dropout_ratio, max_batch_tokens, hidden_size)) {
   // parameters node
-  _inter_w = new Variable("_inter_w");
-  _inter_b = new Variable("_inter_b");
+  _inter_w = new Variable("_inter_w", g_dtype<T1>(), g_dtype<T2>());
+  _inter_b = new Variable("_inter_b", g_dtype<T1>(), g_dtype<T2>());
 
-  _output_w = new Variable("_output_w");
-  _output_b = new Variable("_output_b");
+  _output_w = new Variable("_output_w", g_dtype<T1>(), g_dtype<T2>());
+  _output_b = new Variable("_output_b", g_dtype<T1>(), g_dtype<T2>());
 
-  _ffn_nw = new Variable("_ffn_nw");
-  _ffn_nb = new Variable("_ffn_nb");
+  _ffn_nw = new Variable("_ffn_nw", g_dtype<T1>(), g_dtype<T2>());
+  _ffn_nb = new Variable("_ffn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -80,7 +80,7 @@ template <typename T1, typename T2>
 void FeedForwardLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   int batch_tokens = batch_size * seq_len;
 
-  _ffn_ln->before_forward(batch_tokens);
+  _ffn_ln->before_forward(batch_size, seq_len);
 
   _ff1->before_forward(batch_tokens);
 
@@ -102,26 +102,32 @@ int FeedForwardLayer<T1, T2>::load_para_and_grad(
 
   _inter_w->set_value((char*)(para_ptr + offset));
   _inter_w->set_grad((char*)(grad_ptr + offset));
+  _inter_w->set_shape({_intermediate_size, _hidden_size});
   offset += _hidden_size * _intermediate_size;
 
   _inter_b->set_value((char*)(para_ptr + offset));
   _inter_b->set_grad((char*)(grad_ptr + offset));
+  _inter_b->set_shape({_intermediate_size});
   offset += _intermediate_size;
 
   _output_w->set_value((char*)(para_ptr + offset));
   _output_w->set_grad((char*)(grad_ptr + offset));
+  _output_w->set_shape({_hidden_size, _intermediate_size});
   offset += _hidden_size * _intermediate_size;
 
   _output_b->set_value((char*)(para_ptr + offset));
   _output_b->set_grad((char*)(grad_ptr + offset));
+  _output_b->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _ffn_nw->set_value((char*)(para_ptr + offset));
   _ffn_nw->set_grad((char*)(grad_ptr + offset));
+  _ffn_nw->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _ffn_nb->set_value((char*)(para_ptr + offset));
   _ffn_nb->set_grad((char*)(grad_ptr + offset));
+  _ffn_nb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   return offset;

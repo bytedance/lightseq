@@ -83,8 +83,10 @@ class DecSelfAttentionLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class DecSelfAttentionLayer<__half, __half>;
 template class DecSelfAttentionLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class DecSelfAttentionLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using DecSelfAttentionLayerPtr = std::shared_ptr<DecSelfAttentionLayer<T1, T2>>;

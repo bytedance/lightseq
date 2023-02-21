@@ -11,7 +11,8 @@
   CHECK_CONTIGUOUS(x)
 
 // C++ interface
-
+namespace lightseq {
+namespace cuda {
 void adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
           at::Tensor& g, float lr, float beta1, float beta2, float eps,
           float grad_scale, int step, int mode, int bias_correction,
@@ -59,8 +60,11 @@ void apex_adam(at::Tensor& p, at::Tensor& p_copy, at::Tensor& m, at::Tensor& v,
   apex_fused_adam_cuda(p, p_copy, m, v, g, lr, beta1, beta2, eps, grad_scale,
                        step, mode, bias_correction, decay);
 }
-
+}  // namespace cuda
+}  // namespace lightseq
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("adam", &adam, "LightSeq Adam optimized CUDA implementation.");
-  m.def("apex_adam", &apex_adam, "Apex adam optimized CUDA implementation.");
+  m.def("adam", &lightseq::cuda::adam,
+        "LightSeq Adam optimized CUDA implementation.");
+  m.def("apex_adam", &lightseq::cuda::apex_adam,
+        "Apex adam optimized CUDA implementation.");
 }

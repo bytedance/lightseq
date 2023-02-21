@@ -1,8 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
-#include "cublas_wrappers.h"
 
 namespace lightseq {
 
@@ -19,6 +17,8 @@ class SoftmaxOp : public Operator {
   int _to_len;
   bool _config_mask_future;
   bool _mask_future;
+
+  Variable* _result;
 
  public:
   SoftmaxOp(int max_batch_tokens, int max_seq_len, int nhead,
@@ -41,6 +41,7 @@ class SoftmaxOp : public Operator {
     _from_len = from_len;
     _to_len = to_len;
     _mask_future = mask_future;
+    _result->set_shape({_batchs, _nhead, _from_len, _to_len});
   }
 
   void backward() override;

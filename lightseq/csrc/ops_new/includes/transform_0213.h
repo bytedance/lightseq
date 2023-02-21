@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 
 namespace lightseq {
 
@@ -15,6 +14,8 @@ class Transform0213OP : public Operator {
   int _sz2;
   int _sz3;
 
+  Variable* _result;
+
  public:
   Transform0213OP(int max_numel)
       : Operator("Transform0213"), _max_numel(max_numel) {}
@@ -25,6 +26,7 @@ class Transform0213OP : public Operator {
 
   void before_forward(int sz0, int sz1, int sz2, int sz3) {
     _sz0 = sz0, _sz1 = sz1, _sz2 = sz2, _sz3 = sz3;
+    _result->set_shape({_sz0, _sz2, _sz1, _sz3});
   }
 
   void forward() override;

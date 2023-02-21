@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 
 namespace lightseq {
 
@@ -12,24 +11,31 @@ class BiasDropoutResOp : public Operator {
  private:
   float ratio;
 
-  size_t _max_ele_num;
+  int _max_rows, _max_cols;
   int _rows, _cols;
 
   TensorPtr _mask;
+  Variable* _result;
 
  public:
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
-  BiasDropoutResOp(float r, size_t max_ele_num)
-      : Operator("BiasDropoutResOp"), ratio(r), _max_ele_num(max_ele_num) {
-    _mask.reset(new Tensor("mask", max_ele_num * sizeof(uint8_t)));
+  BiasDropoutResOp(float r, int max_rows, int max_cols)
+      : Operator("BiasDropoutResOp"),
+        ratio(r),
+        _max_rows(max_rows),
+        _max_cols(max_cols) {
+    _mask.reset(new Tensor("mask", g_dtype<uint8_t>(), _max_rows * _max_cols));
   }
 
   virtual ~BiasDropoutResOp() {}
 
   Variable* operator()(Variable* inp, Variable* bias, Variable* residual);
 
-  void before_forward(int rows, int cols) { _rows = rows, _cols = cols; }
+  void before_forward(int rows, int cols) {
+    _rows = rows, _cols = cols;
+    _result->set_shape({_rows, _cols});
+  }
 
   void forward() override;
 

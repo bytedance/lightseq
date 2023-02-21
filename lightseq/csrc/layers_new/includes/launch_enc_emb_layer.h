@@ -23,10 +23,10 @@ class LaunchEncEmbLayer : public Layer {
       : Layer("LaunchEncEmbLayer"),
         _launch_enc_op(new LaunchEncEmbOp<T>(max_batch_tokens, pad_id,
                                              hidden_dim, multilg_type)) {
-    _token_emb = new Variable("token_emb");
-    _pos_emb = new Variable("pos_emb");
-    _lang_emb = new Variable("lang_emb");
-    _lang_id = new Variable("lang_id");
+    _token_emb = new Variable("token_emb", g_dtype<T>());
+    _pos_emb = new Variable("pos_emb", g_dtype<T>());
+    _lang_emb = new Variable("lang_emb", g_dtype<T>());
+    _lang_id = new Variable("lang_id", g_dtype<T>());
 
     this->_context_ptr->exit_layer();  // necessary
   }
@@ -51,14 +51,18 @@ class LaunchEncEmbLayer : public Layer {
 
   int load_params(const std::vector<const T*>& para_vec, int offset) {
     _token_emb->set_value((char*)para_vec[offset]);
+    // _token_emb->set_shape();
     _pos_emb->set_value((char*)para_vec[offset + 1]);
+    // _pos_emb->set_shape();
     // _lang_emb->set_value((char*)para_vec[offset + 4]);
     return 0;
   }
 };
 
-template class LaunchEncEmbLayer<__half>;
 template class LaunchEncEmbLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class LaunchEncEmbLayer<__half>;
+#endif
 
 template <class T>
 using LaunchEncEmbLayerPtr = std::shared_ptr<LaunchEncEmbLayer<T>>;

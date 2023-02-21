@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 
 namespace lightseq {
 
@@ -18,6 +17,8 @@ class CRFOP : public Operator {
   bool _forward_or_decode;  // true for forward, false for decode
   bool _output_decode_score;
   TensorPtr _history;
+
+  Variable* _best_tags;
 
  public:
   CRFOP(int max_batch_tokens, int max_batch_size, int num_tags);

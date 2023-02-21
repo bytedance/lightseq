@@ -1,7 +1,6 @@
 #include "transformer.h"
 
 namespace lightseq {
-namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
@@ -84,7 +83,7 @@ Transformer::Transformer(const std::string weight_path,
   // // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
-      CUBLAS_OP_N, CUBLAS_OP_N,
+      MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose,
       tw_._no_scale_embedding ? 1.f : sqrt(1.f / tw_._hidden_size)));
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
@@ -95,7 +94,7 @@ Transformer::Transformer(const std::string weight_path,
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
-  inp_tokens = new Variable("inp_tokens");
+  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
   dec_tokens = new Variable("dec_tokens",
                             max_batch_tokens * tw_._beam_size * sizeof(int), 0,
                             VariableType::FixedVariable);
@@ -124,24 +123,25 @@ Transformer::Transformer(const std::string weight_path,
 
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
-    Variable *cache_k = new Variable("cache_k");
-    Variable *cache_v = new Variable("cache_v");
+    Variable *cache_k =
+        new Variable("cache_k", total_cache_k, cache_size * dec_layer_idx);
+    Variable *cache_v =
+        new Variable("cache_v", total_cache_v, cache_size * dec_layer_idx);
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
         (*iter)(dec_emb, total_enc_kv, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
     Variable *cache_k_out = std::get<1>(dec_outs);
     Variable *cache_v_out = std::get<2>(dec_outs);
 
-    cache_k->set_ancestor(total_cache_k, cache_size * dec_layer_idx);
-    cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
     dec_layer_idx++;
   }
   Variable *dec_out = (*dec_norm_layer)(dec_emb);
   dec_out = (*linear_layer)(dec_out);
-  _context_ptr->regress_end();
 
   std::tuple<Variable *, Variable *> sample_outs =
       (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
+  _context_ptr->regress_end();
+
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
@@ -255,7 +255,7 @@ void Transformer::Infer() {
   }
   /* ---step3. output the decoding result--- */
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  _context_ptr->synchronize();
 
   set_output_shape(0,
                    {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
@@ -359,5 +359,4 @@ DataType Transformer::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

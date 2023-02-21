@@ -14,7 +14,8 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "cublas_algo_map.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class TransformerDecoderLayer {
  public:
@@ -496,3 +497,6 @@ class TransformerDecoderLayer {
   T *_grad_encdec_kv_cmax_ptr;
   T *_grad_attn_qkv_cache_cmax_ptr;
 };
+
+}  // namespace cuda
+}  // namespace lightseq

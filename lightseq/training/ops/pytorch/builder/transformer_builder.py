@@ -20,23 +20,17 @@ class TransformerBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
-            "csrc/kernels/cublas_algo_map.cpp",
-            "csrc/kernels/cublas_wrappers.cpp",
-            "csrc/kernels/quantize_kernels.cu",
-            "csrc/kernels/transform_kernels.cu",
-            "csrc/kernels/dropout_kernels.cu",
-            "csrc/kernels/normalize_kernels.cu",
-            "csrc/kernels/softmax_kernels.cu",
-            "csrc/kernels/general_kernels.cu",
-            "csrc/kernels/cuda_util.cu",
-            "csrc/kernels/embedding_kernels.cu",
-            "csrc/kernels/cross_entropy.cu",
-            # "csrc/ops/context.cpp",
-            # "csrc/ops/dropout.cpp",
-            # "csrc/ops/feed_forward.cpp",
-            # "csrc/ops/normalize_layer.cpp",
-            # "csrc/ops/softmax.cpp",
-            # "csrc/ops/strided_batch_gemm.cpp",
+            "csrc/kernels/cuda/cublas_algo_map.cpp",
+            "csrc/kernels/cuda/cublas_wrappers.cpp",
+            "csrc/kernels/cuda/quantize_kernels.cu",
+            "csrc/kernels/cuda/transform_kernels.cu",
+            "csrc/kernels/cuda/dropout_kernels.cu",
+            "csrc/kernels/cuda/normalize_kernels.cu",
+            "csrc/kernels/cuda/softmax_kernels.cu",
+            "csrc/kernels/cuda/general_kernels.cu",
+            "csrc/kernels/cuda/cuda_util.cu",
+            "csrc/kernels/cuda/embedding_kernels.cu",
+            "csrc/kernels/cuda/cross_entropy.cu",
             "csrc/layers/cross_entropy_layer.cpp",
             "csrc/layers/quant_linear_layer.cpp",
             "csrc/layers/transformer_encoder_layer.cpp",
@@ -47,7 +41,7 @@ class TransformerBuilder(CUDAOpBuilder):
 
     def include_paths(self):
         paths = [
-            "csrc/kernels/includes",
+            "csrc/kernels/cuda/includes",
             "csrc/ops/includes",
             "csrc/layers/includes",
         ]

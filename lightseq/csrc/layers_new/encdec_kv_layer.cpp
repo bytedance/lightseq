@@ -17,8 +17,8 @@ EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int max_batch_tokens,
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 2 * nshared_layer)) {
   // parameters
-  _enc_kvw = new Variable("_enc_kvw");
-  _enc_kvb = new Variable("_enc_kvb");
+  _enc_kvw = new Variable("_enc_kvw", g_dtype<T1>(), g_dtype<T2>());
+  _enc_kvb = new Variable("_enc_kvb", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }

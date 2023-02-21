@@ -25,29 +25,29 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
           max_batch_tokens, num_heads, hidden_size, 1)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
-          (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0), CUBLAS_OP_T,
-          CUBLAS_OP_N)),
+          (T1(1.0) / T1(sqrt(hidden_size / num_heads))), T1(0.0),
+          MATRIX_OP::Transpose, MATRIX_OP::NonTranspose)),
       _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(
           attn_prob_dropout_ratio, max_batch_tokens * num_heads * max_seq_len)),
       _attn_context(new StridedBatchGemmOp<T1, T2>(
-          max_batch_tokens * hidden_size, T1(1.0), T1(0.0), CUBLAS_OP_N,
-          CUBLAS_OP_N)),
+          max_batch_tokens * hidden_size, T1(1.0), T1(0.0),
+          MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose)),
       _transform_0213(
           new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size)),
       _attn_out_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size)),
       _attn_dropout(new BiasDropoutResOp<T1, T2>(
-          hidden_output_dropout_ratio, max_batch_tokens * hidden_size)) {
+          hidden_output_dropout_ratio, max_batch_tokens, hidden_size)) {
   // parameters
-  _attn_qw = new Variable("_attn_qw");
-  _attn_qb = new Variable("_attn_qb");
+  _attn_qw = new Variable("_attn_qw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_qb = new Variable("_attn_qb", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_ow = new Variable("_attn_ow");
-  _attn_ob = new Variable("_attn_ob");
+  _attn_ow = new Variable("_attn_ow", g_dtype<T1>(), g_dtype<T2>());
+  _attn_ob = new Variable("_attn_ob", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_nw = new Variable("_attn_nw");
-  _attn_nb = new Variable("_attn_nb");
+  _attn_nw = new Variable("_attn_nw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -108,7 +108,7 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
 
-  _attn_ln->before_forward(_batch_tokens);
+  _attn_ln->before_forward(batch_size, trg_seq_len);
 
   _q_linear->before_forward(_batch_tokens);
 
@@ -119,8 +119,7 @@ void DecEncAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _softmax->before_forward(batch_size, trg_seq_len, src_seq_len);
 
-  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len,
-                                     !_context_ptr->is_training());
+  _attn_prob_dropout->before_forward(_batch_heads * trg_seq_len * src_seq_len);
 
   _attn_context->before_forward(_hidden_size / _heads, trg_seq_len, src_seq_len,
                                 _batch_heads);
@@ -142,14 +141,17 @@ int DecEncAttentionLayer<T1, T2>::load_para_and_grad(
   int offset = 0;
   _attn_qw->set_value((char*)(para_ptr + offset));
   _attn_qw->set_grad((char*)(grad_ptr + offset));
+  _attn_qw->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_qb->set_value((char*)(para_ptr + offset));
   _attn_qb->set_grad((char*)(grad_ptr + offset));
+  _attn_qb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_ob->set_value((char*)(para_ptr + offset));

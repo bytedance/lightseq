@@ -13,7 +13,8 @@
 #include "cublas_algo_map.h"
 #include "cublas_wrappers.h"
 #include "kernels.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class FeedForward {
  public:
@@ -102,3 +103,6 @@ class FeedForward {
  private:
   Config config_;
 };
+
+}  // namespace cuda
+}  // namespace lightseq

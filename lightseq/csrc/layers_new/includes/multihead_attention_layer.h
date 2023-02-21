@@ -73,8 +73,10 @@ class MultiheadAttentionLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class MultiheadAttentionLayer<__half, __half>;
 template class MultiheadAttentionLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class MultiheadAttentionLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using MultiheadAttentionLayerPtr =

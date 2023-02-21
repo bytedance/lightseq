@@ -21,6 +21,7 @@ float BertWeight<float>::float2required(float value) {
   return value;
 }
 
+#ifdef LIGHTSEQ_cuda
 /**
 fp16 version, cast fp32 into fp16
 */
@@ -28,6 +29,7 @@ template <>
 __half BertWeight<__half>::float2required(float value) {
   return __float2half_rn(value);
 }
+#endif
 
 /**
 Read model config stored in custom proto file.
@@ -82,10 +84,14 @@ std::string BertWeight<T>::proto_parse_emb_wei(
 
   std::vector<T> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
   _d_src_emb_wei = raw_value;
   for (int e : offset)
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
+#else
+  for (int e : offset) _p_d_src_emb_wei.push_back(raw_value.data() + e);
+#endif
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
   return "";
@@ -197,10 +203,13 @@ std::string BertWeight<T>::proto_parse_enc_wei(const Bert &bert) {
 
   std::vector<T> raw_value;
   for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
   _d_enc_wei = raw_value;
-
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+#else
+  for (int e : offset) _p_d_enc_wei.push_back(raw_value.data() + e);
+#endif
   std::cout << "finish initializing enc_wei from host to device" << std::endl;
   return "";
 }
@@ -300,10 +309,14 @@ void BertWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::vector<T> raw_value;
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
   _d_src_emb_wei = raw_value;
   for (int e : offset)
     _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
                                e);
+#else
+  for (int e : offset) _p_d_src_emb_wei.push_back(raw_value.data() + e);
+#endif
 
   std::cout << "Finish loading src_emb_wei from host to device" << std::endl;
 }
@@ -436,10 +449,13 @@ void BertWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   std::vector<T> raw_value;
   raw_value.reserve(value.size());
   for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
   _d_enc_wei = raw_value;
-
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+#else
+  for (int e : offset) _p_d_enc_wei.push_back(raw_value.data() + e);
+#endif
   std::cout << "Finish loading enc_wei from host to device" << std::endl;
 }
 
@@ -502,7 +518,9 @@ std::string BertWeight<T>::initializing(std::string weight_path) {
   }
 }
 
+#ifdef LIGHTSEQ_cuda
 template class BertWeight<__half>;
+#endif
 template class BertWeight<float>;
 
 }  // namespace lightseq

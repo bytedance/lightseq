@@ -1,20 +1,7 @@
 #pragma once
-
-#include <fcntl.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <thrust/device_vector.h>
-#include <unistd.h>
-
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-
+#include "proto_headers.h"
+#include "proto_util.h"
 #include "bert_crf.pb.h"
-#include "../tools/includes/util.h"
 
 namespace lightseq {
 
@@ -36,9 +23,11 @@ class BertCrfWeight {
   std::vector<const T *> _p_d_src_emb_wei;  // size: 9
   std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
 
+#ifdef LIGHTSEQ_cuda
   // store the weights on gpu memory
   thrust::device_vector<T> _d_src_emb_wei;
   thrust::device_vector<T> _d_enc_wei;
+#endif
 
  public:
   std::string initializing(std::string proto_path);

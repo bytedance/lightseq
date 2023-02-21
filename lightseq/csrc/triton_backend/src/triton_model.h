@@ -5,6 +5,7 @@
 #include "triton/backend/backend_model_instance.h"
 #include "triton/backend/backend_output_responder.h"
 #include "triton/core/tritonbackend.h"
+#include "model_base.h"
 #include "bert.h"
 
 #ifdef NEW_ARCH
@@ -13,9 +14,7 @@
 #else
 #include "gpt.h"
 #include "transformer.h"
-#include "model_base.h"
 #include "quant_transformer.h"
-
 #endif
 
 namespace triton {
@@ -250,7 +249,7 @@ class ModelInstanceState : public BackendModelInstance {
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
-  std::shared_ptr<::lightseq::cuda::LSModel> LightseqModel() {
+  std::shared_ptr<::lightseq::LSModel> LightseqModel() {
     return lightseq_model_ptr_;
   }
   int get_input_index(std::string input_name) {
@@ -270,7 +269,7 @@ class ModelInstanceState : public BackendModelInstance {
   ModelInstanceState(ModelState* model_state,
                      TRITONBACKEND_ModelInstance* triton_model_instance);
   ModelState* model_state_;
-  std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr_;
+  std::shared_ptr<::lightseq::LSModel> lightseq_model_ptr_;
 
   std::unordered_map<std::string, int> input_name_map_;
   std::unordered_map<std::string, int> output_name_map_;
@@ -287,9 +286,11 @@ ModelInstanceState::ModelInstanceState(
       model_state_->RepositoryPath() + "/" + model_state_->ModelFileName();
   std::cout << file_name << std::endl;
 
+#ifdef LIGHTSEQ_cuda
   cudaSetDevice(DeviceId());
-  lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(
-      ::lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+#endif
+  lightseq_model_ptr_ = std::shared_ptr<::lightseq::LSModel>(
+      ::lightseq::LSModelFactory::GetInstance().CreateModel(
           model_state->GetModelType(), file_name,
           model_state_->MaxBatchSize()));
 
