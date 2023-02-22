@@ -43,8 +43,8 @@ class LyrNormalizeLayer : public Layer {
     return out;
   }
 
-  void before_forward(int batch_token_num) {
-    _lyr_norm_op->before_forward(batch_token_num);
+  void before_forward(int batch_size, int seq_len) {
+    _lyr_norm_op->before_forward(batch_size, seq_len);
   }
 
   void before_backward() {}

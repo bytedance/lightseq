@@ -27,6 +27,7 @@ from csrc.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 
 kt = TestDecorator()
 
+
 def generate_enc_layer(initial_weights=None, initial_biases=None):
     config = LSTransformerEncoderLayer.get_config(
         max_batch_tokens=max_batch_tokens,

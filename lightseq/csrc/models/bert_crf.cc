@@ -83,7 +83,7 @@ void BertCrf::before_forward(int batch_size, int seq_len) {
     iter->before_forward(batch_size, seq_len);
   }
 
-  lyr_norm_layer->before_forward(batch_size * seq_len);
+  lyr_norm_layer->before_forward(batch_size, seq_len);
 
   linear_layer->before_forward(batch_size, seq_len);
   crf_layer->before_forward(batch_size, seq_len, false, false);

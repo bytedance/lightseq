@@ -51,7 +51,7 @@ class StridedBatchGemmOp : public Operator {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
     _max_seq = max_seq;
-    // _result->set_shape({});
+    _result->set_shape({batch_heads, nn, mm});
   }
 
   void forward() override;
