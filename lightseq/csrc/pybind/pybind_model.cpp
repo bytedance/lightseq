@@ -226,7 +226,13 @@ class PyBertCrf {
 };
 }  // namespace lightseq
 
-PYBIND11_MODULE(inference, m) {
+#ifdef PYBIND_INTERFACE
+#define PYBIND_MODULE_NAME TORCH_EXTENSION_NAME
+#else
+#define PYBIND_MODULE_NAME inference
+#endif
+
+PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   m.attr("__name__") = "lightseq.inference";
 
   // py::class_<PyTransformer>(m, "Transformer")

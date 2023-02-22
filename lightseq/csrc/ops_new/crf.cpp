@@ -55,7 +55,7 @@ void CRFOP<T>::forward() {
   const T* end_transition = (const T*)parent(1)->value();
   const T* transition = (const T*)parent(2)->value();
   const T* emission = (const T*)parent(3)->value();
-  const uint8_t* mask = (const uint8_t*)parent(4)->value();
+  const T* mask = (const T*)parent(4)->value();
   const T* bias = (const T*)parent(5)->value();
   float* best_score =
       _output_decode_score ? (float*)child(1)->value() : nullptr;

@@ -414,7 +414,7 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
                           int num_tags, int seq_len, int batch_size) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_viterbi(rptr<T>(start_transition), rptr<T>(end_transition),
-                 rptr<T>(transition), rptr<T>(emission), rptr<uint8_t>(mask),
+                 rptr<T>(transition), rptr<T>(emission), rptr<T>(mask),
                  rptr<float>(best_score), rptr<int>(history),
                  rptr<int>(best_tags), num_tags, seq_len, batch_size, stream);
   cudaStreamSynchronize(stream);
@@ -423,7 +423,13 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
 }  // namespace cuda
 }  // namespace lightseq
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+#ifdef PYBIND_INTERFACE
+#define PYBIND_MODULE_NAME TORCH_EXTENSION_NAME
+#else
+#define PYBIND_MODULE_NAME inference
+#endif
+
+PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   m.def("torch_launch_transform_0213_fp32",
         &lightseq::cuda::torch_launch_transform_0213<float>,
         "Test kernel wrapper");
