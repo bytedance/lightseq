@@ -8,8 +8,8 @@ import torch
 import math
 from dataclasses import dataclass
 
-from training.ops.pytorch.layer_base import TransformerEncoderLayerBase
-from training.ops.pytorch.util import (
+from csrc.pytorch.layer_base import TransformerEncoderLayerBase
+from csrc.pytorch.util import (
     copy_para,
     state_dict,
     calc_offset,
@@ -42,14 +42,11 @@ class LSTransformerEncoderFunc(torch.autograd.Function):
 
         (output,) = forward_func(config.layer_id, input, input_mask)
 
-        # if config.is_grad_enabled and config.training:
-        #     ctx.save_for_backward(output, input, input_mask)
-        #     ctx.config = config
         return output
 
 
 # just for layer test
-class TransformerEncoderLayer(TransformerEncoderLayerBase):
+class LSTransformerEncoderLayer(TransformerEncoderLayerBase):
     """
     Initialize the Lightseq Transformer Encoder Layer.
 
@@ -67,11 +64,11 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
     layer_id = 0
 
     def __init__(self, config, initial_weights=None, initial_biases=None):
-        super(TransformerEncoderLayer, self).__init__()
+        super(LSTransformerEncoderLayer, self).__init__()
 
         self.config = copy.deepcopy(config)
-        self.config.layer_id = TransformerEncoderLayer.layer_id
-        TransformerEncoderLayer.layer_id = TransformerEncoderLayer.layer_id + 1
+        self.config.layer_id = LSTransformerEncoderLayer.layer_id
+        LSTransformerEncoderLayer.layer_id = LSTransformerEncoderLayer.layer_id + 1
 
         print("Lightseq Transformer config is ", self.config.__dict__)
 
@@ -85,7 +82,7 @@ class TransformerEncoderLayer(TransformerEncoderLayerBase):
         ims = self.config.intermediate_size
         self.hs = hs
         self.ims = ims
-        self.para_offset = TransformerEncoderLayer.gen_offset(hs, ims)
+        self.para_offset = LSTransformerEncoderLayer.gen_offset(hs, ims)
         self.para = torch.nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
         if initial_weights is None or initial_biases is None:

@@ -8,3 +8,5 @@ cur_dir = os.path.dirname(os.path.abspath(__file__))
 csrc_dir = os.path.dirname(cur_dir)
 lightseq_dir = os.path.dirname(csrc_dir)
 sys.path.insert(0, lightseq_dir)
+
+from .torch_transformer_layers import TransformerEncoderLayer

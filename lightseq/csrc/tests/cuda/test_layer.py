@@ -23,31 +23,9 @@ from csrc.tests.util import (
 import torch
 import torch.nn as nn
 
-from csrc.pytorch.transformer_encoder_layer import TransformerEncoderLayer
-from training.ops.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
+from csrc.pytorch.transformer_encoder_layer import LSTransformerEncoderLayer
 
 kt = TestDecorator()
-
-
-def generate_enc_layer_new(initial_weights=None, initial_biases=None):
-    config = TransformerEncoderLayer.get_config(
-        max_batch_tokens=max_batch_tokens,
-        max_seq_len=max_seq_len,
-        hidden_size=1024,
-        intermediate_size=4096,
-        nhead=16,
-        attn_prob_dropout_ratio=0.0,
-        activation_dropout_ratio=0.0,
-        hidden_dropout_ratio=0.0,
-        pre_layer_norm=True,
-        fp16=True,
-        local_rank=0,
-        activation_fn="relu",
-    )
-    layer = TransformerEncoderLayer(config, initial_weights, initial_biases)
-    layer.to(torch.device("cuda:0"), dtype=torch.half)
-    return layer
-
 
 def generate_enc_layer(initial_weights=None, initial_biases=None):
     config = LSTransformerEncoderLayer.get_config(
@@ -73,13 +51,9 @@ def gen_enc_layer_pair():
     fairseq_enc_layer = fairseq_layers.generate_enc_layer()
     fairseq_enc_layer.train()
     initial_enc_weights, initial_enc_biases = get_fairseq_enc_params(fairseq_enc_layer)
-    custom_enc_layer_base = generate_enc_layer(initial_enc_weights, initial_enc_biases)
-    custom_enc_layer_base.train()
-    custom_enc_layer_new = generate_enc_layer_new(
-        initial_enc_weights, initial_enc_biases
-    )
-    custom_enc_layer_new.train()
-    return custom_enc_layer_base, custom_enc_layer_new
+    custom_enc_layer = generate_enc_layer(initial_enc_weights, initial_enc_biases)
+    custom_enc_layer.train()
+    return fairseq_enc_layer, custom_enc_layer
 
 
 NUM_LAYERS = 4
@@ -93,7 +67,7 @@ for _ in range(NUM_LAYERS):
     base_enc_layers.append(base_enc_layer)
 
 
-@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=1, nrepeat=1)
+@kt.case(dtypes=[torch.half], rtol=1e-3, atol=1e-2, ntest=5, nrepeat=5)
 def test_encoder_layer_forward():
     batch_size, seq_len = kt.bs_sl()
     print(f"(batch_size, seq_len): ({batch_size}, {seq_len})")
