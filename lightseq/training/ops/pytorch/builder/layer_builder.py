@@ -59,6 +59,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/transformer_decoder_layer.cpp",
             "csrc/layers_new/crf_layer.cpp",
             # "csrc/layers_new/gpt_attention_layer.cpp",
+            "csrc/layers_new/sdpa_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]
 
@@ -95,5 +96,6 @@ class LayerBuilder(CUDAOpBuilder):
             "-Wno-reorder",
             "-DPYBIND_LAYER",
             # "-DDEBUG_MODE",
+            # "-DMEM_DEBUG",
             # "-DFP16_MODE",
         ]

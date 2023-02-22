@@ -6,6 +6,7 @@
 #include "cuda_util.h"
 #include "transformer_encoder_layer.h"
 #include "transformer_decoder_layer.h"
+#include "sdpa_layer.h"
 
 // x is torch::Tensor
 #define CHECK_CUDA(x) AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
@@ -282,6 +283,45 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
   return;
 }
 
+template <typename T1, typename T2>
+void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
+                      const torch::Tensor &value, const torch::Tensor &mask,
+                      torch::Tensor &res, int max_batch_tokens, int max_seq_len,
+                      int head_dim, int num_heads,
+                      float attn_prob_dropout_ratio, int batch_size,
+                      int query_len, int kv_len, int kv_size,
+                      bool mask_future) {
+  Context::create_global_context(StatusType::Inference);
+  std::shared_ptr<Context> context_ptr = Context::global_instance();
+
+  char *query_ptr = (char *)query.data_ptr();
+  char *key_ptr = (char *)key.data_ptr();
+  char *value_ptr = (char *)value.data_ptr();
+  char *mask_ptr = (char *)mask.data_ptr();
+  char *res_ptr = (char *)res.data_ptr();
+
+  Variable *q_var = new Variable("query", query_ptr);
+  Variable *k_var = new Variable("key", key_ptr);
+  Variable *v_var = new Variable("value", value_ptr);
+  Variable *mask_var = nullptr;  // FIXME later, only cover non mask
+
+  SDPALayer<T1, T2> *sdpal =
+      new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, head_dim, num_heads,
+                            attn_prob_dropout_ratio);
+  Variable *res_var = (*sdpal)(q_var, k_var, v_var, mask_var);
+  res_var->set_value(res_ptr);
+  sdpal->before_forward(batch_size, query_len, kv_len, kv_size, mask_future);
+
+  context_ptr->build();
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+  CHECK_GPU_ERROR(cudaGetLastError());
+  auto start = std::chrono::high_resolution_clock::now();
+  sdpal->forward();
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+  CHECK_GPU_ERROR(cudaGetLastError());
+  print_time_duration(start, "layer cost", 0);
+}
+
 }  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
@@ -336,4 +376,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("assign_layer_weight_grad_fp16",
         &lightseq::assign_layer_weight_grad<__half, __half>,
         "Bind layer weights and grads");
+
+  m.def("torch_sdpa_layer_fp32", &lightseq::torch_sdpa_layer<float, float>,
+        "Empty");
+  m.def("torch_sdpa_layer_fp16", &lightseq::torch_sdpa_layer<__half, __half>,
+        "Empty");
 }
