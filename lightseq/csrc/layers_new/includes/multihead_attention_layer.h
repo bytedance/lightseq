@@ -2,11 +2,9 @@
 #include "bias_act_dropout.h"
 #include "bias_add_transform_20314.h"
 #include "bias_dropout_residual.h"
-#include "dropout.h"
 #include "linear.h"
 #include "layer_normalize.h"
-#include "softmax.h"
-#include "strided_batch_gemm.h"
+#include "sdpa_layer.h"
 #include "transform_0213.h"
 #include "layer.h"
 
@@ -19,10 +17,9 @@ class MultiheadAttentionLayer : public Layer {
   LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
   LinearOp<T1, T2>* _qkv_linear = nullptr;
   BiasAddTrans20314<T1, T2>* _bias_add_transform_20314 = nullptr;
-  StridedBatchGemmOp<T1, T2>* _attn_scores = nullptr;
-  SoftmaxOp<T1, T2>* _softmax = nullptr;
-  DropoutOp<T1, T2>* _attn_prob_dropout = nullptr;
-  StridedBatchGemmOp<T1, T2>* _attn_context = nullptr;
+
+  SDPALayerPtr<T1, T2> _sdpa_layer = nullptr;
+
   Transform0213OP<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
   BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;

@@ -66,8 +66,6 @@ int create_transformer_encoder_layer_new(
 
   Context::regist_pybind_layer("TransformerEncoderLayer", layer_id, layer);
 
-  layer->before_forward(1, 32);
-
   std::string T1_dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
   std::string T2_dtype = (std::is_same<T2, __half>::value) ? "half" : "float";
 
@@ -179,11 +177,6 @@ int create_transformer_decoder_layer(
 
   (*layer)(dec_inp, enc_out, enc_mask, cache_self_k, cache_self_v);
 
-  if (Context::global_instance()->is_training())
-    layer->before_forward(1, 32, 32, -1);
-  else
-    layer->before_forward(1, 32, 32, 0);
-
   std::string dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
 
   std::cout << "Decoder layer #" << layer_id << " is created with date type ["
@@ -289,27 +282,71 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
   return;
 }
 
-// template <typename T1, typename T2>
-// int create_sdpa_layer(int layer_id, int max_batch_tokens, int max_seq_len,
-//                       int head_dim, int num_heads,
-//                       float attn_prob_dropout_ratio) {
+template <typename T1, typename T2>
+int create_sdpa_layer(int layer_id, int max_batch_tokens, int max_seq_len,
+                      int head_dim, int num_heads,
+                      float attn_prob_dropout_ratio) {
+  Variable *q_var = new Variable("query", g_dtype<T1>());
+  Variable *k_var = new Variable("key", g_dtype<T1>());
+  Variable *v_var = new Variable("value", g_dtype<T1>());
+  Variable *mask_var = nullptr;  // FIXME later, only cover non mask
 
-//   Variable *q_var = new Variable("query", g_dtype<T1>());
-//   q_var->set_value(query_ptr);
-//   Variable *k_var = new Variable("key",  g_dtype<T1>());
-//   k_var->set_value(key_ptr);
-//   Variable *v_var = new Variable("value",  g_dtype<T1>());
-//   v_var->set_value(value_ptr);
-//   Variable *mask_var = nullptr;  // FIXME later, only cover non mask
+  std::shared_ptr<SDPALayer<T1, T2>> sdpal =
+      std::make_shared<SDPALayer<T1, T2>>(max_batch_tokens, max_seq_len,
+                                          head_dim, num_heads,
+                                          attn_prob_dropout_ratio);
+  Variable *res_var = (*sdpal)(q_var, k_var, v_var, mask_var);
 
-//   SDPALayer<T1, T2> *sdpal =
-//       new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, head_dim,
-//       num_heads,
-//                             attn_prob_dropout_ratio);
-//   Variable *res_var = (*sdpal)(q_var, k_var, v_var, mask_var);
+  Context::regist_pybind_layer("SDPALayer", layer_id, sdpal);
 
-//   Context::regist_pybind_layer("SDPALayer", layer_id, layer);
-// }
+  return 0;
+}
+
+template <typename T1, typename T2>
+std::vector<torch::Tensor> sdpa_layer_fw(
+    int layer_id, const torch::Tensor &query, const torch::Tensor &key,
+    const torch::Tensor &value, const torch::Tensor &mask, int batch_size,
+    int query_len, int kv_len, int kv_size, bool mask_future) {
+  CHECK_INPUT(query);
+  CHECK_INPUT(key);
+  CHECK_INPUT(value);
+
+  auto result = torch::empty_like(query);
+
+  const char *query_ptr = (const char *)query.data_ptr();
+  const char *key_ptr = (const char *)key.data_ptr();
+  const char *value_ptr = (const char *)value.data_ptr();
+
+  char *res_ptr = (char *)result.data_ptr();
+
+  std::shared_ptr<SDPALayer<T1, T2>> layer =
+      std::static_pointer_cast<SDPALayer<T1, T2>>(
+          Context::get_pybind_layer("SDPALayer", layer_id));
+
+  Variable *query_node = layer->input(0);
+  query_node->set_value(query_ptr);
+  query_node->set_shape(
+      {size_t(query.size(0)), size_t(query.size(1)), size_t(query.size(2))});
+
+  Variable *key_node = layer->input(1);
+  key_node->set_value(key_ptr);
+  key_node->set_shape(
+      {size_t(key.size(0)), size_t(key.size(1)), size_t(key.size(2))});
+
+  Variable *value_node = layer->input(1);
+  value_node->set_value(value_ptr);
+  value_node->set_shape(
+      {size_t(value.size(0)), size_t(value.size(1)), size_t(value.size(2))});
+
+  Variable *res_node = layer->output(0);
+  res_node->set_value(res_ptr);
+
+  layer->before_forward(batch_size, query_len, kv_len, kv_size, mask_future);
+
+  layer->forward();
+
+  return {result};
+}
 
 template <typename T1, typename T2>
 void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
@@ -397,6 +434,12 @@ PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   m.def("torch_sdpa_layer_fp32", &lightseq::torch_sdpa_layer<float, float>,
         "Empty");
 
+  m.def("create_sdpa_layer_fp32", &lightseq::create_sdpa_layer<float, float>,
+        "Create Lightseq SDPA Layer with fp32");
+
+  m.def("sdpa_layer_fw_fp32", &lightseq::sdpa_layer_fw<float, float>,
+        "Lightseq SDPA forward with fp32");
+
 #ifdef LIGHTSEQ_cuda
   m.def("create_transformer_encoder_layer_new_fp16",
         &lightseq::create_transformer_encoder_layer_new<__half, __half>,
@@ -424,5 +467,11 @@ PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
 
   m.def("torch_sdpa_layer_fp16", &lightseq::torch_sdpa_layer<__half, __half>,
         "Empty");
+
+  m.def("create_sdpa_layer_fp16", &lightseq::create_sdpa_layer<__half, __half>,
+        "Create Lightseq SDPA Layer with fp16");
+
+  m.def("sdpa_layer_fw_fp16", &lightseq::sdpa_layer_fw<__half, __half>,
+        "Lightseq SDPA forward with fp16");
 #endif
 }
