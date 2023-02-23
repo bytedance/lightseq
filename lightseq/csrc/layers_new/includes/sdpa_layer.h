@@ -31,6 +31,7 @@ class SDPALayer : public Layer {
 
   virtual ~SDPALayer() {}
 
+  // mask is for enc-self attention and enc-dec-cross attention
   Variable* operator()(Variable* query, Variable* key, Variable* value,
                        Variable* mask = nullptr);
 
