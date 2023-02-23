@@ -7,21 +7,20 @@ namespace lightseq {
 template <typename T1, typename T2>
 class SoftmaxOp : public Operator {
  private:
-  int _nhead;
+  size_t _nhead;
+  size_t _max_batch_tokens;
+  size_t _max_seq_len;
+  size_t _batchs;
+  size_t _from_len;
+  size_t _to_len;
 
-  int _max_batch_tokens;
-  int _max_seq_len;
-
-  int _batchs;
-  int _from_len;
-  int _to_len;
   bool _config_mask_future;
   bool _mask_future;
 
   Variable* _result;
 
  public:
-  SoftmaxOp(int max_batch_tokens, int max_seq_len, int nhead,
+  SoftmaxOp(size_t max_batch_tokens, size_t max_seq_len, size_t nhead,
             bool mask_future = false)
       : Operator("SoftmaxOp"),
         _max_batch_tokens(max_batch_tokens),
@@ -35,7 +34,7 @@ class SoftmaxOp : public Operator {
 
   void forward() override;
 
-  void before_forward(int batchs, int from_len, int to_len,
+  void before_forward(size_t batchs, size_t from_len, size_t to_len,
                       bool mask_future = false) {
     _batchs = batchs;
     _from_len = from_len;
@@ -46,11 +45,6 @@ class SoftmaxOp : public Operator {
 
   void backward() override;
 
-  void before_backward(int batchs, int from_len, int to_len) {
-    _batchs = batchs;
-    _from_len = from_len;
-    _to_len = to_len;
-  }
 };
 
 }  // namespace lightseq

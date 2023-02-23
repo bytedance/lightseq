@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T>
-CRFOP<T>::CRFOP(int max_batch_tokens, int max_batch_size, int num_tags)
+CRFOP<T>::CRFOP(size_t max_batch_tokens, size_t max_batch_size, size_t num_tags)
     : Operator("CRFOP"),
       _max_batch_tokens(max_batch_tokens),
       _max_batch_size(max_batch_size),
@@ -33,7 +33,7 @@ Variable* CRFOP<T>::operator()(Variable* start_transition,
 }
 
 template <typename T>
-void CRFOP<T>::before_forward(int batch_size, int seq_len,
+void CRFOP<T>::before_forward(size_t batch_size, size_t seq_len,
                               bool forward_or_decode,
                               bool output_decode_score) {
   if (batch_size * seq_len > _max_batch_tokens) {

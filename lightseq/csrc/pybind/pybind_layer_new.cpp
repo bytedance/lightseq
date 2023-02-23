@@ -97,10 +97,10 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
   Variable *inp_node = layer->input(0);
   inp_node->set_value(input_ptr);
   inp_node->set_shape(
-      {(int)input.size(0), (int)input.size(1), (int)input.size(2)});
+      {input.size(0), input.size(1), input.size(2)});
   Variable *inp_mask_node = layer->input(1);
   inp_mask_node->set_value(input_mask_ptr);
-  inp_mask_node->set_shape({(int)input_mask.size(0), (int)input_mask.size(1)});
+  inp_mask_node->set_shape({input_mask.size(0), input_mask.size(1)});
 
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
@@ -288,6 +288,28 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
   return;
 }
 
+// template <typename T1, typename T2>
+// int create_sdpa_layer(int layer_id, int max_batch_tokens, int max_seq_len,
+//                       int head_dim, int num_heads,
+//                       float attn_prob_dropout_ratio) {
+
+//   Variable *q_var = new Variable("query", g_dtype<T1>());
+//   q_var->set_value(query_ptr);
+//   Variable *k_var = new Variable("key",  g_dtype<T1>());
+//   k_var->set_value(key_ptr);
+//   Variable *v_var = new Variable("value",  g_dtype<T1>());
+//   v_var->set_value(value_ptr);
+//   Variable *mask_var = nullptr;  // FIXME later, only cover non mask
+
+//   SDPALayer<T1, T2> *sdpal =
+//       new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, head_dim,
+//       num_heads,
+//                             attn_prob_dropout_ratio);
+//   Variable *res_var = (*sdpal)(q_var, k_var, v_var, mask_var);
+
+//   Context::regist_pybind_layer("SDPALayer", layer_id, layer);
+// }
+
 template <typename T1, typename T2>
 void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
                       const torch::Tensor &value, const torch::Tensor &mask,
@@ -305,9 +327,12 @@ void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
   char *mask_ptr = (char *)mask.data_ptr();
   char *res_ptr = (char *)res.data_ptr();
 
-  Variable *q_var = new Variable("query", query_ptr);
-  Variable *k_var = new Variable("key", key_ptr);
-  Variable *v_var = new Variable("value", value_ptr);
+  Variable *q_var = new Variable("query", g_dtype<T1>());
+  q_var->set_value(query_ptr);
+  Variable *k_var = new Variable("key", g_dtype<T1>());
+  k_var->set_value(key_ptr);
+  Variable *v_var = new Variable("value", g_dtype<T1>());
+  v_var->set_value(value_ptr);
   Variable *mask_var = nullptr;  // FIXME later, only cover non mask
 
   SDPALayer<T1, T2> *sdpal =
@@ -324,7 +349,7 @@ void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
   sdpal->forward();
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));
   CHECK_GPU_ERROR(cudaGetLastError());
-  print_time_duration(start, "layer cost", 0);
+  print_time_duration(start, "layer cost");
 }
 
 }  // namespace lightseq

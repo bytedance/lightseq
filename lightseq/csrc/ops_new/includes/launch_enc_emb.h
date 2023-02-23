@@ -8,20 +8,20 @@ namespace lightseq {
 template <typename T>
 class LaunchEncEmbOp : public Operator {
  private:
-  int _max_batch_tokens;
+  size_t _max_batch_tokens;
   int _pad_id;
-  int _hidden_dim;
-  int _multilg_type;
+  size_t _hidden_dim;
+  size_t _multilg_type;
 
-  int _batch_size;
-  int _seq_len;
+  size_t _batch_size;
+  size_t _seq_len;
 
   Variable* _result;
   Variable* _pad_mask;
 
  public:
-  LaunchEncEmbOp(int max_batch_tokens, int pad_id, int hidden_dim,
-                 int multilg_type)
+  LaunchEncEmbOp(size_t max_batch_tokens, int pad_id, size_t hidden_dim,
+                 size_t multilg_type)
       : Operator("LaunchEncEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _pad_id(pad_id),
@@ -36,13 +36,11 @@ class LaunchEncEmbOp : public Operator {
                                               Variable* lang_emb,
                                               Variable* lang_id);
 
-  void before_forward(int batch_size, int seq_len) {
+  void before_forward(size_t batch_size, size_t seq_len) {
     _batch_size = batch_size, _seq_len = seq_len;
   }
 
   void forward() override;
-
-  void before_backward() {}
 
   void backward() override {
     printf("ERROR! LaunchEncEmbOp can't cal backward()\n");

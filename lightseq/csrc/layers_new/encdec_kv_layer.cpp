@@ -3,9 +3,9 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-EncDecKvLayer<T1, T2>::EncDecKvLayer(int nshared_layer, int max_batch_tokens,
-                                     int hidden_size,
-                                     int num_heads)
+EncDecKvLayer<T1, T2>::EncDecKvLayer(size_t nshared_layer, size_t max_batch_tokens,
+                                     size_t hidden_size,
+                                     size_t num_heads)
     : Layer("EncDecKvLayer"),  // necessary
       _nshared_layer(nshared_layer),
       _max_batch_tokens(max_batch_tokens),
@@ -38,7 +38,7 @@ Variable* EncDecKvLayer<T1, T2>::operator()(Variable* enc_out) {
 }
 
 template <typename T1, typename T2>
-void EncDecKvLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
+void EncDecKvLayer<T1, T2>::before_forward(size_t batch_size, size_t seq_len) {
   _batch_tokens = batch_size * seq_len;
 
   _kv_linear->before_forward(_batch_tokens);
@@ -46,8 +46,6 @@ void EncDecKvLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   _bias_add_transform_20314->before_forward(batch_size, seq_len);
 }
 
-template <typename T1, typename T2>
-void EncDecKvLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
 int EncDecKvLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,

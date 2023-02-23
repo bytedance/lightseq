@@ -1,3 +1,4 @@
+import __init__
 import random
 import math
 from copy import deepcopy
@@ -6,7 +7,7 @@ from dataclasses import dataclass
 import torch
 from torch.nn import functional
 
-from tests.util import TestDecorator
+from csrc.tests.util import TestDecorator
 from csrc.pytorch.builder.cuda_layer_builder import CudaLayerBuilder
 
 kt = TestDecorator()
@@ -94,5 +95,7 @@ def test_sdpa_layer():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
-        "test_sdpa_layer",
+        [
+            "test_sdpa_layer",
+        ]
     )

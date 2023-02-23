@@ -26,23 +26,24 @@ class FeedForwardLayer : public Layer {
   Variable* _ffn_nb;
 
   // shape related
-  int _batch_dim;
-  int _batch_heads;
-  int _batch_tokens;
+  size_t _batch_dim;
+  size_t _batch_heads;
+  size_t _batch_tokens;
 
-  int _layer_id;
-  int _max_batch_tokens;
-  int _max_seq_len;
-  int _hidden_size;
-  int _heads;
-  int _intermediate_size;
+  size_t _layer_id;
+  size_t _max_batch_tokens;
+  size_t _max_seq_len;
+  size_t _hidden_size;
+  size_t _heads;
+  size_t _intermediate_size;
+
   bool _pre_or_postLayerNorm;
   std::string _activation_fn;
   bool _is_post_ln;
 
  public:
-  FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
-                   int hidden_size, int num_heads, int intermediate_size,
+  FeedForwardLayer(size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+                   size_t hidden_size, size_t num_heads, size_t intermediate_size,
                    float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
                    std::string activation_fn, bool is_post_ln = false);

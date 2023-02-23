@@ -106,19 +106,24 @@ void Context::build() {
   }
   _building = true;
 
-#ifdef DEBUG_MODE
   printf(
-      "========== start Context build, StatusType: %s, StatusType id: %d "
-      "==========\n",
-      status_type_str().c_str(), int(_status_type));
-#endif
+      "========== start Lightseq Context build, StatusType: %s ==========\n\n",
+      status_type_str().c_str());
 
   if (!check_validate()) {
     printf("Check validate error!\n");
     exit(-1);
   }
 
-  temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
+  try {
+    temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
+  } catch (...) {
+    std::string error_message =
+        ("allocate temporary buffer failed!\n"
+         "mx_tensor_name is: \n    " + mx_tensor_name + "\n"  
+         "mx_tensor_size is: " + std::to_string(mx_tensor_size / MB_SIZE) + " MB\n");
+    throw std::runtime_error(error_message);
+  }
 
 #if ONLY_OP == true
   for (int idx = 0; idx < _model_ops.size(); idx++) {
@@ -132,11 +137,8 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    // rl->gather_root_leaf_var();
-#ifdef DEBUG_MODE
-    printf("\n########## Context build layer %s forward ##########\n",
+    printf("########## Context build layer %s forward ##########\n\n",
            rl->name().c_str());
-#endif
     rl->forward();
   }
 
@@ -144,10 +146,10 @@ void Context::build() {
     printf("is training!\n");
     for (int idx = _root_layers.size() - 1; idx >= 0; idx--) {
       Layer* rl = _root_layers[idx];
-#ifdef DEBUG_MODE
+
       printf("\n########## Context build layer %s backward ##########\n",
              rl->name().c_str());
-#endif
+
       rl->backward();
     }
   }
@@ -166,9 +168,10 @@ void Context::build() {
   synchronize();
 
 #ifdef DEBUG_MODE
-  draw_all_context();
-  printf("===== finish Context build =====\n");
+  // draw_all_context();
 #endif
+  printf("===== finish Lightseq Context build, StatusType: %s ==========\n\n",
+         status_type_str().c_str());
 }
 
 bool Context::check_validate() {

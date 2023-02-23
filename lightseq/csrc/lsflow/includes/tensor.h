@@ -85,7 +85,7 @@ class Tensor {
   size_t dim_t() { return _shape.view().size(); }
   int element_size() { return _shape.element_size(); }
   const size_t& mx_shape_size() const { return _mx_shape_size; }
-  const std::vector<int>& shape() const { return _shape.view(); }
+  const std::vector<size_t>& shape() const { return _shape.view(); }
   const DataType& dtype() const { return _dtype; }
 
   // unique id of the tensor.

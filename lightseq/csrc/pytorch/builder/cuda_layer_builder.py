@@ -62,7 +62,7 @@ class CudaLayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/encdec_kv_layer.cpp",
             "csrc/layers_new/dec_enc_attention_layer.cpp",
             "csrc/layers_new/transformer_decoder_layer.cpp",
-            "csrc/layers_new/crf_layer.cpp",            
+            "csrc/layers_new/crf_layer.cpp",
             # "csrc/layers_new/gpt_attention_layer.cpp",
             "csrc/layers_new/sdpa_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
@@ -102,5 +102,5 @@ class CudaLayerBuilder(CUDAOpBuilder):
             "-DPYBIND_INTERFACE",
             "-DLIGHTSEQ_cuda",
             # "-DDEBUG_MODE",
-            # "-DMEM_DEBUG",
+            "-DMEM_DEBUG",
         ]

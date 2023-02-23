@@ -11,8 +11,10 @@ class BiasDropoutResOp : public Operator {
  private:
   float ratio;
 
-  int _max_rows, _max_cols;
-  int _rows, _cols;
+  size_t _max_rows;
+  size_t _max_cols;
+  size_t _rows;
+  size_t _cols;
 
   TensorPtr _mask;
   Variable* _result;
@@ -20,7 +22,7 @@ class BiasDropoutResOp : public Operator {
  public:
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
-  BiasDropoutResOp(float r, int max_rows, int max_cols)
+  BiasDropoutResOp(float r, size_t max_rows, size_t max_cols)
       : Operator("BiasDropoutResOp"),
         ratio(r),
         _max_rows(max_rows),
@@ -32,14 +34,12 @@ class BiasDropoutResOp : public Operator {
 
   Variable* operator()(Variable* inp, Variable* bias, Variable* residual);
 
-  void before_forward(int rows, int cols) {
+  void before_forward(size_t rows, size_t cols) {
     _rows = rows, _cols = cols;
     _result->set_shape({_rows, _cols});
   }
 
   void forward() override;
-
-  void before_backward(int rows, int cols) { _rows = rows, _cols = cols; }
 
   void backward() override;
 };

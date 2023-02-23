@@ -15,14 +15,15 @@ class TransformerDecoderLayer : public Layer {
   DecEncAttentionLayerPtr<T1, T2> _enc_attn_layer;
   FeedForwardLayerPtr<T1, T2> _ffn_layer;
 
-  int _layer_id;
-  int _nshared_layer;
-  int _max_batch_tokens;
-  int _hidden_size;
+  size_t _layer_id;
+  size_t _batch_size;
+  size_t _nshared_layer;
+  size_t _max_batch_tokens;
+  size_t _hidden_size;
+  size_t _batch_tokens;
+  size_t _beam_size;
+
   int _step;
-  int _batch_tokens;
-  int _batch_size;
-  int _beam_size;
 
   static Variable* total_enc_kv;
 
@@ -52,7 +53,7 @@ class TransformerDecoderLayer : public Layer {
       Variable* inp, Variable* enc_out, Variable* enc_mask,
       Variable* cache_self_k, Variable* cache_self_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
+  void before_forward(size_t batch_size, size_t trg_seq_len, size_t src_seq_len,
                       int step = -1);
 
   void before_backward() { return; }
@@ -83,14 +84,15 @@ class TransformerDecoderLayerV2 : public Layer {
   DecEncAttentionLayerPtr<T1, T2> _enc_attn_layer;
   FeedForwardLayerPtr<T1, T2> _ffn_layer;
 
-  int _layer_id;
-  int _nshared_layer;
-  int _max_batch_tokens;
-  int _hidden_size;
+  size_t _layer_id;
+  size_t _batch_size;
+  size_t _nshared_layer;
+  size_t _max_batch_tokens;
+  size_t _hidden_size;
+  size_t _batch_tokens;
+  size_t _beam_size;
+  
   int _step;
-  int _batch_tokens;
-  int _batch_size;
-  int _beam_size;
 
   static Variable* total_enc_kv;
 
@@ -121,7 +123,7 @@ class TransformerDecoderLayerV2 : public Layer {
       Variable* inp, Variable* totoal_enc_kv, Variable* enc_mask,
       Variable* cache_self_k, Variable* cache_self_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int src_seq_len,
+  void before_forward(size_t batch_size, size_t trg_seq_len, size_t src_seq_len,
                       int step = -1);
 
   void before_backward() { return; }

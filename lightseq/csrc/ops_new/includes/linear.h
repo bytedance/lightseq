@@ -7,10 +7,10 @@ namespace lightseq {
 template <typename T1, typename T2>
 class LinearOp : public Operator {
  private:
-  int _output_size;
-  int _input_size;
-  int _max_batch_tokens;
-  int _batch_tokens;
+  size_t _output_size;
+  size_t _input_size;
+  size_t _max_batch_tokens;
+  size_t _batch_tokens;
   std::array<int, 3> _gemm_algos;
 
   float _alpha;
@@ -20,7 +20,7 @@ class LinearOp : public Operator {
   Variable* _result;
 
  public:
-  LinearOp(int max_batch_tokens, int output_size, int input_size,
+  LinearOp(size_t max_batch_tokens, size_t output_size, size_t input_size,
            MATRIX_OP opA = MATRIX_OP::Transpose,
            MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.))
       : Operator("LinearOp"),
@@ -38,7 +38,7 @@ class LinearOp : public Operator {
 
   void forward() override;
 
-  void before_forward(int batch_tokens) {
+  void before_forward(size_t batch_tokens) {
     _batch_tokens = batch_tokens;
     _result->set_shape({batch_tokens, _output_size});
   }

@@ -39,17 +39,17 @@ class DecSelfAttentionLayer : public Layer {
   Variable* _attn_nb;
 
   // shape related
-  int _batch_dim;
-  int _batch_heads;
-  int _batch_tokens;
-  int _src_seq_len;
-  int _trg_seq_len;
-  int _trg_batch_tokens;
-  int _layer_id;
-  int _max_batch_tokens;
-  int _max_seq_len;
-  int _hidden_size;
-  int _heads;
+  size_t _batch_dim;
+  size_t _batch_heads;
+  size_t _batch_tokens;
+  size_t _src_seq_len;
+  size_t _trg_seq_len;
+  size_t _trg_batch_tokens;
+  size_t _layer_id;
+  size_t _max_batch_tokens;
+  size_t _max_seq_len;
+  size_t _hidden_size;
+  size_t _heads;
   int _step;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
@@ -61,8 +61,8 @@ class DecSelfAttentionLayer : public Layer {
   Variable* v_out;
 
  public:
-  DecSelfAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
-                        int hidden_size, int num_heads,
+  DecSelfAttentionLayer(size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+                        size_t hidden_size, size_t num_heads,
                         float attn_prob_dropout_ratio,
                         float hidden_output_dropout_ratio,
                         bool pre_or_postLayerNorm, bool is_post_ln,
@@ -74,9 +74,7 @@ class DecSelfAttentionLayer : public Layer {
                                                          Variable* cache_k,
                                                          Variable* cache_v);
 
-  void before_forward(int batch_size, int trg_seq_len, int steps);
-
-  void before_backward();
+  void before_forward(size_t batch_size, size_t trg_seq_len, int steps);
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 

@@ -122,7 +122,10 @@ void MemoryManager::calculate_buffer_() {
         current_buffer =
             _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
       } catch (...) {
-        throw std::runtime_error("cant not allocate buffer!\n");
+        std::string error_message =
+            ("allocate shared buffer " + std::to_string(buffer_vec_.size()) + " failed!\n"
+            "buffer size is: " + std::to_string((max_last_addr - record_last_addr) / MB_SIZE) + " MB\n");
+        throw std::runtime_error(error_message);
       }
 
 #ifdef MEM_DEBUG

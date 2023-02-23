@@ -10,10 +10,10 @@ class BiasActDropoutOp : public Operator {
  private:
   float ratio;
 
-  int _mx_cols;
-  int _mx_rows;
-  int _cols;
-  int _rows;
+  size_t _mx_cols;
+  size_t _mx_rows;
+  size_t _cols;
+  size_t _rows;
 
   Variable* _result;
 
@@ -24,7 +24,7 @@ class BiasActDropoutOp : public Operator {
  public:
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
-  BiasActDropoutOp(float r, int mx_rows, int mx_cols, std::string activation_fn)
+  BiasActDropoutOp(float r, size_t mx_rows, size_t mx_cols, std::string activation_fn)
       : Operator("BiasActDropoutOp"),
         ratio(r),
         _activation_fn(activation_fn),
@@ -37,7 +37,7 @@ class BiasActDropoutOp : public Operator {
 
   Variable* operator()(Variable* inp, Variable* bias);
 
-  void before_forward(int rows, int cols) {
+  void before_forward(size_t rows, size_t cols) {
     _rows = rows, _cols = cols;
     _result->set_shape({rows, cols});
   }

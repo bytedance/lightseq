@@ -9,18 +9,18 @@ namespace lightseq {
 template <typename T1, typename T2>
 class BiasAddTrans20314 : public Operator {
  private:
-  int _max_batch_tokens;
-  int _batch;
-  int _seq_len;
-  int _heads;
-  int _hidden_size;
-  int _trans_count;
+  size_t _max_batch_tokens;
+  size_t _batch;
+  size_t _seq_len;
+  size_t _heads;
+  size_t _hidden_size;
+  size_t _trans_count;
 
   Variable* _res;
 
  public:
-  BiasAddTrans20314(int max_batch_tokens, int heads, int hidden_size,
-                    int trans_count)
+  BiasAddTrans20314(size_t max_batch_tokens, size_t heads, size_t hidden_size,
+                    size_t trans_count)
       : Operator("BiasAddTrans20314"),
         _max_batch_tokens(max_batch_tokens),
         _heads(heads),
@@ -31,7 +31,7 @@ class BiasAddTrans20314 : public Operator {
 
   Variable* operator()(Variable* inp, Variable* bias);
 
-  void before_forward(int batch, int seq_len) {
+  void before_forward(size_t batch, size_t seq_len) {
     _batch = batch, _seq_len = seq_len;
     _res->set_shape(
         {_trans_count, _batch, _heads, _seq_len, _hidden_size / _heads});

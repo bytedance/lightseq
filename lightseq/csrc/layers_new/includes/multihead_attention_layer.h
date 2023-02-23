@@ -40,10 +40,10 @@ class MultiheadAttentionLayer : public Layer {
   int _batch_heads;
   int _batch_tokens;
   int _layer_id;
-  int _max_batch_tokens;
-  int _max_seq_len;
-  int _hidden_size;
-  int _heads;
+  size_t _max_batch_tokens;
+  size_t _max_seq_len;
+  size_t _hidden_size;
+  size_t _heads;
   bool _pre_or_postLayerNorm;
   bool _is_post_ln;
 

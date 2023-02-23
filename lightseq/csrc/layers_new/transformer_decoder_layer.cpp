@@ -97,9 +97,9 @@ void TransformerDecoderLayer<T1, T2>::forward_process() {
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayer<T1, T2>::before_forward(int batch_size,
-                                                     int trg_seq_len,
-                                                     int src_seq_len,
+void TransformerDecoderLayer<T1, T2>::before_forward(size_t batch_size,
+                                                     size_t trg_seq_len,
+                                                     size_t src_seq_len,
                                                      int step) {
   _step = step;
   _batch_size = batch_size;
@@ -244,9 +244,9 @@ TransformerDecoderLayerV2<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-void TransformerDecoderLayerV2<T1, T2>::before_forward(int batch_size,
-                                                       int trg_seq_len,
-                                                       int src_seq_len,
+void TransformerDecoderLayerV2<T1, T2>::before_forward(size_t batch_size,
+                                                       size_t trg_seq_len,
+                                                       size_t src_seq_len,
                                                        int step) {
   _step = step;
   _batch_size = batch_size;

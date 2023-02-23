@@ -16,24 +16,22 @@ class EncDecKvLayer : public Layer {
   Variable* _enc_kvb;
 
   // shape related
-  int _layer_id;
-  int _nshared_layer;
-  int _batch_tokens;
-  int _max_batch_tokens;
-  int _hidden_size;
-  int _heads;
+  size_t _layer_id;
+  size_t _nshared_layer;
+  size_t _batch_tokens;
+  size_t _max_batch_tokens;
+  size_t _hidden_size;
+  size_t _heads;
 
  public:
-  EncDecKvLayer(int nshared_layer, int max_batch_tokens, int hidden_size,
-                int num_heads);
+  EncDecKvLayer(size_t nshared_layer, size_t max_batch_tokens, size_t hidden_size,
+                size_t num_heads);
 
   virtual ~EncDecKvLayer() {}
 
   Variable* operator()(Variable* enc_out);
 
-  void before_forward(int batch_size, int seq_len);
-
-  void before_backward();
+  void before_forward(size_t batch_size, size_t seq_len);
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 

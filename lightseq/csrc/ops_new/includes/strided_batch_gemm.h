@@ -8,11 +8,11 @@ namespace lightseq {
 template <typename T1, typename T2>
 class StridedBatchGemmOp : public Operator {
  private:
-  int _m;
-  int _n;
-  int _k;
-  int _max_ele_num;
-  int _batch_heads;
+  size_t _m;
+  size_t _n;
+  size_t _k;
+  size_t _max_ele_num;
+  size_t _batch_heads;
   float _alpha;
   float _beta;
   std::array<int, 3> _gemm_algos;
@@ -25,7 +25,7 @@ class StridedBatchGemmOp : public Operator {
   Variable* _result;
 
  public:
-  StridedBatchGemmOp(int max_ele_num, float param_alpha, float param_beta,
+  StridedBatchGemmOp(size_t max_ele_num, float param_alpha, float param_beta,
                      MATRIX_OP opA, MATRIX_OP opB)
       : Operator("StridedBatchGemmOp"),
         _max_ele_num(max_ele_num),
@@ -39,7 +39,7 @@ class StridedBatchGemmOp : public Operator {
 
   Variable* operator()(Variable* inpA, Variable* inpB);
 
-  void before_forward(int mm, int nn, int kk, int batch_heads) {
+  void before_forward(size_t mm, size_t nn, size_t kk, size_t batch_heads) {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
     _max_seq = -1;
@@ -47,7 +47,7 @@ class StridedBatchGemmOp : public Operator {
     _result->set_shape({batch_heads, nn, mm});
   }
 
-  void before_forward(int mm, int nn, int kk, int batch_heads, int max_seq) {
+  void before_forward(size_t mm, size_t nn, size_t kk, size_t batch_heads, int max_seq) {
     _m = mm, _n = nn, _k = kk;
     _batch_heads = batch_heads;
     _max_seq = max_seq;

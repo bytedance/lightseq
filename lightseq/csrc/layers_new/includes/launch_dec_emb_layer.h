@@ -18,8 +18,8 @@ class LaunchDecEmbLayer : public Layer {
   Variable* _lang_id;
 
  public:
-  LaunchDecEmbLayer(int max_batch_tokens, int beam_size, int hidden_size,
-                    int trg_vocab_size, int max_step, int multilg_type)
+  LaunchDecEmbLayer(size_t max_batch_tokens, size_t beam_size, size_t hidden_size,
+                    size_t trg_vocab_size, size_t max_step, int multilg_type)
       : Layer("LaunchDecEmbLayer"),
         _launch_dec_op(new LaunchDecEmbOp<T>(max_batch_tokens, beam_size,
                                              hidden_size, trg_vocab_size,
@@ -44,11 +44,10 @@ class LaunchDecEmbLayer : public Layer {
     return out;
   }
 
-  void before_forward(int batch_size, int cur_step) {
+  void before_forward(size_t batch_size, int cur_step) {
     _launch_dec_op->before_forward(batch_size, cur_step);
   }
 
-  void before_backward() {}
 
   int load_params(const std::vector<const T*>& para_vec, int offset) {
     _token_emb->set_value((char*)para_vec[offset]);
