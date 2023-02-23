@@ -16,8 +16,8 @@ class LinearLayer : public Layer {
 
   // shape related
   int _max_batch_tokens;
-  int _input_size;
-  int _output_size;
+  size_t _input_size;
+  size_t _output_size;
 
  public:
   LinearLayer(int max_batch_tokens, int input_size, int output_size,

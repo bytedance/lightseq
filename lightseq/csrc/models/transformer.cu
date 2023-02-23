@@ -39,8 +39,8 @@ Transformer::Transformer(const std::string weight_path,
         new TransformerEncoderLayer<OpType_, OpType_>(
             idx, max_batch_tokens, tw_._max_step, tw_._hidden_size,
             tw_._head_num, tw_._inner_size, attn_prob_dropout_ratio,
-            activation_dropout_ratio, hidden_dropout_ratio, true,
-            tw_._use_gelu ? "gelu" : "relu", false, tw_._is_post_ln));
+            activation_dropout_ratio, hidden_dropout_ratio, !tw_._is_post_ln,
+            tw_._use_gelu ? "gelu" : "relu", false));
     enc_wei_offset +=
         enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
     enc_layer_vec.push_back(enc_layer_);

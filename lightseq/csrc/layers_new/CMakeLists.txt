@@ -8,7 +8,8 @@ set(layers_files
     transformer_decoder_layer.cpp
     crf_layer.cpp
     encdec_kv_layer.cpp
-    sample_layer.cpp)
+    sample_layer.cpp
+    sdpa_layer.cpp)
 
 add_library(lightseq_layers STATIC ${layers_files})
 target_link_libraries(lightseq_layers PUBLIC lightseq_operators lsflow)

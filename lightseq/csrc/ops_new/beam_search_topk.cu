@@ -4,12 +4,13 @@ namespace lightseq {
 
 template <typename T>
 
-BeamSearchTopOp<T>::BeamSearchTopOp(int nshared_dec_layer, int max_batch_size,
-                                    int max_step, int trg_vocab_size,
-                                    int hidden_size, int max_thread_per_block,
-                                    int beam_size, int diverse_lambda,
-                                    int dim_per_head, int end_id, int head_num,
-                                    float length_penalty)
+BeamSearchTopOp<T>::BeamSearchTopOp(size_t nshared_dec_layer,
+                                    size_t max_batch_size, size_t max_step,
+                                    size_t trg_vocab_size, size_t hidden_size,
+                                    size_t max_thread_per_block,
+                                    size_t beam_size, size_t diverse_lambda,
+                                    size_t dim_per_head, int end_id,
+                                    size_t head_num, float length_penalty)
     : Operator("BeamSearchTopOp"),
       _nshared_dec_layer(nshared_dec_layer),
       _max_batch_size(max_batch_size),
