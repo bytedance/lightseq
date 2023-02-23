@@ -368,6 +368,9 @@ PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
         &lightseq::assign_layer_weight_grad<float, float>,
         "Bind layer weights and grads");
 
+  m.def("torch_sdpa_layer_fp32", &lightseq::torch_sdpa_layer<float, float>,
+        "Empty");
+
 #ifdef LIGHTSEQ_cuda
   m.def("create_transformer_encoder_layer_new_fp16",
         &lightseq::create_transformer_encoder_layer_new<__half, __half>,
@@ -393,8 +396,6 @@ PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
         &lightseq::assign_layer_weight_grad<__half, __half>,
         "Bind layer weights and grads");
 
-  m.def("torch_sdpa_layer_fp32", &lightseq::torch_sdpa_layer<float, float>,
-        "Empty");
   m.def("torch_sdpa_layer_fp16", &lightseq::torch_sdpa_layer<__half, __half>,
         "Empty");
 #endif

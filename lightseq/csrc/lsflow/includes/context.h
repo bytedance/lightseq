@@ -84,6 +84,7 @@ class Context {
   // effective address space, so it is necessary to give a temporary space for
   // some steps to test.
   size_t mx_tensor_size = 0;
+  std::string mx_tensor_name = "";
   char* temporary_buffer_ = nullptr;
 
   std::map<std::string, int> layer_name_cnt;

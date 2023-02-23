@@ -25,9 +25,8 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
           max_batch_tokens, num_heads, hidden_size, 3)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
-          (float(1.0) / float(sqrt(hidden_size / num_heads))), T1(0.0),
-          MATRIX_OP::Transpose,  // CUBLAS_OP_T,
-          MATRIX_OP::NonTranspose)),
+          (float(1.0) / float(sqrt(hidden_size / num_heads))), float(0.0),
+          MATRIX_OP::Transpose, MATRIX_OP::NonTranspose)),
       _softmax(new SoftmaxOp<T1, T2>(max_batch_tokens, max_seq_len, num_heads,
                                      mask_future_tokens)),
       _attn_prob_dropout(new DropoutOp<T1, T2>(

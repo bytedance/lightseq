@@ -28,7 +28,7 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 
 void MemoryManager::calculate_buffer_() {
 #ifdef MEM_DEBUG
-  printf("===== Execute MemoryManager calculate_buffer_ =====\n");
+  printf("========== Execute MemoryManager calculate_buffer_ ==========\n");
 #endif
 
   tensor_ptr.clear();
@@ -91,7 +91,7 @@ void MemoryManager::calculate_buffer_() {
   _total_buffer_size = total_consumption;
 
 #ifdef MEM_DEBUG
-  printf("**** shared buffer memory size: %zu MB ****\n",
+  printf("\n******** shared buffer memory size: %zu MB ********\n",
          total_consumption / MB_SIZE);
 #endif
 
@@ -112,18 +112,25 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(ordered_tensor_usages[i]);
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
-      char *current_buffer =
-          _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
+#ifdef MEM_DEBUG
+      printf("****** Buffer Idx: %d, buffer memory: %.2f MB, ", buffer_idx,
+             float(max_last_addr - record_last_addr) / MB_SIZE);
+#endif
+
+      char *current_buffer = nullptr;
+      try {
+        current_buffer =
+            _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
+      } catch (...) {
+        throw std::runtime_error("cant not allocate buffer!\n");
+      }
+
+#ifdef MEM_DEBUG
+      printf("allocate success! ******\n");
+#endif
 
       buffer_vec_.push_back(current_buffer);
       buffer_size_vec_.push_back(max_last_addr - record_last_addr);
-
-#ifdef MEM_DEBUG
-      printf(
-          "*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n",
-          buffer_idx, (max_last_addr - record_last_addr),
-          float(max_last_addr - record_last_addr) / MB_SIZE);
-#endif
 
       buffer_idx++;
       for (auto iter : temp_usages_vec) {
@@ -135,6 +142,10 @@ void MemoryManager::calculate_buffer_() {
       record_last_addr = max_last_addr;
     }
   }
+
+#ifdef MEM_DEBUG
+  printf("\n");
+#endif
 
   // Add algorithm check module
   // return true means check success,
@@ -170,7 +181,8 @@ void MemoryManager::calculate_buffer_() {
     char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef MEM_DEBUG
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end "
+        "idx: %d, life cycle : [%d, %d], name: \"%s\", memory size: %.2f MB, "
+        "end "
         "memory: %.2f MB\n"
         "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: "
         "%p\n\n",
@@ -196,14 +208,16 @@ void MemoryManager::calculate_buffer_() {
       printf("================================\n");
       printf("ERROR occurred!\n");
       printf(
-          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+          "%zu\n",
           unique_id, iter.first.first_idx, iter.first.last_idx,
           iter.first._name.c_str(), size, iter.second);
 
       int check_unique_id = check_iter.first.unique_id;
       size_t check_size = check_iter.first.size;
       printf(
-          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+          "%zu\n",
           check_unique_id, check_iter.first.first_idx,
           check_iter.first.last_idx, check_iter.first._name.c_str(), check_size,
           check_iter.second);

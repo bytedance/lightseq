@@ -104,8 +104,10 @@ Tensor::Tensor(std::string name, DataType dtype, size_t mx_shape_size)
                               : LSMemoryType::FixedMemory;
   if (_mtype == LSMemoryType::SharedMemory) {
     _mm_ptr = _ctx_ptr->memory_manager_ptr();
-    _ctx_ptr->mx_tensor_size =
-        std::max(_ctx_ptr->mx_tensor_size, _mx_shape_size * dtype_size(_dtype));
+    if (_ctx_ptr->mx_tensor_size < _mx_shape_size * dtype_size(_dtype)) {
+      _ctx_ptr->mx_tensor_size = _mx_shape_size * dtype_size(_dtype);
+      _ctx_ptr->mx_tensor_name = _name;
+    }
   }
 }
 
