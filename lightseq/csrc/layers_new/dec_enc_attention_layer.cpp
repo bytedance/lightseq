@@ -4,8 +4,8 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
-    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len, size_t hidden_size,
-    size_t num_heads, float attn_prob_dropout_ratio,
+    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+    size_t hidden_size, size_t num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
     bool is_post_ln)
     : Layer("DecEncAttentionLayer"),  // necessary

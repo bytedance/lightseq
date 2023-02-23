@@ -120,8 +120,11 @@ void Context::build() {
   } catch (...) {
     std::string error_message =
         ("allocate temporary buffer failed!\n"
-         "mx_tensor_name is: \n    " + mx_tensor_name + "\n"  
-         "mx_tensor_size is: " + std::to_string(mx_tensor_size / MB_SIZE) + " MB\n");
+         "mx_tensor_name is: \n    " +
+         mx_tensor_name +
+         "\n"
+         "mx_tensor_size is: " +
+         std::to_string(mx_tensor_size / MB_SIZE) + " MB\n");
     throw std::runtime_error(error_message);
   }
 

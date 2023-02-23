@@ -24,7 +24,8 @@ class BiasActDropoutOp : public Operator {
  public:
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
 
-  BiasActDropoutOp(float r, size_t mx_rows, size_t mx_cols, std::string activation_fn)
+  BiasActDropoutOp(float r, size_t mx_rows, size_t mx_cols,
+                   std::string activation_fn)
       : Operator("BiasActDropoutOp"),
         ratio(r),
         _activation_fn(activation_fn),

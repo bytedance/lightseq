@@ -27,9 +27,7 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 }
 
 void MemoryManager::calculate_buffer_() {
-
   printf("========== Execute MemoryManager calculate_buffer_ ==========\n\n");
-
 
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
@@ -110,7 +108,6 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(ordered_tensor_usages[i]);
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
-
       printf("****** Buffer Idx: %d, buffer memory: %.2f MB, ", buffer_idx,
              float(max_last_addr - record_last_addr) / MB_SIZE);
 
@@ -120,8 +117,11 @@ void MemoryManager::calculate_buffer_() {
             _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
       } catch (...) {
         std::string error_message =
-            ("allocate shared buffer " + std::to_string(buffer_vec_.size()) + " failed!\n"
-            "buffer size is: " + std::to_string((max_last_addr - record_last_addr) / MB_SIZE) + " MB\n");
+            ("allocate shared buffer " + std::to_string(buffer_vec_.size()) +
+             " failed!\n"
+             "buffer size is: " +
+             std::to_string((max_last_addr - record_last_addr) / MB_SIZE) +
+             " MB\n");
         throw std::runtime_error(error_message);
       }
 
@@ -140,7 +140,6 @@ void MemoryManager::calculate_buffer_() {
       record_last_addr = max_last_addr;
     }
   }
-
 
   // Add algorithm check module
   // return true means check success,
@@ -224,7 +223,6 @@ void MemoryManager::calculate_buffer_() {
   }
 
   printf("\n========== Finish MemoryManager calculate_buffer_ ==========\n\n");
-
 }
 
 }  // namespace lightseq

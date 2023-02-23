@@ -17,7 +17,8 @@ class Shape {
   Shape() : _shape_vec({0}), _element_size(0), _is_calculated(false) {}
   Shape(std::vector<size_t> shape)
       : _shape_vec(shape), _element_size(0), _is_calculated(false) {}
-  Shape(std::initializer_list<size_t> list) : Shape(std::vector<size_t>(list)) {}
+  Shape(std::initializer_list<size_t> list)
+      : Shape(std::vector<size_t>(list)) {}
   Shape(const Shape& lx) = default;
   virtual ~Shape() = default;
   const std::vector<size_t>& view() const { return _shape_vec; }

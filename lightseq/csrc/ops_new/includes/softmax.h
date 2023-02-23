@@ -44,7 +44,6 @@ class SoftmaxOp : public Operator {
   }
 
   void backward() override;
-
 };
 
 }  // namespace lightseq

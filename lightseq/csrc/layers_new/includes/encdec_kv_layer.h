@@ -24,8 +24,8 @@ class EncDecKvLayer : public Layer {
   size_t _heads;
 
  public:
-  EncDecKvLayer(size_t nshared_layer, size_t max_batch_tokens, size_t hidden_size,
-                size_t num_heads);
+  EncDecKvLayer(size_t nshared_layer, size_t max_batch_tokens,
+                size_t hidden_size, size_t num_heads);
 
   virtual ~EncDecKvLayer() {}
 

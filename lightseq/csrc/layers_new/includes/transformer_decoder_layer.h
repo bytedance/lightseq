@@ -91,7 +91,7 @@ class TransformerDecoderLayerV2 : public Layer {
   size_t _hidden_size;
   size_t _batch_tokens;
   size_t _beam_size;
-  
+
   int _step;
 
   static Variable* total_enc_kv;

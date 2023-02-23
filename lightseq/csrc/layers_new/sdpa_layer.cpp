@@ -40,12 +40,11 @@ Variable* SDPALayer<T1, T2>::operator()(Variable* query, Variable* key,
   Variable* attn_score = (*_attn_scores)(key, query);
 
   Variable* soft_out = (*_softmax)(attn_score, mask);
-  Variable* attn_context = nullptr; 
+  Variable* attn_context = nullptr;
   if (_context_ptr->is_training()) {
     Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
     attn_context = (*_attn_context)(value, prob_dropout);
-  }
-  else {
+  } else {
     attn_context = (*_attn_context)(value, soft_out);
   }
 

@@ -4,10 +4,10 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 FeedForwardLayer<T1, T2>::FeedForwardLayer(
-    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len, size_t hidden_size,
-    size_t num_heads, size_t intermediate_size, float activation_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool is_post_ln)
+    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+    size_t hidden_size, size_t num_heads, size_t intermediate_size,
+    float activation_dropout_ratio, float hidden_output_dropout_ratio,
+    bool pre_or_postLayerNorm, std::string activation_fn, bool is_post_ln)
     : Layer("FeedForwardLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),

@@ -4,8 +4,8 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
-    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len, size_t hidden_size,
-    size_t num_heads, float attn_prob_dropout_ratio,
+    size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+    size_t hidden_size, size_t num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
     bool is_post_ln, bool is_continuous_cache)
     : Layer("DecSelfAttentionLayer"),  // necessary
@@ -124,7 +124,8 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 
 template <typename T1, typename T2>
 void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
-                                                   size_t trg_seq_len, int steps) {
+                                                   size_t trg_seq_len,
+                                                   int steps) {
   _trg_seq_len = trg_seq_len;
   _batch_heads = batch_size * _heads;
   _trg_batch_tokens = batch_size * trg_seq_len;

@@ -100,7 +100,8 @@ std::vector<torch::Tensor> transformer_encoder_layer_fw(
       {size_t(input.size(0)), size_t(input.size(1)), size_t(input.size(2))});
   Variable *inp_mask_node = layer->input(1);
   inp_mask_node->set_value(input_mask_ptr);
-  inp_mask_node->set_shape({size_t(input_mask.size(0)), size_t(input_mask.size(1))});
+  inp_mask_node->set_shape(
+      {size_t(input_mask.size(0)), size_t(input_mask.size(1))});
 
   Variable *out_node = layer->output(0);
   out_node->set_value(out_ptr);
