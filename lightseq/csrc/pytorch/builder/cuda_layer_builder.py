@@ -102,5 +102,5 @@ class CudaLayerBuilder(CUDAOpBuilder):
             "-DPYBIND_INTERFACE",
             "-DLIGHTSEQ_cuda",
             # "-DDEBUG_MODE",
-            "-DMEM_DEBUG",
+            # "-DMEM_DEBUG",
         ]

@@ -64,9 +64,7 @@ class MultiheadAttentionLayer : public Layer {
 
   Variable* operator()(Variable* inp, Variable* inp_mask);
 
-  void before_forward(int batch_size, int seq_len);
-
-  void before_backward();
+  void before_forward(size_t batch_size, size_t seq_len);
 
   int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 

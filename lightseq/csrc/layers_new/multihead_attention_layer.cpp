@@ -103,8 +103,8 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
-                                                     int seq_len) {
+void MultiheadAttentionLayer<T1, T2>::before_forward(size_t batch_size,
+                                                     size_t seq_len) {
   _batch_tokens = batch_size * seq_len;
   _batch_heads = batch_size * _heads;
   _batch_dim = _batch_tokens * _hidden_size;
@@ -138,9 +138,6 @@ void MultiheadAttentionLayer<T1, T2>::before_forward(int batch_size,
 
   _attn_dropout->before_forward(_batch_tokens, _hidden_size);
 }
-
-template <typename T1, typename T2>
-void MultiheadAttentionLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
 int MultiheadAttentionLayer<T1, T2>::load_para_and_grad(

@@ -27,9 +27,9 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 }
 
 void MemoryManager::calculate_buffer_() {
-#ifdef MEM_DEBUG
-  printf("========== Execute MemoryManager calculate_buffer_ ==========\n");
-#endif
+
+  printf("========== Execute MemoryManager calculate_buffer_ ==========\n\n");
+
 
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
@@ -90,10 +90,8 @@ void MemoryManager::calculate_buffer_() {
   }
   _total_buffer_size = total_consumption;
 
-#ifdef MEM_DEBUG
-  printf("\n******** shared buffer memory size: %zu MB ********\n",
+  printf("******** shared buffer memory size: %zu MB ********\n",
          total_consumption / MB_SIZE);
-#endif
 
   for (auto iter : buffer_vec_) {
     _allocator_ptr->free_mem(iter);
@@ -112,10 +110,9 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(ordered_tensor_usages[i]);
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
-#ifdef MEM_DEBUG
+
       printf("****** Buffer Idx: %d, buffer memory: %.2f MB, ", buffer_idx,
              float(max_last_addr - record_last_addr) / MB_SIZE);
-#endif
 
       char *current_buffer = nullptr;
       try {
@@ -128,9 +125,7 @@ void MemoryManager::calculate_buffer_() {
         throw std::runtime_error(error_message);
       }
 
-#ifdef MEM_DEBUG
       printf("allocate success! ******\n");
-#endif
 
       buffer_vec_.push_back(current_buffer);
       buffer_size_vec_.push_back(max_last_addr - record_last_addr);
@@ -146,9 +141,6 @@ void MemoryManager::calculate_buffer_() {
     }
   }
 
-#ifdef MEM_DEBUG
-  printf("\n");
-#endif
 
   // Add algorithm check module
   // return true means check success,
@@ -231,7 +223,8 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(iter);
   }
 
-  // exit(0);
+  printf("\n========== Finish MemoryManager calculate_buffer_ ==========\n\n");
+
 }
 
 }  // namespace lightseq
