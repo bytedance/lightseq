@@ -46,14 +46,13 @@ class DecEncAttentionLayer : public Layer {
   size_t _hidden_size;
   size_t _heads;
   bool _pre_or_postLayerNorm;
-  bool _is_post_ln;
 
  public:
   DecEncAttentionLayer(size_t layer_id, size_t max_batch_tokens,
                        size_t max_seq_len, size_t hidden_size, size_t num_heads,
                        float attn_prob_dropout_ratio,
                        float hidden_output_dropout_ratio,
-                       bool pre_or_postLayerNorm, bool is_post_ln);
+                       bool pre_or_postLayerNorm);
 
   virtual ~DecEncAttentionLayer() {}
 

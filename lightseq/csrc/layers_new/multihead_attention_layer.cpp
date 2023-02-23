@@ -7,7 +7,7 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-    bool mask_future_tokens, bool is_post_ln)
+    bool mask_future_tokens)
     : Layer("MultiheadAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -15,7 +15,6 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _hidden_size(hidden_size),
       _heads(num_heads),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
-      _is_post_ln(is_post_ln),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -72,23 +71,16 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual;
-  if (_pre_or_postLayerNorm && _is_post_ln) {
-    attn_dropout_residual =
-        (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
-  } else {
-    attn_dropout_residual = (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  }
-
-  if (!_pre_or_postLayerNorm) {
-    Variable* attn_ln_out =
-        (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-    set_outputs({attn_ln_out});
-    return attn_ln_out;
-  } else {
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  if (_pre_or_postLayerNorm) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
+
+  Variable* post_ln = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
+  set_outputs({post_ln});
+  return post_ln;
 }
 
 template <typename T1, typename T2>

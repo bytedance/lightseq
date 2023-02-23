@@ -42,7 +42,6 @@ class MultiheadAttentionLayer : public Layer {
   size_t _hidden_size;
   size_t _heads;
   bool _pre_or_postLayerNorm;
-  bool _is_post_ln;
 
   // tensor slice
   Variable* q_out;
@@ -54,8 +53,7 @@ class MultiheadAttentionLayer : public Layer {
                           int hidden_size, int num_heads,
                           float attn_prob_dropout_ratio,
                           float hidden_output_dropout_ratio,
-                          bool pre_or_postLayerNorm, bool mask_future_tokens,
-                          bool is_post_ln = false);
+                          bool pre_or_postLayerNorm, bool mask_future_tokens);
 
   virtual ~MultiheadAttentionLayer() {}
 

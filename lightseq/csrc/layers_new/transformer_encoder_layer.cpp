@@ -8,17 +8,17 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
     bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, bool is_post_ln)
+    bool mask_future_tokens)
     : Layer("TransformerEncoderLayer") {
   _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
+      pre_or_postLayerNorm, mask_future_tokens));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, activation_fn, is_post_ln));
+      pre_or_postLayerNorm, activation_fn));
 
   this->_context_ptr->exit_layer();  // necessary
 }

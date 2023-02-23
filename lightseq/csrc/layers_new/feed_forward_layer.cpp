@@ -7,7 +7,7 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
     size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
     size_t hidden_size, size_t num_heads, size_t intermediate_size,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn, bool is_post_ln)
+    bool pre_or_postLayerNorm, std::string activation_fn)
     : Layer("FeedForwardLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -17,7 +17,6 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
       _intermediate_size(intermediate_size),
       _pre_or_postLayerNorm(pre_or_postLayerNorm),
       _activation_fn(activation_fn),
-      _is_post_ln(is_post_ln),
 
       // operators
       _ffn_ln(new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)),
@@ -59,21 +58,16 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* ff2_out = (*_ff2)(ffn_act_out, _output_w);
 
-  Variable* ffn_dropout_residual;
-  if (_pre_or_postLayerNorm && _is_post_ln) {
-    ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, ffn_ln_out);
-  } else {
-    ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
-  }
+  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
 
-  if (!_pre_or_postLayerNorm) {
-    Variable* ffn_ln_out = (*_ffn_ln)(ffn_dropout_residual, _ffn_nw, _ffn_nb);
-    set_outputs({ffn_ln_out});
-    return ffn_ln_out;
-  } else {
+  if (_pre_or_postLayerNorm) {
     set_outputs({ffn_dropout_residual});
     return ffn_dropout_residual;
   }
+
+  Variable* post_ln = (*_ffn_ln)(ffn_dropout_residual, _ffn_nw, _ffn_nb);
+  set_outputs({post_ln});
+  return post_ln;
 }
 
 template <typename T1, typename T2>

@@ -39,14 +39,13 @@ class FeedForwardLayer : public Layer {
 
   bool _pre_or_postLayerNorm;
   std::string _activation_fn;
-  bool _is_post_ln;
 
  public:
   FeedForwardLayer(size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
                    size_t hidden_size, size_t num_heads,
                    size_t intermediate_size, float activation_dropout_ratio,
                    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-                   std::string activation_fn, bool is_post_ln = false);
+                   std::string activation_fn);
 
   virtual ~FeedForwardLayer() {}
 

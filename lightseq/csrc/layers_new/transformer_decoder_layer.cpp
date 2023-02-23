@@ -8,8 +8,8 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
     float activation_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool is_post_ln, bool is_continuous_cache,
-    int max_batch_size, int beam_size)
+    std::string activation_fn, bool is_continuous_cache, int max_batch_size,
+    int beam_size)
     : Layer("TransformerDecoderLayer"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
@@ -27,12 +27,11 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
       attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
-      is_post_ln, is_continuous_cache));
+      is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
-      is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
@@ -183,8 +182,8 @@ TransformerDecoderLayerV2<T1, T2>::TransformerDecoderLayerV2(
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
     float activation_dropout_ratio, bool pre_or_postLayerNorm,
-    std::string activation_fn, bool is_post_ln, bool is_continuous_cache,
-    int max_batch_size, int beam_size)
+    std::string activation_fn, bool is_continuous_cache, int max_batch_size,
+    int beam_size)
     : Layer("TransformerDecoderLayerV2"),
       _layer_id(layer_id),
       _nshared_layer(nshared_layer),
@@ -197,12 +196,11 @@ TransformerDecoderLayerV2<T1, T2>::TransformerDecoderLayerV2(
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
       attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
-      is_post_ln, is_continuous_cache));
+      is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
-      is_post_ln));
+      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
