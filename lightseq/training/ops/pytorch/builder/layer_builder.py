@@ -50,6 +50,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/ops_new/concat3_dim1.cpp",
             "csrc/ops_new/transform_0213.cpp",
             "csrc/ops_new/crf.cpp",
+            "csrc/ops_new/split_head_op.cpp",
             "csrc/layers_new/feed_forward_layer.cpp",
             "csrc/layers_new/multihead_attention_layer.cpp",
             "csrc/layers_new/transformer_encoder_layer.cpp",
@@ -58,7 +59,7 @@ class LayerBuilder(CUDAOpBuilder):
             "csrc/layers_new/dec_enc_attention_layer.cpp",
             "csrc/layers_new/transformer_decoder_layer.cpp",
             "csrc/layers_new/crf_layer.cpp",
-            # "csrc/layers_new/gpt_attention_layer.cpp",
+            "csrc/layers_new/gpt_attention_layer.cpp",
             "csrc/layers_new/sdpa_layer.cpp",
             "csrc/pybind/pybind_layer_new.cpp",
         ]

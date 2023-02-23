@@ -79,4 +79,5 @@ void SplitHeadOp<T1, T2>::backward() {
 
 template class SplitHeadOp<float, float>;
 template class SplitHeadOp<__half, __half>;
+
 }  // namespace lightseq

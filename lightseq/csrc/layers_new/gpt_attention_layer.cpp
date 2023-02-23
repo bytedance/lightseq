@@ -2,16 +2,16 @@
 
 namespace lightseq {
 
-"""
+/*
 for training,
 max_batch_tokens = max(batch_size * seq_len)
 for inference,
 max_batch_tokens = max(batch_size * beam_size * seq_len)
-"""
+*/
 template <typename T1, typename T2>
 GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
                                              int max_seq_len, int hidden_size,
-                                             int num_heads, int beam_size;
+                                             int num_heads, int beam_size,
                                              float attn_prob_dropout_ratio,
                                              float hidden_output_dropout_ratio,
                                              bool pre_or_postLayerNorm)
@@ -26,9 +26,8 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
       new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size);
-  _split_head =
-      new SplitHeadOp<T1, T2>(max_batch_tokens, num_heads, hidden_size,
-                              qkv_num = 3, cache_sz = max_seq_len);
+  _split_head = new SplitHeadOp<T1, T2>(max_batch_tokens, num_heads,
+                                        hidden_size, 3, max_seq_len);
   _sdpa = new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, _head_dim,
                                 num_heads, 0.f);
   _transform_0213 = new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size);
@@ -46,7 +45,7 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_nw = new Variable("_attn_nw");
   _attn_nb = new Variable("_attn_nb");
 
-  int cache_size = max_batch_tokens * hidden_dim;
+  int cache_size = max_batch_tokens * hidden_size;
   Variable* _cache_k = new Variable("cache_k", cache_size * sizeof(T1));
   Variable* _cache_v = new Variable("cache_v", cache_size * sizeof(T1));
 
@@ -66,7 +65,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  q_out = (*_split_head)(qkv_out, _attn_qkvb, _cache_k, _cache_v);
+  Variable* q_out = (*_split_head)(qkv_out, _attn_qkvb, _cache_k, _cache_v);
 
   // result of Scaled Dot Product Attention
   Variable* sdpa_res = (*_sdpa)(q_out, _cache_k, _cache_v);
@@ -76,7 +75,8 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  attn_dropout_residual = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_pre_or_postLayerNorm) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
@@ -95,23 +95,23 @@ void GptAttentionLayer<T1, T2>::reorder_cache(Variable* input_ids) {
 }
 */
 
-"""
+/*
 for training or (inference and step=0)
 batch_size = batch_size
 for (inference and step>0)
 batch_size = batch_size * beam_size
-"""
+*/
 template <typename T1, typename T2>
 void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
                                                int steps) {
-  // step = -1 for training
+  // steps = -1 for training
   if (_context_ptr->is_training()) {
-    step = -1;
+    steps = -1;
   }
   // all token number in this batch
   int batch_tokens = batch_size * query_len;
   int attn_from_len = query_len;
-  int attn_to_len = (_step <= 0) ? query_len : steps + 1;
+  int attn_to_len = (steps <= 0) ? query_len : steps + 1;
 
   _attn_ln->before_forward(batch_tokens);
 
@@ -120,11 +120,11 @@ void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
   // for inference only now, FIXME later
   _split_head->before_forward(batch_size, query_len, steps);
 
-  // mask future when training or (inference and step=0)
-  _sdpa->before_forward(batch_size, attn_from_len, attn_to_len, _cache_sz,
+  // mask future when training or (inference and steps=0)
+  _sdpa->before_forward(batch_size, attn_from_len, attn_to_len, _max_seq_len,
                         steps <= 0);
 
-  _transform_0213->before_forward(batch_size, nhead, from_len, _head_dim);
+  _transform_0213->before_forward(batch_size, _nhead, attn_from_len, _head_dim);
 
   _attn_out_linear->before_forward(batch_tokens);
 
