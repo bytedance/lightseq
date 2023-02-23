@@ -18,7 +18,8 @@ Variable* LayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* gamma,
 }
 
 template <typename T1, typename T2>
-void LayerNormalizeOp<T1, T2>::before_forward(int batch_size, int seq_len) {
+void LayerNormalizeOp<T1, T2>::before_forward(size_t batch_size,
+                                              size_t seq_len) {
   _batch_tokens = batch_size * seq_len;
   _result->set_shape({batch_size, seq_len, _hidden_dim});
 }

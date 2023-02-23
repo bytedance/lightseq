@@ -14,7 +14,7 @@ class DropoutOp : public Operator {
   bool _is_skip;
 
   TensorPtr _mask;
-  Variable* _result;
+  Variable* _result = nullptr;
 
  public:
   float RATIO() const { return _context_ptr->is_training() ? ratio : 0.0; }
@@ -30,7 +30,7 @@ class DropoutOp : public Operator {
 
   void before_forward(size_t count) {
     _count = count;
-    _result->set_shape({count});
+    if (_result) _result->set_shape({count});
   }
 
   void forward() override;

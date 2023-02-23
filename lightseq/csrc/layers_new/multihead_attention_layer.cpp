@@ -76,8 +76,14 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* soft_out = (*_softmax)(attn_score, inp_mask);
 
-  Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
-  Variable* attn_context = (*_attn_context)(v_out, prob_dropout);
+  // just only training needs dropout op.
+  Variable* attn_context = nullptr;
+  if (_context_ptr->is_training()) {
+    Variable* prob_dropout = (*_attn_prob_dropout)(soft_out);
+    attn_context = (*_attn_context)(v_out, prob_dropout);
+  } else {
+    attn_context = (*_attn_context)(v_out, soft_out);
+  }
 
   Variable* transform_0213_out = (*_transform_0213)(attn_context);
 
