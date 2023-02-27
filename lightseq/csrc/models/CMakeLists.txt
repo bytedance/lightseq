@@ -1,6 +1,6 @@
 add_library(
   liblightseq SHARED bert.cc # bert_crf.cc
-  # transformer.cu
+  transformer.cu
 )
 
 target_link_libraries(liblightseq PUBLIC lightseq_layers)

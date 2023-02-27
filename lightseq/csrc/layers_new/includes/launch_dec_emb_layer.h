@@ -25,10 +25,10 @@ class LaunchDecEmbLayer : public Layer {
         _launch_dec_op(new LaunchDecEmbOp<T>(max_batch_tokens, beam_size,
                                              hidden_size, trg_vocab_size,
                                              max_step, multilg_type)) {
-    _token_emb = new Variable("token_emb");
-    _pos_emb = new Variable("pos_emb");
-    _lang_emb = new Variable("lang_emb");
-    _lang_id = new Variable("lang_id");
+    _token_emb = new Variable("token_emb", g_dtype<T>());
+    _pos_emb = new Variable("pos_emb", g_dtype<T>());
+    _lang_emb = new Variable("lang_emb", g_dtype<T>());
+    _lang_id = new Variable("lang_id", g_dtype<T>());
 
     this->_context_ptr->exit_layer();  // necessary
   }

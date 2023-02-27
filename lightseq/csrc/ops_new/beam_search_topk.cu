@@ -2,8 +2,12 @@
 
 namespace lightseq {
 
-template <typename T>
+float host_length_norm_func(int length, float alpha) {
+  if (alpha < 0.f) return 1.f / length;
+  return std::pow((5.f + length) / 6.f, -alpha);
+}
 
+template <typename T>
 BeamSearchTopOp<T>::BeamSearchTopOp(size_t nshared_dec_layer,
                                     size_t max_batch_size, size_t max_step,
                                     size_t trg_vocab_size, size_t hidden_size,
@@ -35,7 +39,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(size_t nshared_dec_layer,
 
   if (length_penalty >= 0) {
     for (int i = 0; i < _host_length_norm.size(); i++) {
-      _host_length_norm[i] = host_length_norm(i + 1, length_penalty);
+      _host_length_norm[i] = host_length_norm_func(i + 1, length_penalty);
     }
   }
 }
