@@ -37,10 +37,6 @@ class SDPALayer : public Layer {
 
   void before_forward(int batch_size, int query_len, int kv_len, int kv_size,
                       bool mask_future);
-
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
-
-  int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
 template class SDPALayer<__half, __half>;

@@ -162,26 +162,42 @@ int create_transformer_decoder_layer(
       nshared_layer, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
       num_heads, intermediate_size, attn_prob_dropout_ratio,
       activation_dropout_ratio, hidden_dropout_ratio, pre_or_postLayerNorm,
-      activation_fn);
+      activation_fn, true);
 
-  Context::regist_pybind_layer("TransformerDecoderLayer", layer_id, layer);
+  std::shared_ptr<Context> context_ptr = Context::global_instance();
+  Variable *total_enc_kv = nullptr;
+  if (layer_id == 0) {
+    Variable *enc_out =
+        new Variable("encoder_out", g_dtype<T1>(), g_dtype<T2>());
+    std::shared_ptr<EncDecKvLayer<T1, T2>> total_enc_kv_layer(
+        new EncDecKvLayer<T1, T2>(nshared_layer, max_batch_tokens, hidden_dim,
+                                  num_heads));
+
+    Context::regist_pybind_layer("EncDecKvLayer", 0, total_enc_kv_layer);
+
+    total_enc_kv = (*total_enc_kv_layer)(enc_out);
+    context_ptr->register_object("EncDecKvOut", total_enc_kv);
+  } else {
+    total_enc_kv =
+        static_cast<Variable *>(context_ptr->get_object("EncDecKvOut"));
+  }
 
   Variable *dec_inp =
       new Variable("decoder_input", g_dtype<T1>(), g_dtype<T2>());
-  Variable *enc_out = new Variable("encoder_out", g_dtype<T1>(), g_dtype<T2>());
   Variable *enc_mask = new Variable("encoder_mask", g_dtype<T1>());
   Variable *cache_self_k =
       new Variable("cache_self_k", g_dtype<T1>(), g_dtype<T2>());
   Variable *cache_self_v =
       new Variable("cache_self_v", g_dtype<T1>(), g_dtype<T2>());
 
-  (*layer)(dec_inp, enc_out, enc_mask, cache_self_k, cache_self_v);
+  (*layer)(dec_inp, total_enc_kv, enc_mask, cache_self_k, cache_self_v);
 
   std::string dtype = (std::is_same<T1, __half>::value) ? "half" : "float";
 
   std::cout << "Decoder layer #" << layer_id << " is created with date type ["
             << dtype << "]." << std::endl;
 
+  Context::regist_pybind_layer("TransformerDecoderLayer", layer_id, layer);
   return 0;
 }
 
@@ -189,10 +205,17 @@ template <typename T1, typename T2>
 std::vector<torch::Tensor> transformer_decoder_layer_fw(
     int layer_id, const torch::Tensor &dec_input,
     const torch::Tensor &enc_output, const torch::Tensor &enc_mask,
-    bool prelayernorm, bool quant_mode, std::vector<torch::Tensor> &cache) {
+    bool prelayernorm, bool quant_mode, std::vector<torch::Tensor> &cache,
+    int cur_step = -1) {
   CHECK_INPUT(dec_input);
   CHECK_INPUT(enc_output);
   CHECK_INPUT(enc_mask);
+
+  if (cache.size() != 4) {
+    std::string error_message =
+        "Error Occurred! input cache is invalid format.\n";
+    throw std::runtime_error(error_message);
+  }
 
   const char *dec_input_ptr = (const char *)dec_input.data_ptr();
   const char *enc_output_ptr = (const char *)enc_output.data_ptr();
@@ -205,48 +228,58 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
       std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
           Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
 
-  int batch_size = enc_output.size(0);
-  int trg_seq_len = dec_input.size(1);
-  int src_seq_len = enc_output.size(1);
-  int step = -1;
-  std::vector<char *> cache_ptr(5, nullptr);
-  if (cache.size() > 0) {
-    trg_seq_len = dec_input.size(0) / batch_size;  // beam_size
-    step = cache[0].size(2) - 1;
-    cache_ptr[0] = (char *)cache[0].data_ptr();  // new dec-self-attn k
-    cache_ptr[1] = (char *)cache[1].data_ptr();  // new dec-self-attn v
-    if (step > 0) {
-      cache_ptr[2] = (char *)cache[2].data_ptr();  // old dec-self-attn k
-      cache_ptr[3] = (char *)cache[3].data_ptr();  // old dec-self-attn v
-    }
+  size_t batch_size = enc_output.size(0);
+  // size_t batch_beam = dec_input.size(0);
+  size_t trg_seq_len = dec_input.size(1);
+  size_t src_seq_len = enc_output.size(1);
+  size_t hidden_size = dec_input.size(2);
+
+  std::shared_ptr<Context> _context_ptr = layer->get_context();
+
+  if (layer_id == 0) {
+    std::shared_ptr<EncDecKvLayer<T1, T2>> enc_kv_layer =
+        std::static_pointer_cast<EncDecKvLayer<T1, T2>>(
+            Context::get_pybind_layer("EncDecKvLayer", 0));
+    Variable *enc_out_node = enc_kv_layer->input(0);
+    enc_out_node->set_value(enc_output_ptr);
+    enc_out_node->set_shape({batch_size, src_seq_len, hidden_size});
+
+    enc_kv_layer->before_forward(batch_size, src_seq_len);
+    enc_kv_layer->forward();
   }
 
   Variable *inp_node = layer->input(0);
   inp_node->set_value(dec_input_ptr);
-
-  Variable *enc_out_node = layer->input(1);
-  enc_out_node->set_value(enc_output_ptr);
+  inp_node->set_shape({batch_size, trg_seq_len, hidden_size});
 
   Variable *enc_mask_node = layer->input(2);
   enc_mask_node->set_value(enc_mask_ptr);
+  enc_mask_node->set_shape({batch_size, src_seq_len});
 
-  Variable *old_cache_k = layer->input(3);
-  old_cache_k->set_value(cache_ptr[2]);
+  Variable *cache_k = layer->input(3);
+  Variable *cache_v = layer->input(4);
+  if (_context_ptr->is_inference()) {
+    cache_k->set_value((char *)cache[2].data_ptr());
+    cache_k->set_shape({batch_size, size_t(cur_step), hidden_size});
 
-  Variable *old_cache_v = layer->input(4);
-  old_cache_v->set_value(cache_ptr[3]);
+    cache_v->set_value((char *)cache[3].data_ptr());
+    cache_v->set_shape({batch_size, size_t(cur_step), hidden_size});
+  }
 
   Variable *dec_out = layer->output(0);
   dec_out->set_value(dec_output_ptr);
+  dec_out->set_shape({batch_size, trg_seq_len, hidden_size});
 
-  if (cache.size() > 0) {
-    Variable *new_cache_k = layer->output(1);
-    new_cache_k->set_value(cache_ptr[0]);
-    Variable *new_cache_v = layer->output(2);
-    new_cache_v->set_value(cache_ptr[1]);
-  }
+  Variable *new_cache_k = layer->output(1);
+  new_cache_k->set_value((char *)cache[0].data_ptr());
+  new_cache_k->set_shape({batch_size, size_t(cur_step + 1), hidden_size});
 
-  layer->before_forward(batch_size, trg_seq_len, src_seq_len, step);
+  Variable *new_cache_v = layer->output(2);
+  new_cache_v->set_value((char *)cache[1].data_ptr());
+  new_cache_v->set_shape({batch_size, size_t(cur_step + 1), hidden_size});
+
+
+  layer->before_forward(batch_size, trg_seq_len, src_seq_len, cur_step);
 
   layer->forward();
 
@@ -272,7 +305,13 @@ void assign_layer_weight_grad(const torch::Tensor &weights,
     std::shared_ptr<TransformerDecoderLayer<T1, T2>> layer =
         std::static_pointer_cast<TransformerDecoderLayer<T1, T2>>(
             Context::get_pybind_layer("TransformerDecoderLayer", layer_id));
-    layer->load_para_and_grad(wptr, gptr);
+    size_t offset = layer->load_para_and_grad(wptr, gptr);
+    if (layer_id == 0) {
+      std::shared_ptr<EncDecKvLayer<T1, T2>> enc_kv_layer =
+          std::static_pointer_cast<EncDecKvLayer<T1, T2>>(
+              Context::get_pybind_layer("EncDecKvLayer", 0));
+      enc_kv_layer->load_para_and_grad(wptr + offset, gptr + offset);
+    }
   } else {
     printf("Error! layer_name %s is unsupported!\n", layer_name.c_str());
     exit(-1);

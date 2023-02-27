@@ -65,4 +65,11 @@ class OperatorBuilder(CUDAOpBuilder):
         return args + self.compute_capability_args()
 
     def cxx_args(self):
-        return ["-O3", "-std=c++14", "-g", "-Wno-reorder", "-DONLY_OP"]
+        return [
+            "-O3",
+            "-std=c++14",
+            "-g",
+            "-Wno-reorder",
+            "-DONLY_OP",
+            "-DPYBIND_INTERFACE",
+        ]

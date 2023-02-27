@@ -1,37 +1,40 @@
+import __init__
 from itertools import zip_longest
-import math
-from dataclasses import dataclass
 import copy
-
 import torch
 from torch import nn
-from torch.autograd import Function
+import math
+from dataclasses import dataclass
 
-
-from lightseq.training.ops.pytorch.util import (
+from csrc.pytorch.layer_base import TransformerDecoderLayerBase
+from csrc.pytorch.util import (
     copy_para,
     state_dict,
-    MODEL_ARCH,
-    check_config,
     calc_offset,
 )
-from lightseq.training.ops.pytorch.layer_base import TransformerDecoderLayerBase
+from csrc.pytorch.torch_transformer_layers import (
+    act_quant_config,
+    weight_quant_config
+)
+
+from csrc.pytorch.builder.cuda_layer_builder import CudaLayerBuilder
+
+cuda_layer_module = CudaLayerBuilder().load()
 
 _all_layer_grads = dict()
 
 
-class LSTransformerDecoderFunc(Function):
+class LSTransformerDecoderFunc(torch.autograd.Function):
     @staticmethod
     def forward(
         ctx,
         decoder_states,
         encoder_out,
         encoder_padding_mask,
-        parameters,
         config,
         cache,
     ):
-        cuda_module = layer_cuda_module
+        cuda_module = cuda_layer_module
         forward_func = (
             cuda_module.transformer_decoder_layer_fw_fp16
             if config.fp16
@@ -43,61 +46,13 @@ class LSTransformerDecoderFunc(Function):
             decoder_states,
             encoder_out,
             encoder_padding_mask,
-            config.training,
             config.pre_layer_norm,
             config.quant_mode,
             cache,
+            0,
         )
 
-        if config.is_grad_enabled and config.training:
-            ctx.save_for_backward(
-                output,
-                decoder_states,
-                encoder_out,
-                encoder_padding_mask,
-            )
-            ctx.config = config
         return output
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        cuda_module = layer_cuda_module
-        backward_func = (
-            cuda_module.transformer_decoder_layer_bw_fp16
-            if ctx.config.fp16
-            else cuda_module.transformer_decoder_layer_bw_fp32
-        )
-        assert ctx.config.training
-        (
-            output,
-            decoder_states,
-            encoder_out,
-            encoder_padding_mask,
-        ) = ctx.saved_tensors
-
-        if ctx.config.fp16:
-            grad_output = grad_output.to(torch.half)
-            output = output.to(torch.half)
-            decoder_states = decoder_states.to(torch.half)
-            encoder_out = encoder_out.to(torch.half)
-            encoder_padding_mask = encoder_padding_mask.to(torch.half)
-
-        bw_res = backward_func(
-            ctx.config.layer_id,
-            grad_output,
-            output,
-            decoder_states,
-            encoder_out,
-            encoder_padding_mask,
-        )
-        if ctx.config.layer_id == 0:
-            grad_input, grad_enc_out = bw_res
-        else:
-            grad_input = bw_res[0]
-            grad_enc_out = None
-
-        grad = _all_layer_grads[ctx.config.layer_id]
-        return (grad_input, grad_enc_out, None, grad, None, None)
 
 
 class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
@@ -131,7 +86,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             torch.cuda.set_device(self.config.local_rank)
 
         # create the layer in cuda kernels.
-        cuda_module = layer_cuda_module
+        cuda_module = cuda_layer_module
         create_layer_func = (
             cuda_module.create_transformer_decoder_layer_new_fp16
             if self.config.fp16
@@ -163,12 +118,14 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         )
         if self.config.layer_id != 0:
             self.para_offset = self.para_offset[:-2]
-        self.para = nn.Parameter(torch.Tensor(self.para_offset[-1]))
+        self.para = torch.nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        if initial_weights is None or initial_biases is None:
-            # enc-dec kv weights and bias
-            self.init_transformer_weights()
-            return
+        self.__cache_list = [torch.zeros((self.config.max_batch_tokens, self.config.hidden_size), dtype=torch.half, device="cuda:0") for _ in range(4)]
+
+        # if initial_weights is None or initial_biases is None:
+        #     # enc-dec kv weights and bias
+        #     self.init_transformer_weights()
+        #     return
 
         # For testing only.
         attn_qkvw = [ele.detach().clone() for ele in initial_weights[:3]]
@@ -310,7 +267,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
 
     def calc_bound(self, w):
         """Used to initialize parameters"""
-        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(w)
+        fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(w)
         bound = 1.0 / math.sqrt(fan_in)
         return bound
 
@@ -377,7 +334,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         if self.config.layer_id in _all_layer_grads:
             return
         grad = torch.zeros_like(param)
-        cuda_module = layer_cuda_module
+        cuda_module = cuda_layer_module
         if self.config.fp16:
             func = cuda_module.assign_layer_weight_grad_fp16
         else:
@@ -392,7 +349,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         return destination
 
     def forward(
-        self, decoder_states, encoder_out, encoder_padding_mask, cache=None, **kwargs
+        self, decoder_states, encoder_out, encoder_padding_mask, **kwargs
     ):
         """
         decoder_states, [batch_size, trg_len, hidden_size] or [batch_size * beam_size, 1, hidden_size]
@@ -426,46 +383,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             encoder_padding_mask = encoder_padding_mask.to(torch.half)
 
         self.__assign_layer_weight_grad()
-        cache_list = []
-        if cache is not None:
-            # predict
-            batch_beams = decoder_states.shape[0]
-            if cache:
-                # non-empty dict, step 1-n
-                step = cache["dec_self_k"].shape[2]
-                # Thanks to fengjiangtao@bytedance.com
-                # for helping us find this bug.
-                cache_list = [
-                    cache["dec_self_k"].contiguous(),
-                    cache["dec_self_v"].contiguous(),
-                ]
-            else:
-                # empty dict, step 0
-                step = 0
-            if self.config.layer_id == 0:
-                if step == 0:
-                    shape = (
-                        self.config.nlayer * 2,
-                        encoder_out.shape[0],
-                        encoder_out.shape[1] * self.config.hidden_size,
-                    )
-                    encdec_kv = torch.zeros(
-                        shape, dtype=decoder_states.dtype, device=decoder_states.device
-                    ).contiguous()
-                    cache["encdec_kv"] = encdec_kv
-                cache_list.append(cache["encdec_kv"])
-            head_dim = int(self.config.hidden_size / self.config.nhead)
-            shape = (batch_beams, self.config.nhead, step + 1, head_dim)
-            new_k = torch.zeros(
-                shape, dtype=decoder_states.dtype, device=decoder_states.device
-            ).contiguous()
-            new_v = torch.zeros(
-                shape, dtype=decoder_states.dtype, device=decoder_states.device
-            ).contiguous()
-            cache_list = [new_k, new_v] + cache_list
-            cache["dec_self_k"] = new_k
-            cache["dec_self_v"] = new_v
-            self.config.training = False
+        
         bs, sl, dim = decoder_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(
@@ -484,17 +402,16 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             assert encoder_out.size(0) == encoder_padding_mask.size(
                 0
             ) and encoder_out.size(1) == encoder_padding_mask.size(1)
-        if cache is None:
-            assert bs == encoder_out.size(0)
-        else:
-            assert bs % encoder_out.size(0) == 0
+        # if cache is None:
+        #     assert bs == encoder_out.size(0)
+        # else:
+        #     assert bs % encoder_out.size(0) == 0
         output = LSTransformerDecoderFunc.apply(
             decoder_states,
             encoder_out,
             encoder_padding_mask,
-            self.para,
             self.config,
-            cache_list,
+            self.__cache_list,
         )
         return output.to(self.para)
 

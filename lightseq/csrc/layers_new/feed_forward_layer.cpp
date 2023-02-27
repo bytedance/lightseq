@@ -89,10 +89,10 @@ template <typename T1, typename T2>
 void FeedForwardLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-int FeedForwardLayer<T1, T2>::load_para_and_grad(
+size_t FeedForwardLayer<T1, T2>::load_para_and_grad(
     const T1* para_ptr,
     T2* grad_ptr) {  // for training
-  int offset = 0;
+  size_t offset = 0;
 
   _inter_w->set_value((char*)(para_ptr + offset));
   _inter_w->set_grad((char*)(grad_ptr + offset));

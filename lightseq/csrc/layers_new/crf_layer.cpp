@@ -37,11 +37,6 @@ void CRFLayer<T>::before_forward(int batch_size, int seq_len,
 }
 
 template <typename T>
-void CRFLayer<T>::before_backward() {
-  throw std::runtime_error("CRF not support backward currently!");
-}
-
-template <typename T>
 int CRFLayer<T>::load_params(const std::vector<const T*>& para_vec,
                              int offset) {  // for inference
   int size = 0;

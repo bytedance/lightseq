@@ -59,7 +59,7 @@ class GptAttentionLayer : public Layer {
 
   void before_backward();
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };

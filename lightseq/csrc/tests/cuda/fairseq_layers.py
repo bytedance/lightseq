@@ -14,9 +14,7 @@ from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from torch import Tensor
 
-from csrc.pytorch import (
-    TransformerEncoderLayer,
-)
+from csrc.pytorch import TransformerEncoderLayer, TransformerDecoderLayer
 
 
 def generate_enc_layer():
@@ -46,33 +44,33 @@ def generate_enc_layer():
     return layer
 
 
-# def generate_dec_layer():
-#     hidden_size = 1024
-#     intermediate_size = 1024 * 4
-#     heads = 16
-#     hidden_dropout_ratio = 0.0
-#     attn_dropout_ratio = 0.0
-#     activation_dropout_ratio = 0.0
-#     pre_layer_norm = True
-#     config = TransformerDecoderLayer.get_config(
-#         hidden_size=hidden_size,
-#         intermediate_size=intermediate_size,
-#         nhead=heads,
-#         attn_prob_dropout_ratio=attn_dropout_ratio,
-#         activation_dropout_ratio=activation_dropout_ratio,
-#         hidden_dropout_ratio=hidden_dropout_ratio,
-#         pre_layer_norm=pre_layer_norm,
-#         activation_fn="relu",
-#         max_batch_tokens=None,
-#         max_seq_len=None,
-#         fp16=None,
-#         local_rank=None,
-#         nlayer=None,
-#     )
-#     layer = TransformerDecoderLayer(config)
+def generate_dec_layer():
+    hidden_size = 1024
+    intermediate_size = 1024 * 4
+    heads = 16
+    hidden_dropout_ratio = 0.0
+    attn_dropout_ratio = 0.0
+    activation_dropout_ratio = 0.0
+    pre_layer_norm = True
+    config = TransformerDecoderLayer.get_config(
+        hidden_size=hidden_size,
+        intermediate_size=intermediate_size,
+        nhead=heads,
+        attn_prob_dropout_ratio=attn_dropout_ratio,
+        activation_dropout_ratio=activation_dropout_ratio,
+        hidden_dropout_ratio=hidden_dropout_ratio,
+        pre_layer_norm=pre_layer_norm,
+        activation_fn="relu",
+        max_batch_tokens=None,
+        max_seq_len=None,
+        fp16=None,
+        local_rank=None,
+        nlayer=None,
+    )
+    layer = TransformerDecoderLayer(config)
 
-#     layer.to(torch.device("cuda:0"), dtype=torch.half)
-#     return layer
+    layer.to(torch.device("cuda:0"), dtype=torch.half)
+    return layer
 
 
 def generate_bert_enc_layer():

@@ -6,7 +6,11 @@ Allocator::Allocator() { _ptr_set.clear(); }
 
 Allocator::~Allocator() {
   for (auto iter : _ptr_set) {
-    Allocator::free_mem(iter);
+    try {
+      free_mem(iter);
+    } catch (...) {
+      printf("execute ~Allocator() free_mem failed!\n");
+    }
   }
   _ptr_set.clear();
 }
@@ -26,6 +30,9 @@ char* Allocator::malloc_mem(size_t size) {
         " MB\n";
     printf("%s", error_message.c_str());
     throw std::runtime_error(error_message);
+  }
+  if (_ptr_set.find(ptr) != _ptr_set.end()) {
+    throw std::runtime_error("allocate same address with twice.\n");
   }
   _ptr_set.insert(ptr);
   return ptr;

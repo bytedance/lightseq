@@ -219,7 +219,7 @@ class Variable : public Node {
   friend class Node;
 
 #ifdef DEBUG_MODE
-  void print_var(bool is_fw = true);
+  void print_var(bool is_fw = true, int size = 10);
 #endif
 };
 

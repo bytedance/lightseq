@@ -164,20 +164,32 @@ void Variable::set_offset(int offset, Shape shape) {
 }
 
 #ifdef DEBUG_MODE
-void Variable::print_var(bool is_fw) {
+void Variable::print_var(bool is_fw, int size) {
   if (!_context_ptr->is_built()) {
     return;
   }
   if (is_fw) {
-    if (value() == nullptr)
-      printf("value address is nullptr\n");
-    else
-      _value->print_tensor(10);
+    if (_value == nullptr) {
+      printf("%s does not have _value object.\n", _name.c_str());
+    } else if (value() == nullptr)
+      printf("%s value address is nullptr\n", _name.c_str());
+    else {
+      try {
+        _value->print_tensor(size);
+      } catch (...) {
+        printf("%s variable print tensor value failed!\n", _name.c_str());
+      }
+    }
   } else {
     if (grad() == nullptr)
       printf("grad address is nullptr\n");
-    else
-      _grad->print_tensor(10);
+    else {
+      try {
+        _grad->print_tensor(size);
+      } catch (...) {
+        printf("%s variable print tensor grad failed!\n", _name.c_str());
+      }
+    }
   }
 
   printf("\n");

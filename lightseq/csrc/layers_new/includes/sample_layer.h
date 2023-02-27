@@ -29,8 +29,6 @@ class SampleLayer : public Layer {
 
   void before_forward(int batch_size, int cur_step);
 
-  void before_backward();
-
   int load_params(const std::vector<const T*>& para_vec, int offset);
 
   bool is_stop() { return _beam_search->is_stop(); }

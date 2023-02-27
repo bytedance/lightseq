@@ -63,6 +63,7 @@ class Layer {
 
   bool macro_inputs_check = false;
   bool macro_outputs_check = false;
+  std::shared_ptr<Context> get_context() { return _context_ptr; }
 };
 
 }  // namespace lightseq

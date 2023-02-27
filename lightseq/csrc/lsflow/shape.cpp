@@ -12,10 +12,10 @@ size_t Shape::element_size() {
   }
   size_t product = 1;
   for (int iter : _shape_vec) {
-    if (iter <= 0) {
-      throw std::runtime_error("this tensor with invalid shape");
-      return 0;
-    }
+    // if (iter <= 0) {
+    //   throw std::runtime_error("this tensor with invalid shape");
+    //   return 0;
+    // }
     product *= iter;
   }
   _is_calculated = true;

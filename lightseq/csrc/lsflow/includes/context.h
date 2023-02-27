@@ -79,6 +79,9 @@ class Context {
       StatusType status_type = StatusType::Inference, int device_id = -1);
   static std::shared_ptr<Context> global_instance();
   static void set_global_context(int context_id);
+  static bool global_is_inference() {
+    return Context::global_instance()->is_inference();
+  }
 
   // Before the memory allocation, the tensor is not allocated the actual
   // effective address space, so it is necessary to give a temporary space for
@@ -92,6 +95,7 @@ class Context {
 
   // property field
   bool is_training() { return _status_type == StatusType::Training; }
+  bool is_inference() { return _status_type == StatusType::Inference; }
   const int& node_idx() const { return _node_idx; }
   void update_node_idx();
   const bool& is_built() const { return _built; }

@@ -163,7 +163,13 @@ void Context::build() {
     }
   }
 
-  _allocator_ptr->free_mem(temporary_buffer_);
+  try {
+    _allocator_ptr->free_mem(temporary_buffer_);
+  } catch (...) {
+    printf("execute _allocator_ptr->free_mem(temporary_buffer_) failed\n");
+    throw std::runtime_error(
+        "execute _allocator_ptr->free_mem(temporary_buffer_) failed\n");
+  }
 
   _mm_ptr->calculate_buffer_();
   _built = true;

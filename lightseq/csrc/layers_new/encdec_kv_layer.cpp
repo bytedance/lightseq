@@ -48,15 +48,19 @@ void EncDecKvLayer<T1, T2>::before_forward(size_t batch_size, size_t seq_len) {
 }
 
 template <typename T1, typename T2>
-int EncDecKvLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
-                                              T2* grad_ptr) {  // for training
-  int offset = 0;
+size_t EncDecKvLayer<T1, T2>::load_para_and_grad(
+    const T1* para_ptr,
+    T2* grad_ptr) {  // for training
+  size_t offset = 0;
   _enc_kvw->set_value((char*)(para_ptr + offset));
   _enc_kvw->set_grad((char*)(grad_ptr + offset));
+  _enc_kvw->set_shape(
+      {size_t(2 * _nshared_layer), size_t(_hidden_size), size_t(_hidden_size)});
   offset += _nshared_layer * _hidden_size * _hidden_size * 2;
 
   _enc_kvb->set_value((char*)(para_ptr + offset));
   _enc_kvb->set_grad((char*)(grad_ptr + offset));
+  _enc_kvb->set_shape({size_t(2 * _nshared_layer), size_t(_hidden_size)});
   offset += _nshared_layer * _hidden_size * 2;
 
   return offset;

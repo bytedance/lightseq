@@ -1,7 +1,4 @@
-import sys
-from . import lightseq_dir
-
-sys.path.insert(0, lightseq_dir)
+import __init__
 
 import copy
 import torch

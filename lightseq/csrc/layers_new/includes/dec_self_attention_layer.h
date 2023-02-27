@@ -75,7 +75,7 @@ class DecSelfAttentionLayer : public Layer {
 
   void before_forward(size_t batch_size, size_t trg_seq_len, int steps);
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };

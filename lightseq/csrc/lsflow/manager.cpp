@@ -90,11 +90,15 @@ void MemoryManager::calculate_buffer_() {
 
   printf("******** shared buffer memory size: %zu MB ********\n",
          total_consumption / MB_SIZE);
-
-  for (auto iter : buffer_vec_) {
-    _allocator_ptr->free_mem(iter);
+  try {
+    for (auto iter : buffer_vec_) {
+      _allocator_ptr->free_mem(iter);
+    }
+    buffer_vec_.clear();
+  } catch (...) {
+    printf("execute MemoryManager clear buffer failed!\n");
+    throw std::runtime_error("execute MemoryManager clear buffer failed!");
   }
-  buffer_vec_.clear();
 
   size_t max_last_addr = 0;
   size_t record_last_addr = 0;

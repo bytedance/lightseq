@@ -33,7 +33,7 @@ class EncDecKvLayer : public Layer {
 
   void before_forward(size_t batch_size, size_t seq_len);
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };

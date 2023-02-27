@@ -99,4 +99,5 @@ class LayerBuilder(CUDAOpBuilder):
             # "-DDEBUG_MODE",
             # "-DMEM_DEBUG",
             # "-DFP16_MODE",
+            "-DPYBIND_INTERFACE",
         ]

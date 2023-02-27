@@ -37,9 +37,9 @@ Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-int TransformerEncoderLayer<T1, T2>::load_para_and_grad(
+size_t TransformerEncoderLayer<T1, T2>::load_para_and_grad(
     const T1* para_ptr, T2* grad_ptr) {  // for training
-  int offset = 0;
+  size_t offset = 0;
 
   offset +=
       _attn_layer->load_para_and_grad(para_ptr + offset, grad_ptr + offset);

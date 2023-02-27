@@ -49,7 +49,7 @@ class LyrNormalizeLayer : public Layer {
 
   void before_backward() {}
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
     int offset = 0;
 
     _norm_gamma->set_value((char*)(para_ptr + offset));

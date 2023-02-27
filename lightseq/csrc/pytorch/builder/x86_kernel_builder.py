@@ -95,4 +95,5 @@ class X86KernelBuilder(OpBuilder):
             "-DMKL_ILP64",
             "-m64",
             "-fopenmp",
+            "-DPYBIND_INTERFACE",
         ]

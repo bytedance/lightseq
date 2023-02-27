@@ -24,10 +24,10 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 3)),
       _concat_cache_k(new Concat3Dim1<T1, T2>(
-          _max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
+          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
           is_continuous_cache)),
       _concat_cache_v(new Concat3Dim1<T1, T2>(
-          _max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
+          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
           is_continuous_cache)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
@@ -119,14 +119,17 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
                                                    int steps) {
   _trg_seq_len = trg_seq_len;
   _batch_heads = batch_size * _heads;
-  _trg_batch_tokens = batch_size * trg_seq_len;
+  _trg_batch_tokens =
+      batch_size * trg_seq_len;  // if inference, means batch_size * beam_size.
   _batch_dim = _trg_batch_tokens * _hidden_size;
-  _step = (steps >= 0 ? steps : -1);
+  _step = (_context_ptr->is_inference() ? steps : -1);
 
-  int from_len = (_step == -1) ? _trg_seq_len : 1;
-  int to_len = (_step == -1) ? _trg_seq_len : steps + 1;
-  int _batch_size = (steps >= 0) ? batch_size * _trg_seq_len : batch_size;
-  _batch_heads = (steps >= 0) ? _batch_heads * _trg_seq_len : _batch_heads;
+  int from_len = _context_ptr->is_training() ? _trg_seq_len : 1;
+  int to_len = _context_ptr->is_training() ? _trg_seq_len : steps + 1;
+  int _batch_size =
+      _context_ptr->is_inference() ? _trg_batch_tokens : batch_size;
+  _batch_heads =
+      _context_ptr->is_inference() ? _batch_heads * _trg_seq_len : _batch_heads;
 
   _attn_ln->before_forward(batch_size, trg_seq_len);
 
@@ -142,7 +145,8 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
   _concat_cache_v->before_forward(_batch_size * _heads, _step, from_len,
                                   _context_ptr->is_training());
 
-  _softmax->before_forward(_batch_size, from_len, to_len, steps == -1);
+  _softmax->before_forward(_batch_size, from_len, to_len,
+                           _context_ptr->is_training());
 
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);
 
@@ -184,31 +188,37 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
 }
 
 template <typename T1, typename T2>
-int DecSelfAttentionLayer<T1, T2>::load_para_and_grad(
+size_t DecSelfAttentionLayer<T1, T2>::load_para_and_grad(
     const T1* para_ptr, T2* grad_ptr) {  // for training
-  int offset = 0;
+  size_t offset = 0;
   _attn_qkvw->set_value((char*)(para_ptr + offset));
   _attn_qkvw->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvw->set_shape({3 * _hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size * 3;
 
   _attn_qkvb->set_value((char*)(para_ptr + offset));
   _attn_qkvb->set_grad((char*)(grad_ptr + offset));
+  _attn_qkvb->set_shape({3 * _hidden_size});
   offset += _hidden_size * 3;
 
   _attn_ow->set_value((char*)(para_ptr + offset));
   _attn_ow->set_grad((char*)(grad_ptr + offset));
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   offset += _hidden_size * _hidden_size;
 
   _attn_ob->set_value((char*)(para_ptr + offset));
   _attn_ob->set_grad((char*)(grad_ptr + offset));
+  _attn_ob->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nw->set_value((char*)(para_ptr + offset));
   _attn_nw->set_grad((char*)(grad_ptr + offset));
+  _attn_nw->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nb->set_value((char*)(para_ptr + offset));
   _attn_nb->set_grad((char*)(grad_ptr + offset));
+  _attn_nb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   return offset;

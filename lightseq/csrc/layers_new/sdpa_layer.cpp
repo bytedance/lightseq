@@ -67,16 +67,4 @@ void SDPALayer<T1, T2>::before_forward(int batch_size, int query_len,
                                 kv_size);
 }
 
-template <typename T1, typename T2>
-int SDPALayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
-                                          T2* grad_ptr) {  // for training
-  return 0;
-}
-
-template <typename T1, typename T2>
-int SDPALayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
-                                   int offset) {  // for inference
-  return 0;
-}
-
 }  // namespace lightseq

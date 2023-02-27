@@ -37,8 +37,6 @@ class CRFLayer : public Layer {
   void before_forward(int batch_size, int seq_len, bool forward_or_decode,
                       bool output_decode_score);
 
-  void before_backward();
-
   int load_params(const std::vector<const T*>& para_vec, int offset);
 };
 

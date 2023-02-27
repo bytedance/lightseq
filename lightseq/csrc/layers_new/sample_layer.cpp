@@ -39,9 +39,6 @@ void SampleLayer<T>::before_forward(int batch_size, int cur_step) {
 }
 
 template <typename T>
-void SampleLayer<T>::before_backward() {}
-
-template <typename T>
 int SampleLayer<T>::load_params(const std::vector<const T*>& para_vec,
                                 int offset) {  // for inference
   int size = 0;
