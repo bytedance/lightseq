@@ -39,7 +39,7 @@ class GptAttentionLayer : public Layer {
   int _hidden_size;
   int _nhead;
   int _head_dim;
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
 
   // tensor slice
   Variable* _cache_k;

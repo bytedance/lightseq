@@ -45,7 +45,7 @@ class DecEncAttentionLayer : public Layer {
   size_t _max_seq_len;
   size_t _hidden_size;
   size_t _heads;
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
 
  public:
   DecEncAttentionLayer(size_t layer_id, size_t max_batch_tokens,

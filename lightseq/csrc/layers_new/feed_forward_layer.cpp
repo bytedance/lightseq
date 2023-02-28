@@ -15,7 +15,7 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
       _hidden_size(hidden_size),
       _heads(num_heads),
       _intermediate_size(intermediate_size),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_pre_ln(pre_or_postLayerNorm),
       _activation_fn(activation_fn),
 
       // operators
@@ -47,7 +47,7 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   Variable* ff1_out = nullptr;
   Variable* ffn_ln_out = nullptr;
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     ffn_ln_out = (*_ffn_ln)(inp, _ffn_nw, _ffn_nb);
     ff1_out = (*_ff1)(ffn_ln_out, _inter_w);
   } else {
@@ -58,9 +58,9 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* ff2_out = (*_ff2)(ffn_act_out, _output_w);
 
-  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
 
-  if (_pre_or_postLayerNorm) {
+  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
+  if (_is_pre_ln) {
     set_outputs({ffn_dropout_residual});
     return ffn_dropout_residual;
   }
@@ -133,13 +133,19 @@ int FeedForwardLayer<T1, T2>::load_params(
     int offset) {  // for inference
   int size = 0;
   _ffn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _ffn_nw->set_shape({_hidden_size});
   _ffn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _ffn_nb->set_shape({_hidden_size});
 
   _inter_w->set_value((char*)para_vec[offset + size]), size++;
+  _inter_w->set_shape({_intermediate_size, _hidden_size});
   _inter_b->set_value((char*)para_vec[offset + size]), size++;
+  _inter_b->set_shape({_intermediate_size});
 
   _output_w->set_value((char*)para_vec[offset + size]), size++;
+  _output_w->set_shape({_hidden_size, _intermediate_size});
   _output_b->set_value((char*)para_vec[offset + size]), size++;
+  _output_b->set_shape({_hidden_size});
 
   return size;
 }

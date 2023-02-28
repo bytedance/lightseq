@@ -41,7 +41,7 @@ class MultiheadAttentionLayer : public Layer {
   size_t _max_seq_len;
   size_t _hidden_size;
   size_t _heads;
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
 
   // tensor slice
   Variable* q_out;

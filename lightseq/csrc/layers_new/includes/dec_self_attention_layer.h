@@ -51,7 +51,7 @@ class DecSelfAttentionLayer : public Layer {
   size_t _hidden_size;
   size_t _heads;
   int _step;
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
   bool _is_continuous_cache;
 
   // tensor slice

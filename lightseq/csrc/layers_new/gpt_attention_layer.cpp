@@ -21,7 +21,7 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
       _hidden_size(hidden_size),
       _nhead(num_heads),
       _head_dim(hidden_size / num_heads),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm) {
+      _is_pre_ln(pre_or_postLayerNorm) {
   // operators
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
@@ -58,7 +58,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* qkv_out = nullptr;
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
   } else {
@@ -77,7 +77,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }

@@ -14,7 +14,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_pre_ln(pre_or_postLayerNorm),
       _is_continuous_cache(is_continuous_cache),
       // operators
       _attn_ln(
@@ -67,7 +67,7 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
   } else {
@@ -104,7 +104,7 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
     return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }

@@ -14,7 +14,7 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_pre_ln(pre_or_postLayerNorm),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -52,7 +52,7 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
   set_inputs({inp, inp_mask});
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
   } else {
@@ -71,13 +71,15 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
+    Variable* attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   Variable* post_ln = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
   set_outputs({post_ln});
   return post_ln;
@@ -154,15 +156,17 @@ int MultiheadAttentionLayer<T1, T2>::load_params(
     const std::vector<const T1*>& para_vec, int offset) {  // for inference
   int size = 0;
   _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_shape({_hidden_size});
   _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_shape({_hidden_size});
 
   _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
-  _attn_qkvw->set_shape({3, _hidden_size, _hidden_size});
+  _attn_qkvw->set_shape({3 * _hidden_size, _hidden_size}); // row-major
   _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
-  _attn_qkvb->set_shape({3, _hidden_size});
+  _attn_qkvb->set_shape({3 * _hidden_size}); // row-major
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
-  _attn_ow->set_shape({_hidden_size});
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   _attn_ob->set_value((char*)para_vec[offset + size]), size++;
   _attn_ob->set_shape({_hidden_size});
 

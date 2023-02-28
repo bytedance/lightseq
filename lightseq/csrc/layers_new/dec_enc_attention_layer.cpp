@@ -13,7 +13,7 @@ DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_pre_ln(pre_or_postLayerNorm),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -58,7 +58,7 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
   Variable* q_linear_out = nullptr;
   Variable* attn_ln_out = nullptr;
   set_inputs({inp, enc_mask, enc_k, enc_v});
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
   } else {
@@ -81,7 +81,7 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }

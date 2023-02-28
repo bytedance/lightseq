@@ -37,7 +37,7 @@ class FeedForwardLayer : public Layer {
   size_t _heads;
   size_t _intermediate_size;
 
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
   std::string _activation_fn;
 
  public:

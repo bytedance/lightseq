@@ -19,9 +19,15 @@ class LinearOp : public Operator {
 
   Variable* _result;
 
+#ifdef PYBIND_INTERFACE
+  #define weight_op MATRIX_OP::Transpose
+#else 
+  #define weight_op MATRIX_OP::NonTranspose
+#endif
+
  public:
   LinearOp(size_t max_batch_tokens, size_t output_size, size_t input_size,
-           MATRIX_OP opA = MATRIX_OP::Transpose,
+           MATRIX_OP opA = weight_op,
            MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.))
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
