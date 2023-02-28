@@ -237,7 +237,7 @@ if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            # "test_encoder_layer_forward",
-            "test_decoder_layer_forward",
+            "test_encoder_layer_forward",
+            # "test_decoder_layer_forward",
         ]
     )

@@ -71,15 +71,13 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
-    Variable* attn_dropout_residual =
-        (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   Variable* post_ln = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
   set_outputs({post_ln});
   return post_ln;
