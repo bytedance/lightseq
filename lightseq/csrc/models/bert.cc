@@ -50,6 +50,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
   lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
       max_batch_tokens, tw_._hidden_size));
   lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  printf("Finish initialize layers and assign weights!\n");
 
   /* --- step.5 construct network --- */
   std::tuple<Variable *, Variable *> enc_emb_outs =
@@ -60,6 +61,7 @@ Bert::Bert(const std::string weight_path, const int max_batch_size)
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
   bert_out = (*lyr_norm_layer)(enc_emb);
+  printf("Finish construct network!\n");
 }
 
 Bert::~Bert() {}

@@ -11,13 +11,15 @@ class TransformerEncoderLayer : public Layer {
   MultiheadAttentionLayerPtr<T1, T2> _attn_layer;
   FeedForwardLayerPtr<T1, T2> _ffn_layer;
 
+  int _layer_id;
+
  public:
   TransformerEncoderLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_prob_dropout_ratio,
                           float activation_dropout_ratio,
                           float hidden_output_dropout_ratio,
-                          bool pre_or_postLayerNorm, std::string activation_fn,
+                          bool is_pre_ln, std::string activation_fn,
                           bool mask_future_tokens);
   virtual ~TransformerEncoderLayer() {}
 

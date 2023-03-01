@@ -6,14 +6,14 @@ template <typename T1, typename T2>
 DecEncAttentionLayer<T1, T2>::DecEncAttentionLayer(
     size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
     size_t hidden_size, size_t num_heads, float attn_prob_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm)
+    float hidden_output_dropout_ratio, bool is_pre_ln)
     : Layer("DecEncAttentionLayer"),  // necessary
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _is_pre_ln(pre_or_postLayerNorm),
+      _is_pre_ln(is_pre_ln),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),

@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
     size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
     size_t hidden_size, size_t num_heads, float attn_prob_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
+    float hidden_output_dropout_ratio, bool is_pre_ln,
     bool is_continuous_cache)
     : Layer("DecSelfAttentionLayer"),  // necessary
       _layer_id(layer_id),
@@ -14,7 +14,7 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _is_pre_ln(pre_or_postLayerNorm),
+      _is_pre_ln(is_pre_ln),
       _is_continuous_cache(is_continuous_cache),
       // operators
       _attn_ln(

@@ -6,7 +6,7 @@ template <typename T1, typename T2>
 MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, float attn_prob_dropout_ratio,
-    float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
+    float hidden_output_dropout_ratio, bool is_pre_ln,
     bool mask_future_tokens)
     : Layer("MultiheadAttentionLayer"),  // necessary
       _layer_id(layer_id),
@@ -14,7 +14,7 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _heads(num_heads),
-      _is_pre_ln(pre_or_postLayerNorm),
+      _is_pre_ln(is_pre_ln),
       // operators
       _attn_ln(
           new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)),
@@ -49,15 +49,11 @@ MultiheadAttentionLayer<T1, T2>::MultiheadAttentionLayer(
 template <typename T1, typename T2>
 Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
+  set_inputs({inp, inp_mask});
   Variable* qkv_out = nullptr;
   Variable* attn_ln_out = nullptr;
-  set_inputs({inp, inp_mask});
-  if (_is_pre_ln) {
-    attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-    qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
-  } else {
-    qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
-  }
+  attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
@@ -71,16 +67,17 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
+    Variable* attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, inp);
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
-  Variable* post_ln = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-  set_outputs({post_ln});
-  return post_ln;
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+  set_outputs({attn_dropout_residual});
+  return attn_dropout_residual;
 }
 
 template <typename T1, typename T2>

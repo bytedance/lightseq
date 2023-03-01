@@ -7,7 +7,7 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
     int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
     int hidden_size, int num_heads, int intermediate_size,
     float attn_dropout_ratio, float hidden_output_dropout_ratio,
-    float activation_dropout_ratio, bool pre_or_postLayerNorm,
+    float activation_dropout_ratio, bool is_pre_ln,
     std::string activation_fn, bool is_continuous_cache, int max_batch_size,
     int beam_size)
     : Layer("TransformerDecoderLayer"),
@@ -21,17 +21,17 @@ TransformerDecoderLayer<T1, T2>::TransformerDecoderLayer(
 
   _self_attn_layer.reset(new DecSelfAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm,
+      attn_dropout_ratio, hidden_output_dropout_ratio, is_pre_ln,
       is_continuous_cache));
 
   _enc_attn_layer.reset(new DecEncAttentionLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
-      attn_dropout_ratio, hidden_output_dropout_ratio, pre_or_postLayerNorm));
+      attn_dropout_ratio, hidden_output_dropout_ratio, is_pre_ln));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_trg_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, activation_fn));
+      is_pre_ln, activation_fn));
 
   this->_context_ptr->exit_layer();  // necessary
 }

@@ -7,7 +7,7 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
     size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
     size_t hidden_size, size_t num_heads, size_t intermediate_size,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn)
+    bool is_pre_ln, std::string activation_fn)
     : Layer("FeedForwardLayer"),
       _layer_id(layer_id),
       _max_batch_tokens(max_batch_tokens),
@@ -15,7 +15,7 @@ FeedForwardLayer<T1, T2>::FeedForwardLayer(
       _hidden_size(hidden_size),
       _heads(num_heads),
       _intermediate_size(intermediate_size),
-      _is_pre_ln(pre_or_postLayerNorm),
+      _is_pre_ln(is_pre_ln),
       _activation_fn(activation_fn),
 
       // operators
@@ -47,27 +47,22 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   Variable* ff1_out = nullptr;
   Variable* ffn_ln_out = nullptr;
-  if (_is_pre_ln) {
-    ffn_ln_out = (*_ffn_ln)(inp, _ffn_nw, _ffn_nb);
-    ff1_out = (*_ff1)(ffn_ln_out, _inter_w);
-  } else {
-    ff1_out = (*_ff1)(inp, _inter_w);
-  }
+  ffn_ln_out = (*_ffn_ln)(inp, _ffn_nw, _ffn_nb);
+  ff1_out = (*_ff1)(ffn_ln_out, _inter_w);
 
   Variable* ffn_act_out = (*_ffn_activation_dropout)(ff1_out, _inter_b);
 
   Variable* ff2_out = (*_ff2)(ffn_act_out, _output_w);
 
-
-  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
   if (_is_pre_ln) {
+    Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
     set_outputs({ffn_dropout_residual});
     return ffn_dropout_residual;
   }
 
-  Variable* post_ln = (*_ffn_ln)(ffn_dropout_residual, _ffn_nw, _ffn_nb);
-  set_outputs({post_ln});
-  return post_ln;
+  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, ffn_ln_out);
+  set_outputs({ffn_dropout_residual});
+  return ffn_dropout_residual;
 }
 
 template <typename T1, typename T2>

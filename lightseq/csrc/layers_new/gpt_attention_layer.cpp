@@ -14,14 +14,14 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
                                              int num_heads, int beam_size,
                                              float attn_prob_dropout_ratio,
                                              float hidden_output_dropout_ratio,
-                                             bool pre_or_postLayerNorm)
+                                             bool is_pre_ln)
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _nhead(num_heads),
       _head_dim(hidden_size / num_heads),
-      _is_pre_ln(pre_or_postLayerNorm) {
+      _is_pre_ln(is_pre_ln) {
   // operators
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
