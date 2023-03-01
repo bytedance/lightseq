@@ -71,7 +71,10 @@ int EncDecKvLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
                                        int offset) {  // for inference
   int size = 0;
   _enc_kvw->set_value((char*)para_vec[offset + size]), size++;
+  _enc_kvw->set_shape({2 * _nshared_layer, _hidden_size, _hidden_size});
+
   _enc_kvb->set_value((char*)para_vec[offset + size]), size++;
+  _enc_kvb->set_shape({2 * _nshared_layer, _hidden_size});
   return size;
 }
 

@@ -54,10 +54,12 @@ class LyrNormalizeLayer : public Layer {
 
     _norm_gamma->set_value((char*)(para_ptr + offset));
     _norm_gamma->set_grad((char*)(grad_ptr + offset));
+    _norm_gamma->set_shape({size_t(_hidden_size)});
     offset += _hidden_size;
 
     _norm_betta->set_value((char*)(para_ptr + offset));
     _norm_betta->set_grad((char*)(grad_ptr + offset));
+    _norm_betta->set_shape({size_t(_hidden_size)});
     offset += _hidden_size;
 
     return offset;

@@ -188,7 +188,7 @@ size_t DecSelfAttentionLayer<T1, T2>::load_para_and_grad(
   size_t offset = 0;
   _attn_qkvw->set_value((char*)(para_ptr + offset));
   _attn_qkvw->set_grad((char*)(grad_ptr + offset));
-  _attn_qkvw->set_shape({3 * _hidden_size, _hidden_size});
+  _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
   offset += _hidden_size * _hidden_size * 3;
 
   _attn_qkvb->set_value((char*)(para_ptr + offset));
@@ -224,13 +224,19 @@ int DecSelfAttentionLayer<T1, T2>::load_params(
     const std::vector<const T1*>& para_vec, int offset) {  // for inference
   int size = 0;
   _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_shape({_hidden_size});
   _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_shape({_hidden_size});
 
   _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
   _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_shape({3 * _hidden_size});
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_shape({_hidden_size});
 
   return size;
 }

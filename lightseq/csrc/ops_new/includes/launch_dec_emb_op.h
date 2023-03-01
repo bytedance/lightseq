@@ -39,7 +39,7 @@ class LaunchDecEmbOp : public Operator {
 
   void before_forward(size_t batch_size, int cur_step) {
     _batch_size = batch_size, _cur_step = cur_step;
-    _result->set_shape({batch_size, size_t(cur_step + 1), _beam_size});
+    _result->set_shape({batch_size, size_t(cur_step + 1), _beam_size, _hidden_size});
   }
 
   void forward() override;
