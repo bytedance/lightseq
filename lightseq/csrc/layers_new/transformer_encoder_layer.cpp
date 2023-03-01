@@ -30,10 +30,8 @@ Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
   set_inputs({inp, inp_mask});
 
   Variable* attn_out = (*_attn_layer)(inp, inp_mask);
-  printf("Finish construct EncoderLayer #%d's attn layer\n", _layer_id);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
-  printf("Finish construct EncoderLayer #%d's feedforward layer\n", _layer_id);
 
   set_outputs({ffn_out});
   return ffn_out;

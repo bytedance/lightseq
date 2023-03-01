@@ -32,6 +32,7 @@ char* Allocator::malloc_mem(size_t size) {
     throw std::runtime_error(error_message);
   }
   if (_ptr_set.find(ptr) != _ptr_set.end()) {
+    printf("allocate same address with twice.\n");
     throw std::runtime_error("allocate same address with twice.\n");
   }
   _ptr_set.insert(ptr);

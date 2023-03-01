@@ -126,6 +126,7 @@ void MemoryManager::calculate_buffer_() {
              "buffer size is: " +
              std::to_string((max_last_addr - record_last_addr) / MB_SIZE) +
              " MB\n");
+        printf("%s", error_message.c_str());
         throw std::runtime_error(error_message);
       }
 

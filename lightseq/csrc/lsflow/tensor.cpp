@@ -80,8 +80,9 @@ int dtype_size(DataType dtype) {
     case DataType::kUInt64:
       return 8;
     case DataType::kNotSupported: {
-      throw std::runtime_error(
-          "call dtype_size(DataType ) with kNotSupported DataType");
+      // throw std::runtime_error(
+      //     "call dtype_size(DataType ) with kNotSupported DataType");
+      printf("call dtype_size(DataType ) with kNotSupported DataType\n");
       return 0;
     }
   }
@@ -235,6 +236,7 @@ void Tensor::print_tensor(int size) {
       print_vec((__half*)tensor(), _name + " head", size);
       print_vec((__half*)tensor() + ele_siz - size, _name + " tail", size);
 #else
+      printf("error! float16 can not be used without cuda!");
       throw std::runtime_error("error! float16 can not be used without cuda!");
 #endif
       break;
@@ -250,6 +252,8 @@ void Tensor::print_tensor(int size) {
       break;
     }
     case DataType::kNotSupported: {
+      printf(
+          "error! print tensor with kNotSupported DataType");
       throw std::runtime_error(
           "error! print tensor with kNotSupported DataType");
       break;

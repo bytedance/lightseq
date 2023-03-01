@@ -50,6 +50,8 @@ Variable::Variable(std::string name, Variable* parent_variable)
 
 void Variable::fixed_memory() {
   if (_variable_type == VariableType::OffsetVariable) {
+      printf(
+        "OffsetVariable should not execute fixed_memory() func!");
     throw std::runtime_error(
         "OffsetVariable should not execute fixed_memory() func!");
     return;
@@ -58,6 +60,7 @@ void Variable::fixed_memory() {
     return;
   }
   if (parents().size() > 0 && children().size() > 0) {
+    printf("ERROR! this node is not a IONode!\n");
     throw std::runtime_error("ERROR! this node is not a IONode!\n");
   }
   _value->reset_fixed();
@@ -102,8 +105,8 @@ void Variable::set_shape(Shape shape) {
 }
 
 void Variable::malloc_memory(size_t size) {
-  int value_byte_size = size * dtype_size(_fw_dtype);
-  int grad_byte_size = size * dtype_size(_bw_dtype);
+  size_t value_byte_size = size * dtype_size(_fw_dtype);
+  size_t grad_byte_size = _context_ptr->is_training() ? size * dtype_size(_bw_dtype) : 0;
 #ifdef MEM_DEBUG
   printf(
       "Varaible %s malloc memory, value size: %zu "

@@ -125,6 +125,7 @@ void Context::build() {
          "\n"
          "mx_tensor_size is: " +
          std::to_string(mx_tensor_size / MB_SIZE) + " MB\n");
+    printf("%s", error_message.c_str());
     throw std::runtime_error(error_message);
   }
 

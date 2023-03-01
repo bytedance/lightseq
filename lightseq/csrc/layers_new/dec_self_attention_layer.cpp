@@ -64,15 +64,8 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
                                           Variable* cache_v) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable* qkv_out = nullptr;
-  Variable* attn_ln_out = nullptr;
-
-  if (_is_pre_ln) {
-    attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-    qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
-  } else {
-    qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
-  }
+  Variable*  attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  Variable*  qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
@@ -102,15 +95,17 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
+    Variable* attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, inp);
     set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
     return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }
-  Variable* post_ln = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-  set_outputs({post_ln, cache_k_out, cache_v_out});
-  return std::make_tuple(post_ln, cache_k_out, cache_v_out);
+
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+  set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
+  return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
 }
 
 template <typename T1, typename T2>

@@ -67,7 +67,7 @@ Transformer::Transformer(const std::string weight_path,
     TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
         new TransformerDecoderLayer<OpType_, OpType_>(
             tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step,
-            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0, true,
+            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0, !tw_._is_post_ln,
             tw_._use_gelu ? "gelu" : "relu", false, max_batch_size,
             tw_._beam_size));
     dec_wei_offset +=
@@ -142,8 +142,8 @@ Transformer::Transformer(const std::string weight_path,
 
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
-  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
-                                sizeof(int));
+  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size);
+  dec_tokens->malloc_memory(max_batch_tokens * tw_._beam_size);
 
   transformer_out = new Variable("transformer_out", g_dtype<int>());
 
