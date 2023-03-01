@@ -81,9 +81,9 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
-  
+
   Variable* attn_dropout_residual =
-    (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
   set_outputs({attn_dropout_residual});
   return attn_dropout_residual;
 }

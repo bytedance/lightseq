@@ -252,8 +252,7 @@ void Tensor::print_tensor(int size) {
       break;
     }
     case DataType::kNotSupported: {
-      printf(
-          "error! print tensor with kNotSupported DataType");
+      printf("error! print tensor with kNotSupported DataType");
       throw std::runtime_error(
           "error! print tensor with kNotSupported DataType");
       break;

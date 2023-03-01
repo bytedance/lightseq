@@ -64,8 +64,8 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
                                           Variable* cache_v) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable*  attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-  Variable*  qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
+  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  Variable* qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);

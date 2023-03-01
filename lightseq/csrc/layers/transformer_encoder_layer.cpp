@@ -81,8 +81,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
       _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                        _batch_tokens, _stream);
     }
-    const T *gemmQKV_inp_ptr =
-        _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
 
     cublasLtMatmulAlgo_info qkv_algo_info =
         _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
@@ -111,8 +110,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
       _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                        _batch_tokens, _stream);
     }
-    const T *gemmQKV_inp_ptr =
-        _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
     _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
                         _cublasHandle);
 
@@ -284,10 +282,9 @@ void TransformerEncoderLayer<T>::Forward(const T *input_ptr,
   T *attn_buffer = _shared_mem_ptr;  // 3 * _batch_dim
   // _batch_dim
   T *ffn_inp_ptr =
-      _is_pre_ln
-          ? _shared_mem_ptr +
-                std::max(3 * _batch_dim, _intermediate_size * _hidden_size)
-          : _ff1_inp_ptr;
+      _is_pre_ln ? _shared_mem_ptr + std::max(3 * _batch_dim,
+                                              _intermediate_size * _hidden_size)
+                 : _ff1_inp_ptr;
   zero_mask_grad();
 
   attn_layer_fw(input_ptr, input_mask_ptr, ffn_inp_ptr, attn_buffer);
@@ -371,8 +368,7 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   launch_transform4d_0213<T>(grad_qkv_4d_ptr, grad_qkv_5d_ptr, _batch_size,
                              _seq_len, _hidden_size, _heads, 3, _stream);
 
-  const T *gemmQKV_inp_ptr =
-      _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+  const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Backward(_batch_tokens, grad_qkv_4d_ptr, gemmQKV_inp_ptr,
                        _attn_qkvw_ptr, _grad_attn_qkvw_ptr, _grad_attn_qkvb_ptr,
                        _cublasHandle, _stream, grad_input_buf_ptr);

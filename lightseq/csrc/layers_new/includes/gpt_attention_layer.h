@@ -48,8 +48,7 @@ class GptAttentionLayer : public Layer {
  public:
   GptAttentionLayer(int max_batch_tokens, int max_seq_len, int hidden_size,
                     int num_heads, int beam_size, float attn_prob_dropout_ratio,
-                    float hidden_output_dropout_ratio,
-                    bool is_pre_ln = true);
+                    float hidden_output_dropout_ratio, bool is_pre_ln = true);
 
   virtual ~GptAttentionLayer() {}
 

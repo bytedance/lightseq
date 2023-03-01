@@ -32,11 +32,11 @@ int main(int argc, char* argv[]) {
   void* d_input;
   CHECK_GPU_ERROR(
       cudaMalloc(&d_input, sizeof(int) * batch_size * batch_seq_len));
-  CHECK_GPU_ERROR(cudaMemcpy(
-      d_input, host_input.data(), sizeof(int) * batch_size * batch_seq_len,
-      cudaMemcpyHostToDevice));
+  CHECK_GPU_ERROR(cudaMemcpy(d_input, host_input.data(),
+                             sizeof(int) * batch_size * batch_seq_len,
+                             cudaMemcpyHostToDevice));
 
-//   model->benchmark_mode(true);
+  //   model->benchmark_mode(true);
   model->set_input_ptr(0, d_input);
   model->set_input_shape(0, {batch_size, batch_seq_len});
 
@@ -47,8 +47,7 @@ int main(int argc, char* argv[]) {
     for (int j = 0; j < shape.size(); j++) {
       total_size *= shape[j];
     }
-    CHECK_GPU_ERROR(
-        cudaMalloc(&d_output, total_size * sizeof(int)));
+    CHECK_GPU_ERROR(cudaMalloc(&d_output, total_size * sizeof(int)));
     model->set_output_ptr(i, d_output);
   }
   CHECK_GPU_ERROR(cudaStreamSynchronize(0));

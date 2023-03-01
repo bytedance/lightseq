@@ -55,4 +55,3 @@ class LSFSTransformerDecoderLayer(LSTransformerDecoderLayer):
         if cache:
             self.set_self_attn_cache(incremental_state, cache)
         return res, None, None
-

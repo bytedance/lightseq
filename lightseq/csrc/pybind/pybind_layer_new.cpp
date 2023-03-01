@@ -50,14 +50,12 @@ template <typename T1, typename T2>
 int create_transformer_encoder_layer_new(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-    float activation_dropout_ratio, float hidden_dropout_ratio,
-    bool is_pre_ln, std::string activation_fn,
-    bool mask_future_tokens) {
+    float activation_dropout_ratio, float hidden_dropout_ratio, bool is_pre_ln,
+    std::string activation_fn, bool mask_future_tokens) {
   auto layer = std::make_shared<TransformerEncoderLayer<T1, T2>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-      hidden_dropout_ratio, is_pre_ln, activation_fn,
-      mask_future_tokens);
+      hidden_dropout_ratio, is_pre_ln, activation_fn, mask_future_tokens);
 
   Variable *inp(new Variable("input", g_dtype<T1>(), g_dtype<T2>()));
   Variable *inp_mask(new Variable("inp_mask", g_dtype<T1>()));
@@ -156,13 +154,12 @@ int create_transformer_decoder_layer(
     int nshared_layer, int layer_id, int max_batch_tokens, int max_seq_len,
     int hidden_dim, int num_heads, int intermediate_size,
     float attn_prob_dropout_ratio, float activation_dropout_ratio,
-    float hidden_dropout_ratio, bool is_pre_ln,
-    std::string activation_fn) {
+    float hidden_dropout_ratio, bool is_pre_ln, std::string activation_fn) {
   auto layer = std::make_shared<TransformerDecoderLayer<T1, T2>>(
       nshared_layer, layer_id, max_batch_tokens, max_seq_len, hidden_dim,
       num_heads, intermediate_size, attn_prob_dropout_ratio,
-      activation_dropout_ratio, hidden_dropout_ratio, is_pre_ln,
-      activation_fn, true);
+      activation_dropout_ratio, hidden_dropout_ratio, is_pre_ln, activation_fn,
+      true);
 
   std::shared_ptr<Context> context_ptr = Context::global_instance();
   Variable *total_enc_kv = nullptr;
@@ -277,7 +274,6 @@ std::vector<torch::Tensor> transformer_decoder_layer_fw(
   Variable *new_cache_v = layer->output(2);
   new_cache_v->set_value((char *)cache[1].data_ptr());
   new_cache_v->set_shape({batch_size, size_t(cur_step + 1), hidden_size});
-
 
   layer->before_forward(batch_size, trg_seq_len, src_seq_len, cur_step);
 

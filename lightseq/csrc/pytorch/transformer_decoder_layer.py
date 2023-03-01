@@ -12,10 +12,7 @@ from csrc.pytorch.util import (
     state_dict,
     calc_offset,
 )
-from csrc.pytorch.torch_transformer_layers import (
-    act_quant_config,
-    weight_quant_config
-)
+from csrc.pytorch.torch_transformer_layers import act_quant_config, weight_quant_config
 
 from csrc.pytorch.builder.cuda_layer_builder import CudaLayerBuilder
 
@@ -120,7 +117,14 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             self.para_offset = self.para_offset[:-2]
         self.para = torch.nn.Parameter(torch.Tensor(self.para_offset[-1]))
 
-        self.__cache_list = [torch.zeros((self.config.max_batch_tokens, self.config.hidden_size), dtype=torch.half, device="cuda:0") for _ in range(4)]
+        self.__cache_list = [
+            torch.zeros(
+                (self.config.max_batch_tokens, self.config.hidden_size),
+                dtype=torch.half,
+                device="cuda:0",
+            )
+            for _ in range(4)
+        ]
 
         # if initial_weights is None or initial_biases is None:
         #     # enc-dec kv weights and bias
@@ -348,9 +352,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
         )
         return destination
 
-    def forward(
-        self, decoder_states, encoder_out, encoder_padding_mask, **kwargs
-    ):
+    def forward(self, decoder_states, encoder_out, encoder_padding_mask, **kwargs):
         """
         decoder_states, [batch_size, trg_len, hidden_size] or [batch_size * beam_size, 1, hidden_size]
         encoder_out, [src_len, batch_size, hidden_size]
@@ -383,7 +385,7 @@ class LSTransformerDecoderLayer(TransformerDecoderLayerBase):
             encoder_padding_mask = encoder_padding_mask.to(torch.half)
 
         self.__assign_layer_weight_grad()
-        
+
         bs, sl, dim = decoder_states.size()
         if bs * sl > self.config.max_batch_tokens:
             raise ValueError(

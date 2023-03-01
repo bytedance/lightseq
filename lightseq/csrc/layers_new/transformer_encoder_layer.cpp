@@ -7,14 +7,12 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool is_pre_ln, std::string activation_fn,
-    bool mask_future_tokens)
-    : Layer("TransformerEncoderLayer"),
-      _layer_id(layer_id) {
+    bool is_pre_ln, std::string activation_fn, bool mask_future_tokens)
+    : Layer("TransformerEncoderLayer"), _layer_id(layer_id) {
   _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      is_pre_ln, mask_future_tokens));
+      attn_prob_dropout_ratio, hidden_output_dropout_ratio, is_pre_ln,
+      mask_future_tokens));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,

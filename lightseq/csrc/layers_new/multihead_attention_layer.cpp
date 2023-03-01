@@ -156,9 +156,9 @@ int MultiheadAttentionLayer<T1, T2>::load_params(
   _attn_nb->set_shape({_hidden_size});
 
   _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
-  _attn_qkvw->set_shape({3 * _hidden_size, _hidden_size}); // row-major
+  _attn_qkvw->set_shape({3 * _hidden_size, _hidden_size});  // row-major
   _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
-  _attn_qkvb->set_shape({3 * _hidden_size}); // row-major
+  _attn_qkvb->set_shape({3 * _hidden_size});  // row-major
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
   _attn_ow->set_shape({_hidden_size, _hidden_size});

@@ -34,8 +34,8 @@ class TransformerDecoderLayer : public Layer {
                           int _max_seq_len, int hidden_size, int num_heads,
                           int intermediate_size, float attn_dropout_ratio,
                           float hidden_output_dropout_ratio,
-                          float activation_dropout_ratio,
-                          bool is_pre_ln, std::string activation_fn,
+                          float activation_dropout_ratio, bool is_pre_ln,
+                          std::string activation_fn,
                           bool is_continuous_cache = true,
                           int max_batch_size = 1, int beam_size = 1);
 

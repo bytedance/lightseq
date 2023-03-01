@@ -18,9 +18,8 @@ class TransformerEncoderLayer : public Layer {
                           int hidden_size, int num_heads, int intermediate_size,
                           float attn_prob_dropout_ratio,
                           float activation_dropout_ratio,
-                          float hidden_output_dropout_ratio,
-                          bool is_pre_ln, std::string activation_fn,
-                          bool mask_future_tokens);
+                          float hidden_output_dropout_ratio, bool is_pre_ln,
+                          std::string activation_fn, bool mask_future_tokens);
   virtual ~TransformerEncoderLayer() {}
 
   Variable* operator()(Variable* inp, Variable* inp_mask);

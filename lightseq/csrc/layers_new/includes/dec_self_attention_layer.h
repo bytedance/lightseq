@@ -63,8 +63,7 @@ class DecSelfAttentionLayer : public Layer {
   DecSelfAttentionLayer(size_t layer_id, size_t max_batch_tokens,
                         size_t max_seq_len, size_t hidden_size,
                         size_t num_heads, float attn_prob_dropout_ratio,
-                        float hidden_output_dropout_ratio,
-                        bool is_pre_ln,
+                        float hidden_output_dropout_ratio, bool is_pre_ln,
                         bool is_continuous_cache = true);
 
   virtual ~DecSelfAttentionLayer() {}

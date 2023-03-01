@@ -11,8 +11,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 set(PROTO_FILES bert.proto bert_crf.proto transformer.proto)
 
 set(WEIGHT_FILES bert_weight.cc # bert_crf_weight.cc
-    transformer_weight.cc
-)
+                 transformer_weight.cc)
 
 protobuf_generate_cpp(PROTO_SRC PROTO_HEADER ${PROTO_FILES})
 add_library(weight_lib STATIC ${WEIGHT_FILES} ${PROTO_SRC} ${PROTO_HEADER}

@@ -60,7 +60,8 @@ Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
     return ffn_dropout_residual;
   }
 
-  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, ffn_ln_out);
+  Variable* ffn_dropout_residual =
+      (*_ffn_dropout)(ff2_out, _output_b, ffn_ln_out);
   set_outputs({ffn_dropout_residual});
   return ffn_dropout_residual;
 }

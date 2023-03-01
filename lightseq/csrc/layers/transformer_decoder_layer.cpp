@@ -114,8 +114,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     }
     CHECK_GPU_ERROR(cudaGetLastError());
 
-    const T *gemmQKV_inp_ptr =
-        _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
 
     cublasLtMatmulAlgo_info qkv_algo_info =
         _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
@@ -148,8 +147,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_fw(const T *input_ptr,
     }
     CHECK_GPU_ERROR(cudaGetLastError());
 
-    const T *gemmQKV_inp_ptr =
-        _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
     _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
                         _cublasHandle);
     launch_bias_add_transform_20314<T>(q_tf_ptr, buffer, _attn_qkvb_ptr,
@@ -625,8 +623,7 @@ void TransformerDecoderLayer<T>::self_attn_layer_bw(const T *input_ptr,
   launch_transform4d_0213<T>(grad_qkv_4d_ptr, grad_qkv_5d_ptr, _batch_size,
                              _trg_seq_len, _hidden_size, _heads, 3, _stream);
 
-  const T *gemmQKV_inp_ptr =
-      _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
+  const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Backward(_batch_tokens, grad_qkv_4d_ptr, gemmQKV_inp_ptr,
                        _attn_qkvw_ptr, _grad_attn_qkvw_ptr, _grad_attn_qkvb_ptr,
                        _cublasHandle, _stream, grad_input_buf_ptr);

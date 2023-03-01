@@ -52,8 +52,8 @@ class MultiheadAttentionLayer : public Layer {
   MultiheadAttentionLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                           int hidden_size, int num_heads,
                           float attn_prob_dropout_ratio,
-                          float hidden_output_dropout_ratio,
-                          bool is_pre_ln, bool mask_future_tokens);
+                          float hidden_output_dropout_ratio, bool is_pre_ln,
+                          bool mask_future_tokens);
 
   virtual ~MultiheadAttentionLayer() {}
 
