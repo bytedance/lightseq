@@ -68,7 +68,9 @@ class LyrNormalizeLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset) {
     int size = 0;
     _norm_gamma->set_value((char*)para_vec[offset + size]), size++;
+    _norm_gamma->set_shape({size_t(_hidden_size)});
     _norm_betta->set_value((char*)para_vec[offset + size]), size++;
+    _norm_betta->set_shape({size_t(_hidden_size)});
     return size;
   }
 };

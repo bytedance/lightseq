@@ -34,7 +34,7 @@ class Tensor {
 
   static int global_tensor_id;
   TensorPtr _original_tensor;
-  int _offset;
+  int _offset = 0;
 
  public:
   // Applies to tensors using FixedMemory and SharedMemory memory types.

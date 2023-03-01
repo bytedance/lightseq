@@ -6,6 +6,7 @@ template <typename T1, typename T2>
 Variable* Concat3Dim1<T1, T2>::operator()(Variable* inp, Variable* cache) {
   if (!_is_continuous_cache) {
     _new_cache = new Variable("cache_out", cache);
+    _new_cache->set_offset(0, {_mx_sz0, _mx_sz1, _mx_sz2});
   } else {
     _new_cache = new Variable("cache_out", g_dtype<T1>(),
                               g_dtype<T2>());  // just for pybind interface

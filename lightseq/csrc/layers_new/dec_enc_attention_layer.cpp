@@ -55,11 +55,9 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                    Variable* enc_mask,
                                                    Variable* enc_k,
                                                    Variable* enc_v) {
-  Variable* q_linear_out = nullptr;
-  Variable* attn_ln_out = nullptr;
   set_inputs({inp, enc_mask, enc_k, enc_v});
-  attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-  q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
+  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  Variable* q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314_q)(q_linear_out, _attn_qb);
@@ -144,14 +142,17 @@ size_t DecEncAttentionLayer<T1, T2>::load_para_and_grad(
 
   _attn_ob->set_value((char*)(para_ptr + offset));
   _attn_ob->set_grad((char*)(grad_ptr + offset));
+  _attn_ob->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nw->set_value((char*)(para_ptr + offset));
   _attn_nw->set_grad((char*)(grad_ptr + offset));
+  _attn_nw->set_shape({_hidden_size});
   offset += _hidden_size;
 
   _attn_nb->set_value((char*)(para_ptr + offset));
   _attn_nb->set_grad((char*)(grad_ptr + offset));
+  _attn_nb->set_shape({_hidden_size});
   offset += _hidden_size;
 
   return offset;
@@ -162,13 +163,19 @@ int DecEncAttentionLayer<T1, T2>::load_params(
     const std::vector<const T1*>& para_vec, int offset) {  // for inference
   int size = 0;
   _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_shape({_hidden_size});
   _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_shape({_hidden_size});
 
   _attn_qw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qw->set_shape({_hidden_size, _hidden_size});
   _attn_qb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qb->set_shape({_hidden_size});
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_shape({_hidden_size});
 
   return size;
 }

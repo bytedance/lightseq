@@ -77,7 +77,6 @@ void TransformerDecoderLayer<T1, T2>::before_forward(
 
   enc_k->set_offset(2 * _layer_id * _hidden_size * batch_size * src_seq_len,
                     {batch_size, src_seq_len, _hidden_size});
-
   enc_v->set_offset(
       (2 * _layer_id + 1) * _hidden_size * batch_size * src_seq_len,
       {batch_size, src_seq_len, _hidden_size});
