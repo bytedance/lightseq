@@ -46,24 +46,26 @@ template <typename T1, typename T2>
 Variable* FeedForwardLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   Variable* ff1_out = nullptr;
-  Variable* ffn_ln_out = nullptr;
-  ffn_ln_out = (*_ffn_ln)(inp, _ffn_nw, _ffn_nb);
-  ff1_out = (*_ff1)(ffn_ln_out, _inter_w);
+  if (_is_pre_ln) {
+    Variable* ffn_ln_out = (*_ffn_ln)(inp, _ffn_nw, _ffn_nb);
+    ff1_out = (*_ff1)(ffn_ln_out, _inter_w);
+  } else {
+    ff1_out = (*_ff1)(inp, _inter_w);
+  }
 
   Variable* ffn_act_out = (*_ffn_activation_dropout)(ff1_out, _inter_b);
 
   Variable* ff2_out = (*_ff2)(ffn_act_out, _output_w);
 
+  Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
   if (_is_pre_ln) {
-    Variable* ffn_dropout_residual = (*_ffn_dropout)(ff2_out, _output_b, inp);
     set_outputs({ffn_dropout_residual});
     return ffn_dropout_residual;
   }
 
-  Variable* ffn_dropout_residual =
-      (*_ffn_dropout)(ff2_out, _output_b, ffn_ln_out);
-  set_outputs({ffn_dropout_residual});
-  return ffn_dropout_residual;
+  Variable* ffn_ln_out = (*_ffn_ln)(ffn_dropout_residual, _ffn_nw, _ffn_nb);
+  set_outputs({ffn_ln_out});
+  return ffn_ln_out;
 }
 
 template <typename T1, typename T2>

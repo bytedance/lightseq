@@ -9,10 +9,12 @@ for inference,
 max_batch_tokens = max(batch_size * beam_size * seq_len)
 */
 template <typename T1, typename T2>
-GptAttentionLayer<T1, T2>::GptAttentionLayer(
-    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
-    int beam_size, float attn_prob_dropout_ratio,
-    float hidden_output_dropout_ratio, bool is_pre_ln)
+GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
+                                             int max_seq_len, int hidden_size,
+                                             int num_heads, int beam_size,
+                                             float attn_prob_dropout_ratio,
+                                             float hidden_output_dropout_ratio,
+                                             bool is_pre_ln)
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
