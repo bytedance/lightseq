@@ -40,7 +40,10 @@ class GptAttentionLayer : public Layer {
   int _nhead;
   int _head_dim;
   bool _is_pre_ln;
+<<<<<<< HEAD
   bool _is_lightseq_v1;
+=======
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
 
   // tensor slice
   Variable* _cache_k;
@@ -54,8 +57,12 @@ class GptAttentionLayer : public Layer {
  public:
   GptAttentionLayer(int max_batch_tokens, int max_seq_len, int hidden_size,
                     int num_heads, int beam_size, float attn_prob_dropout_ratio,
+<<<<<<< HEAD
                     float hidden_output_dropout_ratio, bool is_pre_ln = true,
                     bool is_lightseq_v1 = false);
+=======
+                    float hidden_output_dropout_ratio, bool is_pre_ln = true);
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
 
   virtual ~GptAttentionLayer() {}
 

@@ -7,8 +7,12 @@ std::tuple<Variable*, Variable*, Variable*> SplitHeadOp<T1, T2>::operator()(
     Variable* inp, Variable* bias) {
   set_parents({inp, bias});
   size_t trans_size = _max_batch_tokens * _hidden_size;
+<<<<<<< HEAD
   Variable* query =
       new Variable("splited_query", trans_size, g_dtype<T1>(), g_dtype<T2>());
+=======
+  Variable* query = new Variable("splited_query", trans_size * sizeof(T1));
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   if (_qkv_num == 1) {
     this->set_children({query});
     return std::make_tuple(query, nullptr, nullptr);
@@ -39,11 +43,17 @@ void SplitHeadOp<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
+<<<<<<< HEAD
 #ifdef LIGHTSEQ_cuda
   cuda::launch_split_head<T1>(inp_ptr, bias_ptr, q_ptr, k_ptr, v_ptr,
                               _batch_size, _hidden_size, _head_dim, _seq_len,
                               _qkv_num, _stream);
 #endif
+=======
+
+  launch_split_head<T1>(inp_ptr, bias_ptr, q_ptr, k_ptr, v_ptr, _batch_size,
+                        _hidden_size, _head_dim, _seq_len, _qkv_num, _stream);
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
 }
 
 template <typename T1, typename T2>
@@ -60,9 +70,13 @@ Variable* SplitHeadWithBeamOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                                   Variable* cache_v) {
   set_parents({inp, bias, cache_k, cache_v});
   size_t trans_size = _max_batch_tokens * _hidden_size;
+<<<<<<< HEAD
   Variable* query =
       new Variable("splited_query", _max_batch_tokens * _hidden_size,
                    g_dtype<T1>(), g_dtype<T2>());
+=======
+  Variable* query = new Variable("splited_query", trans_size * sizeof(T1));
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   this->set_children({query});
   return query;
 }
@@ -81,6 +95,7 @@ void SplitHeadWithBeamOp<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
+<<<<<<< HEAD
 #ifdef LIGHTSEQ_cuda
   cuda::launch_split_head_with_beam<T1>(
       inp_ptr, bias_ptr, q_ptr, k_ptr, v_ptr, _batch_size, _hidden_size,
@@ -92,4 +107,14 @@ template class SplitHeadWithBeamOp<float, float>;
 #ifdef LIGHTSEQ_cuda
 template class SplitHeadWithBeamOp<__half, __half>;
 #endif
+=======
+
+  launch_split_head_with_beam<T1>(
+      inp_ptr, bias_ptr, q_ptr, k_ptr, v_ptr, _batch_size, _hidden_size,
+      _head_dim, _beam_size, _q_len, _step, _cache_len, _stream);
+}
+
+template class SplitHeadWithBeamOp<float, float>;
+template class SplitHeadWithBeamOp<__half, __half>;
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
 }  // namespace lightseq

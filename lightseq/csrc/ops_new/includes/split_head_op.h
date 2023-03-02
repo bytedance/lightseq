@@ -37,7 +37,11 @@ template <typename T1, typename T2>
 class SplitHeadOp : public Operator {
  private:
   // const after init
+<<<<<<< HEAD
   size_t _max_batch_tokens;  // batch_size * seq_len
+=======
+  int _max_batch_tokens;  // batch_size * seq_len
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   int _nhead;
   size_t _hidden_size;
   int _head_dim;
@@ -115,9 +119,15 @@ template <typename T1, typename T2>
 class SplitHeadWithBeamOp : public Operator {
  private:
   // const after init
+<<<<<<< HEAD
   size_t _max_batch_tokens;  // batch_size * beam_size * q_len
   int _nhead;
   size_t _hidden_size;
+=======
+  int _max_batch_tokens;  // batch_size * beam_size * q_len
+  int _nhead;
+  int _hidden_size;
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   int _head_dim;
   int _beam_size;
   int _cache_len;

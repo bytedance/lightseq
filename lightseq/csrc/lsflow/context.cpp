@@ -115,10 +115,13 @@ void Context::build() {
     exit(-1);
   }
 
+<<<<<<< HEAD
   printf(
       "Please pay attention to whether the build order of the layer is "
       "consistent with the actual execution order.\n");
 
+=======
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   try {
     temporary_buffer_ = _allocator_ptr->malloc_mem(mx_tensor_size);
   } catch (...) {

@@ -9,18 +9,31 @@ for inference,
 max_batch_tokens = max(batch_size * beam_size * seq_len)
 */
 template <typename T1, typename T2>
+<<<<<<< HEAD
 GptAttentionLayer<T1, T2>::GptAttentionLayer(
     int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
     int beam_size, float attn_prob_dropout_ratio,
     float hidden_output_dropout_ratio, bool is_pre_ln, bool is_lightseq_v1)
+=======
+GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
+                                             int max_seq_len, int hidden_size,
+                                             int num_heads, int beam_size,
+                                             float attn_prob_dropout_ratio,
+                                             float hidden_output_dropout_ratio,
+                                             bool is_pre_ln)
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _nhead(num_heads),
       _head_dim(hidden_size / num_heads),
+<<<<<<< HEAD
       _is_pre_ln(is_pre_ln),
       _is_lightseq_v1(is_lightseq_v1) {
+=======
+      _is_pre_ln(is_pre_ln) {
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   // operators
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
@@ -75,6 +88,7 @@ Variable* GptAttentionLayer<T1, T2>::v1_network(Variable* inp) {
     return attn_dropout_residual;
   }
 
+<<<<<<< HEAD
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, ln_res);
   Variable* attn_ln_out =
@@ -85,6 +99,8 @@ Variable* GptAttentionLayer<T1, T2>::v1_network(Variable* inp) {
 template <typename T1, typename T2>
 Variable* GptAttentionLayer<T1, T2>::standard_network(Variable* inp) {
   Variable* qkv_out = nullptr;
+=======
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
   if (_is_pre_ln) {
     Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
@@ -105,6 +121,10 @@ Variable* GptAttentionLayer<T1, T2>::standard_network(Variable* inp) {
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
+<<<<<<< HEAD
+=======
+    set_outputs({attn_dropout_residual});
+>>>>>>> 2ead2836dd0d9aad3c900640c72cf348f98cfe6c
     return attn_dropout_residual;
   }
 
