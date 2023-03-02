@@ -55,7 +55,7 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
                    g_dtype<int>());
 
   _seq_score = new Variable(
-      "seq_score", _max_batch_size * _beam_size * _max_step, g_dtype<int>(),
+      "seq_score", _max_batch_size * _beam_size * _max_step, g_dtype<float>(),
       DataType::kNotSupported, VariableType::RegressiveVariable);
 
   // initial own variable

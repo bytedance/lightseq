@@ -115,9 +115,15 @@ Transformer::Transformer(const std::string weight_path,
   total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
                                g_dtype<OpType_>(), DataType::kNotSupported,
                                VariableType::RegressiveVariable);
+  total_cache_k->set_shape({size_t(tw_._n_dec_layer),
+                            size_t(_max_batch_size * tw_._beam_size),
+                            size_t(tw_._max_step), size_t(tw_._hidden_size)});
   total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
                                g_dtype<OpType_>(), DataType::kNotSupported,
                                VariableType::RegressiveVariable);
+  total_cache_v->set_shape({size_t(tw_._n_dec_layer),
+                            size_t(_max_batch_size * tw_._beam_size),
+                            size_t(tw_._max_step), size_t(tw_._hidden_size)});
   pad_mask->set_regress_var();
 
   int dec_layer_idx = 0;

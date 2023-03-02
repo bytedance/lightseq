@@ -13,6 +13,7 @@ class SampleLayer : public Layer {
 
   // parameters
   Variable* _logit_bias;
+  size_t _trg_vocab_size;
 
  public:
   SampleLayer(int nshared_dec_layer, int max_batch_size, int max_step,

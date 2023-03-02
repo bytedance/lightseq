@@ -9,6 +9,7 @@ SampleLayer<T>::SampleLayer(int nshared_dec_layer, int max_batch_size,
                             int diverse_lambda, int dim_per_head, int end_id,
                             int head_num, float length_penalty)
     : Layer("SampleLayer"),
+      _trg_vocab_size(trg_vocab_size),
       _beam_search(new BeamSearchTopOp<T>(
           nshared_dec_layer, max_batch_size, max_step, trg_vocab_size,
           hidden_size, max_thread_per_block, beam_size, diverse_lambda,
@@ -43,7 +44,7 @@ int SampleLayer<T>::load_params(const std::vector<const T*>& para_vec,
                                 int offset) {  // for inference
   int size = 0;
   _logit_bias->set_value((char*)para_vec[offset + size]), size++;
-
+  _logit_bias->set_shape({_trg_vocab_size});
   return size;
 }
 

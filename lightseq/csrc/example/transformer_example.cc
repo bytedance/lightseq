@@ -74,15 +74,17 @@ int main(int argc, char* argv[]) {
     d_output = static_cast<const float*>(model->get_output_ptr(i));
     std::vector<int> shape = model->get_output_shape(i);
     std::cout << "output shape: ";
+    int size = 1;
     for (int j = 0; j < shape.size(); j++) {
       std::cout << shape[j] << " ";
+      size *= shape[j];
     }
     std::cout << std::endl;
 
     if (!i)
-      lightseq::print_vec((int*)d_output, "output", batch_size);
+      lightseq::print_vec((int*)d_output, "output", size);
     else
-      lightseq::print_vec((float*)d_output, "output", batch_size);
+      lightseq::print_vec((float*)d_output, "output", size);
   }
 
   return 0;

@@ -41,8 +41,7 @@ class Concat3Dim1 : public Operator {
     _sz0 = sz0, _sz1_0 = sz1_0, _sz1_1 = sz1_1, _is_skip = is_skip;
     if (_is_continuous_cache) {
       _new_cache->set_shape({_sz0, _sz1_0 + _sz1_1, _mx_sz2});
-    }
-    else {
+    } else {
       _new_cache->set_shape({_sz0, _sz1_0 + _sz1_1, _mx_sz2});
     }
   }

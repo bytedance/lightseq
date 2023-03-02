@@ -24,11 +24,11 @@ DecSelfAttentionLayer<T1, T2>::DecSelfAttentionLayer(
       _bias_add_transform_20314(new BiasAddTrans20314<T1, T2>(
           max_batch_tokens, num_heads, hidden_size, 3)),
       _concat_cache_k(new Concat3Dim1<T1, T2>(
-          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads, layer_id,
-          is_continuous_cache)),
+          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
+          layer_id, is_continuous_cache)),
       _concat_cache_v(new Concat3Dim1<T1, T2>(
-          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads, layer_id,
-          is_continuous_cache)),
+          max_batch_tokens * num_heads, max_seq_len, hidden_size / num_heads,
+          layer_id, is_continuous_cache)),
       _attn_scores(new StridedBatchGemmOp<T1, T2>(
           max_batch_tokens * num_heads * max_seq_len,
           (float(1.0) / float(sqrt(hidden_size / num_heads))), T1(0.0),
@@ -134,8 +134,6 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
   q_out->set_offset(0, {_trg_batch_tokens, _hidden_size});
   k_out->set_offset(_batch_dim * 1, {_trg_batch_tokens, _hidden_size});
   v_out->set_offset(_batch_dim * 2, {_trg_batch_tokens, _hidden_size});
-
-  
 
   _concat_cache_k->before_forward(_batch_size * _heads, _step, from_len,
                                   _context_ptr->is_training());
