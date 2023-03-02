@@ -19,7 +19,7 @@ class GptAttentionLayer : public Layer {
   // operators
   LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
   LinearOp<T1, T2>* _qkv_linear = nullptr;
-  SplitHeadOp<T1, T2>* _split_head = nullptr;
+  SplitHeadWithBeamOp<T1, T2>* _split_head = nullptr;
   SDPALayer<T1, T2>* _sdpa = nullptr;
   Transform0213OP<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
@@ -40,15 +40,20 @@ class GptAttentionLayer : public Layer {
   int _nhead;
   int _head_dim;
   bool _is_pre_ln;
+  bool _is_lightseq_v1;
 
   // tensor slice
   Variable* _cache_k;
   Variable* _cache_v;
 
+  // Compatible with the parameter encapsulation logic of the old version of lightseq.
+  Variable* v1_network(Variable* inp);
+  Variable* standard_network(Variable* inp);
+
  public:
   GptAttentionLayer(int max_batch_tokens, int max_seq_len, int hidden_size,
                     int num_heads, int beam_size, float attn_prob_dropout_ratio,
-                    float hidden_output_dropout_ratio, bool is_pre_ln = true);
+                    float hidden_output_dropout_ratio, bool is_pre_ln = true, bool is_lightseq_v1 = false);
 
   virtual ~GptAttentionLayer() {}
 
@@ -63,8 +68,11 @@ class GptAttentionLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class GptAttentionLayer<__half, __half>;
 template class GptAttentionLayer<float, float>;
+
+#ifdef LIGHTSEQ_cuda
+template class GptAttentionLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using GptAttentionLayerPtr = std::shared_ptr<GptAttentionLayer<T1, T2>>;

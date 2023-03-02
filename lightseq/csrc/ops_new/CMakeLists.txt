@@ -11,6 +11,7 @@ set(operator_files
     layer_normalize.cpp
     linear.cpp
     softmax.cpp
+    split_head_op.cpp
     strided_batch_gemm.cpp
     transform_0213.cpp)
 

@@ -1,5 +1,6 @@
 set(layers_files
     feed_forward_layer.cpp
+    gpt_attention_layer.cpp
     linear_layer.cpp
     multihead_attention_layer.cpp
     transformer_encoder_layer.cpp
