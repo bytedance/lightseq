@@ -26,8 +26,8 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
       new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size);
-  _split_head = new SplitHeadWithBeamOp<T1, T2>(max_batch_tokens, num_heads,
-                                                hidden_size, 3, max_seq_len);
+  _split_head = new SplitHeadOp<T1, T2>(max_batch_tokens, num_heads,
+                                        hidden_size, 3, max_seq_len);
   _sdpa = new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, _head_dim,
                                 num_heads, 0.f);
   _transform_0213 = new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size);

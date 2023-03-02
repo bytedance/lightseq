@@ -19,7 +19,7 @@ class GptAttentionLayer : public Layer {
   // operators
   LayerNormalizeOp<T1, T2>* _attn_ln = nullptr;
   LinearOp<T1, T2>* _qkv_linear = nullptr;
-  SplitHeadWithBeamOp<T1, T2>* _split_head = nullptr;
+  SplitHeadOp<T1, T2>* _split_head = nullptr;
   SDPALayer<T1, T2>* _sdpa = nullptr;
   Transform0213OP<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
