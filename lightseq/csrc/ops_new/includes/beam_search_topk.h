@@ -16,14 +16,14 @@ class BeamSearchTopOp : public Operator {
   size_t _trg_vocab_size;
   size_t _length_norm;
   int _cur_step;
-  size_t _step_token_num;
+  int _step_token_num;
   size_t _max_thread_per_block;
   size_t _beam_size;
   float _diverse_lambda;
   size_t _nshared_dec_layer;
 
   size_t _cub_sort_buffer_bytes;
-  size_t _host_can_num_batch;
+  int _host_can_num_batch;
   size_t _batch_size;
   size_t _cache_size;
   size_t _hidden_size;
