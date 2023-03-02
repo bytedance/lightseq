@@ -9,12 +9,10 @@ for inference,
 max_batch_tokens = max(batch_size * beam_size * seq_len)
 */
 template <typename T1, typename T2>
-GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
-                                             int max_seq_len, int hidden_size,
-                                             int num_heads, int beam_size,
-                                             float attn_prob_dropout_ratio,
-                                             float hidden_output_dropout_ratio,
-                                             bool is_pre_ln, bool is_lightseq_v1)
+GptAttentionLayer<T1, T2>::GptAttentionLayer(
+    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
+    int beam_size, float attn_prob_dropout_ratio,
+    float hidden_output_dropout_ratio, bool is_pre_ln, bool is_lightseq_v1)
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -28,7 +26,7 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _qkv_linear =
       new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size);
   _split_head = new SplitHeadWithBeamOp<T1, T2>(max_batch_tokens, num_heads,
-                                        hidden_size, 3, max_seq_len);
+                                                hidden_size, 3, max_seq_len);
   _sdpa = new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, _head_dim,
                                 num_heads, 0.f);
   _transform_0213 = new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size);
@@ -48,18 +46,16 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
 
   int cache_size = max_batch_tokens * hidden_size;
   Variable* _cache_k =
-      new Variable("cache_k", cache_size,
-                   g_dtype<T1>(), g_dtype<T2>());
+      new Variable("cache_k", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
   Variable* _cache_v =
-      new Variable("cache_v", cache_size,
-                   g_dtype<T1>(), g_dtype<T2>());
+      new Variable("cache_v", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
-Variable* GptAttentionLayer<T1, T2>::v1_network(Variable *inp) {
+Variable* GptAttentionLayer<T1, T2>::v1_network(Variable* inp) {
   Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
   Variable* qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
 
@@ -87,7 +83,7 @@ Variable* GptAttentionLayer<T1, T2>::v1_network(Variable *inp) {
 }
 
 template <typename T1, typename T2>
-Variable* GptAttentionLayer<T1, T2>::standard_network(Variable *inp) {
+Variable* GptAttentionLayer<T1, T2>::standard_network(Variable* inp) {
   Variable* qkv_out = nullptr;
   if (_is_pre_ln) {
     Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
@@ -121,7 +117,7 @@ template <typename T1, typename T2>
 Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   Variable* out_var = nullptr;
-  if(_is_lightseq_v1) {
+  if (_is_lightseq_v1) {
     out_var = v1_network(inp);
   } else {
     out_var = standard_network(inp);

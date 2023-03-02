@@ -46,14 +46,16 @@ class GptAttentionLayer : public Layer {
   Variable* _cache_k;
   Variable* _cache_v;
 
-  // Compatible with the parameter encapsulation logic of the old version of lightseq.
+  // Compatible with the parameter encapsulation logic of the old version of
+  // lightseq.
   Variable* v1_network(Variable* inp);
   Variable* standard_network(Variable* inp);
 
  public:
   GptAttentionLayer(int max_batch_tokens, int max_seq_len, int hidden_size,
                     int num_heads, int beam_size, float attn_prob_dropout_ratio,
-                    float hidden_output_dropout_ratio, bool is_pre_ln = true, bool is_lightseq_v1 = false);
+                    float hidden_output_dropout_ratio, bool is_pre_ln = true,
+                    bool is_lightseq_v1 = false);
 
   virtual ~GptAttentionLayer() {}
 
