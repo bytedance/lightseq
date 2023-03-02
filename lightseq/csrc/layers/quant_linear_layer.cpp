@@ -2,7 +2,8 @@
 
 #include "context.h"
 #include "kernels.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 QuantLinearLayer<T>::QuantLinearLayer(int layer_id, int in_features,
                                       int out_features, int max_batch_tokens)
@@ -87,3 +88,5 @@ void QuantLinearLayer<T>::SetQuantMode(bool enable_quant) {
 
 template class QuantLinearLayer<float>;
 template class QuantLinearLayer<__half>;
+}  // namespace cuda
+}  // namespace lightseq

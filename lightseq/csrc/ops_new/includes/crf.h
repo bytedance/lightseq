@@ -1,7 +1,6 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
 
 namespace lightseq {
 
@@ -9,18 +8,20 @@ namespace lightseq {
 template <typename T>
 class CRFOP : public Operator {
  private:
-  int _num_tags;
-  int _seq_len;
-  int _batch_size;
-  int _max_batch_tokens;
-  int _max_batch_size;
+  size_t _num_tags;
+  size_t _seq_len;
+  size_t _batch_size;
+  size_t _max_batch_tokens;
+  size_t _max_batch_size;
 
   bool _forward_or_decode;  // true for forward, false for decode
   bool _output_decode_score;
   TensorPtr _history;
 
+  Variable* _best_tags;
+
  public:
-  CRFOP(int max_batch_tokens, int max_batch_size, int num_tags);
+  CRFOP(size_t max_batch_tokens, size_t max_batch_size, size_t num_tags);
 
   virtual ~CRFOP() {}
 
@@ -28,7 +29,7 @@ class CRFOP : public Operator {
                        Variable* transition, Variable* emission, Variable* mask,
                        Variable* bias);
 
-  void before_forward(int batch_size, int seq_len, bool forward_or_decode,
+  void before_forward(size_t batch_size, size_t seq_len, bool forward_or_decode,
                       bool output_decode_score);
 
   void forward() override;

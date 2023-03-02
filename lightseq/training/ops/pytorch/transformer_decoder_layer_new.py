@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.autograd import Function
 
-from . import layer_cuda_module
+
 from lightseq.training.ops.pytorch.util import (
     copy_para,
     state_dict,

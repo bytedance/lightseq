@@ -7,7 +7,8 @@
 #include <type_traits>
 
 #include "cuda_util.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class TransformerEmbeddingLayer {
  public:
@@ -105,3 +106,5 @@ class TransformerEmbeddingLayer {
   T *_grad_embeddings_ptr;
   T *_grad_clip_max_ptr;
 };
+}  // namespace cuda
+}  // namespace lightseq

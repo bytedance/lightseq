@@ -1,7 +1,6 @@
 #include "transformer.h"
 
 namespace lightseq {
-namespace cuda {
 
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
@@ -40,8 +39,8 @@ Transformer::Transformer(const std::string weight_path,
         new TransformerEncoderLayer<OpType_, OpType_>(
             idx, max_batch_tokens, tw_._max_step, tw_._hidden_size,
             tw_._head_num, tw_._inner_size, attn_prob_dropout_ratio,
-            activation_dropout_ratio, hidden_dropout_ratio, true,
-            tw_._use_gelu ? "gelu" : "relu", false, tw_._is_post_ln));
+            activation_dropout_ratio, hidden_dropout_ratio, !tw_._is_post_ln,
+            tw_._use_gelu ? "gelu" : "relu", false));
     enc_wei_offset +=
         enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
     enc_layer_vec.push_back(enc_layer_);
@@ -65,12 +64,12 @@ Transformer::Transformer(const std::string weight_path,
   // initial TransformerDecoder layers
   int dec_wei_offset = 0;
   for (int idx = 0; idx < tw_._n_dec_layer; idx++) {
-    TransformerDecoderLayerV2Ptr<OpType_, OpType_> dec_layer_(
-        new TransformerDecoderLayerV2<OpType_, OpType_>(
+    TransformerDecoderLayerPtr<OpType_, OpType_> dec_layer_(
+        new TransformerDecoderLayer<OpType_, OpType_>(
             tw_._n_dec_layer, idx, max_batch_tokens, tw_._max_step,
-            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0, true,
-            tw_._use_gelu ? "gelu" : "relu", false, false, max_batch_size,
-            tw_._beam_size));
+            tw_._hidden_size, tw_._head_num, tw_._inner_size, 0, 0, 0,
+            !tw_._is_post_ln, tw_._use_gelu ? "gelu" : "relu", false,
+            max_batch_size, tw_._beam_size));
     dec_wei_offset +=
         dec_layer_->load_params(tw_.get_dec_wei(), dec_wei_offset);
     dec_layer_vec.push_back(dec_layer_);
@@ -84,7 +83,7 @@ Transformer::Transformer(const std::string weight_path,
   // // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
-      CUBLAS_OP_N, CUBLAS_OP_N,
+      MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose,
       tw_._no_scale_embedding ? 1.f : sqrt(1.f / tw_._hidden_size)));
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
@@ -95,10 +94,8 @@ Transformer::Transformer(const std::string weight_path,
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
-  inp_tokens = new Variable("inp_tokens");
-  dec_tokens = new Variable("dec_tokens",
-                            max_batch_tokens * tw_._beam_size * sizeof(int), 0,
-                            VariableType::FixedVariable);
+  inp_tokens = new Variable("inp_tokens", g_dtype<int>());
+  dec_tokens = new Variable("dec_tokens", g_dtype<int>());
   std::tuple<Variable *, Variable *> enc_emb_outs =
       (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
@@ -114,40 +111,52 @@ Transformer::Transformer(const std::string weight_path,
 
   _context_ptr->regress_begin();
   Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
-  cache_size =
-      max_batch_tokens * tw_._beam_size * tw_._hidden_size * sizeof(OpType_);
+  cache_size = max_batch_tokens * tw_._beam_size * tw_._hidden_size;
   total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
-                               0, VariableType::RegressiveVariable);
+                               g_dtype<OpType_>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  total_cache_k->set_shape({size_t(tw_._n_dec_layer),
+                            size_t(_max_batch_size * tw_._beam_size),
+                            size_t(tw_._max_step), size_t(tw_._hidden_size)});
   total_cache_v = new Variable("total_cache_v", cache_size * tw_._n_dec_layer,
-                               0, VariableType::RegressiveVariable);
+                               g_dtype<OpType_>(), DataType::kNotSupported,
+                               VariableType::RegressiveVariable);
+  total_cache_v->set_shape({size_t(tw_._n_dec_layer),
+                            size_t(_max_batch_size * tw_._beam_size),
+                            size_t(tw_._max_step), size_t(tw_._hidden_size)});
   pad_mask->set_regress_var();
 
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
-    Variable *cache_k = new Variable("cache_k");
-    Variable *cache_v = new Variable("cache_v");
+    Variable *cache_k = new Variable("cache_k", total_cache_k);
+    cache_k->set_offset(cache_size * dec_layer_idx,
+                        {size_t(max_batch_tokens), size_t(tw_._beam_size),
+                         size_t(tw_._hidden_size)});
+    Variable *cache_v = new Variable("cache_v", total_cache_v);
+    cache_v->set_offset(cache_size * dec_layer_idx,
+                        {size_t(max_batch_tokens), size_t(tw_._beam_size),
+                         size_t(tw_._hidden_size)});
     std::tuple<Variable *, Variable *, Variable *> dec_outs =
         (*iter)(dec_emb, total_enc_kv, pad_mask, cache_k, cache_v);
     dec_emb = std::get<0>(dec_outs);
     Variable *cache_k_out = std::get<1>(dec_outs);
     Variable *cache_v_out = std::get<2>(dec_outs);
 
-    cache_k->set_ancestor(total_cache_k, cache_size * dec_layer_idx);
-    cache_v->set_ancestor(total_cache_v, cache_size * dec_layer_idx);
     dec_layer_idx++;
   }
   Variable *dec_out = (*dec_norm_layer)(dec_emb);
   dec_out = (*linear_layer)(dec_out);
-  _context_ptr->regress_end();
 
   std::tuple<Variable *, Variable *> sample_outs =
       (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
+  _context_ptr->regress_end();
+
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
-  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size *
-                                sizeof(int));
+  dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size);
+  dec_tokens->malloc_memory(max_batch_tokens * tw_._beam_size);
 
-  transformer_out = new Variable("transformer_out");
+  transformer_out = new Variable("transformer_out", g_dtype<int>());
 
   std::vector<int> start_id_vec(
       _max_batch_size * tw_._beam_size * tw_._max_step, tw_._start_id);
@@ -166,7 +175,7 @@ void Transformer::encoder_before_forward(int batch_size, int seq_len) {
     iter->before_forward(batch_size, seq_len);
     dec_layer_idx++;
   }
-  enc_norm_layer->before_forward(batch_size * seq_len);
+  enc_norm_layer->before_forward(batch_size, seq_len);
   _enc_kv_layer->before_forward(batch_size, seq_len);
 }
 
@@ -179,7 +188,7 @@ void Transformer::decoder_before_forward(int batch_size, int seq_len,
   }
 
   int beam_batch_size = batch_size * tw_._beam_size;
-  dec_norm_layer->before_forward(beam_batch_size);
+  dec_norm_layer->before_forward(batch_size, tw_._beam_size);
   linear_layer->before_forward(beam_batch_size, 1);
   sample_layer->before_forward(batch_size, cur_step);
 }
@@ -234,20 +243,20 @@ void Transformer::Infer() {
   }
 
   if (_output_topk || _is_sampling) {
-    ker_write_topk_result<<<batch_size * tw_._beam_size, step + 1, 0,
-                            _context_ptr->get_stream()>>>(
+    cuda::ker_write_topk_result<<<batch_size * tw_._beam_size, step + 1, 0,
+                                  _context_ptr->get_stream()>>>(
         (int *)dec_tokens->value(), (float *)seq_score->value(),
         (int *)transformer_out->value(), tw_._trg_vocab_size, tw_._max_step,
         tw_._beam_size, tw_._end_id);
   } else {
     if (tw_._length_penalty >= 0.f || step == _batch_max_decode_length) {
-      ker_write_trg_tokenid_pos_penalty<<<batch_size, step + 1, 0,
-                                          _context_ptr->get_stream()>>>(
+      cuda::ker_write_trg_tokenid_pos_penalty<<<batch_size, step + 1, 0,
+                                                _context_ptr->get_stream()>>>(
           (int *)dec_tokens->value(), (float *)seq_score->value(),
           (int *)transformer_out->value(), tw_._max_step, tw_._beam_size);
     } else {
-      ker_write_trg_tokenid_neg_penalty<<<batch_size, step + 1, 0,
-                                          _context_ptr->get_stream()>>>(
+      cuda::ker_write_trg_tokenid_neg_penalty<<<batch_size, step + 1, 0,
+                                                _context_ptr->get_stream()>>>(
           (int *)dec_tokens->value(), (float *)seq_score->value(),
           (int *)transformer_out->value(), tw_._max_step, tw_._beam_size,
           tw_._trg_vocab_size, tw_._end_id);
@@ -255,7 +264,7 @@ void Transformer::Infer() {
   }
   /* ---step3. output the decoding result--- */
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  _context_ptr->synchronize();
 
   set_output_shape(0,
                    {batch_size, _output_topk ? tw_._beam_size : 1, step + 1});
@@ -359,5 +368,4 @@ DataType Transformer::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

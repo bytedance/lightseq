@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+  auto model = lightseq::LSModelFactory::GetInstance().CreateModel(
       "Bert", model_weights_path, max_batch_size);
 
   void* d_input;
@@ -57,10 +57,10 @@ int main(int argc, char* argv[]) {
   std::cout << "infer preprocessing finished" << std::endl;
 
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 1; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
-    print_time_duration(start, "one infer time", 0);
+    // print_time_duration(start, "one infer time");
   }
 
   for (int i = 0; i < model->get_output_size(); i++) {
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << std::endl;
 
-    print_vec(d_output, "output", 5);
+    lightseq::print_vec(d_output, "output", 5);
   }
 
   return 0;

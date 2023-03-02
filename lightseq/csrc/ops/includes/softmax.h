@@ -9,6 +9,8 @@
 #include "kernels.h"
 
 using namespace std;
+namespace lightseq {
+namespace cuda {
 
 template <typename T>
 class Softmax {
@@ -40,3 +42,5 @@ class Softmax {
  private:
   Config config_;
 };
+}  // namespace cuda
+}  // namespace lightseq

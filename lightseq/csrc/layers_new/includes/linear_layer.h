@@ -16,13 +16,13 @@ class LinearLayer : public Layer {
 
   // shape related
   int _max_batch_tokens;
-  int _input_size;
-  int _output_size;
+  size_t _input_size;
+  size_t _output_size;
 
  public:
   LinearLayer(int max_batch_tokens, int input_size, int output_size,
-              cublasOperation_t opA = CUBLAS_OP_T,
-              cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.));
+              MATRIX_OP opA = MATRIX_OP::Transpose,
+              MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.));
 
   virtual ~LinearLayer() {}
 
@@ -32,13 +32,15 @@ class LinearLayer : public Layer {
 
   void before_backward();
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class LinearLayer<__half, __half>;
 template class LinearLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class LinearLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using LinearLayerPtr = std::shared_ptr<LinearLayer<T1, T2>>;

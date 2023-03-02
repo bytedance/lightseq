@@ -19,6 +19,7 @@ float TransformerWeight<float>::float2required(float value) {
   return value;
 }
 
+#ifdef LIGHTSEQ_cuda
 /**
 fp16 version, cast fp32 into fp16
 */
@@ -26,6 +27,7 @@ template <>
 __half TransformerWeight<__half>::float2required(float value) {
   return __float2half_rn(value);
 }
+#endif
 
 /**
 Read model config stored in custom proto file.
@@ -124,10 +126,14 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
   if (source == "src") {
     std::vector<T> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
     _d_src_emb_wei = raw_value;
     for (int e : offset)
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_emb_wei.data()) + e);
+#else
+    _p_d_src_emb_wei = raw_value;
+#endif
   } else {
     // for trg, encdec_kv_kernel, encdec_kv_bias, logit_bias
 
@@ -138,8 +144,8 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
       return "Wrong encode_output_project_kernel_kv_size !";
     for (float ele : layer.encode_output_project_kernel_kv())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          2 * _n_dec_layer * _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, 2 * _n_dec_layer * _hidden_size);
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
@@ -158,11 +164,15 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
 
     std::vector<T> raw_value;
     for (float e : value) raw_value.push_back(float2required(e));
+#ifdef LIGHTSEQ_cuda
     _d_trg_emb_wei = raw_value;
     for (int e : offset) {
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_emb_wei.data()) + e);
     }
+#else
+    _p_d_trg_emb_wei = raw_value;
+#endif
   }  // trg
 
   temp_buffer.clear();
@@ -175,13 +185,21 @@ std::string TransformerWeight<T>::proto_parse_emb_wei(
     }
 
     if (source == "src") {
+#ifdef LIGHTSEQ_cuda
       _d_src_lang_emb = raw_value;
       _p_d_src_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_src_lang_emb.data()));
+#else
+      _p_d_src_emb_wei = raw_value;
+#endif
     } else {
+#ifdef LIGHTSEQ_cuda
       _d_trg_lang_emb = raw_value;
       _p_d_trg_emb_wei.push_back(
           thrust::raw_pointer_cast(_d_trg_lang_emb.data()));
+#else
+      _p_d_trg_emb_wei = raw_value;
+#endif
     }
 
     std::cout << "Finish loading multi lingual weights from host to device"
@@ -227,8 +245,8 @@ std::string TransformerWeight<T>::proto_parse_enc_wei(
       return "Wrong multihead_project_kernel_qkv_size !";
     for (float ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          3 * _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, 3 * _hidden_size);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -245,8 +263,8 @@ std::string TransformerWeight<T>::proto_parse_enc_wei(
       return "Wrong multihead_project_kernel_output_size !";
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
 
     idx += _hidden_size * _hidden_size;
 
@@ -275,8 +293,8 @@ std::string TransformerWeight<T>::proto_parse_enc_wei(
       return "Wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
 
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _inner_size);
 
     idx += _hidden_size * _inner_size;
 
@@ -292,8 +310,8 @@ std::string TransformerWeight<T>::proto_parse_enc_wei(
       return "Wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
 
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _inner_size, _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -346,8 +364,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
         _hidden_size * _hidden_size * 3)
       return "Wrong self_project_kernel_qkv size !";
     for (float ele : dec_layer.self_project_kernel_qkv()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size * 3);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size * 3);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -362,8 +380,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
       return "Wrong self_project_kernel_output size !";
     for (float ele : dec_layer.self_project_kernel_output())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -388,8 +406,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
     if (dec_layer.encdec_project_kernel_q_size() != _hidden_size * _hidden_size)
       return "Wrong encdec_project_kernel_q size !";
     for (float ele : dec_layer.encdec_project_kernel_q()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -404,8 +422,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
       return "Wrong encdec_project_kernel_output size !";
     for (float ele : dec_layer.encdec_project_kernel_output())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -431,8 +449,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
     if (dec_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_first_kernel_size !";
     for (float ele : dec_layer.ffn_first_kernel()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -445,8 +463,8 @@ std::string TransformerWeight<T>::proto_parse_dec_wei(
     if (dec_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
       return "Wrong ffn_second_kernel_size !";
     for (float ele : dec_layer.ffn_second_kernel()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _inner_size, _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -653,8 +671,8 @@ void TransformerWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file,
         },
         "Wrong encode_output_project_kernel_kv_size !");
 
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size * 2 * _n_dec_layer);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size * 2 * _n_dec_layer);
     idx += _hidden_size * _hidden_size * 2 * _n_dec_layer;
 
     offset.push_back(idx);
@@ -750,8 +768,8 @@ void TransformerWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size * 3);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size * 3);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -768,8 +786,8 @@ void TransformerWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong multihead_project_kernel_output_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -800,8 +818,8 @@ void TransformerWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -817,8 +835,8 @@ void TransformerWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _inner_size, _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -885,8 +903,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong self_project_kernel_qkv_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size * 3);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size * 3);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -902,8 +920,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong self_project_kernel_output_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -934,8 +952,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong encdec_project_kernel_q_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -951,8 +969,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong encdec_project_kernel_output_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -983,8 +1001,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _hidden_size, _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -1000,8 +1018,8 @@ void TransformerWeight<T>::hdf5_parse_dec_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
+    // transform_param_shape(value.data() + idx, temp_buffer.data(),
+    // _inner_size, _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -1102,7 +1120,9 @@ std::string TransformerWeight<T>::initializing(std::string weight_path,
   }
 }
 
+#ifdef LIGHTSEQ_cuda
 template class TransformerWeight<__half>;
+#endif
 template class TransformerWeight<float>;
 
 }  // namespace lightseq

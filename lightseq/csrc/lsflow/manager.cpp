@@ -27,9 +27,7 @@ void MemoryManager::remove_life_cycle(int unique_id) {
 }
 
 void MemoryManager::calculate_buffer_() {
-#ifdef MEM_DEBUG
-  printf("===== Execute MemoryManager calculate_buffer_ =====\n");
-#endif
+  printf("========== Execute MemoryManager calculate_buffer_ ==========\n\n");
 
   tensor_ptr.clear();
   std::vector<std::pair<TensorUsage, size_t>> tensor_usages_vec{};
@@ -88,16 +86,19 @@ void MemoryManager::calculate_buffer_() {
     total_consumption =
         std::max(total_consumption, best_offset + cal_tensor_usage.size);
   }
+  _total_buffer_size = total_consumption;
 
-#ifdef MEM_DEBUG
-  printf("**** shared buffer memory size: %zu MB ****\n",
+  printf("******** shared buffer memory size: %zu MB ********\n",
          total_consumption / MB_SIZE);
-#endif
-
-  for (auto iter : buffer_vec_) {
-    cuda_free(iter);
+  try {
+    for (auto iter : buffer_vec_) {
+      _allocator_ptr->free_mem(iter);
+    }
+    buffer_vec_.clear();
+  } catch (...) {
+    printf("execute MemoryManager clear buffer failed!\n");
+    throw std::runtime_error("execute MemoryManager clear buffer failed!");
   }
-  buffer_vec_.clear();
 
   size_t max_last_addr = 0;
   size_t record_last_addr = 0;
@@ -111,15 +112,29 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(ordered_tensor_usages[i]);
     if ((i + 1 == ordered_tensor_usages.size()) ||
         (max_last_addr == ordered_tensor_usages[i + 1].second)) {
-      char *current_buffer =
-          cuda_malloc<char>(max_last_addr - record_last_addr);
+      printf("****** Buffer Idx: %d, buffer memory: %.2f MB, ", buffer_idx,
+             float(max_last_addr - record_last_addr) / MB_SIZE);
+
+      char *current_buffer = nullptr;
+      try {
+        current_buffer =
+            _allocator_ptr->malloc_mem(max_last_addr - record_last_addr);
+      } catch (...) {
+        std::string error_message =
+            ("allocate shared buffer " + std::to_string(buffer_vec_.size()) +
+             " failed!\n"
+             "buffer size is: " +
+             std::to_string((max_last_addr - record_last_addr) / MB_SIZE) +
+             " MB\n");
+        printf("%s", error_message.c_str());
+        throw std::runtime_error(error_message);
+      }
+
+      printf("allocate success! ******\n");
+
       buffer_vec_.push_back(current_buffer);
-#ifdef MEM_DEBUG
-      printf(
-          "*** Buffer Idx: %d, buffer size: %zu, buffer memory: %.2f MB ***\n",
-          buffer_idx, (max_last_addr - record_last_addr),
-          float(max_last_addr - record_last_addr) / MB_SIZE);
-#endif
+      buffer_size_vec_.push_back(max_last_addr - record_last_addr);
+
       buffer_idx++;
       for (auto iter : temp_usages_vec) {
         int unique_id = iter.first.unique_id;
@@ -165,7 +180,8 @@ void MemoryManager::calculate_buffer_() {
     char *addr = tensor_ptr.find(unique_id)->second;
 #ifdef MEM_DEBUG
     printf(
-        "idx: %d, life cycle : [%d, %d], name: %s, memory size: %.2f MB, end "
+        "idx: %d, life cycle : [%d, %d], name: \"%s\", memory size: %.2f MB, "
+        "end "
         "memory: %.2f MB\n"
         "offset: %zu, size: %zu, end_offset: %zu, address: %p, end_addr: "
         "%p\n\n",
@@ -191,14 +207,16 @@ void MemoryManager::calculate_buffer_() {
       printf("================================\n");
       printf("ERROR occurred!\n");
       printf(
-          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+          "%zu\n",
           unique_id, iter.first.first_idx, iter.first.last_idx,
           iter.first._name.c_str(), size, iter.second);
 
       int check_unique_id = check_iter.first.unique_id;
       size_t check_size = check_iter.first.size;
       printf(
-          "idx: %d, life cycle : [%d, %d], name: %s, size: %zu, offset: %zu\n",
+          "idx: %d, life cycle : [%d, %d], name: \"%s\", size: %zu, offset: "
+          "%zu\n",
           check_unique_id, check_iter.first.first_idx,
           check_iter.first.last_idx, check_iter.first._name.c_str(), check_size,
           check_iter.second);
@@ -209,7 +227,7 @@ void MemoryManager::calculate_buffer_() {
     temp_usages_vec.push_back(iter);
   }
 
-  // exit(0);
+  printf("\n========== Finish MemoryManager calculate_buffer_ ==========\n\n");
 }
 
 }  // namespace lightseq

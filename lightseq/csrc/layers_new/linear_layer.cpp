@@ -4,8 +4,8 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 LinearLayer<T1, T2>::LinearLayer(int max_batch_tokens, int input_size,
-                                 int output_size, cublasOperation_t opA,
-                                 cublasOperation_t opB, float alpha)
+                                 int output_size, MATRIX_OP opA, MATRIX_OP opB,
+                                 float alpha)
     : Layer("LinearLayer"),
       _max_batch_tokens(max_batch_tokens),
       _input_size(input_size),
@@ -14,7 +14,7 @@ LinearLayer<T1, T2>::LinearLayer(int max_batch_tokens, int input_size,
       _linear(new LinearOp<T1, T2>(max_batch_tokens, output_size, input_size,
                                    opA, opB, alpha)) {
   // parameters node
-  _linear_w = new Variable("_linear_w");
+  _linear_w = new Variable("_linear_w", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -39,12 +39,13 @@ template <typename T1, typename T2>
 void LinearLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-int LinearLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
-                                            T2* grad_ptr) {  // for training
-  int offset = 0;
+size_t LinearLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
+                                               T2* grad_ptr) {  // for training
+  size_t offset = 0;
 
   _linear_w->set_value((char*)(para_ptr + offset));
   _linear_w->set_grad((char*)(grad_ptr + offset));
+  _linear_w->set_shape({_output_size, _input_size});
   offset += _input_size * _output_size;
 
   return offset;

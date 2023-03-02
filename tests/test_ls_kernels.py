@@ -1060,7 +1060,7 @@ def test_crf():
     torch_mask = ~kt.attn_mask(batch_size, seq_len, torch.bool)
     # torch_mask = kt.ones((batch_size, seq_len)).to(torch.bool)
     ls_mask = torch_mask.clone()
-    ls_mask = (~ls_mask).to(dtype=torch.uint8)
+    ls_mask = (~ls_mask).to(dtype=torch.half) * (-100000000.0)
 
     emissions = kt.rand((batch_size, seq_len, num_tags))
     crf = CRF(num_tags, batch_first=True)
@@ -1634,7 +1634,7 @@ def test_torch_launch_fake_quantize():
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
-        "test_launch_transform_0213",
+        # "test_launch_transform_0213",
         # "test_launch_bias_add_transform_20314",
         # "test_launch_transform4d_0213",
         # "test_launch_bias_add_transform_20314_new",
@@ -1664,5 +1664,5 @@ if __name__ == "__main__":
         # "test_torch_launch_ls_quantize",
         # "test_torch_launch_ls_dequantize",
         # "test_torch_launch_fake_quantize",
-        # "test_crf",
+        "test_crf",
     )

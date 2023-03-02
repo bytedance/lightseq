@@ -8,27 +8,16 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-protobuf_generate_cpp(BERT_PROTO_SRC BERT_PROTO_HEADER bert.proto)
-add_library(bert_weight STATIC bert_weight.cc ${BERT_PROTO_SRC}
-                               ${BERT_PROTO_HEADER})
-target_link_libraries(bert_weight PUBLIC utils ${Protobuf_LIBRARIES})
-target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(bert_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+set(PROTO_FILES bert.proto bert_crf.proto transformer.proto)
 
-protobuf_generate_cpp(BERT_CRF_PROTO_SRC BERT_CRF_PROTO_HEADER bert_crf.proto)
-add_library(bert_crf_weight STATIC bert_crf_weight.cc ${BERT_CRF_PROTO_SRC}
-                                   ${BERT_CRF_PROTO_HEADER})
-target_link_libraries(bert_crf_weight PUBLIC utils ${Protobuf_LIBRARIES})
-target_include_directories(bert_crf_weight PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(bert_crf_weight PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+set(WEIGHT_FILES bert_weight.cc # bert_crf_weight.cc
+                 transformer_weight.cc)
 
-protobuf_generate_cpp(TRANSFORMER_PROTO_SRC TRANSFORMER_PROTO_HEADER
-                      transformer.proto)
-add_library(
-  transformer_weight STATIC transformer_weight.cc ${TRANSFORMER_PROTO_SRC}
-                            ${TRANSFORMER_PROTO_HEADER})
-target_link_libraries(transformer_weight PUBLIC utils ${Protobuf_LIBRARIES})
-target_include_directories(transformer_weight
-                           PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(transformer_weight
-                           PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+protobuf_generate_cpp(PROTO_SRC PROTO_HEADER ${PROTO_FILES})
+add_library(weight_lib STATIC ${WEIGHT_FILES} ${PROTO_SRC} ${PROTO_HEADER}
+                              proto_util.cc)
+target_link_libraries(weight_lib PRIVATE ${HDF5_LIBRARIES})
+target_link_libraries(weight_lib PUBLIC ${Protobuf_LIBRARIES})
+target_include_directories(weight_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(weight_lib PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(weight_lib PUBLIC ${HDF5_INCLUDE_DIRS})

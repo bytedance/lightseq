@@ -20,19 +20,19 @@ class LayerBuilder(CUDAOpBuilder):
 
     def sources(self):
         return [
-            "csrc/kernels/cublas_wrappers.cu",
-            "csrc/kernels/transform_kernels.cu",
-            "csrc/kernels/transform_kernels_new.cu",
-            "csrc/kernels/dropout_kernels.cu",
-            "csrc/kernels/normalize_kernels.cu",
-            "csrc/kernels/softmax_kernels.cu",
-            "csrc/kernels/softmax_kernels_new.cu",
-            "csrc/kernels/general_kernels.cu",
-            "csrc/kernels/cuda_util.cu",
-            "csrc/kernels/embedding_kernels.cu",
-            "csrc/kernels/cross_entropy.cu",
-            "csrc/kernels/transformerKernels.cc.cu",
-            "csrc/kernels/crf.cu",
+            "csrc/kernels/cuda/cublas_wrappers.cu",
+            "csrc/kernels/cuda/transform_kernels.cu",
+            "csrc/kernels/cuda/transform_kernels_new.cu",
+            "csrc/kernels/cuda/dropout_kernels.cu",
+            "csrc/kernels/cuda/normalize_kernels.cu",
+            "csrc/kernels/cuda/softmax_kernels.cu",
+            "csrc/kernels/cuda/softmax_kernels_new.cu",
+            "csrc/kernels/cuda/general_kernels.cu",
+            "csrc/kernels/cuda/cuda_util.cu",
+            "csrc/kernels/cuda/embedding_kernels.cu",
+            "csrc/kernels/cuda/cross_entropy.cu",
+            "csrc/kernels/cuda/transformerKernels.cc.cu",
+            "csrc/kernels/cuda/crf.cu",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
             "csrc/lsflow/manager.cpp",
@@ -66,7 +66,7 @@ class LayerBuilder(CUDAOpBuilder):
 
     def include_paths(self):
         paths = [
-            "csrc/kernels/includes",
+            "csrc/kernels/cuda/includes",
             "csrc/ops_new/includes",
             "csrc/lsflow/includes",
             "csrc/layers_new/includes",
@@ -99,4 +99,5 @@ class LayerBuilder(CUDAOpBuilder):
             # "-DDEBUG_MODE",
             # "-DMEM_DEBUG",
             # "-DFP16_MODE",
+            "-DPYBIND_INTERFACE",
         ]

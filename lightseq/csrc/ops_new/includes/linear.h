@@ -1,27 +1,34 @@
 #pragma once
 #include "declaration.h"
 #include "node.h"
-#include "kernels.h"
-#include "cublas_wrappers.h"
 
 namespace lightseq {
 
 template <typename T1, typename T2>
 class LinearOp : public Operator {
  private:
-  int _output_size;
-  int _input_size;
-  int _max_batch_tokens;
-  int _batch_tokens;
+  size_t _output_size;
+  size_t _input_size;
+  size_t _max_batch_tokens;
+  size_t _batch_tokens;
   std::array<int, 3> _gemm_algos;
-  cublasOperation_t _opA;
-  cublasOperation_t _opB;
+
   float _alpha;
+  MATRIX_OP _opA;
+  MATRIX_OP _opB;
+
+  Variable* _result;
+
+#ifdef PYBIND_INTERFACE
+#define weight_op MATRIX_OP::Transpose
+#else
+#define weight_op MATRIX_OP::NonTranspose
+#endif
 
  public:
-  LinearOp(int max_batch_tokens, int output_size, int input_size,
-           cublasOperation_t opA = CUBLAS_OP_T,
-           cublasOperation_t opB = CUBLAS_OP_N, float alpha = float(1.))
+  LinearOp(size_t max_batch_tokens, size_t output_size, size_t input_size,
+           MATRIX_OP opA = weight_op, MATRIX_OP opB = MATRIX_OP::NonTranspose,
+           float alpha = float(1.))
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),
@@ -37,7 +44,10 @@ class LinearOp : public Operator {
 
   void forward() override;
 
-  void before_forward(int batch_tokens) { _batch_tokens = batch_tokens; }
+  void before_forward(size_t batch_tokens) {
+    _batch_tokens = batch_tokens;
+    _result->set_shape({batch_tokens, _output_size});
+  }
 
   void backward() override;
 

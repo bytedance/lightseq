@@ -9,7 +9,8 @@
 #include "feed_forward.h"
 #include "cublas_wrappers.h"
 #include "cuda_util.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class QuantLinearLayer {
  public:
@@ -67,3 +68,5 @@ class QuantLinearLayer {
   float *_igemm_alpha_ptr;
   float *_igemm_beta_ptr;
 };
+}  // namespace cuda
+}  // namespace lightseq

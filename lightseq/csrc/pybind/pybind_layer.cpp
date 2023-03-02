@@ -23,21 +23,20 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_encoder_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_cross_entropy_layers;
 static std::unordered_map<int, std::shared_ptr<void>> s_quant_linear_layers;
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 int create_transformer_encoder_layer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-    float activation_dropout_ratio, float hidden_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens) {
+    float activation_dropout_ratio, float hidden_dropout_ratio, bool is_pre_ln,
+    std::string activation_fn, bool mask_future_tokens) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   auto layer = std::make_shared<TransformerEncoderLayer<T>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn,
-      mask_future_tokens);
+      hidden_dropout_ratio, is_pre_ln, activation_fn, mask_future_tokens);
 
   s_transformer_encoder_layers[layer_id] = layer;
 
@@ -109,17 +108,19 @@ static std::unordered_map<int, std::shared_ptr<void>>
     s_transformer_decoder_layers;
 
 template <typename T>
-int create_transformer_decoder_layer(
-    int layer_id, int max_batch_tokens, int max_seq_len, int hidden_dim,
-    int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
-    float activation_dropout_ratio, float hidden_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn) {
+int create_transformer_decoder_layer(int layer_id, int max_batch_tokens,
+                                     int max_seq_len, int hidden_dim,
+                                     int num_heads, int intermediate_size,
+                                     float attn_prob_dropout_ratio,
+                                     float activation_dropout_ratio,
+                                     float hidden_dropout_ratio, bool is_pre_ln,
+                                     std::string activation_fn) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   Context::Instance().set_stream(stream);
   auto layer = std::make_shared<TransformerDecoderLayer<T>>(
       layer_id, max_batch_tokens, max_seq_len, hidden_dim, num_heads,
       intermediate_size, attn_prob_dropout_ratio, activation_dropout_ratio,
-      hidden_dropout_ratio, pre_or_postLayerNorm, activation_fn);
+      hidden_dropout_ratio, is_pre_ln, activation_fn);
 
   s_transformer_decoder_layers[layer_id] = layer;
 
@@ -473,84 +474,98 @@ torch::Tensor quant_linear_layer_fw(const int layer_id,
 
   return outputs;
 }
+}  // namespace cuda
+}  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("transformer_encoder_layer_fw_fp32",
-        &transformer_encoder_layer_fw<float>,
+        &lightseq::cuda::transformer_encoder_layer_fw<float>,
         "LightSeq Transformer Encoder forward with fp32 (CUDA)");
   m.def("transformer_encoder_layer_fw_fp16",
-        &transformer_encoder_layer_fw<__half>,
+        &lightseq::cuda::transformer_encoder_layer_fw<__half>,
         "LightSeq Transformer Encoder forward with fp16 (CUDA)");
   m.def("transformer_encoder_layer_bw_fp32",
-        &transformer_encoder_layer_bw<float>,
+        &lightseq::cuda::transformer_encoder_layer_bw<float>,
         "LightSeq Transformer Encoder backward with fp32 (CUDA)");
   m.def("transformer_encoder_layer_bw_fp16",
-        &transformer_encoder_layer_bw<__half>,
+        &lightseq::cuda::transformer_encoder_layer_bw<__half>,
         "LightSeq Transformer Encoder backward with fp16 (CUDA)");
   m.def("create_transformer_encoder_layer_fp32",
-        &create_transformer_encoder_layer<float>,
+        &lightseq::cuda::create_transformer_encoder_layer<float>,
         "Create LightSeq Transformer Encoder Layer with fp32 (CUDA)");
   m.def("create_transformer_encoder_layer_fp16",
-        &create_transformer_encoder_layer<__half>,
+        &lightseq::cuda::create_transformer_encoder_layer<__half>,
         "Create LightSeq Transformer Encoder Layer with fp16 (CUDA)");
   m.def("transformer_decoder_layer_fw_fp32",
-        &transformer_decoder_layer_fw<float>,
+        &lightseq::cuda::transformer_decoder_layer_fw<float>,
         "LightSeq Transformer Decoder forward with fp32 (CUDA)");
   m.def("transformer_decoder_layer_fw_fp16",
-        &transformer_decoder_layer_fw<__half>,
+        &lightseq::cuda::transformer_decoder_layer_fw<__half>,
         "LightSeq Transformer Decoder forward with fp16 (CUDA)");
   m.def("transformer_decoder_layer_bw_fp32",
-        &transformer_decoder_layer_bw<float>,
+        &lightseq::cuda::transformer_decoder_layer_bw<float>,
         "LightSeq Transformer Decoder backward with fp32 (CUDA)");
   m.def("transformer_decoder_layer_bw_fp16",
-        &transformer_decoder_layer_bw<__half>,
+        &lightseq::cuda::transformer_decoder_layer_bw<__half>,
         "LightSeq Transformer Decoder backward with fp16 (CUDA)");
   m.def("create_transformer_decoder_layer_fp32",
-        &create_transformer_decoder_layer<float>,
+        &lightseq::cuda::create_transformer_decoder_layer<float>,
         "Create LightSeq Transformer Decoder Layer with fp32 (CUDA)");
   m.def("create_transformer_decoder_layer_fp16",
-        &create_transformer_decoder_layer<__half>,
+        &lightseq::cuda::create_transformer_decoder_layer<__half>,
         "Create LightSeq Transformer Decoder Layer with fp16 (CUDA)");
   m.def("transformer_embedding_layer_fw_fp32",
-        &transformer_embedding_layer_fw<float>,
+        &lightseq::cuda::transformer_embedding_layer_fw<float>,
         "LightSeq Transformer Embedding forward with fp32 (CUDA)");
   m.def("transformer_embedding_layer_fw_fp16",
-        &transformer_embedding_layer_fw<__half>,
+        &lightseq::cuda::transformer_embedding_layer_fw<__half>,
         "LightSeq Transformer Embedding forward with fp16 (CUDA)");
   m.def("transformer_embedding_layer_bw_fp32",
-        &transformer_embedding_layer_bw<float>,
+        &lightseq::cuda::transformer_embedding_layer_bw<float>,
         "LightSeq Transformer Embedding backward with fp32 (CUDA)");
   m.def("transformer_embedding_layer_bw_fp16",
-        &transformer_embedding_layer_bw<__half>,
+        &lightseq::cuda::transformer_embedding_layer_bw<__half>,
         "LightSeq Transformer Embedding backward with fp16 (CUDA)");
   m.def("create_transformer_embedding_layer_fp32",
-        &create_transformer_embedding_layer<float>,
+        &lightseq::cuda::create_transformer_embedding_layer<float>,
         "Create LightSeq Transformer Embedding Layer with fp32 (CUDA)");
   m.def("create_transformer_embedding_layer_fp16",
-        &create_transformer_embedding_layer<__half>,
+        &lightseq::cuda::create_transformer_embedding_layer<__half>,
         "Create LightSeq Transformer Embedding Layer with fp16 (CUDA)");
-  m.def("create_cross_entropy_layer_fp32", &create_cross_entropy_layer<float>,
+  m.def("create_cross_entropy_layer_fp32",
+        &lightseq::cuda::create_cross_entropy_layer<float>,
         "Create LightSeq Cross Entropy Layer with fp32 (CUDA)");
-  m.def("create_cross_entropy_layer_fp16", &create_cross_entropy_layer<__half>,
+  m.def("create_cross_entropy_layer_fp16",
+        &lightseq::cuda::create_cross_entropy_layer<__half>,
         "Create LightSeq Cross Entropy Layer with fp16 (CUDA)");
-  m.def("cross_entropy_layer_fw_fp32", &cross_entropy_layer_fw<float>,
+  m.def("cross_entropy_layer_fw_fp32",
+        &lightseq::cuda::cross_entropy_layer_fw<float>,
         "LightSeq Cross Entropy forward with fp32 (CUDA)");
-  m.def("cross_entropy_layer_fw_fp16", &cross_entropy_layer_fw<__half>,
+  m.def("cross_entropy_layer_fw_fp16",
+        &lightseq::cuda::cross_entropy_layer_fw<__half>,
         "LightSeq Cross Entropy forward with fp16 (CUDA)");
-  m.def("cross_entropy_layer_bw_fp32", &cross_entropy_layer_bw<float>,
+  m.def("cross_entropy_layer_bw_fp32",
+        &lightseq::cuda::cross_entropy_layer_bw<float>,
         "LightSeq Cross Entropy backward with fp32 (CUDA)");
-  m.def("cross_entropy_layer_bw_fp16", &cross_entropy_layer_bw<__half>,
+  m.def("cross_entropy_layer_bw_fp16",
+        &lightseq::cuda::cross_entropy_layer_bw<__half>,
         "LightSeq Cross Entropy backward with fp16 (CUDA)");
-  m.def("create_quant_linear_layer_fp32", &create_quant_linear_layer<float>,
+  m.def("create_quant_linear_layer_fp32",
+        &lightseq::cuda::create_quant_linear_layer<float>,
         "Create LightSeq Cross Entropy Layer with fp32 (CUDA)");
-  m.def("create_quant_linear_layer_fp16", &create_quant_linear_layer<__half>,
+  m.def("create_quant_linear_layer_fp16",
+        &lightseq::cuda::create_quant_linear_layer<__half>,
         "Create LightSeq Cross Entropy Layer with fp16 (CUDA)");
-  m.def("quant_linear_layer_fw_fp32", &quant_linear_layer_fw<float>,
+  m.def("quant_linear_layer_fw_fp32",
+        &lightseq::cuda::quant_linear_layer_fw<float>,
         "LightSeq Cross Entropy forward with fp32 (CUDA)");
-  m.def("quant_linear_layer_fw_fp16", &quant_linear_layer_fw<__half>,
+  m.def("quant_linear_layer_fw_fp16",
+        &lightseq::cuda::quant_linear_layer_fw<__half>,
         "LightSeq Cross Entropy forward with fp16 (CUDA)");
-  m.def("assign_layer_weight_grad_fp32", &assign_layer_weight_grad<float>,
+  m.def("assign_layer_weight_grad_fp32",
+        &lightseq::cuda::assign_layer_weight_grad<float>,
         "Bind layer weights and grads");
-  m.def("assign_layer_weight_grad_fp16", &assign_layer_weight_grad<__half>,
+  m.def("assign_layer_weight_grad_fp16",
+        &lightseq::cuda::assign_layer_weight_grad<__half>,
         "Bind layer weights and grads");
 }

@@ -14,14 +14,14 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
                                              int num_heads, int beam_size,
                                              float attn_prob_dropout_ratio,
                                              float hidden_output_dropout_ratio,
-                                             bool pre_or_postLayerNorm)
+                                             bool is_pre_ln)
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
       _hidden_size(hidden_size),
       _nhead(num_heads),
       _head_dim(hidden_size / num_heads),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm) {
+      _is_pre_ln(is_pre_ln) {
   // operators
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
@@ -58,7 +58,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* qkv_out = nullptr;
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     Variable* ln_res = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
   } else {
@@ -77,7 +77,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
 
   Variable* attn_dropout_residual =
       (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
@@ -135,9 +135,9 @@ template <typename T1, typename T2>
 void GptAttentionLayer<T1, T2>::before_backward() {}
 
 template <typename T1, typename T2>
-int GptAttentionLayer<T1, T2>::load_para_and_grad(
+size_t GptAttentionLayer<T1, T2>::load_para_and_grad(
     const T1* para_ptr, T2* grad_ptr) {  // for training
-  int offset = 0;
+  size_t offset = 0;
   _attn_qkvw->set_value((char*)(para_ptr + offset));
   _attn_qkvw->set_grad((char*)(grad_ptr + offset));
   offset += _hidden_size * _hidden_size * 3;

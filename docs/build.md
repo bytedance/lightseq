@@ -1,7 +1,7 @@
 # Build from source code
 
 ## Requirements
-- cudatoolkit-dev >= 11, < 12
+- cudatoolkit-dev >= 10.1 < 11
 - protobuf >= 3.13
 - cmake >= 3.18
 

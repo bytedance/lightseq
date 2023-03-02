@@ -39,7 +39,7 @@ class GptAttentionLayer : public Layer {
   int _hidden_size;
   int _nhead;
   int _head_dim;
-  bool _pre_or_postLayerNorm;
+  bool _is_pre_ln;
 
   // tensor slice
   Variable* _cache_k;
@@ -48,8 +48,7 @@ class GptAttentionLayer : public Layer {
  public:
   GptAttentionLayer(int max_batch_tokens, int max_seq_len, int hidden_size,
                     int num_heads, int beam_size, float attn_prob_dropout_ratio,
-                    float hidden_output_dropout_ratio,
-                    bool pre_or_postLayerNorm = true);
+                    float hidden_output_dropout_ratio, bool is_pre_ln = true);
 
   virtual ~GptAttentionLayer() {}
 
@@ -59,7 +58,7 @@ class GptAttentionLayer : public Layer {
 
   void before_backward();
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };

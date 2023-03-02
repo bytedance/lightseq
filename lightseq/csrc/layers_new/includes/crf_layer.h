@@ -37,13 +37,13 @@ class CRFLayer : public Layer {
   void before_forward(int batch_size, int seq_len, bool forward_or_decode,
                       bool output_decode_score);
 
-  void before_backward();
-
   int load_params(const std::vector<const T*>& para_vec, int offset);
 };
 
-template class CRFLayer<__half>;
 template class CRFLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class CRFLayer<__half>;
+#endif
 
 template <class T>
 using CRFLayerPtr = std::shared_ptr<CRFLayer<T>>;

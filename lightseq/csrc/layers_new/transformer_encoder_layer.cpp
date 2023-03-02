@@ -7,18 +7,17 @@ TransformerEncoderLayer<T1, T2>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
     int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
     float activation_dropout_ratio, float hidden_output_dropout_ratio,
-    bool pre_or_postLayerNorm, std::string activation_fn,
-    bool mask_future_tokens, bool is_post_ln)
-    : Layer("TransformerEncoderLayer") {
+    bool is_pre_ln, std::string activation_fn, bool mask_future_tokens)
+    : Layer("TransformerEncoderLayer"), _layer_id(layer_id) {
   _attn_layer.reset(new MultiheadAttentionLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, mask_future_tokens, is_post_ln));
+      attn_prob_dropout_ratio, hidden_output_dropout_ratio, is_pre_ln,
+      mask_future_tokens));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      pre_or_postLayerNorm, activation_fn, is_post_ln));
+      is_pre_ln, activation_fn));
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -37,9 +36,9 @@ Variable* TransformerEncoderLayer<T1, T2>::operator()(Variable* inp,
 }
 
 template <typename T1, typename T2>
-int TransformerEncoderLayer<T1, T2>::load_para_and_grad(
+size_t TransformerEncoderLayer<T1, T2>::load_para_and_grad(
     const T1* para_ptr, T2* grad_ptr) {  // for training
-  int offset = 0;
+  size_t offset = 0;
 
   offset +=
       _attn_layer->load_para_and_grad(para_ptr + offset, grad_ptr + offset);

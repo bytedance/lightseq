@@ -14,7 +14,8 @@
 #include "softmax.h"
 #include "strided_batch_gemm.h"
 #include "cublas_algo_map.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 class TransformerDecoderLayer {
  public:
@@ -325,7 +326,7 @@ class TransformerDecoderLayer {
     _encdec_attn_score_ptr =
         cuda_malloc<T>(_max_batch_tokens * _heads * _max_seq_len);
 
-    if (_pre_or_postLayerNorm) {
+    if (_is_pre_ln) {
       _gemmQKV_inp_ptr = cuda_malloc<T>(_max_batch_tokens * _hidden_size);
     } else {
       _gemmQKV_inp_ptr = nullptr;
@@ -371,7 +372,7 @@ class TransformerDecoderLayer {
   const size_t _intermediate_size;
   const size_t _max_batch_tokens;
   const size_t _max_seq_len;
-  const bool _pre_or_postLayerNorm;
+  const bool _is_pre_ln;
   const std::string _activation_fn;
   // dynamic parameter between batch
   size_t _batch_size;
@@ -496,3 +497,6 @@ class TransformerDecoderLayer {
   T *_grad_encdec_kv_cmax_ptr;
   T *_grad_attn_qkv_cache_cmax_ptr;
 };
+
+}  // namespace cuda
+}  // namespace lightseq

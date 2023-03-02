@@ -19,7 +19,6 @@ typedef float OpType_;
 #endif
 
 namespace lightseq {
-namespace cuda {
 
 class Transformer : public LSModel {
  private:
@@ -32,7 +31,7 @@ class Transformer : public LSModel {
 
   LaunchDecEmbLayerPtr<OpType_> launch_dec_emb_layer;
   EncDecKvLayerPtr<OpType_, OpType_> _enc_kv_layer;
-  std::vector<TransformerDecoderLayerV2Ptr<OpType_, OpType_>> dec_layer_vec;
+  std::vector<TransformerDecoderLayerPtr<OpType_, OpType_>> dec_layer_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
   LinearLayerPtr<OpType_, OpType_> linear_layer;
 
@@ -81,5 +80,4 @@ class Transformer : public LSModel {
 
 LSMODEL_REGISTER(Transformer);
 
-}  // namespace cuda
 }  // namespace lightseq

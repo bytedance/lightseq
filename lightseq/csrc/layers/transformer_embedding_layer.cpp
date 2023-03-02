@@ -2,7 +2,8 @@
 
 #include "context.h"
 #include "kernels.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 TransformerEmbeddingLayer<T>::TransformerEmbeddingLayer(
     int layer_id, const T *pos_embeddings_ptr, int max_batch_tokens,
@@ -68,3 +69,5 @@ void TransformerEmbeddingLayer<T>::SetQuantMode(bool enable_quant) {
 
 template class TransformerEmbeddingLayer<float>;
 template class TransformerEmbeddingLayer<__half>;
+}  // namespace cuda
+}  // namespace lightseq

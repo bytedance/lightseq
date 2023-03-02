@@ -13,6 +13,7 @@ class SampleLayer : public Layer {
 
   // parameters
   Variable* _logit_bias;
+  size_t _trg_vocab_size;
 
  public:
   SampleLayer(int nshared_dec_layer, int max_batch_size, int max_step,
@@ -29,15 +30,15 @@ class SampleLayer : public Layer {
 
   void before_forward(int batch_size, int cur_step);
 
-  void before_backward();
-
   int load_params(const std::vector<const T*>& para_vec, int offset);
 
   bool is_stop() { return _beam_search->is_stop(); }
 };
 
-template class SampleLayer<__half>;
 template class SampleLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class SampleLayer<__half>;
+#endif
 
 template <typename T>
 using SampleLayerPtr = std::shared_ptr<SampleLayer<T>>;

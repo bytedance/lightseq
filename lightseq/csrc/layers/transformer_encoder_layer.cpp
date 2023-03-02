@@ -3,7 +3,8 @@
 #include "context.h"
 #include "kernels.h"
 #include "cuda_util.h"
-
+namespace lightseq {
+namespace cuda {
 template <typename T>
 TransformerEncoderLayer<T>::TransformerEncoderLayer(
     int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
@@ -18,7 +19,7 @@ TransformerEncoderLayer<T>::TransformerEncoderLayer(
       _heads(num_heads),
       _intermediate_size(intermediate_size),
       _training(true),
-      _pre_or_postLayerNorm(pre_or_postLayerNorm),
+      _is_pre_ln(pre_or_postLayerNorm),
       _activation_fn(activation_fn),
       _qkv_linear(
           typename FeedForward<T>::Config(3 * hidden_size, hidden_size)),
@@ -76,12 +77,11 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
     int8_t *qout_ptr = i8_buffer_ptr;
     i8_buffer_ptr += _batch_dim * 3;
     int8_t *qweight_ptr = i8_buffer_ptr;
-    if (_pre_or_postLayerNorm) {
+    if (_is_pre_ln) {
       _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                        _batch_tokens, _stream);
     }
-    const T *gemmQKV_inp_ptr =
-        _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
 
     cublasLtMatmulAlgo_info qkv_algo_info =
         _algo_map.getAlgo(_batch_tokens, _hidden_size * 3, _hidden_size);
@@ -106,12 +106,11 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
         _hidden_size / _heads, _stream, attn_qkv_cache_cmax,
         qkv_layout[2] == kCol32);
   } else {
-    if (_pre_or_postLayerNorm) {
+    if (_is_pre_ln) {
       _attn_ln.Forward(_gemmQKV_inp_ptr, input_ptr, _attn_nw_ptr, _attn_nb_ptr,
                        _batch_tokens, _stream);
     }
-    const T *gemmQKV_inp_ptr =
-        _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+    const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
     _qkv_linear.Forward(_batch_tokens, gemmQKV_inp_ptr, _attn_qkvw_ptr, buffer,
                         _cublasHandle);
 
@@ -178,7 +177,7 @@ void TransformerEncoderLayer<T>::attn_layer_fw(const T *input_ptr,
                                         _hidden_size, _stream);
   }
 
-  if (!_pre_or_postLayerNorm) {
+  if (!_is_pre_ln) {
     // in-place ln since ln-input will not be used in post-ln mode
     _attn_ln.Forward(output_ptr, output_ptr, _attn_nw_ptr, _attn_nb_ptr,
                      _batch_tokens, _stream);
@@ -195,7 +194,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     int8_t *qout_ptr = i8_buffer_ptr;
     i8_buffer_ptr += _batch_tokens * _intermediate_size;
     int8_t *qweight_ptr = i8_buffer_ptr;
-    if (_pre_or_postLayerNorm) {
+    if (_is_pre_ln) {
       _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                       _batch_tokens, _stream);
     }
@@ -220,7 +219,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     i8_buffer_ptr += _batch_tokens * _hidden_size;
     qweight_ptr = i8_buffer_ptr;
 
-    T *fake_inp = _pre_or_postLayerNorm
+    T *fake_inp = _is_pre_ln
                       ? inp_ptr + _batch_dim
                       : _shared_mem_ptr + _intermediate_size * _hidden_size;
     T *fake_weight = _shared_mem_ptr;
@@ -241,7 +240,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                        _batch_tokens, _hidden_size, _stream);
 
-    if (!_pre_or_postLayerNorm) {
+    if (!_is_pre_ln) {
       // in-place ln since ln-input will not be used in post-ln mode
       _ffn_ln.Forward(out_ptr, out_ptr, _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
                       _stream);
@@ -250,7 +249,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
     return;
   }
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     _ffn_ln.Forward(_ff1_inp_ptr, inp_ptr, _ffn_nw_ptr, _ffn_nb_ptr,
                     _batch_tokens, _stream);
   }
@@ -267,7 +266,7 @@ void TransformerEncoderLayer<T>::ffn_layer_fw(T *inp_ptr, T *out_ptr) {
   _ffn_dropout.bias_dropout_residual(out_ptr, out_ptr, inp_ptr, _output_b_ptr,
                                      _batch_tokens, _hidden_size, _stream);
 
-  if (!_pre_or_postLayerNorm) {
+  if (!_is_pre_ln) {
     // in-place ln since ln-input will not be used in post-ln mode
     _ffn_ln.Forward(out_ptr, out_ptr, _ffn_nw_ptr, _ffn_nb_ptr, _batch_tokens,
                     _stream);
@@ -283,10 +282,9 @@ void TransformerEncoderLayer<T>::Forward(const T *input_ptr,
   T *attn_buffer = _shared_mem_ptr;  // 3 * _batch_dim
   // _batch_dim
   T *ffn_inp_ptr =
-      _pre_or_postLayerNorm
-          ? _shared_mem_ptr +
-                std::max(3 * _batch_dim, _intermediate_size * _hidden_size)
-          : _ff1_inp_ptr;
+      _is_pre_ln ? _shared_mem_ptr + std::max(3 * _batch_dim,
+                                              _intermediate_size * _hidden_size)
+                 : _ff1_inp_ptr;
   zero_mask_grad();
 
   attn_layer_fw(input_ptr, input_mask_ptr, ffn_inp_ptr, attn_buffer);
@@ -318,7 +316,7 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   // buffer += max(3 * _batch_dim,
   //   batch_size * head_num * seq_len * seq_len);
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     _attn_dropout.d_bias_dropout_residual(grad_input_ptr, _grad_attn_ob_ptr,
                                           grad_output_ptr, _batch_tokens,
                                           _hidden_size, _stream);
@@ -370,13 +368,12 @@ void TransformerEncoderLayer<T>::attn_layer_bw(const T *input_ptr,
   launch_transform4d_0213<T>(grad_qkv_4d_ptr, grad_qkv_5d_ptr, _batch_size,
                              _seq_len, _hidden_size, _heads, 3, _stream);
 
-  const T *gemmQKV_inp_ptr =
-      _pre_or_postLayerNorm ? _gemmQKV_inp_ptr : input_ptr;
+  const T *gemmQKV_inp_ptr = _is_pre_ln ? _gemmQKV_inp_ptr : input_ptr;
   _qkv_linear.Backward(_batch_tokens, grad_qkv_4d_ptr, gemmQKV_inp_ptr,
                        _attn_qkvw_ptr, _grad_attn_qkvw_ptr, _grad_attn_qkvb_ptr,
                        _cublasHandle, _stream, grad_input_buf_ptr);
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     if (_enable_quant) {
       launch_d_cmax(_grad_attn_qkvw_ptr, static_cast<T *>(nullptr),
                     _attn_prob_dropout.get_mask(),
@@ -424,7 +421,7 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   T *grad_ff1_out_ptr = buffer;
   // buffer += _batch_size * _seq_len * _intermediate_size;
 
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     _ffn_dropout.d_bias_dropout_residual(grad_inp_ptr, _grad_output_b_ptr,
                                          grad_output_ptr, _batch_tokens,
                                          _hidden_size, _stream);
@@ -466,7 +463,7 @@ void TransformerEncoderLayer<T>::ffn_layer_bw(const T *grad_output_ptr,
   grad_out, grad_residual, output, gamma, betta,
   */
   const T *add_res_ptr = _ff1_inp_ptr;
-  if (_pre_or_postLayerNorm) {
+  if (_is_pre_ln) {
     if (_enable_quant) {
       launch_d_cmax(_grad_inter_w_ptr, static_cast<T *>(nullptr),
                     _ffn_activation_dropout.get_mask(),
@@ -554,3 +551,5 @@ int8_t *TransformerEncoderLayer<T>::_shared_quant_mem_ptr = nullptr;
 
 template class TransformerEncoderLayer<float>;
 template class TransformerEncoderLayer<__half>;
+}  // namespace cuda
+}  // namespace lightseq

@@ -24,8 +24,10 @@ class LyrNormalizeLayer : public Layer {
         _max_batch_tokens(max_batch_tokens),
         _lyr_norm_op(
             new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
-    _norm_gamma = new Variable("layer_norm_gamma");
-    _norm_betta = new Variable("layer_norm_betta");
+    _norm_gamma =
+        new Variable("layer_norm_gamma", g_dtype<T1>(), g_dtype<T2>());
+    _norm_betta =
+        new Variable("layer_norm_betta", g_dtype<T1>(), g_dtype<T2>());
 
     this->_context_ptr->exit_layer();  // necessary
   }
@@ -41,21 +43,23 @@ class LyrNormalizeLayer : public Layer {
     return out;
   }
 
-  void before_forward(int batch_token_num) {
-    _lyr_norm_op->before_forward(batch_token_num);
+  void before_forward(int batch_size, int seq_len) {
+    _lyr_norm_op->before_forward(batch_size, seq_len);
   }
 
   void before_backward() {}
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr) {
     int offset = 0;
 
     _norm_gamma->set_value((char*)(para_ptr + offset));
     _norm_gamma->set_grad((char*)(grad_ptr + offset));
+    _norm_gamma->set_shape({size_t(_hidden_size)});
     offset += _hidden_size;
 
     _norm_betta->set_value((char*)(para_ptr + offset));
     _norm_betta->set_grad((char*)(grad_ptr + offset));
+    _norm_betta->set_shape({size_t(_hidden_size)});
     offset += _hidden_size;
 
     return offset;
@@ -64,13 +68,17 @@ class LyrNormalizeLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset) {
     int size = 0;
     _norm_gamma->set_value((char*)para_vec[offset + size]), size++;
+    _norm_gamma->set_shape({size_t(_hidden_size)});
     _norm_betta->set_value((char*)para_vec[offset + size]), size++;
+    _norm_betta->set_shape({size_t(_hidden_size)});
     return size;
   }
 };
 
-template class LyrNormalizeLayer<__half, __half>;
 template class LyrNormalizeLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class LyrNormalizeLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using LyrNormalizeLayerPtr = std::shared_ptr<LyrNormalizeLayer<T1, T2>>;

@@ -5,18 +5,15 @@ namespace lightseq {
 template <typename T1, typename T2>
 Variable* BiasDropoutResOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                                Variable* residual) {
-  Variable* result =
-      new Variable("BiasDropoutResOp_out", _max_ele_num * sizeof(T1),
-                   _max_ele_num * sizeof(T2));
+  _result = new Variable("BiasDropoutResOp_out", _max_rows * _max_cols,
+                         g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, bias, residual});
-  this->set_children({result});
-  return result;
+  this->set_children({_result});
+  return _result;
 }
 
 template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::forward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T1* input = (T1*)parent(0)->value();
   T1* bias = (T1*)parent(1)->value();
   T1* residual = (T1*)parent(2)->value();
@@ -27,14 +24,15 @@ void BiasDropoutResOp<T1, T2>::forward() {
     return;
   }
 
-  launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
-                                 _rows * _cols, _cols, RATIO(), stream);
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
+  cuda::launch_ls_dropout_res_bias<T1>(output, input, mask_ptr, bias, residual,
+                                       _rows * _cols, _cols, RATIO(), stream);
+#endif
 }
 
 template <typename T1, typename T2>
 void BiasDropoutResOp<T1, T2>::backward() {
-  cudaStream_t stream = _context_ptr->get_stream();
-
   T2* input_grad = (T2*)parent(0)->grad();
   T2* bias_grad = (T2*)parent(1)->grad();
   T2* residual_grad = (T2*)parent(2)->grad();
@@ -49,20 +47,24 @@ void BiasDropoutResOp<T1, T2>::backward() {
     return;
   }
 
-  launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad, mask_ptr,
-                                 _rows, _cols, RATIO(), stream);
+#ifdef LIGHTSEQ_cuda
+  cudaStream_t stream = _context_ptr->get_stream();
+  cuda::launch_ls_dropout_bias_bwd<T2>(input_grad, bias_grad, output_grad,
+                                       mask_ptr, _rows, _cols, RATIO(), stream);
 
   if (is_res_cover) {  // cover
     CHECK_GPU_ERROR(cudaMemcpyAsync((void*)residual_grad, (void*)output_grad,
                                     _cols * _rows * sizeof(T2),
                                     cudaMemcpyDefault, stream));
   } else {
-    launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
-                      _cols, stream);
+    cuda::launch_fused_add2(residual_grad, output_grad, residual_grad, _rows, 1,
+                            _cols, stream);
   }
+#endif
 }
 
 template class BiasDropoutResOp<float, float>;
+#ifdef LIGHTSEQ_cuda
 template class BiasDropoutResOp<__half, __half>;
-
+#endif
 }  // namespace lightseq

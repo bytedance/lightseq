@@ -26,26 +26,26 @@ class FeedForwardLayer : public Layer {
   Variable* _ffn_nb;
 
   // shape related
-  int _batch_dim;
-  int _batch_heads;
-  int _batch_tokens;
+  size_t _batch_dim;
+  size_t _batch_heads;
+  size_t _batch_tokens;
 
-  int _layer_id;
-  int _max_batch_tokens;
-  int _max_seq_len;
-  int _hidden_size;
-  int _heads;
-  int _intermediate_size;
-  bool _pre_or_postLayerNorm;
+  size_t _layer_id;
+  size_t _max_batch_tokens;
+  size_t _max_seq_len;
+  size_t _hidden_size;
+  size_t _heads;
+  size_t _intermediate_size;
+
+  bool _is_pre_ln;
   std::string _activation_fn;
-  bool _is_post_ln;
 
  public:
-  FeedForwardLayer(int layer_id, int max_batch_tokens, int max_seq_len,
-                   int hidden_size, int num_heads, int intermediate_size,
-                   float activation_dropout_ratio,
-                   float hidden_output_dropout_ratio, bool pre_or_postLayerNorm,
-                   std::string activation_fn, bool is_post_ln = false);
+  FeedForwardLayer(size_t layer_id, size_t max_batch_tokens, size_t max_seq_len,
+                   size_t hidden_size, size_t num_heads,
+                   size_t intermediate_size, float activation_dropout_ratio,
+                   float hidden_output_dropout_ratio, bool is_pre_ln,
+                   std::string activation_fn);
 
   virtual ~FeedForwardLayer() {}
 
@@ -55,13 +55,15 @@ class FeedForwardLayer : public Layer {
 
   void before_backward();
 
-  int load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
+  size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);
 
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class FeedForwardLayer<__half, __half>;
 template class FeedForwardLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class FeedForwardLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using FeedForwardLayerPtr = std::shared_ptr<FeedForwardLayer<T1, T2>>;

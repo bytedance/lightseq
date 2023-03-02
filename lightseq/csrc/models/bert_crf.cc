@@ -1,7 +1,6 @@
 #include "bert_crf.h"
 
 namespace lightseq {
-namespace cuda {
 
 BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"encoder_output"}),
@@ -20,7 +19,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
   tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
-  inp_tokens = new Variable("inp_tokens");
+  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -40,8 +39,8 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
         new TransformerEncoderLayer<OpType_, OpType_>(
             idx, max_batch_tokens, tw_._max_step, tw_._hidden_size,
             tw_._head_num, tw_._inner_size, attn_prob_dropout_ratio,
-            activation_dropout_ratio, hidden_dropout_ratio, true,
-            tw_._use_gelu ? "gelu" : "relu", false, tw_._is_post_ln));
+            activation_dropout_ratio, hidden_dropout_ratio, !tw_._is_post_ln,
+            tw_._use_gelu ? "gelu" : "relu", false));
     enc_wei_offset +=
         enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
     enc_layer_vec.push_back(enc_layer_);
@@ -84,7 +83,7 @@ void BertCrf::before_forward(int batch_size, int seq_len) {
     iter->before_forward(batch_size, seq_len);
   }
 
-  lyr_norm_layer->before_forward(batch_size * seq_len);
+  lyr_norm_layer->before_forward(batch_size, seq_len);
 
   linear_layer->before_forward(batch_size, seq_len);
   crf_layer->before_forward(batch_size, seq_len, false, false);
@@ -104,7 +103,7 @@ void BertCrf::Infer() {
   linear_layer->forward();
   crf_layer->forward();
 
-  CHECK_GPU_ERROR(cudaStreamSynchronize(_context_ptr->get_stream()));
+  _context_ptr->synchronize();
 
   set_output_shape(0, {batch_size, seq_len});
 }
@@ -188,5 +187,4 @@ DataType BertCrf::get_output_dtype(int index) {
   }
 }
 
-}  // namespace cuda
 }  // namespace lightseq

@@ -18,16 +18,17 @@ class LaunchDecEmbLayer : public Layer {
   Variable* _lang_id;
 
  public:
-  LaunchDecEmbLayer(int max_batch_tokens, int beam_size, int hidden_size,
-                    int trg_vocab_size, int max_step, int multilg_type)
+  LaunchDecEmbLayer(size_t max_batch_tokens, size_t beam_size,
+                    size_t hidden_size, size_t trg_vocab_size, size_t max_step,
+                    int multilg_type)
       : Layer("LaunchDecEmbLayer"),
         _launch_dec_op(new LaunchDecEmbOp<T>(max_batch_tokens, beam_size,
                                              hidden_size, trg_vocab_size,
                                              max_step, multilg_type)) {
-    _token_emb = new Variable("token_emb");
-    _pos_emb = new Variable("pos_emb");
-    _lang_emb = new Variable("lang_emb");
-    _lang_id = new Variable("lang_id");
+    _token_emb = new Variable("token_emb", g_dtype<T>());
+    _pos_emb = new Variable("pos_emb", g_dtype<T>());
+    _lang_emb = new Variable("lang_emb", g_dtype<T>());
+    _lang_id = new Variable("lang_id", g_dtype<T>());
 
     this->_context_ptr->exit_layer();  // necessary
   }
@@ -44,11 +45,9 @@ class LaunchDecEmbLayer : public Layer {
     return out;
   }
 
-  void before_forward(int batch_size, int cur_step) {
+  void before_forward(size_t batch_size, int cur_step) {
     _launch_dec_op->before_forward(batch_size, cur_step);
   }
-
-  void before_backward() {}
 
   int load_params(const std::vector<const T*>& para_vec, int offset) {
     _token_emb->set_value((char*)para_vec[offset]);
@@ -58,8 +57,10 @@ class LaunchDecEmbLayer : public Layer {
   }
 };
 
-template class LaunchDecEmbLayer<__half>;
 template class LaunchDecEmbLayer<float>;
+#ifdef LIGHTSEQ_cuda
+template class LaunchDecEmbLayer<__half>;
+#endif
 
 template <class T>
 using LaunchDecEmbLayerPtr = std::shared_ptr<LaunchDecEmbLayer<T>>;
