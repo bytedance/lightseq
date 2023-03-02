@@ -9,6 +9,7 @@ set(operator_files
     launch_dec_emb_op.cpp
     launch_enc_emb.cpp
     layer_normalize.cpp
+    split_head_op.cpp
     linear.cpp
     softmax.cpp
     strided_batch_gemm.cpp

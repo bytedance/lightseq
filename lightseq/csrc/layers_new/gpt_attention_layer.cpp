@@ -9,12 +9,10 @@ for inference,
 max_batch_tokens = max(batch_size * beam_size * seq_len)
 */
 template <typename T1, typename T2>
-GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
-                                             int max_seq_len, int hidden_size,
-                                             int num_heads, int beam_size,
-                                             float attn_prob_dropout_ratio,
-                                             float hidden_output_dropout_ratio,
-                                             bool is_pre_ln)
+GptAttentionLayer<T1, T2>::GptAttentionLayer(
+    int max_batch_tokens, int max_seq_len, int hidden_size, int num_heads,
+    int beam_size, float attn_prob_dropout_ratio,
+    float hidden_output_dropout_ratio, bool is_pre_ln)
     : Layer("GptAttentionLayer"),
       _max_batch_tokens(max_batch_tokens),
       _max_seq_len(max_seq_len),
@@ -26,28 +24,31 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_ln = new LayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false);
   _qkv_linear =
       new LinearOp<T1, T2>(max_batch_tokens, 3 * hidden_size, hidden_size);
-  _split_head = new SplitHeadOp<T1, T2>(max_batch_tokens, num_heads,
-                                        hidden_size, 3, max_seq_len);
+  _split_head = new SplitHeadWithBeamOp<T1, T2>(max_batch_tokens, num_heads,
+                                                hidden_size, 3, max_seq_len);
   _sdpa = new SDPALayer<T1, T2>(max_batch_tokens, max_seq_len, _head_dim,
                                 num_heads, 0.f);
   _transform_0213 = new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size);
   _attn_out_linear =
       new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size);
   _attn_dropout = new BiasDropoutResOp<T1, T2>(hidden_output_dropout_ratio,
-                                               max_batch_tokens * hidden_size);
+                                               max_batch_tokens, hidden_size);
   // parameters init
-  _attn_qkvw = new Variable("_attn_qkvw");
-  _attn_qkvb = new Variable("_attn_qkvb");
+  _attn_qkvw = new Variable("_attn_qkvw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_qkvb = new Variable("_attn_qkvb", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_ow = new Variable("_attn_ow");
-  _attn_ob = new Variable("_attn_ob");
+  _attn_ow = new Variable("_attn_ow", g_dtype<T1>(), g_dtype<T2>());
+  _attn_ob = new Variable("_attn_ob", g_dtype<T1>(), g_dtype<T2>());
 
-  _attn_nw = new Variable("_attn_nw");
-  _attn_nb = new Variable("_attn_nb");
+  _attn_nw = new Variable("_attn_nw", g_dtype<T1>(), g_dtype<T2>());
+  _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   int cache_size = max_batch_tokens * hidden_size;
-  Variable* _cache_k = new Variable("cache_k", cache_size * sizeof(T1));
-  Variable* _cache_v = new Variable("cache_v", cache_size * sizeof(T1));
+  Variable* _cache_k =
+      new Variable("cache_k", cache_size, g_dtype<T1>(), g_dtype<T2>());
+
+  Variable* _cache_v =
+      new Variable("cache_v", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -113,7 +114,7 @@ void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
   int attn_from_len = query_len;
   int attn_to_len = (steps <= 0) ? query_len : steps + 1;
 
-  _attn_ln->before_forward(batch_tokens);
+  _attn_ln->before_forward(batch_size, query_len);
 
   _qkv_linear->before_forward(batch_tokens);
 
