@@ -63,8 +63,10 @@ class GptAttentionLayer : public Layer {
   int load_params(const std::vector<const T1*>& para_vec, int offset);
 };
 
-template class GptAttentionLayer<__half, __half>;
 template class GptAttentionLayer<float, float>;
+#ifdef LIGHTSEQ_cuda
+template class GptAttentionLayer<__half, __half>;
+#endif
 
 template <class T1, class T2>
 using GptAttentionLayerPtr = std::shared_ptr<GptAttentionLayer<T1, T2>>;

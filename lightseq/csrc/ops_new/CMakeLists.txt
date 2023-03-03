@@ -1,5 +1,6 @@
 set(operator_files
     beam_search_topk.cu
+    sampling.cc.cu
     bias_act_dropout.cpp
     bias_add_transform_20314.cpp
     bias_dropout_residual.cpp
@@ -8,7 +9,9 @@ set(operator_files
     dropout.cpp
     launch_dec_emb_op.cpp
     launch_enc_emb.cpp
+    launch_gpt_emb.cpp
     layer_normalize.cpp
+    split_head_op.cpp
     linear.cpp
     softmax.cpp
     strided_batch_gemm.cpp

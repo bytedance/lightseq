@@ -64,8 +64,13 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
                                           Variable* cache_v) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-  Variable* qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
+  Variable* qkv_out = nullptr;
+  if (_is_pre_ln) {
+    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
+  } else {
+    qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
+  }
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
@@ -73,10 +78,8 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   k_out = new Variable("k_out", transform_20314_out);
   v_out = new Variable("v_out", transform_20314_out);
 
-  Variable* cache_k_out;
-  Variable* cache_v_out;
-  cache_k_out = (*_concat_cache_k)(k_out, cache_k);
-  cache_v_out = (*_concat_cache_v)(v_out, cache_v);
+  Variable* cache_k_out = (*_concat_cache_k)(k_out, cache_k);
+  Variable* cache_v_out = (*_concat_cache_v)(v_out, cache_v);
 
   Variable* attn_score = (*_attn_scores)(cache_k_out, q_out);
 
@@ -95,17 +98,16 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
-    Variable* attn_dropout_residual =
-        (*_attn_dropout)(attn_linear, _attn_ob, inp);
     set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
     return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
-  set_outputs({attn_dropout_residual, cache_k_out, cache_v_out});
-  return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
+  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  set_outputs({attn_ln_out, cache_k_out, cache_v_out});
+  return std::make_tuple(attn_ln_out, cache_k_out, cache_v_out);
 }
 
 template <typename T1, typename T2>

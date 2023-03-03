@@ -16,6 +16,7 @@
 
 #include "kernels.h"
 #include "embKernels.h"
+#include "gptKernels.h"
 #include "transformerKernels.h"
 #include "cuda_util.h"
 #include "cublas_wrappers.h"
