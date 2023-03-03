@@ -16,17 +16,15 @@ class SampleLayer : public Layer {
   size_t _trg_vocab_size;
 
  public:
-  SampleLayer(int nshared_dec_layer, int max_batch_size, int max_step,
-              int trg_vocab_size, int hidden_size, int max_thread_per_block,
-              int beam_size, int diverse_lambda, int dim_per_head, int end_id,
-              int head_num, float length_penalty);  // for beam_search
+  SampleLayer(int max_batch_size, int max_step, int trg_vocab_size,
+              int hidden_size, int max_thread_per_block, int beam_size,
+              int diverse_lambda, int dim_per_head, int end_id, int head_num,
+              float length_penalty);  // for beam_search
 
   virtual ~SampleLayer() {}
 
   std::tuple<Variable*, Variable*> operator()(Variable* logits,
-                                              Variable* alive_seq,
-                                              Variable* caches_k,
-                                              Variable* caches_v);
+                                              Variable* alive_seq);
 
   void before_forward(int batch_size, int cur_step);
 

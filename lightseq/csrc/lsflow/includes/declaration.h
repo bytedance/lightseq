@@ -69,4 +69,6 @@ const int MB_SIZE = 1024 * 1024;
 
 #define CHECK_DTYPE(dtype, base_type) (dtype == g_dtype<base_type>())
 
+enum class GenerateMethod { Topk, Topp, BeamSearch };
+
 }  // namespace lightseq
