@@ -6,7 +6,6 @@
 
 namespace lightseq {
 
-
 template <class T>
 class GeneratorLayer : public Layer {
  private:
@@ -24,10 +23,11 @@ class GeneratorLayer : public Layer {
  public:
   // this construct method is for beam_search generate method.
   GeneratorLayer(GenerateMethod gm, int max_batch_size, int max_step,
-              int trg_vocab_size, int hidden_size, int max_thread_per_block,
-              int beam_size = 0, int diverse_lambda = 0, int dim_per_head = 0, int end_id = 0,
-              int head_num = 0, float length_penalty = 0., int topk = 0, float topp = 0, bool has_logits_bias = false);
-
+                 int trg_vocab_size, int hidden_size, int max_thread_per_block,
+                 int beam_size = 0, int diverse_lambda = 0,
+                 int dim_per_head = 0, int end_id = 0, int head_num = 0,
+                 float length_penalty = 0., int topk = 0, float topp = 0,
+                 bool has_logits_bias = false);
 
   virtual ~GeneratorLayer() {}
 
@@ -39,7 +39,6 @@ class GeneratorLayer : public Layer {
   int load_params(const std::vector<const T*>& para_vec, int offset);
 
   bool is_stop() { return _beam_search->is_stop(); }
-
 };
 
 template class GeneratorLayer<float>;

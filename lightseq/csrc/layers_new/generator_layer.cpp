@@ -3,34 +3,38 @@
 namespace lightseq {
 
 template <typename T>
-GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int max_batch_size, int max_step,
-              int trg_vocab_size, int hidden_size, int max_thread_per_block,
-              int beam_size, int diverse_lambda, int dim_per_head, int end_id,
-              int head_num, float length_penalty, int topk, float topp, bool has_logits_bias)
+GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int max_batch_size,
+                                  int max_step, int trg_vocab_size,
+                                  int hidden_size, int max_thread_per_block,
+                                  int beam_size, int diverse_lambda,
+                                  int dim_per_head, int end_id, int head_num,
+                                  float length_penalty, int topk, float topp,
+                                  bool has_logits_bias)
     : Layer("GeneratorLayer"),
       _generate_method(gm),
       _trg_vocab_size(trg_vocab_size),
       _has_logits_bias(has_logits_bias) {
   if (_generate_method == GenerateMethod::BeamSearch) {
     _beam_search = new BeamSearchTopOp<T>(
-        max_batch_size, max_step, trg_vocab_size,
-        hidden_size, max_thread_per_block, beam_size, diverse_lambda,
-        dim_per_head, end_id, head_num, length_penalty);
-  }
-  else {
-    _sampling = new SamplingOp<T>(
-      gm, max_batch_size, max_step, max_thread_per_block, trg_vocab_size, topk, topp, end_id
-    );
+        max_batch_size, max_step, trg_vocab_size, hidden_size,
+        max_thread_per_block, beam_size, diverse_lambda, dim_per_head, end_id,
+        head_num, length_penalty);
+  } else {
+    _sampling =
+        new SamplingOp<T>(gm, max_batch_size, max_step, max_thread_per_block,
+                          trg_vocab_size, topk, topp, end_id);
   }
 
   _logit_bias = new Variable("logits_bias", g_dtype<T>());
 
   if (!has_logits_bias) {
     auto allocator_ptr = _context_ptr->allocator();
-    char* tmp_logit_bias_ptr = allocator_ptr->malloc_mem(trg_vocab_size * sizeof(T));
+    char* tmp_logit_bias_ptr =
+        allocator_ptr->malloc_mem(trg_vocab_size * sizeof(T));
 #ifdef LIGHTSEQ_cuda
-    CHECK_GPU_ERROR(cudaMemset(tmp_logit_bias_ptr, T(0.), trg_vocab_size * sizeof(T)));
-#else 
+    CHECK_GPU_ERROR(
+        cudaMemset(tmp_logit_bias_ptr, T(0.), trg_vocab_size * sizeof(T)));
+#else
     memset(tmp_logit_bias_ptr, T(0.), trg_vocab_size * sizeof(T));
 #endif
     _logit_bias->set_value(tmp_logit_bias_ptr);
@@ -47,16 +51,15 @@ std::tuple<Variable*, Variable*> GeneratorLayer<T>::operator()(
   Variable* alive_seq_out = nullptr;
   Variable* seq_score = nullptr;
 
-  if(GenerateMethod::BeamSearch == _generate_method) {
-    std::tuple<Variable*, Variable*> beam_search_outs = (*_beam_search)(
-        logits, _logit_bias, alive_seq);
+  if (GenerateMethod::BeamSearch == _generate_method) {
+    std::tuple<Variable*, Variable*> beam_search_outs =
+        (*_beam_search)(logits, _logit_bias, alive_seq);
     alive_seq_out = std::get<0>(beam_search_outs);
     seq_score = std::get<1>(beam_search_outs);
-  }
-  else {
+  } else {
     alive_seq_out = (*_sampling)(logits, _logit_bias, alive_seq);
   }
-  
+
   set_outputs({alive_seq_out, seq_score});
   return std::make_tuple(alive_seq_out, seq_score);
 }
@@ -68,7 +71,7 @@ void GeneratorLayer<T>::before_forward(int batch_size, int cur_step) {
 
 template <typename T>
 int GeneratorLayer<T>::load_params(const std::vector<const T*>& para_vec,
-                                int offset) {  // for inference
+                                   int offset) {  // for inference
   int size = 0;
 
   _logit_bias->set_value((char*)para_vec[offset + size]), size++;
