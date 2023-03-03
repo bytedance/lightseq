@@ -6,7 +6,7 @@ template <typename T>
 GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int max_batch_size,
                                   int max_step, int trg_vocab_size,
                                   int hidden_size, int max_thread_per_block,
-                                  int beam_size, int diverse_lambda,
+                                  int beam_size, float diverse_lambda,
                                   int dim_per_head, int end_id, int head_num,
                                   float length_penalty, int topk, float topp,
                                   bool has_logits_bias)
@@ -78,6 +78,19 @@ int GeneratorLayer<T>::load_params(const std::vector<const T*>& para_vec,
   _logit_bias->set_shape({_trg_vocab_size});
 
   return size;
+}
+
+template<typename T>
+bool GeneratorLayer<T>::is_stop() {
+  switch(_generate_method) {
+    case GenerateMethod::BeamSearch:
+      return _beam_search->is_stop(); 
+    case GenerateMethod::Topk:
+      return _sampling->is_stop();
+    case GenerateMethod::Topp:
+      return _sampling->is_stop();
+  }
+  return true;
 }
 
 }  // namespace lightseq

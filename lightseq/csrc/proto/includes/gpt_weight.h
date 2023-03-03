@@ -11,7 +11,6 @@ Load the model weights which stored in custom proto file into GPU memory.
 template <typename T>
 class GptWeight {
  private:
-
   T float2required(float value);
 
   void proto_get_model_config(const Gpt &gpt);
@@ -63,6 +62,11 @@ class GptWeight {
   int _topk = 4;
   float _topp = 0.75;
   int _eos_id;
+
+  int _beam_size = 0;
+  float _length_penalty = 0.;
+  float _diverse_lambda = 0.;
+  bool use_gelu = true;
 };
 
 }  // namespace lightseq

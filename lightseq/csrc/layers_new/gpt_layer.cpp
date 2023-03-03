@@ -7,18 +7,18 @@ GptLayer<T1, T2>::GptLayer(int layer_id, int max_batch_tokens, int max_seq_len,
                            int hidden_size, int num_heads,
                            int intermediate_size, float attn_prob_dropout_ratio,
                            float activation_dropout_ratio,
-                           float hidden_output_dropout_ratio, bool is_pre_ln,
+                           float hidden_output_dropout_ratio,
                            std::string activation_fn, bool mask_future_tokens,
                            int beam_size)
     : Layer("GptLayer"), _layer_id(layer_id) {
   _attn_layer.reset(new GptAttentionLayer<T1, T2>(
       max_batch_tokens, max_seq_len, hidden_size, num_heads, beam_size,
-      attn_prob_dropout_ratio, hidden_output_dropout_ratio, is_pre_ln));
+      attn_prob_dropout_ratio, hidden_output_dropout_ratio, true));
 
   _ffn_layer.reset(new FeedForwardLayer<T1, T2>(
       layer_id, max_batch_tokens, max_seq_len, hidden_size, num_heads,
       intermediate_size, activation_dropout_ratio, hidden_output_dropout_ratio,
-      is_pre_ln, activation_fn));
+      true, activation_fn));
 
   this->_context_ptr->exit_layer();  // necessary
 }

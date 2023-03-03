@@ -63,6 +63,10 @@ void SamplingOp<T>::forward() {
         inp_tokens_ptr, out_tokens_ptr, _trg_vocab_size, _topp, _p_d_unfinished,
         _p_d_curandstate, _eos_id);
   }
+
+  CHECK_GPU_ERROR(cudaMemcpyAsync(&_h_unfinished, _p_d_unfinished, sizeof(int),
+                                  cudaMemcpyDeviceToHost, _stream));
+  CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 #endif
 }
 

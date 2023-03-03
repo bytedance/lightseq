@@ -59,15 +59,10 @@ message GptModelConf {
   int32 eos_id = 6;
   int32 extra_decode_length = 7;
 
-
-  // int32 beam_size = 2;  // beam size of beam search
-  // float length_penalty = 4;  // length penalty of beam search
-  // float diverse_lambda = 7; // diverse beam search lambda
-  // bool use_gelu = 14; // use gelu for activation otherwise relu
-  // Multilingual model type, 0 for bilingual
-  // 1 for token level multilingual,
-  // 2 for sentence level multilingual
-  // int32 multilg_type = 15;
+  int32 beam_size = 8;  // beam size of beam search
+  float length_penalty = 9;  // length penalty of beam search
+  float diverse_lambda = 10; // diverse beam search lambda
+  bool use_gelu = 11; // use gelu for activation otherwise relu
 }
 
 message Gpt {

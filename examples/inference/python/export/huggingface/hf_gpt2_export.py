@@ -154,7 +154,7 @@ def extract_gpt_weights(
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.generation_method not in ["topk", "topp", "ppl"]:
+    if args.generation_method not in ["topk", "topp", "ppl", "beam_search"]:
         args.generation_method = "topk"
     output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"

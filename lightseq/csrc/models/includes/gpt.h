@@ -23,17 +23,15 @@ class Gpt : public LSModel {
   std::shared_ptr<Context> _context_ptr;
 
   LaunchGptEmbLayerPtr<OpType_> _launch_gpt_emb_layer;
-  std::vector<GptLayer<OpType_, OpType_> > _gpt_layers_vec;
+  std::vector<GptLayerPtr<OpType_, OpType_> > _gpt_layers_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> _lyr_norm_layer;
+  linear_layerPtr<OpType_> _linear_layer;
   GeneratorLayerPtr<OpType_> _generator_layer;
 
   ContextPtr context_ptr;
 
-  Variable* inp_tokens;  // need to allocate
-  Variable* token_emb;
-  Variable* pos_emb;
-
-  Variable* Gpt_out;
+  Variable* _inp_tokens;  // need to allocate
+  Variable* _gpt_out;
 
   int _max_batch_size;
   GenerateMethod _generate_method;

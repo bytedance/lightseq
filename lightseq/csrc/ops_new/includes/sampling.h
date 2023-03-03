@@ -22,6 +22,8 @@ class SamplingOp : public Operator {
   int _seq_len;
   int _logits_seq_len;
 
+  int _h_unfinished;
+
 #ifdef LIGHTSEQ_cuda
   curandState* _p_d_curandstate;  //[batch_size]
 #endif
@@ -46,6 +48,8 @@ class SamplingOp : public Operator {
   void forward() override;
 
   void backward() override {}
+
+  bool is_stop() { return _h_unfinished == 0; }
 };
 
 }  // namespace lightseq

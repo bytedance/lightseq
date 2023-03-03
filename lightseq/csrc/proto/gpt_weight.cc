@@ -29,7 +29,7 @@ template <>
 __half GptWeight<__half>::float2required(float value) {
   return __float2half_rn(value);
 }
-#endif 
+#endif
 
 /**
 Read model config stored in custom proto file.
@@ -73,8 +73,7 @@ void GptWeight<T>::proto_get_model_config(const Gpt &gpt) {
 Load the weights of embedding layer into GPU memory.
 */
 template <typename T>
-std::string GptWeight<T>::proto_parse_emb_wei(
-    const GptEmbeddingLayer &layer) {
+std::string GptWeight<T>::proto_parse_emb_wei(const GptEmbeddingLayer &layer) {
   std::vector<int> offset;
   std::vector<float> value;
   int idx = 0;
@@ -520,7 +519,7 @@ std::string GptWeight<T>::initializing(std::string weight_path) {
 }
 #ifdef LIGHTSEQ_cuda
 template class GptWeight<__half>;
-#endif 
+#endif
 template class GptWeight<float>;
 
 }  // namespace lightseq
