@@ -66,7 +66,7 @@ class GptWeight {
   int _beam_size = 0;
   float _length_penalty = 0.;
   float _diverse_lambda = 0.;
-  bool use_gelu = true;
+  bool _use_gelu = true;
 };
 
 }  // namespace lightseq

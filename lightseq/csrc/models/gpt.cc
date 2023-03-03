@@ -22,7 +22,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   _context_ptr->regress_begin();
 
   /* --- step.3 initial input Variable node --- */
-  inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
+  _inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -30,7 +30,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   // initial LaunchEncEmb layer
   _launch_gpt_emb_layer.reset(new LaunchGptEmbLayer<OpType_>(
       max_batch_tokens, tw_._padding_id, tw_._hidden_size));
-  launch_enc_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
+  _launch_gpt_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
 
   // initial TransformerEncoder layers
   float attn_prob_dropout_ratio = 0.0;
@@ -54,44 +54,48 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 
   // intial Project hidden states to vocab logits
   _linear_layer.reset(new LinearLayer<OpType_, OpType_>(
-      max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
+      max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._src_vocab_size,
       MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose, 1.f));
-  _linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
+  _linear_layer->load_params(tw_.get_src_emb_wei(), 0);
 
   _generator_layer.reset(
       new GeneratorLayer<OpType_>(
           _generate_method, max_batch_tokens, tw_._max_step,
-          tw_._trg_vocab_size, tw_._hidden_size, 1024, tw_._beam_size,
+          tw_._src_vocab_size, tw_._hidden_size, 1024, tw_._beam_size,
           tw_._diverse_lambda, tw_._dim_per_head, tw_._eos_id, tw_._head_num,
-          tw_._length_penalty, tw_._topk, tw_.topp, false));
+          tw_._length_penalty, tw_._topk, tw_._topp, false));
 
   _context_ptr->regress_end();
   printf("Finish initialize layers and assign weights!\n");
 
   /* --- step.5 construct network --- */
   std::tuple<Variable *, Variable *> gpt_emb_outs =
-      (*_launch_gpt_emb_layer)(inp_tokens);
+      (*_launch_gpt_emb_layer)(_inp_tokens);
   Variable *gpt_emb = std::get<0>(gpt_emb_outs);
   for (auto iter : _gpt_layers_vec) {
     gpt_emb = (*iter)(gpt_emb);
   }
   gpt_emb = (*_lyr_norm_layer)(gpt_emb);
   Variable* logits_prob = (*_linear_layer)(gpt_emb);
-  _gpt_out = (*_generator_layer)(logits_prob, inp_tokens);
+  
+  std::tuple<Variable*, Variable*> gen_outs = (*_generator_layer)(logits_prob, _inp_tokens);
+  _out_tokens = std::get<0>(gen_outs);
+  _out_scores = std::get<1>(gen_outs);
+
   printf("Finish construct network!\n");
 }
 
 Gpt::~Gpt() {}
 
 void Gpt::before_forward(int batch_size, int seq_len, int steps) {
-  _launch_gpt_emb_layer->before_forward(batch_size, seq_len);
+  _launch_gpt_emb_layer->before_forward(batch_size, seq_len, steps);
 
   for (auto iter : _gpt_layers_vec) {
     iter->before_forward(batch_size, seq_len, steps);
   }
   _lyr_norm_layer->before_forward(batch_size, seq_len + steps);
   _linear_layer->before_forward(batch_size, seq_len + steps);
-  _generator_layer->before_forward(batch_size, seq_len, steps);
+  _generator_layer->before_forward(batch_size, steps);
 }
 
 void Gpt::Infer() {
@@ -103,8 +107,8 @@ void Gpt::Infer() {
   while(true){
     before_forward(batch_size, seq_len, steps);
 
-    launch_enc_emb_layer->forward();
-    for (auto iter : enc_layer_vec) {
+    _launch_gpt_emb_layer->forward();
+    for (auto iter : _gpt_layers_vec) {
       iter->forward();
     }
     _lyr_norm_layer->forward();
@@ -128,7 +132,7 @@ void Gpt::Infer() {
 void Gpt::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
-      inp_tokens->set_value((char *)input_ptr);
+      _inp_tokens->set_value((char *)input_ptr);
       break;
 
     default:
@@ -140,7 +144,7 @@ void Gpt::set_input_ptr(int index, void *input_ptr) {
 void Gpt::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      _gpt_out->set_value((char *)output_ptr);
+      _out_tokens->set_value((char *)output_ptr);
       break;
 
     default:
@@ -152,7 +156,7 @@ void Gpt::set_output_ptr(int index, void *output_ptr) {
 const void *Gpt::get_output_ptr(int index) {
   switch (index) {
     case 0:
-      return static_cast<void *>(_gpt_out->value());
+      return static_cast<void *>(_out_tokens->value());
     default:
       throw std::runtime_error("invalid output index");
       break;

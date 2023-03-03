@@ -31,7 +31,7 @@ class LaunchGptEmbLayer : public Layer {
     set_inputs({inp});
 
     std::tuple<Variable*, Variable*> out =
-        (*_launch_gpt_op)(inp, _token_emb, _pos_emb, _lang_emb, _lang_id);
+        (*_launch_gpt_op)(inp, _token_emb, _pos_emb);
 
     set_outputs({std::get<0>(out), std::get<1>(out)});
     return out;

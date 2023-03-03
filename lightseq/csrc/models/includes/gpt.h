@@ -1,13 +1,13 @@
 #pragma once
 #include "model_base.h"
 
-// #include "Gpt_weight.h"
+#include "model_util.h"
 #include "gpt_weight.h"
-
 #include "launch_gpt_emb_layer.h"
 #include "gpt_layer.h"
 #include "lyr_normalize_layer.h"
 #include "linear_layer.h"
+#include "generator_layer.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;
@@ -25,13 +25,14 @@ class Gpt : public LSModel {
   LaunchGptEmbLayerPtr<OpType_> _launch_gpt_emb_layer;
   std::vector<GptLayerPtr<OpType_, OpType_> > _gpt_layers_vec;
   LyrNormalizeLayerPtr<OpType_, OpType_> _lyr_norm_layer;
-  linear_layerPtr<OpType_> _linear_layer;
+  LinearLayerPtr<OpType_, OpType_> _linear_layer;
   GeneratorLayerPtr<OpType_> _generator_layer;
 
   ContextPtr context_ptr;
 
   Variable* _inp_tokens;  // need to allocate
-  Variable* _gpt_out;
+  Variable* _out_tokens;
+  Variable* _out_scores;
 
   int _max_batch_size;
   GenerateMethod _generate_method;
@@ -40,7 +41,7 @@ class Gpt : public LSModel {
   Gpt(const std::string weight_path, const int max_batch_size);
   ~Gpt();
 
-  void before_forward(int batch_size, int seq_len);
+  void before_forward(int batch_size, int seq_len, int steps);
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

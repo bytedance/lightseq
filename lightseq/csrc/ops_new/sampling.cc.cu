@@ -6,7 +6,8 @@ template <typename T>
 SamplingOp<T>::SamplingOp(GenerateMethod gm, int max_batch_size, int max_step,
                           int max_thread_per_block, int trg_vocab_size,
                           int topk, float topp, int eos_id)
-    : _generate_method(gm),
+    : Operator("SamplingOp"),
+      _generate_method(gm),
       _max_batch_size(max_batch_size),
       _max_step(max_step),
       _max_thread_per_block(max_thread_per_block),
@@ -69,5 +70,10 @@ void SamplingOp<T>::forward() {
   CHECK_GPU_ERROR(cudaStreamSynchronize(_stream));
 #endif
 }
+
+template class SamplingOp<float>;
+#ifdef LIGHTSEQ_cuda
+template class SamplingOp<__half>;
+#endif
 
 }  // namespace lightseq
