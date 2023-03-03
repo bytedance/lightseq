@@ -11,7 +11,6 @@
 #include "linear_layer.h"
 #include "sample_layer.h"
 #include "encdec_kv_layer.h"
-#include "model_util.h"
 
 #ifdef FP16_MODE
 typedef __half OpType_;

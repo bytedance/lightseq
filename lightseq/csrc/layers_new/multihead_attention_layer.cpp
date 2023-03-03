@@ -51,12 +51,9 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                       Variable* inp_mask) {
   set_inputs({inp, inp_mask});
   Variable* qkv_out = nullptr;
-  if (_is_pre_ln) {
-    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-    qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
-  } else {
-    qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
-  }
+  Variable* attn_ln_out = nullptr;
+  attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  qkv_out = (*_qkv_linear)(attn_ln_out, _attn_qkvw);
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314)(qkv_out, _attn_qkvb);
@@ -70,18 +67,17 @@ Variable* MultiheadAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
-
   if (_is_pre_ln) {
+    Variable* attn_dropout_residual =
+        (*_attn_dropout)(attn_linear, _attn_ob, inp);
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
-  Variable* attn_ln_out =
-      (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-  set_outputs({attn_ln_out});
-  return attn_ln_out;
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
+  set_outputs({attn_dropout_residual});
+  return attn_dropout_residual;
 }
 
 template <typename T1, typename T2>

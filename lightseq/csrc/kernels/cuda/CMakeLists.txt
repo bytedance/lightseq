@@ -13,7 +13,6 @@ set(cuda_kernel_files
     embKernels.cc.cu
     # fused_adam_kernel.cu
     general_kernels.cu
-    gptKernels.cc.cu
     normalize_kernels.cu
     softmax_kernels.cu
     softmax_kernels_new.cu
@@ -25,7 +24,7 @@ set(cuda_kernel_files
 list(APPEND CMAKE_MODULE_PATH ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
 add_library(lightseq_kernels STATIC ${cuda_kernel_files})
-target_link_libraries(lightseq_kernels PUBLIC -lcublas)
 target_include_directories(lightseq_kernels PUBLIC ${HDF5_INCLUDE_DIRS})
 target_include_directories(lightseq_kernels INTERFACE includes)
 target_link_libraries(lightseq_kernels PRIVATE ${HDF5_LIBRARIES})
+target_link_libraries(lightseq_kernels PUBLIC -lcublas)

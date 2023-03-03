@@ -3,17 +3,17 @@
 namespace lightseq {
 
 template <typename T>
-SampleLayer<T>::SampleLayer(int max_batch_size, int max_step,
-                            int trg_vocab_size, int hidden_size,
+SampleLayer<T>::SampleLayer(int nshared_dec_layer, int max_batch_size,
+                            int max_step, int trg_vocab_size, int hidden_size,
                             int max_thread_per_block, int beam_size,
                             int diverse_lambda, int dim_per_head, int end_id,
                             int head_num, float length_penalty)
     : Layer("SampleLayer"),
       _trg_vocab_size(trg_vocab_size),
       _beam_search(new BeamSearchTopOp<T>(
-          max_batch_size, max_step, trg_vocab_size, hidden_size,
-          max_thread_per_block, beam_size, diverse_lambda, dim_per_head, end_id,
-          head_num, length_penalty)) {
+          nshared_dec_layer, max_batch_size, max_step, trg_vocab_size,
+          hidden_size, max_thread_per_block, beam_size, diverse_lambda,
+          dim_per_head, end_id, head_num, length_penalty)) {
   _logit_bias = new Variable("logits_bias", g_dtype<T>());
 
   this->_context_ptr->exit_layer();  // necessary
@@ -21,11 +21,12 @@ SampleLayer<T>::SampleLayer(int max_batch_size, int max_step,
 
 template <typename T>
 std::tuple<Variable*, Variable*> SampleLayer<T>::operator()(
-    Variable* logits, Variable* alive_seq) {
-  set_inputs({logits, alive_seq});
+    Variable* logits, Variable* alive_seq, Variable* total_cache_k,
+    Variable* total_cache_v) {
+  set_inputs({logits, alive_seq, total_cache_k, total_cache_v});
 
-  std::tuple<Variable*, Variable*> beam_search_outs =
-      (*_beam_search)(logits, _logit_bias, alive_seq);
+  std::tuple<Variable*, Variable*> beam_search_outs = (*_beam_search)(
+      logits, _logit_bias, alive_seq, total_cache_k, total_cache_v);
   Variable* alive_seq_out = std::get<0>(beam_search_outs);
   Variable* seq_score = std::get<1>(beam_search_outs);
 

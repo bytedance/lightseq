@@ -25,6 +25,7 @@ class BeamSearchTopOp : public Operator {
   size_t _cub_sort_buffer_bytes;
   int _host_can_num_batch;
   size_t _batch_size;
+  size_t _cache_size;
   size_t _hidden_size;
   int _end_id;
   size_t _dim_per_head;
@@ -38,19 +39,24 @@ class BeamSearchTopOp : public Operator {
   Variable* _seq_prob;
   Variable* _seq_score;
   Variable* _alive_seq_out;
+  Variable* _caches_k_buf;
+  Variable* _caches_v_buf;
 
  public:
-  BeamSearchTopOp(size_t max_batch_size, size_t max_step, size_t trg_vocab_size,
-                  size_t hidden_size, size_t max_thread_per_block,
-                  size_t beam_size, size_t diverse_lambda, size_t dim_per_head,
-                  int end_id, size_t head_num, float length_penalty);
+  BeamSearchTopOp(size_t nshared_dec_layer, size_t max_batch_size,
+                  size_t max_step, size_t trg_vocab_size, size_t hidden_size,
+                  size_t max_thread_per_block, size_t beam_size,
+                  size_t diverse_lambda, size_t dim_per_head, int end_id,
+                  size_t head_num, float length_penalty);
 
-  virtual ~BeamSearchTopOp() {}
+  ~BeamSearchTopOp() {}
 
-  // output: out_token_ids, token_scores
+  // output:
   std::tuple<Variable*, Variable*> operator()(Variable* logits,
                                               Variable* logit_bias,
-                                              Variable* alive_seq);
+                                              Variable* alive_seq,
+                                              Variable* caches_k,
+                                              Variable* caches_v);
 
   void forward() override;
 

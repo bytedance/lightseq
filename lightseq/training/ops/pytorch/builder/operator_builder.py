@@ -31,16 +31,11 @@ class OperatorBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda/cuda_util.cu",
             "csrc/kernels/cuda/embedding_kernels.cu",
             "csrc/kernels/cuda/cross_entropy.cu",
-            "csrc/lsflow/allocator.cpp",
             "csrc/lsflow/context.cpp",
             "csrc/lsflow/layer.cpp",
-            "csrc/lsflow/lsflow_util.cpp",
             "csrc/lsflow/manager.cpp",
             "csrc/lsflow/node.cpp",
-            "csrc/lsflow/operator.cpp",
-            "csrc/lsflow/shape.cpp",
             "csrc/lsflow/tensor.cpp",
-            "csrc/lsflow/variable.cpp",
             "csrc/ops_new/split_head_op.cpp",
             "csrc/pybind/pybind_op.cpp",
         ]
@@ -77,5 +72,4 @@ class OperatorBuilder(CUDAOpBuilder):
             "-Wno-reorder",
             "-DONLY_OP",
             "-DPYBIND_INTERFACE",
-            "-DLIGHTSEQ_cuda",
         ]

@@ -88,9 +88,9 @@ Transformer::Transformer(const std::string weight_path,
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
   sample_layer.reset(new SampleLayer<OpType_>(
-      max_batch_size, tw_._max_step, tw_._trg_vocab_size, tw_._hidden_size,
-      1024, tw_._beam_size, tw_._diverse_lambda, tw_._dim_per_head, tw_._end_id,
-      tw_._head_num, tw_._length_penalty));
+      tw_._n_dec_layer, max_batch_size, tw_._max_step, tw_._trg_vocab_size,
+      tw_._hidden_size, 1024, tw_._beam_size, tw_._diverse_lambda,
+      tw_._dim_per_head, tw_._end_id, tw_._head_num, tw_._length_penalty));
   sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
@@ -148,13 +148,13 @@ Transformer::Transformer(const std::string weight_path,
   dec_out = (*linear_layer)(dec_out);
 
   std::tuple<Variable *, Variable *> sample_outs =
-      (*sample_layer)(dec_out, dec_tokens);
+      (*sample_layer)(dec_out, dec_tokens, total_cache_k, total_cache_v);
   _context_ptr->regress_end();
 
   dec_tokens_buf = std::get<0>(sample_outs);
   seq_score = std::get<1>(sample_outs);
-  dec_tokens->malloc_memory(max_batch_tokens * tw_._beam_size);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size);
+  dec_tokens->malloc_memory(max_batch_tokens * tw_._beam_size);
 
   transformer_out = new Variable("transformer_out", g_dtype<int>());
 
