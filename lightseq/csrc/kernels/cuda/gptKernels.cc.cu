@@ -66,7 +66,8 @@ __global__ void ker_gpt_embedding<__half>(const __half* token_emb,
 
   if (tid == padding_id) {
     // for padding id
-    output_h[target_pos * blockDim.x + threadIdx.x] = __float2half2_rn(CUDA_FLOAT_INF_NEG);
+    output_h[target_pos * blockDim.x + threadIdx.x] =
+        __float2half2_rn(CUDA_FLOAT_INF_NEG);
     return;
   }
   if (threadIdx.x == 0) {
@@ -655,7 +656,8 @@ __global__ void ker_topk_sample(const T* logits, int* old_input_ids,
 //         logits, old_input_ids, new_input_ids, real_seq_len, vocab_size,
 //         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
 //   else {
-//     throw std::invalid_argument("topk argument should be in [1,2,4,8,16,32]");
+//     throw std::invalid_argument("topk argument should be in
+//     [1,2,4,8,16,32]");
 //   }
 // }
 

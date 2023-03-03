@@ -4,7 +4,6 @@
 #include <curand_kernel.h>
 #include "kernels.h"
 
-
 namespace lightseq {
 namespace cuda {
 
