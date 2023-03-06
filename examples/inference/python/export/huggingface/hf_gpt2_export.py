@@ -54,6 +54,7 @@ def extract_gpt_weights(
     output_file,
     model_dir,
     generation_method,
+    beam_size=1,
     topk=1,
     topp=0.75,
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
@@ -131,6 +132,7 @@ def extract_gpt_weights(
         data=np.array([ord(c) for c in generation_method]).astype(np.int8),
         dtype="i1",
     )
+    hdf5_file.create_dataset("model_conf/beam_size", data=beam_size, dtype="i4")
     hdf5_file.create_dataset("model_conf/topp", data=topp, dtype="f4")
     hdf5_file.create_dataset("model_conf/topk", data=topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=eos_id, dtype="i4")
@@ -160,6 +162,7 @@ if __name__ == "__main__":
     input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
     topk = 1
     topp = 0.75
+    beam_size = 4
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     eos_id = 50256
     pad_id = 50257
@@ -169,6 +172,7 @@ if __name__ == "__main__":
         output_lightseq_model_name,
         input_huggingface_gpt_model,
         generation_method=args.generation_method,
+        beam_size=beam_size,
         topk=topk,
         topp=topp,
         eos_id=eos_id,

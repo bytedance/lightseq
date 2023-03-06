@@ -16,7 +16,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-  // tw_.print_model_config();
+  tw_.print_model_config();
   _generate_method = get_generate_method(tw_._sampling_method);
 
   _context_ptr->regress_begin();
@@ -38,13 +38,13 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   float hidden_dropout_ratio = 0.0;
   int enc_wei_offset = 0;
   for (int idx = 0; idx < tw_._n_enc_layer; idx++) {
-    GptLayerPtr<OpType_, OpType_> enc_layer_(new GptLayer<OpType_, OpType_>(
+    GptLayerPtr<OpType_, OpType_> gpt_layer(new GptLayer<OpType_, OpType_>(
         idx, max_batch_tokens, tw_._max_step, tw_._hidden_size, tw_._head_num,
         tw_._inner_size, attn_prob_dropout_ratio, activation_dropout_ratio,
         hidden_dropout_ratio, tw_._use_gelu ? "gelu" : "relu", false));
     enc_wei_offset +=
-        enc_layer_->load_params(tw_.get_enc_wei(), enc_wei_offset);
-    _gpt_layers_vec.push_back(enc_layer_);
+        gpt_layer->load_params(tw_.get_enc_wei(), enc_wei_offset);
+    _gpt_layers_vec.push_back(gpt_layer);
   }
 
   // initial LayerNormalize layer
@@ -88,14 +88,15 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 Gpt::~Gpt() {}
 
 void Gpt::before_forward(int batch_size, int seq_len, int steps) {
-  _launch_gpt_emb_layer->before_forward(batch_size, seq_len, steps);
-
-  for (auto iter : _gpt_layers_vec) {
-    iter->before_forward(batch_size, seq_len, steps);
+  if(steps == 0){
+    _launch_gpt_emb_layer->before_forward(batch_size, seq_len, steps);
+    for (auto iter : _gpt_layers_vec) {
+      iter->before_forward(batch_size, seq_len, steps);
+    }
+    _lyr_norm_layer->before_forward(batch_size, seq_len + steps);
+    _linear_layer->before_forward(batch_size, seq_len + steps);
+    _generator_layer->before_forward(batch_size, steps);
   }
-  _lyr_norm_layer->before_forward(batch_size, seq_len + steps);
-  _linear_layer->before_forward(batch_size, seq_len + steps);
-  _generator_layer->before_forward(batch_size, steps);
 }
 
 void Gpt::Infer() {
@@ -121,6 +122,7 @@ void Gpt::Infer() {
     if(_generate_method == GenerateMethod::BeamSearch) {
       // refresh cache
     }
+    // Variable::swap_tensor();
 
     steps ++;
   }
@@ -144,7 +146,8 @@ void Gpt::set_input_ptr(int index, void *input_ptr) {
 void Gpt::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      _out_tokens->set_value((char *)output_ptr);
+      // _out_tokens->set_value((char *)output_ptr);
+      _gpt_out_ptr = (int*)output_ptr;
       break;
 
     default:
@@ -156,7 +159,8 @@ void Gpt::set_output_ptr(int index, void *output_ptr) {
 const void *Gpt::get_output_ptr(int index) {
   switch (index) {
     case 0:
-      return static_cast<void *>(_out_tokens->value());
+      // return static_cast<void *>(_out_tokens->value());
+      return static_cast<void *>(_gpt_out_ptr);
     default:
       throw std::runtime_error("invalid output index");
       break;

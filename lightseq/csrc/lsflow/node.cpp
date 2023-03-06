@@ -26,9 +26,14 @@ Node::~Node() {
 }
 
 void Node::set_parents(std::vector<Node*> parents) {
+  int idx = 0;
   for (Node* iter : parents) {
     _parents.push_back(iter);
-    iter->add_child(this);
+    if(iter == nullptr) 
+      printf("Node %s 's parent #%d is nullptr\n", _name.c_str(), idx);
+    else 
+      iter->add_child(this);
+    idx ++;
   }
   if (node_type() == NodeType::Operator) {
     if (_context_ptr->in_regress()) {

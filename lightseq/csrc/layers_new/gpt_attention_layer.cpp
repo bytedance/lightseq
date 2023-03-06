@@ -46,10 +46,10 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   int cache_size = max_batch_tokens * hidden_size;
-  Variable* _cache_k =
+  _cache_k =
       new Variable("cache_k", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
-  Variable* _cache_v =
+  _cache_v =
       new Variable("cache_v", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
@@ -173,13 +173,19 @@ int GptAttentionLayer<T1, T2>::load_params(
     const std::vector<const T1*>& para_vec, int offset) {  // for inference
   int size = 0;
   _attn_nw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nw->set_shape({_hidden_size});
   _attn_nb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_nb->set_shape({_hidden_size});
 
   _attn_qkvw->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvw->set_shape({_hidden_size, 3 * _hidden_size});
   _attn_qkvb->set_value((char*)para_vec[offset + size]), size++;
+  _attn_qkvb->set_shape({_hidden_size * 3});
 
   _attn_ow->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ow->set_shape({_hidden_size, _hidden_size});
   _attn_ob->set_value((char*)para_vec[offset + size]), size++;
+  _attn_ob->set_shape({_hidden_size});
 
   return size;
 }

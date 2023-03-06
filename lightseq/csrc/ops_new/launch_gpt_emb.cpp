@@ -11,7 +11,7 @@ std::tuple<Variable*, Variable*> LaunchGptEmbOp<T>::operator()(
 
   _result = new Variable("LaunchGptEmbOp_out", _max_batch_tokens * _hidden_dim,
                          g_dtype<T>());
-  _result_seq_len = new Variable("pad_mask", _max_batch_tokens, g_dtype<int>());
+  _result_seq_len = new Variable("result_seq_len", _max_batch_tokens, g_dtype<int>());
   this->set_children({_result, _result_seq_len});
   return std::make_tuple(_result, _result_seq_len);
 }

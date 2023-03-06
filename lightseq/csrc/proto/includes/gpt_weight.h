@@ -63,10 +63,35 @@ class GptWeight {
   float _topp = 0.75;
   int _eos_id;
 
-  int _beam_size = 0;
+  int _beam_size = 4;
   float _length_penalty = 0.;
   float _diverse_lambda = 0.;
   bool _use_gelu = true;
+
+
+  void print_model_config() {
+    std::cout << "***model config***" << std::endl;
+    std::cout << "encoder layers: " << _n_enc_layer << std::endl;
+    std::cout << "hidden size: " << _hidden_size << std::endl;
+    std::cout << "inner size: " << _inner_size << std::endl;
+    std::cout << "head number: " << _head_num << std::endl;
+    std::cout << "dim per head: " << _dim_per_head << std::endl;
+    std::cout << "src vocab size: " << _src_vocab_size << std::endl;
+    std::cout << "use_gelu: " << _use_gelu << std::endl;
+    std::cout << "end_id: " << _eos_id << std::endl;
+    std::cout << "padding_id: " << _padding_id << std::endl;
+    std::cout << std::endl;
+    std::cout << "***generator config***" << std::endl;
+    std::cout << "beam size: " << _beam_size << std::endl;
+    std::cout << "max step: " << _max_step << std::endl;
+    std::cout << "extra decode length(max decode length - src input length): "
+              << _extra_decode_length << std::endl;
+    std::cout << "length penalty: " << _length_penalty << std::endl;
+    std::cout << "diverse lambda: " << _diverse_lambda << std::endl;
+    std::cout << "sampling method: " << _sampling_method << std::endl;
+    std::cout << "topk: " << _topk << std::endl;
+    std::cout << "topp: " << _topp << std::endl;
+  }
 };
 
 }  // namespace lightseq
