@@ -23,7 +23,7 @@ class GptAttentionLayer : public Layer {
   SDPALayer<T1, T2>* _sdpa = nullptr;
   Transform0213OP<T1, T2>* _transform_0213 = nullptr;
   LinearOp<T1, T2>* _attn_out_linear = nullptr;
-  BiasDropoutResOp<T1, T2>* _attn_dropout = nullptr;
+  BiasDropoutResOp<T1, T2>* _attn_res = nullptr;
 
   // parameters
   Variable* _attn_qkvw;
@@ -36,7 +36,7 @@ class GptAttentionLayer : public Layer {
   // shape related
   int _max_batch_tokens;
   int _max_seq_len;
-  int _hidden_size;
+  size_t _hidden_size;
   int _nhead;
   int _head_dim;
   bool _is_pre_ln;

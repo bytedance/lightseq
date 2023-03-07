@@ -15,10 +15,11 @@ class LaunchGptEmbLayer : public Layer {
   Variable* _pos_emb;
 
  public:
-  LaunchGptEmbLayer(int max_batch_tokens, int pad_id, int hidden_dim)
+  LaunchGptEmbLayer(int max_batch_tokens, int max_step, int beam_size,
+                    int pad_id, int hidden_dim)
       : Layer("LaunchGptEmbLayer"),
-        _launch_gpt_op(
-            new LaunchGptEmbOp<T>(max_batch_tokens, pad_id, hidden_dim)) {
+        _launch_gpt_op(new LaunchGptEmbOp<T>(max_batch_tokens, max_step,
+                                             beam_size, pad_id, hidden_dim)) {
     _token_emb = new Variable("token_emb", g_dtype<T>());
     _pos_emb = new Variable("pos_emb", g_dtype<T>());
 
@@ -54,7 +55,7 @@ class LaunchGptEmbLayer : public Layer {
 
 template class LaunchGptEmbLayer<float>;
 #ifdef LIGHTSEQ_cuda
-template class LaunchGptEmbLayer<__half>;
+// template class LaunchGptEmbLayer<__half>;
 #endif
 
 template <class T>

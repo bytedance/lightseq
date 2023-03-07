@@ -13,7 +13,8 @@ BeamSearchTopOp<T>::BeamSearchTopOp(size_t max_batch_size, size_t max_step,
                                     size_t max_thread_per_block,
                                     size_t beam_size, size_t diverse_lambda,
                                     size_t dim_per_head, int end_id,
-                                    size_t head_num, float length_penalty)
+                                    size_t head_num, float length_penalty,
+                                    bool with_start_id)
     : Operator("BeamSearchTopOp"),
       _max_batch_size(max_batch_size),
       _max_step(max_step),
@@ -24,6 +25,7 @@ BeamSearchTopOp<T>::BeamSearchTopOp(size_t max_batch_size, size_t max_step,
       _diverse_lambda(diverse_lambda),
       _dim_per_head(dim_per_head),
       _end_id(end_id),
+      _with_start_id(with_start_id),
       _head_num(head_num),
       _cub_sort_buffer_bytes(max_batch_size * beam_size * trg_vocab_size *
                              sizeof(T)),
@@ -60,6 +62,10 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
   _num_beam_can = new Variable("num_beam_can", _max_batch_size * _beam_size + 1,
                                g_dtype<int>(), DataType::kNotSupported,
                                VariableType::RegressiveVariable);
+
+  // printf("_max_batch_size, _beam_size, _trg_vocab_size: %zu %zu %zu\n",
+  // _max_batch_size, _beam_size, _trg_vocab_size);
+
   _can_idx = new Variable(
       "can_idx", _max_batch_size * _beam_size * _trg_vocab_size, g_dtype<int>(),
       DataType::kNotSupported, VariableType::RegressiveVariable);
@@ -162,12 +168,14 @@ void BeamSearchTopOp<T>::forward() {
       Deciding whether early stop based on num_finish_beam
   */
   CHECK_GPU_ERROR(cudaMemsetAsync(num_beam_can_ptr, 0, sizeof(int), stream));
+
+  printf("beam search current step: %d\n", _cur_step);
   cuda::ker_refresh_result<<<dim3(_batch_size, _beam_size), _max_step, 0,
                              stream>>>(
       can_idx_ptr, can_score_ptr, num_beam_can_ptr + 1, alive_seq_ptr,
       alive_seq_out, seq_probs_ptr, seq_score_ptr, num_beam_can_ptr,
       _trg_vocab_size, _cur_step, _host_length_norm[_cur_step], _diverse_lambda,
-      _end_id);
+      _end_id, _with_start_id);
 
   // swap alive_seq
   // Variable::swap_tensor(parent(4), child(3));
@@ -182,8 +190,9 @@ void BeamSearchTopOp<T>::forward() {
     printf("++++++ _batch_size: %d ++++++\n", ii);
     for (int jj = 0; jj < _beam_size; jj++) {
       printf("++++++ _beam_size: %d ++++++\n", jj);
-      print_vec(alive_seq_out + (ii * _beam_size + jj) * _max_step,
-                "Batch token ids", _cur_step + 2);
+      print_vec(
+          alive_seq_out + (ii * _beam_size + jj) * _max_step + _with_start_id,
+          "Batch token ids", _cur_step + 1);
       print_vec(seq_probs_ptr + ii * _beam_size + jj, "Batch probs", 1);
       print_vec(seq_score_ptr + ii * _beam_size + jj, "Batch scores", 1);
     }

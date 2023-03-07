@@ -1394,13 +1394,11 @@ vocab_size: target vocabulary size
 cur_step: current step
 length_norm: length penlty norm value
 */
-__global__ void ker_refresh_result(const int* can_idx, const float* can_score,
-                                   const int* num_can_per_beam,
-                                   const int* old_alive_seq, int* new_alive_seq,
-                                   float* seq_probs, float* seq_score,
-                                   int* num_finish_beam, int vocab_size,
-                                   int cur_step, float length_norm,
-                                   float diverse_lambda, int end_id) {
+__global__ void ker_refresh_result(
+    const int* can_idx, const float* can_score, const int* num_can_per_beam,
+    const int* old_alive_seq, int* new_alive_seq, float* seq_probs,
+    float* seq_score, int* num_finish_beam, int vocab_size, int cur_step,
+    float length_norm, float diverse_lambda, int end_id, bool with_start_id) {
   // step1 update alive_seq
   int can_pos = num_can_per_beam[blockIdx.x * gridDim.y] + blockIdx.y;
   int ori_can_idx = can_idx[can_pos];  // can_beam_id * vocab_size + vocab_id
@@ -1412,9 +1410,9 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
     can_beam_id %= gridDim.y;
   }
   int thread_vocab_id;
-  if (threadIdx.x > cur_step + 1) {
+  if (threadIdx.x > cur_step + with_start_id) {
     thread_vocab_id = end_id;
-  } else if (threadIdx.x == cur_step + 1) {
+  } else if (threadIdx.x == cur_step + with_start_id) {
     // add current step generate vocabulary id
     thread_vocab_id = can_vocab_id;
   } else {

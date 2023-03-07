@@ -65,8 +65,15 @@ std::tuple<Variable*, Variable*> GeneratorLayer<T>::operator()(
 }
 
 template <typename T>
-void GeneratorLayer<T>::before_forward(int batch_size, int cur_step) {
-  _beam_search->before_forward(batch_size, cur_step);
+void GeneratorLayer<T>::before_forward(int batch_size, int seq_len,
+                                       int cur_step) {
+  if (_generate_method == GenerateMethod::BeamSearch) {
+    printf("GeneratorLayer<T>::before_forward: %d %d", seq_len, cur_step);
+    _beam_search->before_forward(batch_size, seq_len + cur_step);
+  } else {
+    _sampling->before_forward(batch_size, seq_len + cur_step,
+                              cur_step ? 1 : seq_len);
+  }
 }
 
 template <typename T>
@@ -80,11 +87,11 @@ int GeneratorLayer<T>::load_params(const std::vector<const T*>& para_vec,
   return size;
 }
 
-template<typename T>
+template <typename T>
 bool GeneratorLayer<T>::is_stop() {
-  switch(_generate_method) {
+  switch (_generate_method) {
     case GenerateMethod::BeamSearch:
-      return _beam_search->is_stop(); 
+      return _beam_search->is_stop();
     case GenerateMethod::Topk:
       return _sampling->is_stop();
     case GenerateMethod::Topp:

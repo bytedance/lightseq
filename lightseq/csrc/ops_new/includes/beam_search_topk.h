@@ -21,6 +21,7 @@ class BeamSearchTopOp : public Operator {
   size_t _beam_size;
   float _diverse_lambda;
   size_t _nshared_dec_layer;
+  bool _with_start_id;
 
   size_t _cub_sort_buffer_bytes;
   int _host_can_num_batch;
@@ -43,7 +44,8 @@ class BeamSearchTopOp : public Operator {
   BeamSearchTopOp(size_t max_batch_size, size_t max_step, size_t trg_vocab_size,
                   size_t hidden_size, size_t max_thread_per_block,
                   size_t beam_size, size_t diverse_lambda, size_t dim_per_head,
-                  int end_id, size_t head_num, float length_penalty);
+                  int end_id, size_t head_num, float length_penalty,
+                  bool with_start_id = false);
 
   virtual ~BeamSearchTopOp() {}
 
