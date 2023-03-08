@@ -112,7 +112,8 @@ __global__ void select_beam_rough_topk(
     const T* logits, const T* logit_bias, const float* seq_probs,
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
-    float length_norm, int cur_step, float diverse_lambda, int end_id, bool from_only_beam) {
+    float length_norm, int cur_step, float diverse_lambda, int end_id,
+    bool from_only_beam) {
   if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
@@ -174,8 +175,8 @@ __global__ void select_beam_rough_topk(
     num_cur_beam_can = 0;
   }
 
-  if(from_only_beam && (blockIdx.x % beam_size) > 0) {
-    return ;
+  if (from_only_beam && (blockIdx.x % beam_size) > 0) {
+    return;
   }
 
   /*

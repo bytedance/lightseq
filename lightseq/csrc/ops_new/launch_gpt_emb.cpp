@@ -30,11 +30,6 @@ void LaunchGptEmbOp<T>::forward() {
     return;
   }
 
-  for (int i = 0; i < _beam_size; i++) {
-    print_vec(inp_tokens + i * _max_step,
-              "input with beam-" + std::to_string(i), 10);
-  }
-
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
   // cuda::ker_gpt_embedding_launcher<T>(
