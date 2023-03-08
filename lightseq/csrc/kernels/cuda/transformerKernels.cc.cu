@@ -112,7 +112,7 @@ __global__ void select_beam_rough_topk(
     const T* logits, const T* logit_bias, const float* seq_probs,
     const float* seq_score, const int* alive_seq, int* can_idx,
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
-    float length_norm, int cur_step, float diverse_lambda, int end_id) {
+    float length_norm, int cur_step, float diverse_lambda, int end_id, bool from_only_beam) {
   if (cur_step != 0 && alive_seq[blockIdx.x * max_step + cur_step] == end_id) {
     // this is a finished beam
     if (threadIdx.x == 0) {
@@ -120,7 +120,7 @@ __global__ void select_beam_rough_topk(
       int pos = atomicAdd(num_beam_can, 1);  // get a candidate pos
       if (diverse_lambda == 0) {
         can_score[pos] =
-            seq_score[blockIdx.x];  // this beam's score will not be change
+            seq_score[blockIdx.x];  // this beam's score will not be changed
       } else {
         // add the beam id offset in score to sort in each beam
         int batch_id = blockIdx.x / beam_size;
@@ -172,6 +172,10 @@ __global__ void select_beam_rough_topk(
     s_log_prob_base = seq_probs[blockIdx.x] - logf(sum_exp_logit) - s_max_logit;
     s_topk = rough_top_kth_logit;
     num_cur_beam_can = 0;
+  }
+
+  if(from_only_beam && (blockIdx.x % beam_size) > 0) {
+    return ;
   }
 
   /*
@@ -239,43 +243,43 @@ void select_beam_rough_topk_launcher(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id) {
+    float diverse_lambda, int end_id, bool from_only_beam) {
   if (beam_size == 1)
     select_beam_rough_topk<T, 1>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
   if (beam_size == 2)
     select_beam_rough_topk<T, 2>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
   if (beam_size == 4)
     select_beam_rough_topk<T, 4>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
   if (beam_size == 8)
     select_beam_rough_topk<T, 8>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
   if (beam_size == 16)
     select_beam_rough_topk<T, 16>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
   if (beam_size == 32)
     select_beam_rough_topk<T, 32>
         <<<step_token_num, max_thread_per_block, 0, stream>>>(
             logits, logit_bias, seq_probs, seq_score, alive_seq, can_idx,
             can_score, num_beam_can, vocab_size, max_step, length_norm,
-            cur_step, diverse_lambda, end_id);
+            cur_step, diverse_lambda, end_id, from_only_beam);
 }
 
 template void select_beam_rough_topk_launcher<float>(
@@ -284,7 +288,7 @@ template void select_beam_rough_topk_launcher<float>(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool from_only_beam);
 
 template void select_beam_rough_topk_launcher<__half>(
     const __half* logits, const __half* logit_bias, const float* seq_probs,
@@ -292,7 +296,7 @@ template void select_beam_rough_topk_launcher<__half>(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool from_only_beam);
 
 /**
 @brief: ker_diverse_beam_search

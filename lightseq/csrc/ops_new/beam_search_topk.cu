@@ -127,24 +127,7 @@ void BeamSearchTopOp<T>::forward() {
       logits_ptr, logits_bias_ptr, seq_probs_ptr, seq_score_ptr, alive_seq_ptr,
       can_idx_ptr, can_score_ptr, num_beam_can_ptr, _trg_vocab_size, _max_step,
       _host_length_norm[_cur_pos], _cur_pos, _step_token_num,
-      _max_thread_per_block, stream, _beam_size, _diverse_lambda, _end_id);
-
-  if (_step == 0) {
-    CHECK_GPU_ERROR(cudaMemcpy(_host_num_beam_can.data(), num_beam_can_ptr,
-                               (1 + _step_token_num) * sizeof(int),
-                               cudaMemcpyDefault));
-    _host_num_beam_can[0] = 0;
-    for (int i = 1; i < 1 + _step_token_num; i++) {
-      if (i % _beam_size == 1) {
-        _host_num_beam_can[0] += _host_num_beam_can[i];
-      } else {
-        _host_num_beam_can[i] = 0;
-      }
-    }
-    CHECK_GPU_ERROR(cudaMemcpy(num_beam_can_ptr, _host_num_beam_can.data(),
-                               (1 + _step_token_num) * sizeof(int),
-                               cudaMemcpyDefault));
-  }
+      _max_thread_per_block, stream, _beam_size, _diverse_lambda, _end_id, _step == 0);
 
   thrust::exclusive_scan(thrust::cuda::par.on(stream), num_beam_can_ptr + 1,
                          num_beam_can_ptr + 1 + _step_token_num,
@@ -209,7 +192,6 @@ void BeamSearchTopOp<T>::forward() {
     }
   }
   // #endif
-
 #endif
 }
 

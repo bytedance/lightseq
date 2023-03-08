@@ -35,7 +35,7 @@ void select_beam_rough_topk_launcher(
     float* can_score, int* num_beam_can, int vocab_size, int max_step,
     float length_norm, int cur_step, int step_token_num,
     int max_thread_per_block, cudaStream_t stream, int beam_size,
-    float diverse_lambda, int end_id);
+    float diverse_lambda, int end_id, bool from_only_beam);
 
 void ker_diverse_beam_search_launcher(float* can_score, int* can_ids,
                                       int* num_beam_can, int step_token_num,

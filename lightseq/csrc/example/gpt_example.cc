@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
   std::vector<int> example_input = {40, 1842, 345, 11, 475, 345, 910, 326};
   int eg_seq_len = example_input.size();
 
-  int batch_size = 1;
+  int batch_size = 4;
   int batch_seq_len = eg_seq_len;
 
   if (argc == 4) {
