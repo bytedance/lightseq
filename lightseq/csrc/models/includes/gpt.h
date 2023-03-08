@@ -34,7 +34,11 @@ class Gpt : public LSModel {
   Variable* _out_tokens;
   Variable* _out_scores;
 
+  Variable* _total_caches_k;
+  Variable* _total_caches_v;
+
   int* _gpt_out_ptr = nullptr;
+  int* _input_ptr = nullptr;
 
   int _max_batch_size;
   GenerateMethod _generate_method;
@@ -43,7 +47,7 @@ class Gpt : public LSModel {
   Gpt(const std::string weight_path, const int max_batch_size);
   ~Gpt();
 
-  void before_forward(int batch_size, int seq_len, int steps);
+  void before_forward(int batch_size, int prompt_len, int steps);
 
   void Infer() override;
   void set_input_ptr(int index, void* input_ptr) override;

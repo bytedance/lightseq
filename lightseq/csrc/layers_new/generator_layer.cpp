@@ -3,11 +3,12 @@
 namespace lightseq {
 
 template <typename T>
-GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int max_batch_size,
-                                  int max_step, int trg_vocab_size,
-                                  int hidden_size, int max_thread_per_block,
-                                  int beam_size, float diverse_lambda,
-                                  int dim_per_head, int end_id, int head_num,
+GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int nshared_dec_layer,
+                                  int max_batch_size, int max_step,
+                                  int trg_vocab_size, int hidden_size,
+                                  int max_thread_per_block, int beam_size,
+                                  float diverse_lambda, int dim_per_head,
+                                  int end_id, int head_num,
                                   float length_penalty, int topk, float topp,
                                   bool has_logits_bias)
     : Layer("GeneratorLayer"),
@@ -16,9 +17,9 @@ GeneratorLayer<T>::GeneratorLayer(GenerateMethod gm, int max_batch_size,
       _has_logits_bias(has_logits_bias) {
   if (_generate_method == GenerateMethod::BeamSearch) {
     _beam_search = new BeamSearchTopOp<T>(
-        max_batch_size, max_step, trg_vocab_size, hidden_size,
-        max_thread_per_block, beam_size, diverse_lambda, dim_per_head, end_id,
-        head_num, length_penalty);
+        nshared_dec_layer, max_batch_size, max_step, trg_vocab_size,
+        hidden_size, max_thread_per_block, beam_size, diverse_lambda,
+        dim_per_head, end_id, head_num, length_penalty);
   } else {
     _sampling =
         new SamplingOp<T>(gm, max_batch_size, max_step, max_thread_per_block,
@@ -65,8 +66,14 @@ std::tuple<Variable*, Variable*> GeneratorLayer<T>::operator()(
 }
 
 template <typename T>
-void GeneratorLayer<T>::before_forward(int batch_size, int cur_step) {
-  _beam_search->before_forward(batch_size, cur_step);
+void GeneratorLayer<T>::before_forward(int batch_size, int prompt_len,
+                                       int cur_step) {
+  if (_generate_method == GenerateMethod::BeamSearch) {
+    _beam_search->before_forward(batch_size, prompt_len, cur_step);
+  } else {
+    _sampling->before_forward(batch_size, prompt_len + cur_step,
+                              cur_step ? 1 : prompt_len);
+  }
 }
 
 template <typename T>
@@ -80,17 +87,24 @@ int GeneratorLayer<T>::load_params(const std::vector<const T*>& para_vec,
   return size;
 }
 
-template<typename T>
+template <typename T>
 bool GeneratorLayer<T>::is_stop() {
-  switch(_generate_method) {
+  switch (_generate_method) {
     case GenerateMethod::BeamSearch:
-      return _beam_search->is_stop(); 
+      return _beam_search->is_stop();
     case GenerateMethod::Topk:
       return _sampling->is_stop();
     case GenerateMethod::Topp:
       return _sampling->is_stop();
   }
   return true;
+}
+
+template <typename T>
+void GeneratorLayer<T>::refresh_cache(Variable* caches_k, Variable* caches_v) {
+  if (_generate_method == GenerateMethod::BeamSearch) {
+    _beam_search->refresh_cache(caches_k, caches_v);
+  }
 }
 
 }  // namespace lightseq

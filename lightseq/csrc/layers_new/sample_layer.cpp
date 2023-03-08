@@ -3,7 +3,7 @@
 namespace lightseq {
 
 template <typename T>
-SampleLayer<T>::SampleLayer(int max_batch_size, int max_step,
+SampleLayer<T>::SampleLayer(int nshared_layer, int max_batch_size, int max_step,
                             int trg_vocab_size, int hidden_size,
                             int max_thread_per_block, int beam_size,
                             int diverse_lambda, int dim_per_head, int end_id,
@@ -11,7 +11,7 @@ SampleLayer<T>::SampleLayer(int max_batch_size, int max_step,
     : Layer("SampleLayer"),
       _trg_vocab_size(trg_vocab_size),
       _beam_search(new BeamSearchTopOp<T>(
-          max_batch_size, max_step, trg_vocab_size, hidden_size,
+          nshared_layer, max_batch_size, max_step, trg_vocab_size, hidden_size,
           max_thread_per_block, beam_size, diverse_lambda, dim_per_head, end_id,
           head_num, length_penalty)) {
   _logit_bias = new Variable("logits_bias", g_dtype<T>());
@@ -35,7 +35,7 @@ std::tuple<Variable*, Variable*> SampleLayer<T>::operator()(
 
 template <typename T>
 void SampleLayer<T>::before_forward(int batch_size, int cur_step) {
-  _beam_search->before_forward(batch_size, cur_step);
+  _beam_search->before_forward(batch_size, 1, cur_step);
 }
 
 template <typename T>

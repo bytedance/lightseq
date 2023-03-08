@@ -16,9 +16,10 @@ class SampleLayer : public Layer {
   size_t _trg_vocab_size;
 
  public:
-  SampleLayer(int max_batch_size, int max_step, int trg_vocab_size,
-              int hidden_size, int max_thread_per_block, int beam_size,
-              int diverse_lambda, int dim_per_head, int end_id, int head_num,
+  SampleLayer(int nshared_layer, int max_batch_size, int max_step,
+              int trg_vocab_size, int hidden_size, int max_thread_per_block,
+              int beam_size, int diverse_lambda, int dim_per_head, int end_id,
+              int head_num,
               float length_penalty);  // for beam_search
 
   virtual ~SampleLayer() {}

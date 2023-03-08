@@ -33,8 +33,8 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _transform_0213 = new Transform0213OP<T1, T2>(max_batch_tokens * hidden_size);
   _attn_out_linear =
       new LinearOp<T1, T2>(max_batch_tokens, hidden_size, hidden_size);
-  _attn_dropout = new BiasDropoutResOp<T1, T2>(hidden_output_dropout_ratio,
-                                               max_batch_tokens, hidden_size);
+  _attn_res = new BiasDropoutResOp<T1, T2>(hidden_output_dropout_ratio,
+                                           max_batch_tokens, hidden_size);
   // parameters init
   _attn_qkvw = new Variable("_attn_qkvw", g_dtype<T1>(), g_dtype<T2>());
   _attn_qkvb = new Variable("_attn_qkvb", g_dtype<T1>(), g_dtype<T2>());
@@ -46,17 +46,14 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
   _attn_nb = new Variable("_attn_nb", g_dtype<T1>(), g_dtype<T2>());
 
   int cache_size = max_batch_tokens * hidden_size;
-  _cache_k =
-      new Variable("cache_k", cache_size, g_dtype<T1>(), g_dtype<T2>());
-
-  _cache_v =
-      new Variable("cache_v", cache_size, g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
-Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
+Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp,
+                                                Variable* cache_k,
+                                                Variable* cache_v) {
   set_inputs({inp});
 
   Variable* qkv_out = nullptr;
@@ -68,27 +65,19 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp) {
     qkv_out = (*_qkv_linear)(inp, _attn_qkvw);
   }
 
-  Variable* q_out = (*_split_head)(qkv_out, _attn_qkvb, _cache_k, _cache_v);
+  Variable* q_out = (*_split_head)(qkv_out, _attn_qkvb, cache_k, cache_v);
 
   // result of Scaled Dot Product Attention
-  Variable* sdpa_res = (*_sdpa)(q_out, _cache_k, _cache_v);
+  Variable* sdpa_res = (*_sdpa)(q_out, cache_k, cache_v);
 
   // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
   Variable* transform_0213_out = (*_transform_0213)(sdpa_res);
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, inp);
-  if (_is_pre_ln) {
-    set_outputs({attn_dropout_residual});
-    return attn_dropout_residual;
-  }
-
-  Variable* attn_ln_out =
-      (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
-  set_outputs({attn_ln_out});
-  return attn_ln_out;
+  Variable* attn_dropout_residual = (*_attn_res)(attn_linear, _attn_ob, inp);
+  set_outputs({attn_dropout_residual});
+  return attn_dropout_residual;
 }
 
 /*
@@ -131,7 +120,7 @@ void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
 
   _attn_out_linear->before_forward(batch_tokens);
 
-  _attn_dropout->before_forward(batch_tokens, _hidden_size);
+  _attn_res->before_forward(batch_tokens, _hidden_size);
 }
 
 template <typename T1, typename T2>

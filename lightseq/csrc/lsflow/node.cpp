@@ -29,11 +29,11 @@ void Node::set_parents(std::vector<Node*> parents) {
   int idx = 0;
   for (Node* iter : parents) {
     _parents.push_back(iter);
-    if(iter == nullptr) 
+    if (iter == nullptr)
       printf("Node %s 's parent #%d is nullptr\n", _name.c_str(), idx);
-    else 
+    else
       iter->add_child(this);
-    idx ++;
+    idx++;
   }
   if (node_type() == NodeType::Operator) {
     if (_context_ptr->in_regress()) {

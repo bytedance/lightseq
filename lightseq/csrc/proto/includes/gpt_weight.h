@@ -68,7 +68,6 @@ class GptWeight {
   float _diverse_lambda = 0.;
   bool _use_gelu = true;
 
-
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
     std::cout << "encoder layers: " << _n_enc_layer << std::endl;

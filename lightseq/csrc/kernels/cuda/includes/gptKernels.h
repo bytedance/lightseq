@@ -8,13 +8,25 @@
 namespace lightseq {
 namespace cuda {
 
+/**
+@brief: launch_gpt_embedding
+for gpt embedding, look up token embedding, add position embedding
+
+@param
+token_emb: [vocab_size, hidden_size]
+pos_emb: [max_step, hidden_size]
+token_id: input token id, [batch_size, beam_size, max_step]
+output: result, [batch_size, token_seq_len, hidden_size]
+padding_id, the padding_id, default 0
+pos_offset: get real pos when decoding which gridDim.y=1
+*/
+
 template <typename T>
-void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
-                                int hidden_size, cudaStream_t stream,
-                                const T* token_emb, const T* pos_emb,
-                                const int* token_id, T* output,
-                                int* real_seq_len, int padding_id,
-                                int pos_offset);
+void launch_gpt_embedding(const float* token_emb, const float* pos_emb,
+                          const int* tokens, float* output, int batch_size,
+                          int beam_size, int hidden_dim, int step_offset,
+                          int seq_len, int max_step, int padding_id,
+                          cudaStream_t stream);
 
 template <typename T>
 void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,

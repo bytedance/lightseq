@@ -11,7 +11,8 @@ std::tuple<Variable*, Variable*> LaunchGptEmbOp<T>::operator()(
 
   _result = new Variable("LaunchGptEmbOp_out", _max_batch_tokens * _hidden_dim,
                          g_dtype<T>());
-  _result_seq_len = new Variable("result_seq_len", _max_batch_tokens, g_dtype<int>());
+  _result_seq_len =
+      new Variable("result_seq_len", _max_batch_tokens, g_dtype<int>());
   this->set_children({_result, _result_seq_len});
   return std::make_tuple(_result, _result_seq_len);
 }
@@ -29,16 +30,24 @@ void LaunchGptEmbOp<T>::forward() {
     return;
   }
 
+  for (int i = 0; i < _beam_size; i++) {
+    print_vec(inp_tokens + i * _max_step,
+              "input with beam-" + std::to_string(i), 10);
+  }
+
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  cuda::ker_gpt_embedding_launcher<T>(
-      _batch_size, _seq_len, _hidden_dim, _stream, token_emb, pos_emb,
-      inp_tokens, output_ptr, seq_len_ptr, _pad_id, _offset);
+  // cuda::ker_gpt_embedding_launcher<T>(
+  //     _batch_size, _seq_len, _hidden_dim, _stream, token_emb, pos_emb,
+  //     inp_tokens, output_ptr, seq_len_ptr, _pad_id, _offset);
+  cuda::launch_gpt_embedding<float>(
+      token_emb, pos_emb, inp_tokens, output_ptr, _batch_size, _beam_size,
+      _hidden_dim, _offset, _seq_len, _max_step, _pad_id, _stream);
 #endif
 }
 
 template class LaunchGptEmbOp<float>;
 #ifdef LIGHTSEQ_cuda
-template class LaunchGptEmbOp<__half>;
+// template class LaunchGptEmbOp<__half>;
 #endif
 }  // namespace lightseq

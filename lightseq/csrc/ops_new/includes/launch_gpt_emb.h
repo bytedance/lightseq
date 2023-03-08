@@ -15,16 +15,21 @@ class LaunchGptEmbOp : public Operator {
 
   size_t _batch_size;
   size_t _seq_len;
+  int _max_step;
+  int _beam_size;
   int _offset;
 
   Variable* _result;
   Variable* _result_seq_len;
 
  public:
-  LaunchGptEmbOp(size_t max_batch_tokens, int pad_id, size_t hidden_dim)
+  LaunchGptEmbOp(size_t max_batch_tokens, int max_step, int beam_size,
+                 int pad_id, size_t hidden_dim)
       : Operator("LaunchGptEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _pad_id(pad_id),
+        _max_step(max_step),
+        _beam_size(beam_size),
         _hidden_dim(hidden_dim) {}
 
   virtual ~LaunchGptEmbOp() {}
