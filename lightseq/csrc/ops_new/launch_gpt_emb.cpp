@@ -30,16 +30,8 @@ void LaunchGptEmbOp<T>::forward() {
     return;
   }
 
-  for (int i = 0; i < _beam_size; i++) {
-    print_vec(inp_tokens + i * _max_step,
-              "input with beam-" + std::to_string(i), 10);
-  }
-
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  // cuda::ker_gpt_embedding_launcher<T>(
-  //     _batch_size, _seq_len, _hidden_dim, _stream, token_emb, pos_emb,
-  //     inp_tokens, output_ptr, seq_len_ptr, _pad_id, _offset);
   cuda::launch_gpt_embedding<float>(
       token_emb, pos_emb, inp_tokens, output_ptr, _batch_size, _beam_size,
       _hidden_dim, _offset, _seq_len, _max_step, _pad_id, _stream);

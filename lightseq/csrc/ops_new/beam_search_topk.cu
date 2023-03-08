@@ -109,7 +109,7 @@ void BeamSearchTopOp<T>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  if (_cur_pos == 0) {
+  if (_step == 0) {
     CHECK_GPU_ERROR(cudaMemcpyAsync(
         (void*)seq_probs_ptr, (void*)_host_alive_seq_probs.data(),
         sizeof(float) * _batch_size * _beam_size, cudaMemcpyDefault, stream));
@@ -128,23 +128,6 @@ void BeamSearchTopOp<T>::forward() {
       can_idx_ptr, can_score_ptr, num_beam_can_ptr, _trg_vocab_size, _max_step,
       _host_length_norm[_cur_pos], _cur_pos, _step_token_num,
       _max_thread_per_block, stream, _beam_size, _diverse_lambda, _end_id);
-
-  if (_step == 0) {
-    CHECK_GPU_ERROR(cudaMemcpy(_host_num_beam_can.data(), num_beam_can_ptr,
-                               (1 + _step_token_num) * sizeof(int),
-                               cudaMemcpyDefault));
-    _host_num_beam_can[0] = 0;
-    for (int i = 1; i < 1 + _step_token_num; i++) {
-      if (i % _beam_size == 1) {
-        _host_num_beam_can[0] += _host_num_beam_can[i];
-      } else {
-        _host_num_beam_can[i] = 0;
-      }
-    }
-    CHECK_GPU_ERROR(cudaMemcpy(num_beam_can_ptr, _host_num_beam_can.data(),
-                               (1 + _step_token_num) * sizeof(int),
-                               cudaMemcpyDefault));
-  }
 
   thrust::exclusive_scan(thrust::cuda::par.on(stream), num_beam_can_ptr + 1,
                          num_beam_can_ptr + 1 + _step_token_num,
@@ -189,15 +172,11 @@ void BeamSearchTopOp<T>::forward() {
       _trg_vocab_size, _cur_pos, _host_length_norm[_cur_pos], _diverse_lambda,
       _end_id);
 
-  // swap alive_seq
-  // Variable::swap_tensor(parent(4), child(3));
-  // don't swap alive_seq with alive_seq_buf in this function
-
   CHECK_GPU_ERROR(cudaMemcpyAsync(&_host_can_num_batch, num_beam_can_ptr,
                                   sizeof(int), cudaMemcpyDefault, stream));
   CHECK_GPU_ERROR(cudaStreamSynchronize(stream));
 
-  // #ifdef DEBUG_MODE
+#ifdef DEBUG_MODE
   for (int ii = 0; ii < _batch_size; ii++) {
     printf("++++++ _batch_size: %d ++++++\n", ii);
     for (int jj = 0; jj < _beam_size; jj++) {
@@ -208,8 +187,7 @@ void BeamSearchTopOp<T>::forward() {
       print_vec(seq_score_ptr + ii * _beam_size + jj, "Batch scores", 1);
     }
   }
-  // #endif
-
+#endif
 #endif
 }
 

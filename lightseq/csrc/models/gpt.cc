@@ -135,9 +135,9 @@ void Gpt::Infer() {
 #ifdef LIGHTSEQ_cuda
   for (int i = 0; i < batch_size; i++) {
     for (int j = 0; j < tw_._beam_size; j++) {
-      CHECK_GPU_ERROR(cudaMemcpy(
+      CHECK_GPU_ERROR(cudaMemcpyAsync(
           _inp_tokens->value<int>() + (i * tw_._beam_size + j) * tw_._max_step,
-          _input_ptr, prompt_len * sizeof(int), cudaMemcpyDefault));
+          _input_ptr, prompt_len * sizeof(int), cudaMemcpyDefault, _context_ptr->get_stream()));
     }
   }
 #endif
@@ -177,12 +177,27 @@ void Gpt::Infer() {
     if (_generate_method == GenerateMethod::BeamSearch) {
       _generator_layer->refresh_cache(_total_caches_k, _total_caches_v);
     }
-    Variable::swap_tensor(_inp_tokens, _out_tokens);
-    steps++;
-  }
-  _context_ptr->synchronize();
 
-  set_output_shape(0, {batch_size, prompt_len + steps});
+    steps++;
+    if(steps + prompt_len < tw_._max_step){
+      Variable::swap_tensor(_inp_tokens, _out_tokens);
+    }
+  }
+
+  for(int batch_idx = 0; batch_idx < batch_size; batch_idx ++) {
+    for(int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx ++) {
+      cudaMemcpyAsync(
+          _gpt_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
+          _out_tokens->value<int>() + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          (steps + prompt_len) * sizeof(int), cudaMemcpyDefault, _context_ptr->get_stream());
+    }
+  }
+
+  _context_ptr->synchronize();
+  if(_generate_method == GenerateMethod::BeamSearch)
+    set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
+  else 
+    set_output_shape(0, {batch_size, prompt_len + steps});
 }
 
 void Gpt::set_input_ptr(int index, void *input_ptr) {
