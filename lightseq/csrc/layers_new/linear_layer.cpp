@@ -56,6 +56,7 @@ int LinearLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
                                      int offset) {  // for inference
   int size = 0;
   _linear_w->set_value((char*)para_vec[offset + size]), size++;
+  _linear_w->set_shape({_input_size, _output_size});
 
   return size;
 }

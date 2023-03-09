@@ -30,16 +30,20 @@ template <typename T1, typename T2>
 Variable* SplitHeadOp<T1, T2>::operator()(Variable* inp, Variable* bias,
                                           Variable* key, Variable* value) {
   if (_cache_sz == 0) {
+    printf("Call the wrong version, should not provided cache.\n");
     throw std::runtime_error(
         "Call the wrong version, should not provided cache.");
   }
   if (_qkv_num != 3) {
+    printf("qkv_num shoule be 3 when with cache.\n");
     throw std::runtime_error("qkv_num shoule be 3 when with cache.");
   }
-  set_parents({inp, bias, key, value});
+  this->set_parents({inp, bias, key, value});
+
   size_t trans_size = _max_query_tokens * _hidden_size;
   Variable* query =
       new Variable("splited_query", trans_size, g_dtype<T1>(), g_dtype<T2>());
+
   this->set_children({query});
   return query;
 }

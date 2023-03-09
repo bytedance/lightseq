@@ -427,13 +427,7 @@ void torch_sdpa_layer(const torch::Tensor &query, const torch::Tensor &key,
 
 }  // namespace lightseq
 
-#ifdef PYBIND_INTERFACE
-#define PYBIND_MODULE_NAME TORCH_EXTENSION_NAME
-#else
-#define PYBIND_MODULE_NAME inference
-#endif
-
-PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   // create default context
   lightseq::Context::create_global_context(lightseq::StatusType::Inference);
 

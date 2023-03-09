@@ -17,11 +17,11 @@ class GptLayer : public Layer {
   GptLayer(int layer_id, int max_batch_tokens, int max_seq_len, int hidden_size,
            int num_heads, int intermediate_size, float attn_prob_dropout_ratio,
            float activation_dropout_ratio, float hidden_output_dropout_ratio,
-           bool is_pre_ln, std::string activation_fn, bool mask_future_tokens,
+           std::string activation_fn, bool mask_future_tokens,
            int beam_size = 1);
   virtual ~GptLayer() {}
 
-  Variable* operator()(Variable* inp);
+  Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v);
 
   void before_forward(int batch_size, int seq_len, int steps) {
     _attn_layer->before_forward(batch_size, seq_len, steps);

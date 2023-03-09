@@ -33,90 +33,137 @@ real_seq_len: record seq len exclude padding, [batch_size]
 padding_id, the padding_id, default 0
 pos_offset: get real pos when decoding which gridDim.y=1
 */
+// template <typename T>
+// __global__ void ker_gpt_embedding(const T* token_emb, const T* pos_emb,
+//                                   const int* token_id, T* output,
+//                                   int* real_seq_len, int padding_id,
+//                                   int pos_offset) {
+//   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
+//   int tid = token_id[target_pos];
+//   if (tid == padding_id) {
+//     // for padding id
+//     output[target_pos * blockDim.x + threadIdx.x] = CUDA_FLOAT_INF_NEG;
+//     return;
+//   }
+//   if (threadIdx.x == 0) {
+//     atomicAdd(real_seq_len + blockIdx.x, 1);
+//   }
+//   output[target_pos * blockDim.x + threadIdx.x] =
+//       token_emb[tid * blockDim.x + threadIdx.x] +
+//       pos_emb[(blockIdx.y + pos_offset) * blockDim.x + threadIdx.x];
+// }
+
+// /* fp16 version */
+// template <>
+// __global__ void ker_gpt_embedding<__half>(const __half* token_emb,
+//                                           const __half* pos_emb,
+//                                           const int* token_id, __half*
+//                                           output, int* real_seq_len, int
+//                                           padding_id, int pos_offset) {
+//   int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
+//   int tid = token_id[target_pos];
+//   half2* output_h = (half2*)output;
+
+//   if (tid == padding_id) {
+//     // for padding id
+//     output_h[target_pos * blockDim.x + threadIdx.x] =
+//         __float2half2_rn(CUDA_FLOAT_INF_NEG);
+//     return;
+//   }
+//   if (threadIdx.x == 0) {
+//     atomicAdd(real_seq_len + blockIdx.x, 1);
+//   }
+
+//   float2 te =
+//       __half22float2(((const half2*)token_emb)[tid * blockDim.x +
+//       threadIdx.x]);
+//   float2 pe = __half22float2(
+//       ((const half2*)
+//            pos_emb)[(blockIdx.y + pos_offset) * blockDim.x + threadIdx.x]);
+//   te.x += pe.x;
+//   te.y += pe.y;
+//   output_h[target_pos * blockDim.x + threadIdx.x] = __float22half2_rn(te);
+// }
+
+// template <typename T>
+// void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
+//                                 int hidden_size, cudaStream_t stream,
+//                                 const T* token_emb, const T* pos_emb,
+//                                 const int* token_id, T* output,
+//                                 int* real_seq_len, int padding_id,
+//                                 int pos_offset) {
+//   ker_gpt_embedding<T>
+//       <<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
+//           token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
+//           pos_offset);
+// }
+
+// template <>
+// void ker_gpt_embedding_launcher<__half>(
+//     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
+//     const __half* token_emb, const __half* pos_emb, const int* token_id,
+//     __half* output, int* real_seq_len, int padding_id, int pos_offset) {
+//   ker_gpt_embedding<__half>
+//       <<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
+//           token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
+//           pos_offset);
+// }
+
+// template void ker_gpt_embedding_launcher<float>(
+//     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
+//     const float* token_emb, const float* pos_emb, const int* token_id,
+//     float* output, int* real_seq_len, int padding_id, int pos_offset);
+
+// template void ker_gpt_embedding_launcher<__half>(
+//     int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
+//     const __half* token_emb, const __half* pos_emb, const int* token_id,
+//     __half* output, int* real_seq_len, int padding_id, int pos_offset);
+
 template <typename T>
-__global__ void ker_gpt_embedding(const T* token_emb, const T* pos_emb,
-                                  const int* token_id, T* output,
-                                  int* real_seq_len, int padding_id,
-                                  int pos_offset) {
-  int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
-  int tid = token_id[target_pos];
-  if (tid == padding_id) {
-    // for padding id
-    output[target_pos * blockDim.x + threadIdx.x] = CUDA_FLOAT_INF_NEG;
+__global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
+                                     const int* token_ids, T* output,
+                                     int batch_size, int beam_size, int seq_len,
+                                     int hidden_dim, int padding_id,
+                                     int max_step, int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
     return;
   }
-  if (threadIdx.x == 0) {
-    atomicAdd(real_seq_len + blockIdx.x, 1);
-  }
-  output[target_pos * blockDim.x + threadIdx.x] =
-      token_emb[tid * blockDim.x + threadIdx.x] +
-      pos_emb[(blockIdx.y + pos_offset) * blockDim.x + threadIdx.x];
-}
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
 
-/* fp16 version */
-template <>
-__global__ void ker_gpt_embedding<__half>(const __half* token_emb,
-                                          const __half* pos_emb,
-                                          const int* token_id, __half* output,
-                                          int* real_seq_len, int padding_id,
-                                          int pos_offset) {
-  int target_pos = blockIdx.x * gridDim.y + blockIdx.y;
-  int tid = token_id[target_pos];
-  half2* output_h = (half2*)output;
+  // int output_idx =
+  //     flat_4dim(batch_idx, beam_idx, seq_idx + step_offset, state_idx,
+  //               beam_size, max_step, hidden_dim);
 
-  if (tid == padding_id) {
-    // for padding id
-    output_h[target_pos * blockDim.x + threadIdx.x] =
-        __float2half2_rn(CUDA_FLOAT_INF_NEG);
+  if (token_id == padding_id) {
+    output[idx] = CUDA_FLOAT_INF_NEG;
     return;
   }
-  if (threadIdx.x == 0) {
-    atomicAdd(real_seq_len + blockIdx.x, 1);
-  }
 
-  float2 te =
-      __half22float2(((const half2*)token_emb)[tid * blockDim.x + threadIdx.x]);
-  float2 pe = __half22float2(
-      ((const half2*)
-           pos_emb)[(blockIdx.y + pos_offset) * blockDim.x + threadIdx.x]);
-  te.x += pe.x;
-  te.y += pe.y;
-  output_h[target_pos * blockDim.x + threadIdx.x] = __float22half2_rn(te);
-}
-
-template <typename T>
-void ker_gpt_embedding_launcher(int batch_size, int batch_seq_len,
-                                int hidden_size, cudaStream_t stream,
-                                const T* token_emb, const T* pos_emb,
-                                const int* token_id, T* output,
-                                int* real_seq_len, int padding_id,
-                                int pos_offset) {
-  ker_gpt_embedding<T>
-      <<<dim3(batch_size, batch_seq_len), hidden_size, 0, stream>>>(
-          token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
-          pos_offset);
+  output[idx] = token_emb[token_id * hidden_dim + state_idx] +
+                pos_emb[(seq_idx + step_offset) * hidden_dim + state_idx];
 }
 
 template <>
-void ker_gpt_embedding_launcher<__half>(
-    int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const __half* token_emb, const __half* pos_emb, const int* token_id,
-    __half* output, int* real_seq_len, int padding_id, int pos_offset) {
-  ker_gpt_embedding<__half>
-      <<<dim3(batch_size, batch_seq_len), hidden_size / 2, 0, stream>>>(
-          token_emb, pos_emb, token_id, output, real_seq_len, padding_id,
-          pos_offset);
+void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
+                                 const int* tokens, float* output,
+                                 int batch_size, int beam_size, int hidden_dim,
+                                 int step_offset, int seq_len, int max_step,
+                                 int padding_id, cudaStream_t stream) {
+  if (seq_len + step_offset >= max_step) {
+    throw std::runtime_error("violate seq_len + step_offset < max_step");
+  }
+  int nele = batch_size * beam_size * seq_len * hidden_dim;
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_gpt_embedding<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, output, batch_size, beam_size, seq_len,
+      hidden_dim, padding_id, max_step, step_offset);
 }
-
-template void ker_gpt_embedding_launcher<float>(
-    int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const float* token_emb, const float* pos_emb, const int* token_id,
-    float* output, int* real_seq_len, int padding_id, int pos_offset);
-
-template void ker_gpt_embedding_launcher<__half>(
-    int batch_size, int batch_seq_len, int hidden_size, cudaStream_t stream,
-    const __half* token_emb, const __half* pos_emb, const int* token_id,
-    __half* output, int* real_seq_len, int padding_id, int pos_offset);
 
 /**
 @brief: ker_correlation_softmax_gpt

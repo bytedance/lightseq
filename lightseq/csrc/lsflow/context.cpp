@@ -145,7 +145,7 @@ void Context::build() {
 #endif
 
   for (Layer* rl : _root_layers) {
-    printf("########## Context build layer %s forward ##########\n\n",
+    printf("########## Context build layer %s forward ##########\n",
            rl->name().c_str());
     rl->forward();
   }
@@ -161,6 +161,8 @@ void Context::build() {
       rl->backward();
     }
   }
+
+  printf("\n########## Context build layer ##########\n");
 
   for (auto iter : _all_node_vec) {
     if (iter->node_type() == NodeType::Variable) {
