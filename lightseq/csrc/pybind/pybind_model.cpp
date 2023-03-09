@@ -198,7 +198,8 @@ class PyBert {
 //   }
 
 //   py::array_t<int> infer(
-//       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+//       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq)
+//       {
 //     auto input_seq_out = input_seq.mutable_unchecked<2>();
 //     const int *input_seq_data = input_seq_out.data(0, 0);
 //     int batch_size = input_seq_out.shape(0);
@@ -216,7 +217,8 @@ class PyBert {
 //     std::vector<int> output_shape = model_->get_output_shape(0);
 //     auto output = py::array_t<int>(output_shape);
 //     int *output_data = output.mutable_data(0, 0);
-//     const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
+//     const int *d_output = static_cast<const int
+//     *>(model_->get_output_ptr(0));
 
 //     CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
 //                                sizeof(int) * output.size(),
@@ -240,16 +242,14 @@ class PyGpt {
     int max_size =
         std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
                         std::multiplies<int>());
-    CHECK_GPU_ERROR(
-        cudaMalloc(&d_input_, sizeof(int) * max_size));
+    CHECK_GPU_ERROR(cudaMalloc(&d_input_, sizeof(int) * max_size));
 
     for (int i = 0; i < model_->get_output_size(); i++) {
       void *d_output;
       std::vector<int> shape = model_->get_output_max_shape(i);
       int output_size = std::accumulate(shape.begin(), shape.end(), 1,
                                         std::multiplies<int>());
-      CHECK_GPU_ERROR(
-          cudaMalloc(&d_output, output_size * sizeof(int)));
+      CHECK_GPU_ERROR(cudaMalloc(&d_output, output_size * sizeof(int)));
       model_->set_output_ptr(i, d_output);
       d_outputs_.push_back(d_output);
     }
@@ -275,9 +275,9 @@ class PyGpt {
           "ppl");
     }
 
-    CHECK_GPU_ERROR(
-        cudaMemcpy(d_input_, input_seq_data, sizeof(int) * input_seq_out.size(),
-                   cudaMemcpyHostToDevice));
+    CHECK_GPU_ERROR(cudaMemcpy(d_input_, input_seq_data,
+                               sizeof(int) * input_seq_out.size(),
+                               cudaMemcpyHostToDevice));
 
     model_->set_input_ptr(0, d_input_);
     model_->set_input_shape(0, {batch_size, batch_seq_len});
@@ -289,8 +289,8 @@ class PyGpt {
     int *output_data = output.mutable_data(0, 0);
     const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
     CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
-                                               sizeof(int) * output.size(),
-                                               cudaMemcpyDeviceToHost));
+                               sizeof(int) * output.size(),
+                               cudaMemcpyDeviceToHost));
 
     return output;
   }
@@ -317,14 +317,15 @@ PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
   py::class_<lightseq::PyBert>(m, "Bert")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
-      .def("infer", &lightseq::PyBert::infer, py::return_value_policy::reference_internal,
-           py::arg("input_seq"));
+      .def("infer", &lightseq::PyBert::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"));
 
   // py::class_<lightseq::PyBertCrf>(m, "BertCrf")
   //     .def(py::init<const std::string, const int>(), py::arg("weight_path"),
   //          py::arg("max_batch_size"))
   //     .def("infer", &lightseq::PyBertCrf::infer,
-  //          py::return_value_policy::reference_internal, py::arg("input_seq"));
+  //          py::return_value_policy::reference_internal,
+  //          py::arg("input_seq"));
 
   py::class_<lightseq::PyGpt>(m, "Gpt")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),

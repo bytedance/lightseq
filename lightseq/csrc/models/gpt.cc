@@ -3,8 +3,7 @@
 namespace lightseq {
 
 Gpt::Gpt(const std::string weight_path, const int max_batch_size)
-    : LSModel({"token_ids"}, {"gpt_out"}),
-      _max_batch_size(max_batch_size) {
+    : LSModel({"token_ids"}, {"gpt_out"}), _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
   Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
@@ -138,7 +137,8 @@ void Gpt::Infer() {
     for (int j = 0; j < tw_._beam_size; j++) {
       CHECK_GPU_ERROR(cudaMemcpyAsync(
           _inp_tokens->value<int>() + (i * tw_._beam_size + j) * tw_._max_step,
-          _input_ptr, prompt_len * sizeof(int), cudaMemcpyDefault, _context_ptr->get_stream()));
+          _input_ptr, prompt_len * sizeof(int), cudaMemcpyDefault,
+          _context_ptr->get_stream()));
     }
   }
 #endif
@@ -180,24 +180,27 @@ void Gpt::Infer() {
     }
 
     steps++;
-    if(steps + prompt_len < tw_._max_step){
+    if (steps + prompt_len < tw_._max_step) {
       Variable::swap_tensor(_inp_tokens, _out_tokens);
     }
   }
 
-  for(int batch_idx = 0; batch_idx < batch_size; batch_idx ++) {
-    for(int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx ++) {
+  for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
+    for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
       cudaMemcpyAsync(
-          _gpt_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
-          _out_tokens->value<int>() + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
-          (steps + prompt_len) * sizeof(int), cudaMemcpyDefault, _context_ptr->get_stream());
+          _gpt_out_ptr +
+              (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
+          _out_tokens->value<int>() +
+              (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
+          _context_ptr->get_stream());
     }
   }
 
   _context_ptr->synchronize();
-  if(_generate_method == GenerateMethod::BeamSearch)
+  if (_generate_method == GenerateMethod::BeamSearch)
     set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
-  else 
+  else
     set_output_shape(0, {batch_size, prompt_len + steps});
 }
 
