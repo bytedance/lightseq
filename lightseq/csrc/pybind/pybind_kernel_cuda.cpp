@@ -423,7 +423,6 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
 }  // namespace cuda
 }  // namespace lightseq
 
-
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_transform_0213_fp32",
         &lightseq::cuda::torch_launch_transform_0213<float>,
