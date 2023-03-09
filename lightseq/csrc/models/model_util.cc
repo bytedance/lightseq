@@ -11,5 +11,4 @@ GenerateMethod get_generate_method(std::string method_) {
   return GenerateMethod::UnDefined;
 }
 
-
 }  // namespace lightseq
