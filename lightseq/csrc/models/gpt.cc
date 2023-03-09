@@ -3,7 +3,7 @@
 namespace lightseq {
 
 Gpt::Gpt(const std::string weight_path, const int max_batch_size)
-    : LSModel({"token_ids"}, {"encoder_output"}),
+    : LSModel({"token_ids"}, {"gpt_out"}),
       _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
   Context::create_global_context(StatusType::Inference);
@@ -13,11 +13,11 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   // saved in custom proto file
   std::string model_weights_path = weight_path;
   std::string res = tw_.initializing(model_weights_path);
-  // tw_._beam_size = 1;
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
   tw_.print_model_config();
+  printf("*** model max_batch_size: %d ***\n", max_batch_size);
   _generate_method = get_generate_method(tw_._sampling_method);
 
   _context_ptr->regress_begin();
@@ -99,6 +99,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   _inp_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step);
   _out_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step);
 
+  _context_ptr->build();
   printf("Finish construct network!\n");
 }
 
@@ -250,7 +251,7 @@ std::vector<int> Gpt::get_input_max_shape(int index) {
 std::vector<int> Gpt::get_output_max_shape(int index) {
   switch (index) {
     case 0:
-      return {_max_batch_size, tw_._max_step, tw_._hidden_size};
+      return {_max_batch_size, tw_._beam_size, tw_._max_step};
 
     default:
       throw std::runtime_error("invalid output index");
@@ -273,12 +274,7 @@ DataType Gpt::get_input_dtype(int index) {
 DataType Gpt::get_output_dtype(int index) {
   switch (index) {
     case 0:
-#ifdef FP16_MODE
-      return DataType::kFloat16;
-#else
-      return DataType::kFloat32;
-#endif
-
+      return DataType::kInt32;
       break;
 
     default:

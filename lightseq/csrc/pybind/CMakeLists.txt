@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.18)
 if(DEVICE_INDEX EQUAL 1)
   set(LS_PYBIND_KERNEL_FILE pybind_kernel_x86.cpp)
 elseif(DEVICE_INDEX EQUAL 0)
-  set(LS_PYBIND_KERNEL_FILES pybind_kernel_cuda.cpp)
+  set(LS_PYBIND_KERNEL_FILES pybind_model.cpp)
 endif()
 
 pybind11_add_module(lightseq MODULE ${LS_PYBIND_KERNEL_FILES})

@@ -79,6 +79,9 @@ int main(int argc, char* argv[]) {
       std::cout << shape[j] << " ";
     }
     std::cout << std::endl;
+    if(i == 0) {
+      lightseq::print_vec(d_output, "d_output", shape[2]);
+    }
   }
 
   return 0;
