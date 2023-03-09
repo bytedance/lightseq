@@ -85,13 +85,8 @@ void test_gemm_u8s8s32(
 }  // namespace x86
 }  // namespace lightseq
 
-#ifdef PYBIND_INTERFACE
-#define PYBIND_MODULE_NAME TORCH_EXTENSION_NAME
-#else
-#define PYBIND_MODULE_NAME inference
-#endif
 
-PYBIND11_MODULE(PYBIND_MODULE_NAME, m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("test_simple_gemm", &lightseq::x86::test_simple_gemm,
         "LightSeq test gemm with fp32 (x86 CPU)");
   m.def("test_gemm_u8s8s32", &lightseq::x86::test_gemm_u8s8s32,

@@ -77,10 +77,9 @@ class CMakeBuild(build_ext):
             cmake_args += (
                 ["-DUSE_NEW_ARCH=ON"] if ENABLE_NEW_ARCH else ["-DUSE_NEW_ARCH=OFF"]
             )
-            cmake_args += ["-DUSE_PYBIND=ON"]
             cmake_args += ["-DDEVICE_ARCH={}".format(DEVICE_ARCH)]
             cmake_args += ["-DDYNAMIC_API=OFF"]
-            # build_args += ["--target", "lightseq"]
+            build_args += ["--target", "lightseq"]
             build_args += ["--", "-j{}".format(multiprocessing.cpu_count())]
 
         env = os.environ.copy()
