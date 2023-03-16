@@ -22,8 +22,8 @@ pos_offset: get real pos when decoding which gridDim.y=1
 */
 
 template <typename T>
-void launch_gpt_embedding(const float* token_emb, const float* pos_emb,
-                          const int* tokens, float* output, int batch_size,
+void launch_gpt_embedding(const T* token_emb, const T* pos_emb,
+                          const int* tokens, T* output, int batch_size,
                           int beam_size, int hidden_dim, int step_offset,
                           int seq_len, int max_step, int padding_id,
                           cudaStream_t stream);
