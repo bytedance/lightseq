@@ -136,7 +136,7 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
                             beam_size, max_step);
   int token_id = token_ids[token_idx];
 
-  float4 output_val = ((float4 *)output)[idx];
+  float4& output_val = ((float4 *)output)[idx];
   if (token_id == padding_id) {
     output_val.x = CUDA_FLOAT_INF_NEG;
     output_val.y = CUDA_FLOAT_INF_NEG;
@@ -152,7 +152,6 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
     output_val.z = token_emb_val.z + pos_emb_val.z;
     output_val.w = token_emb_val.w + pos_emb_val.w;
   }
-  ((float4 *)output)[idx] = output_val;
 }
 
 
@@ -173,26 +172,33 @@ __global__ void kernel_gpt_embedding<__half>(const __half* token_emb, const __ha
                             beam_size, max_step);
   int token_id = token_ids[token_idx];
 
-//   float4 output_val = ((float4 *)output)[idx];
-//   if (token_id == padding_id) {
-//     __half* output_h2 = (__half2 *)(&output_val);
-// #pragma unroll
-//     for(int i = 0; i < 4; i ++) {
-
-//     }
-//     output_val.x = CUDA_FLOAT_INF_NEG;
-//     output_val.y = CUDA_FLOAT_INF_NEG;
-//     output_val.z = CUDA_FLOAT_INF_NEG;
-//     output_val.w = CUDA_FLOAT_INF_NEG;
-//     return;
-//   }
-//   float4 token_emb_val =  ((float4 *)token_emb)[token_id * hidden_dim + state_idx];
-//   float4 pos_emb_val = ((float4 *)pos_emb)[(seq_idx + step_offset) * hidden_dim + state_idx];
-
-//   output_val.x = token_emb_val.x + pos_emb_val.x;
-//   output_val.y = token_emb_val.y + pos_emb_val.y;
-//   output_val.z = token_emb_val.z + pos_emb_val.z;
-//   output_val.w = token_emb_val.w + pos_emb_val.w;
+  float4& output_val = ((float4 *)output)[idx];
+  if (token_id == padding_id) {
+    __half2* output_h2 = (__half2 *)(&output_val);
+#pragma unroll
+    for(int i = 0; i < 4; i ++) {
+      float2 output_f2 = __half22float2(output_h2[i]);
+      output_f2.x = __float2half(CUDA_FLOAT_INF_NEG);
+      output_f2.y = __float2half(CUDA_FLOAT_INF_NEG);
+      output_h2[i] = __float22half2_rn(output_f2);
+    }
+    return;
+  }
+  else {
+    float4 token_emb_val =  ((float4 *)token_emb)[token_id * hidden_dim + state_idx];
+    float4 pos_emb_val = ((float4 *)pos_emb)[(seq_idx + step_offset) * hidden_dim + state_idx];
+    __half2 *value_h2 = (__half2 *)(&token_emb_val);
+    __half2 *pemb_h2 = (__half2 *)(&pos_emb_val);
+#pragma unroll
+    for (int i = 0; i < 4; i++) {
+      float2 value_f2 = __half22float2(value_h2[i]);
+      float2 pemb_f2 = __half22float2(pemb_h2[i]);
+      value_f2.x += pemb_f2.x;
+      value_f2.y += pemb_f2.y;
+      value_h2[i] = __float22half2_rn(value_f2);
+    }
+    output_val = token_emb_val;
+  }
 }
 template <>
 void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
@@ -206,7 +212,8 @@ void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
   if (hidden_dim % 4) {
     throw std::runtime_error("violate hidden_dim % 4 = 0");
   }
-  int nele = (batch_size * beam_size * seq_len * hidden_dim) / 4;
+  hidden_dim >>= 2;
+  int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_gpt_embedding<float><<<nblock, MAX_THREADS, 0, stream>>>(
       token_emb, pos_emb, tokens, output, batch_size, beam_size, seq_len,
@@ -225,7 +232,8 @@ void launch_gpt_embedding<__half>(const __half* token_emb, const __half* pos_emb
   if (hidden_dim % 8) {
     throw std::runtime_error("violate hidden_dim % 8 = 0");
   }
-  int nele = (batch_size * beam_size * seq_len * hidden_dim) / 8;
+  hidden_dim >>= 3;
+  int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_gpt_embedding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
       token_emb, pos_emb, tokens, output, batch_size, beam_size, seq_len,

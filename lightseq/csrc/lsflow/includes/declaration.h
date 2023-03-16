@@ -23,6 +23,12 @@
 
 namespace lightseq {
 
+#ifdef FP16_MODE
+typedef __half OpType_;
+#else
+typedef float OpType_;
+#endif
+
 enum class NodeType { Variable, Operator };
 // const std::string NodeTypeString[] = {"Variable", "Operator"};
 enum VariableType {

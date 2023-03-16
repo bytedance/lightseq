@@ -32,7 +32,7 @@ void LaunchGptEmbOp<T>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
-  cuda::launch_gpt_embedding<float>(
+  cuda::launch_gpt_embedding<T>(
       token_emb, pos_emb, inp_tokens, output_ptr, _batch_size, _beam_size,
       _hidden_dim, _offset, _seq_len, _max_step, _pad_id, _stream);
 #endif
@@ -40,6 +40,6 @@ void LaunchGptEmbOp<T>::forward() {
 
 template class LaunchGptEmbOp<float>;
 #ifdef LIGHTSEQ_cuda
-// template class LaunchGptEmbOp<__half>;
+template class LaunchGptEmbOp<__half>;
 #endif
 }  // namespace lightseq

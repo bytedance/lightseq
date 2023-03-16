@@ -7,12 +7,6 @@
 #include "transformer_encoder_layer.h"
 #include "lyr_normalize_layer.h"
 
-#ifdef FP16_MODE
-typedef __half OpType_;
-#else
-typedef float OpType_;
-#endif
-
 namespace lightseq {
 
 class Bert : public LSModel {
