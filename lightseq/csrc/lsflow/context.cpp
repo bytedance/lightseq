@@ -107,7 +107,8 @@ void Context::build() {
   _building = true;
 
   printf(
-      "========== start Lightseq Context build, StatusType: %s, OpType_: %d ==========\n\n",
+      "========== start Lightseq Context build, StatusType: %s, OpType_: %d "
+      "==========\n\n",
       status_type_str().c_str(), g_dtype<OpType_>());
 
   if (!check_validate()) {

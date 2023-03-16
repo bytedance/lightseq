@@ -9,7 +9,6 @@
 #include "linear_layer.h"
 #include "crf_layer.h"
 
-
 namespace lightseq {
 
 class BertCrf : public LSModel {
