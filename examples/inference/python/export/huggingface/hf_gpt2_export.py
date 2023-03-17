@@ -2,14 +2,65 @@
 Export Hugging Face GPT2 models to hdf5 format.
 """
 import os
+import sys
+
+sys.path.insert(0, "/mlx_devbox/users/zhoubofan/playground/")
+sys.path.insert(0, "/mlx_devbox/users/zhoubofan/playground/lightseq")
 import h5py
 import numpy as np
 from collections import OrderedDict
 from transformers import GPT2LMHeadModel
 from lightseq.training.ops.pytorch.export import fill_hdf5_layer
 from export.util import parse_args
+import torch
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+
+def get_transformation_var_names(n_layers, hf_prefix="transformer."):
+    mapping = {}
+    mapping_with_transpose = {}
+
+    mapping["model.embedding.position_embedding"] = hf_prefix + "wpe.weight"
+    mapping["model.embedding.weight"] = hf_prefix + "wte.weight"
+    for i in range(n_layers):
+        selfattn_prefix = f"model.decoder.layers.{i}.selfatt_layer."
+        ffn_prefix = f"model.decoder.layers.{i}.ffn_layer."
+        mapping[selfattn_prefix + "norm_layer.weight"] = (
+            hf_prefix + f"h.{i}.ln_1.weight"
+        )
+        mapping[selfattn_prefix + "norm_layer.bias"] = hf_prefix + f"h.{i}.ln_1.bias"
+        mapping[selfattn_prefix + "selfatt.qkv_transform.weight"] = (
+            hf_prefix + f"h.{i}.attn.c_attn.weight"
+        )
+        mapping[selfattn_prefix + "selfatt.qkv_transform.bias"] = (
+            hf_prefix + f"h.{i}.attn.c_attn.bias"
+        )
+        mapping[selfattn_prefix + "selfatt.output_transform.weight"] = (
+            hf_prefix + f"h.{i}.attn.c_proj.weight"
+        )
+        mapping[selfattn_prefix + "selfatt.output_transform.bias"] = (
+            hf_prefix + f"h.{i}.attn.c_proj.bias"
+        )
+
+        mapping_with_transpose[ffn_prefix + "dense1.weight"] = (
+            hf_prefix + f"h.{i}.mlp.c_fc.weight"
+        )
+        mapping_with_transpose[ffn_prefix + "dense1.bias"] = (
+            hf_prefix + f"h.{i}.mlp.c_fc.bias"
+        )
+        mapping_with_transpose[ffn_prefix + "dense2.weight"] = (
+            hf_prefix + f"h.{i}.mlp.c_proj.weight"
+        )
+        mapping_with_transpose[ffn_prefix + "dense2.bias"] = (
+            hf_prefix + f"h.{i}.mlp.c_proj.bias"
+        )
+        mapping[ffn_prefix + "norm_layer.weight"] = hf_prefix + f"h.{i}.ln_2.weight"
+        mapping[ffn_prefix + "norm_layer.bias"] = hf_prefix + f"h.{i}.ln_2.bias"
+    mapping["model.decoder.output_norm.weight"] = hf_prefix + "ln_f.weight"
+    mapping["model.decoder.output_norm.bias"] = hf_prefix + "ln_f.bias"
+
+    return mapping, mapping_with_transpose
 
 
 """
@@ -55,20 +106,57 @@ def extract_gpt_weights(
     model_dir,
     generation_method,
     beam_size=1,
+    length_penalty=1.0,
     topk=1,
     topp=0.75,
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
-    eos_id=50256,
-    pad_id=50257,
-    max_step=50,
+    eos_id=69764,
+    pad_id=69765,
+    max_step=255,
     extra_decode_length=0,
 ):
 
     # load var names
-    model = GPT2LMHeadModel.from_pretrained(model_dir)
-    head_num = model.config.n_head
-    encoder_state_dict = model.state_dict()
-    enc_var_name_list = list(encoder_state_dict.keys())
+    model = torch.load(
+        model_dir
+    )  # bytedseq.pyneurst.models.gpt2.Gpt2.from_pretrained(model_dir)
+    print(model.keys())
+    print("-------")
+    print(model["global_step"])
+    print("-------")
+    print(model["model_configs"])
+    print("-------")
+    # print(model['state_dict'].keys())
+    # print('-------')
+    config = model["model_configs"]["task.params"]["model.params"]
+    head_num = config["num_attention_heads"]
+
+    encoder_state_dict = model["state_dict"]
+
+    hfmp, hftmp = get_transformation_var_names(
+        n_layers=config["num_layers"], hf_prefix="transformer."
+    )
+
+    trans_state_dict = OrderedDict()
+    for k, v in encoder_state_dict.items():
+        if k in hfmp.keys():
+            trans_state_dict[hfmp[k]] = v
+        elif k in hftmp.keys():
+            if v.dim() == 1:
+                trans_state_dict[hftmp[k]] = v
+            else:
+                # print(v.dim(), k)
+                trans_state_dict[hftmp[k]] = v.transpose(0, 1)
+        else:
+            print("error")
+            exit(-1)
+
+    encoder_state_dict = trans_state_dict
+
+    print(encoder_state_dict.keys())
+    print("-------")
+
+    enc_var_name_list = list(trans_state_dict.keys())
 
     # initialize output file
     output_file += ".hdf5"
@@ -128,6 +216,9 @@ def extract_gpt_weights(
     hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
     hdf5_file.create_dataset("model_conf/src_padding_id", data=pad_id, dtype="i4")
     hdf5_file.create_dataset(
+        "model_conf/length_penalty", data=length_penalty, dtype="f4"
+    )
+    hdf5_file.create_dataset(
         "model_conf/sampling_method",
         data=np.array([ord(c) for c in generation_method]).astype(np.int8),
         dtype="i1",
@@ -155,23 +246,35 @@ def extract_gpt_weights(
 
 
 if __name__ == "__main__":
+
+    # model = GPT2LMHeadModel.from_pretrained('gpt2')
+    # head_num = model.config.n_head
+    # encoder_state_dict = model.state_dict()
+    # enc_var_name_list = list(encoder_state_dict.keys())
+    # print(encoder_state_dict.keys())
+    # exit(0)
+
     args = parse_args()
-    if args.generation_method not in ["topk", "topp", "ppl", "beam_search"]:
-        args.generation_method = "topk"
-    output_lightseq_model_name = "lightseq_gpt2_base"  # or "lightseq_gpt2_large"
-    input_huggingface_gpt_model = "gpt2"  # or "gpt2-large"
+    # if args.generation_method not in ["topk", "topp", "ppl", "beam_search"]:
+    args.generation_method = "topk"
+    output_lightseq_model_name = "lightseq_gpt2_pyneurst"  # or "lightseq_gpt2_large"
+    input_huggingface_gpt_model = (
+        "/mlx_devbox/users/zhoubofan/playground/ckpt-500400.pt"  # or "gpt2-large"
+    )
     topk = 1
     topp = 0.75
     beam_size = 4
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
-    eos_id = 50256
-    pad_id = 50257
-    max_step = 50
+    length_penalty = 0.6
+    eos_id = 69765
+    pad_id = 69766
+    max_step = 255
     extra_decode_length = 0  # use positive length to avtivate it
     extract_gpt_weights(
         output_lightseq_model_name,
         input_huggingface_gpt_model,
         generation_method=args.generation_method,
+        length_penalty=length_penalty,
         beam_size=beam_size,
         topk=topk,
         topp=topp,
