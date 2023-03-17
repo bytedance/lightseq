@@ -13,12 +13,6 @@
 #include "encdec_kv_layer.h"
 #include "model_util.h"
 
-#ifdef FP16_MODE
-typedef __half OpType_;
-#else
-typedef float OpType_;
-#endif
-
 namespace lightseq {
 
 class Transformer : public LSModel {

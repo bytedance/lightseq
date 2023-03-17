@@ -55,7 +55,7 @@ class LaunchGptEmbLayer : public Layer {
 
 template class LaunchGptEmbLayer<float>;
 #ifdef LIGHTSEQ_cuda
-// template class LaunchGptEmbLayer<__half>;
+template class LaunchGptEmbLayer<__half>;
 #endif
 
 template <class T>

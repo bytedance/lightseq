@@ -9,12 +9,6 @@
 #include "linear_layer.h"
 #include "generator_layer.h"
 
-#ifdef FP16_MODE
-typedef __half OpType_;
-#else
-typedef float OpType_;
-#endif
-
 namespace lightseq {
 
 class Gpt : public LSModel {
