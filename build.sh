@@ -2,6 +2,7 @@
 
 export LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LIBRARY_PATH}
 export PATH=/opt/common_tools:/usr/local/cuda/bin:/usr/local/hdf5:${PATH}
+export LD_LIBRARY_PATH=/usr/local/cuda/compat:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
 PROJECT_DIR=$(dirname $(readlink -e $0))
 cd $PROJECT_DIR

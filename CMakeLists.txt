@@ -12,8 +12,6 @@ if(USE_NEW_ARCH)
   add_definitions(-DNEW_ARCH)
 
   set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86 87)
-  set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
-  list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
   # setting compiler flags
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -O0")
@@ -43,6 +41,8 @@ if(USE_NEW_ARCH)
   if(DEVICE_INDEX EQUAL 0)
     add_definitions(-DLIGHTSEQ_cuda)
     set(DEVICE_ARCHITECTURE cuda)
+    find_package(CUDAToolkit)
+    find_package(CUDA 11 REQUIRED)
   elseif(DEVICE_INDEX EQUAL 1)
     add_definitions(-DLIGHTSEQ_x86)
     set(DEVICE_ARCHITECTURE x86)
@@ -83,6 +83,9 @@ if(USE_NEW_ARCH)
     message(STATUS "Build using fp32 precision")
   endif()
 
+  set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
+  list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
+
   set(COMMON_HEADER_DIRS
       ${PROJECT_SOURCE_DIR}
       ${CUDA_PATH}/include
@@ -105,8 +108,8 @@ if(USE_NEW_ARCH)
   add_subdirectory(lightseq/csrc/lsflow)
   add_subdirectory(lightseq/csrc/ops_new)
   add_subdirectory(lightseq/csrc/layers_new)
-  add_subdirectory(lightseq/csrc/models)
   add_subdirectory(lightseq/csrc/proto)
+  add_subdirectory(lightseq/csrc/models)
   add_subdirectory(lightseq/csrc/example)
   add_subdirectory(lightseq/csrc/pybind)
   if(USE_TRITONBACKEND)
