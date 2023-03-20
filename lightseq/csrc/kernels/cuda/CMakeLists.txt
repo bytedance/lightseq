@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
 
-
 set(cuda_kernel_files
     util.cc.cu
     cross_entropy.cu
@@ -19,7 +18,6 @@ set(cuda_kernel_files
     transform_kernels_new.cu
     crf.cu
     transformerKernels.cc.cu)
-
 
 add_library(lightseq_kernels STATIC ${cuda_kernel_files})
 target_link_libraries(lightseq_kernels PUBLIC -lcublas)

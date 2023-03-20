@@ -8,7 +8,6 @@ find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-
 set(PROTO_FILES bert.proto bert_crf.proto transformer.proto gpt.proto)
 
 set(WEIGHT_FILES bert_weight.cc # bert_crf_weight.cc

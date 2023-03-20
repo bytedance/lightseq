@@ -6,7 +6,6 @@ find_package(Threads REQUIRED)
 
 set(CMAKE_CXX_STANDARD 14)
 
-
 add_library(
   lsflow STATIC
   context.cpp
