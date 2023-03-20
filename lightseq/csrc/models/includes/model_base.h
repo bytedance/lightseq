@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace lightseq {
+namespace cuda {
 
 enum DataType {
   kNotSupported = 0,
@@ -26,7 +27,7 @@ enum DataType {
 
 // Bellow is an usage example for lightseq cpp API
 //
-// auto model = lightseq::LSModelFactory::GetInstance().CreateModel(
+// auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
 //     "Transformer", model_weights_path, max_batch_size);
 // model->set_input_ptr(0, d_input);
 // model->set_input_shape(0, {batch_size, batch_seq_len});
@@ -38,7 +39,7 @@ enum DataType {
 //   for (int j = 0; j < shape.size(); j++) {
 //     total_size *= shape[j];
 //   }
-//   lightseq::CHECK_GPU_ERROR(
+//   lightseq::cuda::CHECK_GPU_ERROR(
 //       cudaMalloc(&d_output, total_size * sizeof(int)));
 //   model->set_output_ptr(i, d_output);
 // }
@@ -85,6 +86,8 @@ class LSModel {
   std::vector<int> get_output_shape(int index) { return output_shapes_[index]; }
   virtual std::vector<int> get_output_max_shape(int index) = 0;
   virtual DataType get_output_dtype(int index) = 0;
+
+  virtual void benchmark_mode(bool is_benchmark) = 0;
 
  protected:
   void set_output_shape(int index, std::vector<int> shape) {
@@ -144,5 +147,6 @@ class Reflector {
   }                                                                 \
   Reflector reflector_##className(#className, create_object_##className);
 
+}  // namespace cuda
 }  // namespace lightseq
 #endif

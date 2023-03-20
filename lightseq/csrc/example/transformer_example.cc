@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  auto model = lightseq::LSModelFactory::GetInstance().CreateModel(
+  auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Transformer", model_weights_path, max_batch_size);
 
   void* d_input;

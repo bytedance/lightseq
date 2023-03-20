@@ -56,33 +56,33 @@ std::tuple<Variable*, Variable*> BeamSearchTopOp<T>::operator()(
 
   _seq_score = new Variable(
       "seq_score", _max_batch_size * _beam_size * _max_step, g_dtype<float>(),
-      DataType::kNotSupported, VariableType::RegressiveVariable);
+      cuda::DataType::kNotSupported, VariableType::RegressiveVariable);
 
   // initial own variable
 
   _num_beam_can = new Variable("num_beam_can", _max_batch_size * _beam_size + 1,
-                               g_dtype<int>(), DataType::kNotSupported,
+                               g_dtype<int>(), cuda::DataType::kNotSupported,
                                VariableType::RegressiveVariable);
   _can_idx = new Variable(
       "can_idx", _max_batch_size * _beam_size * _trg_vocab_size, g_dtype<int>(),
-      DataType::kNotSupported, VariableType::RegressiveVariable);
+      cuda::DataType::kNotSupported, VariableType::RegressiveVariable);
   _can_score =
       new Variable("can_score", _max_batch_size * _beam_size * _trg_vocab_size,
-                   g_dtype<float>(), DataType::kNotSupported,
+                   g_dtype<float>(), cuda::DataType::kNotSupported,
                    VariableType::RegressiveVariable);
-  _seq_prob =
-      new Variable("seq_prob", _max_batch_size * _beam_size, g_dtype<float>(),
-                   DataType::kNotSupported, VariableType::RegressiveVariable);
+  _seq_prob = new Variable("seq_prob", _max_batch_size * _beam_size,
+                           g_dtype<float>(), cuda::DataType::kNotSupported,
+                           VariableType::RegressiveVariable);
 
   _caches_k_buf = new Variable("caches_k_buf",
                                _nshared_dec_layer * _max_batch_size *
                                    _max_step * _beam_size * _hidden_size,
-                               g_dtype<T>(), DataType::kNotSupported,
+                               g_dtype<T>(), cuda::DataType::kNotSupported,
                                VariableType::RegressiveVariable);
   _caches_v_buf = new Variable("caches_v_buf",
                                _nshared_dec_layer * _max_batch_size *
                                    _max_step * _beam_size * _hidden_size,
-                               g_dtype<T>(), DataType::kNotSupported,
+                               g_dtype<T>(), cuda::DataType::kNotSupported,
                                VariableType::RegressiveVariable);
 
   set_children({_alive_seq_out, _seq_score});

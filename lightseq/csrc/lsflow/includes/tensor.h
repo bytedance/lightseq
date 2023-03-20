@@ -12,16 +12,16 @@ namespace lightseq {
 
 // Convert C++ basic data types to custom data types.
 template <typename T>
-DataType g_dtype();
+cuda::DataType g_dtype();
 
-// return byte size of DataType.
-int dtype_size(DataType dtype);
+// return byte size of cuda::DataType.
+int dtype_size(cuda::DataType dtype);
 
 class Tensor {
  private:
   LSMemoryType _mtype;
   char* _ptr = nullptr;
-  DataType _dtype;
+  cuda::DataType _dtype;
 
   // If mx_shape is 0, then tensor's memory type is FixedMemory or OffsetMemory.
   size_t _mx_shape_size;
@@ -41,7 +41,7 @@ class Tensor {
   // When the mx_shape parameter is empty, it means that the tensor uses the
   // FixedMemory memory type, and then manually set the specific pointer address
   // and tensor shape.
-  Tensor(std::string name, DataType dtype, size_t mx_shape_size = 0);
+  Tensor(std::string name, cuda::DataType dtype, size_t mx_shape_size = 0);
 
   // Applicable to tensors whose video memory type is OffsetMemory.
   // In this case the initialized tensor is a partial fragment of the original
@@ -86,7 +86,7 @@ class Tensor {
   int element_size() { return _shape.element_size(); }
   const size_t& mx_shape_size() const { return _mx_shape_size; }
   const std::vector<size_t>& shape() const { return _shape.view(); }
-  const DataType& dtype() const { return _dtype; }
+  const cuda::DataType& dtype() const { return _dtype; }
 
   // unique id of the tensor.
   int unique_id() { return _id; }
@@ -106,9 +106,9 @@ class Tensor {
   std::string memory_type();
 
   // Use the corresponding data type to print the tensor according to the
-  // DataType information. Print the head and tail of the tensor according to
-  // the shape information. The size parameter is used to indicate the number of
-  // elements to be printed separately.
+  // cuda::DataType information. Print the head and tail of the tensor according
+  // to the shape information. The size parameter is used to indicate the number
+  // of elements to be printed separately.
   void print_tensor(int size);
 
   friend class Variable;

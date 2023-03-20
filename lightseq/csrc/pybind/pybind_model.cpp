@@ -12,15 +12,17 @@
 
 namespace py = pybind11;
 namespace lightseq {
+namespace cuda {
+
 class PyTransformer {
  private:
-  lightseq::LSModel *model_;
+  LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
  public:
   PyTransformer(std::string weight_path, int max_batch_size) {
-    model_ = lightseq::LSModelFactory::GetInstance().CreateModel(
+    model_ = LSModelFactory::GetInstance().CreateModel(
         "Transformer", weight_path, max_batch_size);
     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
     int max_size =
@@ -85,13 +87,13 @@ class PyTransformer {
 
 class PyBert {
  private:
-  lightseq::LSModel *model_;
+  LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
  public:
   PyBert(std::string weight_path, int max_batch_size) {
-    model_ = lightseq::LSModelFactory::GetInstance().CreateModel(
+    model_ = LSModelFactory::GetInstance().CreateModel(
         "Bert", weight_path, max_batch_size);
     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
     int max_size =
@@ -136,15 +138,15 @@ class PyBert {
     std::vector<int> output_shape = model_->get_output_shape(0);
     auto output = py::array_t<float>(output_shape);
     float *output_data = output.mutable_data(0, 0);
-    lightseq::DataType output_type = model_->get_output_dtype(0);
-    if (output_type == lightseq::kFloat32) {
+    DataType output_type = model_->get_output_dtype(0);
+    if (output_type == kFloat32) {
       const float *d_output =
           static_cast<const float *>(model_->get_output_ptr(0));
 
       CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
                                  sizeof(float) * output.size(),
                                  cudaMemcpyDeviceToHost));
-    } else if (output_type == lightseq::kFloat16) {
+    } else if (output_type == kFloat16) {
       const half *d_output =
           static_cast<const half *>(model_->get_output_ptr(0));
       std::vector<half> h_bert_out(output.size());
@@ -165,13 +167,13 @@ class PyBert {
 
 // class PyBertCrf {
 //  private:
-//   lightseq::LSModel *model_;
+//   LSModel *model_;
 //   int *d_input_;
 //   std::vector<void *> d_outputs_;
 
 //  public:
 //   PyBertCrf(std::string weight_path, int max_batch_size) {
-//     model_ = lightseq::LSModelFactory::GetInstance().CreateModel(
+//     model_ = LSModelFactory::GetInstance().CreateModel(
 //         "BertCrf", weight_path, max_batch_size);
 //     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
 //     int max_size =
@@ -230,13 +232,13 @@ class PyBert {
 
 class PyGpt {
  private:
-  lightseq::LSModel *model_;
+  LSModel *model_;
   int *d_input_;
   std::vector<void *> d_outputs_;
 
  public:
   PyGpt(std::string weight_path, int max_batch_size) {
-    model_ = lightseq::LSModelFactory::GetInstance().CreateModel(
+    model_ = LSModelFactory::GetInstance().CreateModel(
         "Gpt", weight_path, max_batch_size);
     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
     int max_size =
@@ -268,7 +270,7 @@ class PyGpt {
     const int *input_seq_data = input_seq_out.data(0, 0);
     int batch_size = input_seq_out.shape(0);
     int batch_seq_len = input_seq_out.shape(1);
-    if (model_->get_output_dtype(0) != lightseq::DataType::kInt32) {
+    if (model_->get_output_dtype(0) != DataType::kInt32) {
       throw std::runtime_error(
           "This model is not for sample, maybe you have set the "
           "sampling_method to "
@@ -295,7 +297,7 @@ class PyGpt {
     return output;
   }
 };
-
+}
 }  // namespace lightseq
 
 PYBIND11_MODULE(inference, m) {
@@ -308,22 +310,22 @@ PYBIND11_MODULE(inference, m) {
   //          py::return_value_policy::reference_internal,
   //          py::arg("input_seq"));
 
-  py::class_<lightseq::PyBert>(m, "Bert")
+  py::class_<lightseq::cuda::PyBert>(m, "Bert")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
-      .def("infer", &lightseq::PyBert::infer,
+      .def("infer", &lightseq::cuda::PyBert::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
 
-  // py::class_<lightseq::PyBertCrf>(m, "BertCrf")
+  // py::class_<lightseq::cuda::PyBertCrf>(m, "BertCrf")
   //     .def(py::init<const std::string, const int>(), py::arg("weight_path"),
   //          py::arg("max_batch_size"))
-  //     .def("infer", &lightseq::PyBertCrf::infer,
+  //     .def("infer", &lightseq::cuda::PyBertCrf::infer,
   //          py::return_value_policy::reference_internal,
   //          py::arg("input_seq"));
 
-  py::class_<lightseq::PyGpt>(m, "Gpt")
+  py::class_<lightseq::cuda::PyGpt>(m, "Gpt")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
-      .def("infer", &lightseq::PyGpt::infer,
+      .def("infer", &lightseq::cuda::PyGpt::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
 }
