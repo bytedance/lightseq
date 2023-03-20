@@ -249,7 +249,7 @@ class ModelInstanceState : public BackendModelInstance {
 
   // Get the state of the model that corresponds to this instance.
   ModelState* StateForModel() const { return model_state_; }
-  std::shared_ptr<::lightseq::LSModel> LightseqModel() {
+  std::shared_ptr<::lightseq::cuda::LSModel> LightseqModel() {
     return lightseq_model_ptr_;
   }
   int get_input_index(std::string input_name) {
@@ -269,7 +269,7 @@ class ModelInstanceState : public BackendModelInstance {
   ModelInstanceState(ModelState* model_state,
                      TRITONBACKEND_ModelInstance* triton_model_instance);
   ModelState* model_state_;
-  std::shared_ptr<::lightseq::LSModel> lightseq_model_ptr_;
+  std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr_;
 
   std::unordered_map<std::string, int> input_name_map_;
   std::unordered_map<std::string, int> output_name_map_;
@@ -289,8 +289,8 @@ ModelInstanceState::ModelInstanceState(
 #ifdef LIGHTSEQ_cuda
   cudaSetDevice(DeviceId());
 #endif
-  lightseq_model_ptr_ = std::shared_ptr<::lightseq::LSModel>(
-      ::lightseq::LSModelFactory::GetInstance().CreateModel(
+  lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(
+      ::lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
           model_state->GetModelType(), file_name,
           model_state_->MaxBatchSize()));
 

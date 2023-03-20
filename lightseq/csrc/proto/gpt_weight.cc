@@ -67,6 +67,18 @@ void GptWeight<T>::proto_get_model_config(const Gpt &gpt) {
   if (gpt.model_conf().eos_id() != 0) {
     _eos_id = gpt.model_conf().eos_id();
   }
+  if (gpt.model_conf().beam_size() != 0) {
+    _beam_size = gpt.model_conf().beam_size();
+  }
+  if (gpt.model_conf().length_penalty() != 0) {
+    _length_penalty = gpt.model_conf().length_penalty();
+  }
+  if (gpt.model_conf().diverse_lambda() != 0) {
+    _diverse_lambda = gpt.model_conf().diverse_lambda();
+  }
+  if (gpt.model_conf().use_gelu() != 0) {
+    _use_gelu = gpt.model_conf().use_gelu();
+  }
 }
 
 /**
@@ -285,6 +297,34 @@ void GptWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
                            &_eos_id_read);
   if (_eos_id_read != 0) {
     _eos_id = _eos_id_read;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
+                             &_beam_size);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _beam_size = 1;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/length_penalty",
+                             H5T_NATIVE_FLOAT, &_length_penalty);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _length_penalty = 1.0;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/diverse_lambda",
+                             H5T_NATIVE_FLOAT, &_diverse_lambda);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _diverse_lambda = 0.;
+  }
+
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/use_gelu", H5T_NATIVE_HBOOL,
+                             &_use_gelu);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _use_gelu = true;
   }
 }
 

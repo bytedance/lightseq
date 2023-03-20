@@ -1,7 +1,7 @@
 #include "transformer.h"
 
 namespace lightseq {
-
+namespace cuda {
 Transformer::Transformer(const std::string weight_path,
                          const int max_batch_size)
     : LSModel({"source_ids"}, {"target_ids", "target_scores"}),
@@ -367,5 +367,5 @@ DataType Transformer::get_output_dtype(int index) {
       break;
   }
 }
-
+}  // namespace cuda
 }  // namespace lightseq

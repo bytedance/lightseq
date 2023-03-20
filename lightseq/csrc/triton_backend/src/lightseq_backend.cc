@@ -246,7 +246,7 @@ TRITONSERVER_Error* TRITONBACKEND_ModelInstanceExecute(
   }
 #endif
 
-  std::shared_ptr<::lightseq::LSModel> lightseq_model_ptr =
+  std::shared_ptr<::lightseq::cuda::LSModel> lightseq_model_ptr =
       instance_state->LightseqModel();
 
   // 'responses' is initialized as a parallel array to 'requests',
