@@ -1,7 +1,7 @@
 #include "gpt.h"
 
 namespace lightseq {
-
+namespace cuda {
 Gpt::Gpt(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"gpt_out"}), _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
@@ -201,7 +201,7 @@ void Gpt::Infer() {
   if (_generate_method == GenerateMethod::BeamSearch)
     set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
   else
-    set_output_shape(0, {batch_size, prompt_len + steps});
+    set_output_shape(0, {batch_size, 1, prompt_len + steps});
 }
 
 void Gpt::set_input_ptr(int index, void *input_ptr) {
@@ -285,5 +285,5 @@ DataType Gpt::get_output_dtype(int index) {
       break;
   }
 }
-
+}  // namespace cuda
 }  // namespace lightseq

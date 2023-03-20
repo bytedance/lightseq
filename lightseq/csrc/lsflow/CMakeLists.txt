@@ -6,7 +6,6 @@ find_package(Threads REQUIRED)
 
 set(CMAKE_CXX_STANDARD 14)
 
-include_directories(includes)
 
 add_library(
   lsflow STATIC
@@ -22,7 +21,3 @@ add_library(
   variable.cpp)
 
 target_link_libraries(lsflow PUBLIC lightseq_kernels)
-
-if(DEBUG)
-  add_subdirectory(example)
-endif()

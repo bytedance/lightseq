@@ -59,12 +59,12 @@ class GptWeight {
   int _head_num;
   int _padding_id;  // for src
   std::string _sampling_method = "topk";
-  int _topk = 4;
+  int _topk = 1;
   float _topp = 0.75;
   int _eos_id;
 
-  int _beam_size = 4;
-  float _length_penalty = 0.;
+  int _beam_size = 1;
+  float _length_penalty = 1.0;
   float _diverse_lambda = 0.;
   bool _use_gelu = true;
 
