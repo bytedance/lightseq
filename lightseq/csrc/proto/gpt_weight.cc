@@ -299,32 +299,32 @@ void GptWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
     _eos_id = _eos_id_read;
   }
 
-  int _beam_size_read;
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
-                           &_beam_size_read);
-  if (_beam_size_read != 0) {
-    _beam_size = _beam_size_read;
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
+                             &_beam_size);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _beam_size = 1;
   }
 
-  float _length_penalty_read;
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_FLOAT,
-                           &_length_penalty_read);
-  if (_length_penalty_read != 0) {
-    _length_penalty = _length_penalty_read;
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/length_penalty",
+                             H5T_NATIVE_FLOAT, &_length_penalty);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _length_penalty = 1.0;
   }
 
-  float _diverse_lambda_read;
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_FLOAT,
-                           &_diverse_lambda_read);
-  if (_diverse_lambda_read != 0) {
-    _diverse_lambda = _diverse_lambda_read;
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/diverse_lambda",
+                             H5T_NATIVE_FLOAT, &_diverse_lambda);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _diverse_lambda = 0.;
   }
 
-  float _use_gelu_read;
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_HBOOL,
-                           &_use_gelu_read);
-  if (_use_gelu_read != 0) {
-    _use_gelu = _use_gelu_read;
+  try {
+    read_hdf5_dataset_scalar(hdf5_file, "model_conf/use_gelu", H5T_NATIVE_HBOOL,
+                             &_use_gelu);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _use_gelu = true;
   }
 }
 

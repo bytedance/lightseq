@@ -93,8 +93,8 @@ class PyBert {
 
  public:
   PyBert(std::string weight_path, int max_batch_size) {
-    model_ = LSModelFactory::GetInstance().CreateModel(
-        "Bert", weight_path, max_batch_size);
+    model_ = LSModelFactory::GetInstance().CreateModel("Bert", weight_path,
+                                                       max_batch_size);
     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
     int max_size =
         std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
@@ -238,8 +238,8 @@ class PyGpt {
 
  public:
   PyGpt(std::string weight_path, int max_batch_size) {
-    model_ = LSModelFactory::GetInstance().CreateModel(
-        "Gpt", weight_path, max_batch_size);
+    model_ = LSModelFactory::GetInstance().CreateModel("Gpt", weight_path,
+                                                       max_batch_size);
     std::vector<int> max_input_shape = model_->get_input_max_shape(0);
     int max_size =
         std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
@@ -297,7 +297,7 @@ class PyGpt {
     return output;
   }
 };
-}
+}  // namespace cuda
 }  // namespace lightseq
 
 PYBIND11_MODULE(inference, m) {
