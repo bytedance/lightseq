@@ -11,7 +11,7 @@ if [[ ! -d "`pwd`/build" ]]; then
 fi
 
 cd build && \
-cmake -DCMAKE_BUILD_TYPE=Release -DFP16_MODE=ON -DUSE_NEW_ARCH=ON -DDEBUG_MODE=OFF -DDYNAMIC_API=ON .. && \
+cmake -DCMAKE_BUILD_TYPE=Release -DUSE_NEW_ARCH=ON -DDEVICE_ARCH=cuda -DUSE_TRITONBACKEND=ON -DDEBUG_MODE=OFF -DFP16_MODE=ON -DMEM_DEBUG=OFF -DDYNAMIC_API=ON .. && \
 make -j${nproc} && \
 mkdir $PROJECT_DIR/output && \
 mkdir $PROJECT_DIR/output/lib && \
