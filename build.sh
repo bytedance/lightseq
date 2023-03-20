@@ -19,5 +19,4 @@ mkdir $PROJECT_DIR/output/lib && \
 cp $PROJECT_DIR/build/lightseq/csrc/models/liblightseq.so $PROJECT_DIR/output && \
 cp -av /usr/local/cuda/lib64/libcublas.so* $PROJECT_DIR/output/lib && \
 cp -av /usr/local/cuda/lib64/libcublasLt.so* $PROJECT_DIR/output/lib && \
-cp -av /usr/local/cuda/lib64/libcudart.so* $PROJECT_DIR/output/lib && \
-cp $PROJECT_DIR/run.sh $PROJECT_DIR/output
+cp -av /usr/local/cuda/lib64/libcudart.so* $PROJECT_DIR/output/lib
