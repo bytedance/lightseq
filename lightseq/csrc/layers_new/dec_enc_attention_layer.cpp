@@ -58,11 +58,10 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
   set_inputs({inp, enc_mask, enc_k, enc_v});
 
   Variable* q_linear_out = nullptr;
-  if(_is_pre_ln){
+  if (_is_pre_ln) {
     Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
     q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
-  }
-  else {
+  } else {
     q_linear_out = (*_q_linear)(inp, _attn_qw);
   }
 
@@ -80,13 +79,15 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
-  Variable* attn_dropout_residual = (*_attn_dropout)(attn_linear, _attn_ob, inp);
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
-  Variable* attn_ln_out = (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
+  Variable* attn_ln_out =
+      (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
   set_outputs({attn_ln_out});
   return attn_ln_out;
 }
