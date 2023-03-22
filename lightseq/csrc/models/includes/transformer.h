@@ -9,7 +9,7 @@
 #include "transformer_decoder_layer.h"
 #include "lyr_normalize_layer.h"
 #include "linear_layer.h"
-#include "sample_layer.h"
+#include "generator_layer.h"
 #include "encdec_kv_layer.h"
 #include "model_util.h"
 
@@ -30,7 +30,7 @@ class Transformer : public LSModel {
   LyrNormalizeLayerPtr<OpType_, OpType_> dec_norm_layer;
   LinearLayerPtr<OpType_, OpType_> linear_layer;
 
-  SampleLayerPtr<OpType_> sample_layer;
+  GeneratorLayerPtr<OpType_> _generator_layer;
 
   ContextPtr context_ptr;
 
@@ -52,6 +52,7 @@ class Transformer : public LSModel {
   int _max_batch_size;
   bool _output_topk = true;
   bool _is_sampling;
+  GenerateMethod _generate_method;
 
   const std::set<std::string> kSamplingMethods = {"beam_search", "topk", "topp",
                                                   "topk_greedy"};

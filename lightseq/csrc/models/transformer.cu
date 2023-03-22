@@ -18,6 +18,7 @@ Transformer::Transformer(const std::string weight_path,
     throw std::runtime_error(res);
   }
   tw_.print_model_config();
+  _generate_method = get_generate_method(tw_._sampling_method);
 
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -28,6 +29,11 @@ Transformer::Transformer(const std::string weight_path,
   launch_enc_emb_layer.reset(new LaunchEncEmbLayer<OpType_>(
       max_batch_tokens, tw_._padding_id, tw_._hidden_size, tw_._multilg_type));
   launch_enc_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
+
+  // initial LayerNormalize layer
+  enc_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size));
+  enc_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   // // initial TransformerEncoder layers
   float attn_prob_dropout_ratio = 0.0;
@@ -46,10 +52,9 @@ Transformer::Transformer(const std::string weight_path,
     enc_layer_vec.push_back(enc_layer_);
   }
 
-  // // initial LayerNormalize layer
-  enc_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
-      max_batch_tokens, tw_._hidden_size));
-  enc_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  _enc_kv_layer.reset(new EncDecKvLayer<OpType_, OpType_>(
+      tw_._n_dec_layer, max_batch_tokens, tw_._hidden_size, tw_._head_num));
+  _enc_kv_layer->load_params(tw_.get_trg_emb_wei(), 4);
 
   // initial LaunchDecEmb layer
   launch_dec_emb_layer.reset(new LaunchDecEmbLayer<OpType_>(
@@ -57,9 +62,10 @@ Transformer::Transformer(const std::string weight_path,
       tw_._max_step, tw_._multilg_type));
   launch_dec_emb_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
-  _enc_kv_layer.reset(new EncDecKvLayer<OpType_, OpType_>(
-      tw_._n_dec_layer, max_batch_tokens, tw_._hidden_size, tw_._head_num));
-  _enc_kv_layer->load_params(tw_.get_trg_emb_wei(), 4);
+  // initial LayerNormalize layer
+  dec_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_size * tw_._beam_size, tw_._hidden_size));
+  dec_norm_layer->load_params(tw_.get_trg_emb_wei(), 2);
 
   // initial TransformerDecoder layers
   int dec_wei_offset = 0;
@@ -75,23 +81,19 @@ Transformer::Transformer(const std::string weight_path,
     dec_layer_vec.push_back(dec_layer_);
   }
 
-  // // initial LayerNormalize layer
-  dec_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
-      max_batch_size * tw_._beam_size, tw_._hidden_size));
-  dec_norm_layer->load_params(tw_.get_trg_emb_wei(), 2);
-
-  // // intial Project hidden states to vocab logits
+  // intial Project hidden states to vocab logits
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._trg_vocab_size,
       MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose,
       tw_._no_scale_embedding ? 1.f : sqrt(1.f / tw_._hidden_size)));
   linear_layer->load_params(tw_.get_trg_emb_wei(), 0);
 
-  sample_layer.reset(new SampleLayer<OpType_>(
-      tw_._n_dec_layer, max_batch_size, tw_._max_step, tw_._trg_vocab_size,
-      tw_._hidden_size, 1024, tw_._beam_size, tw_._diverse_lambda,
-      tw_._dim_per_head, tw_._end_id, tw_._head_num, tw_._length_penalty));
-  sample_layer->load_params(tw_.get_trg_emb_wei(), 6);
+  _generator_layer.reset(new GeneratorLayer<OpType_>(
+      _generate_method, tw_._n_dec_layer, max_batch_size, tw_._max_step,
+      tw_._trg_vocab_size, tw_._hidden_size, 1024, tw_._beam_size,
+      tw_._diverse_lambda, tw_._dim_per_head, tw_._end_id, tw_._head_num,
+      tw_._length_penalty, tw_._topk, tw_._topp, true));
+  _generator_layer->load_params(tw_.get_trg_emb_wei(), 6);
 
   /* --- step.5 construct network --- */
   inp_tokens = new Variable("inp_tokens", g_dtype<int>());
@@ -100,16 +102,17 @@ Transformer::Transformer(const std::string weight_path,
       (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
   Variable *pad_mask = std::get<1>(enc_emb_outs);
+  enc_emb = (*enc_norm_layer)(enc_emb);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
-  Variable *enc_out = (*enc_norm_layer)(enc_emb);
 
-  Variable *total_enc_kv = (*_enc_kv_layer)(enc_out);
+  Variable *total_enc_kv = (*_enc_kv_layer)(enc_emb);
 
   total_enc_kv->set_regress_var();
 
   _context_ptr->regress_begin();
+
   Variable *dec_emb = (*launch_dec_emb_layer)(dec_tokens);
   cache_size = max_batch_tokens * tw_._beam_size * tw_._hidden_size;
   total_cache_k = new Variable("total_cache_k", cache_size * tw_._n_dec_layer,
@@ -126,6 +129,7 @@ Transformer::Transformer(const std::string weight_path,
                             size_t(tw_._max_step), size_t(tw_._hidden_size)});
   pad_mask->set_regress_var();
 
+  dec_emb = (*dec_norm_layer)(dec_emb);
   int dec_layer_idx = 0;
   for (auto iter : dec_layer_vec) {
     Variable *cache_k = new Variable("cache_k", total_cache_k);
@@ -141,18 +145,17 @@ Transformer::Transformer(const std::string weight_path,
     dec_emb = std::get<0>(dec_outs);
     Variable *cache_k_out = std::get<1>(dec_outs);
     Variable *cache_v_out = std::get<2>(dec_outs);
-
     dec_layer_idx++;
   }
-  Variable *dec_out = (*dec_norm_layer)(dec_emb);
-  dec_out = (*linear_layer)(dec_out);
+  dec_emb = (*linear_layer)(dec_emb);
 
-  std::tuple<Variable *, Variable *> sample_outs =
-      (*sample_layer)(dec_out, dec_tokens);
+  std::tuple<Variable *, Variable *> generate_outs =
+      (*_generator_layer)(dec_emb, dec_tokens);
+
   _context_ptr->regress_end();
 
-  dec_tokens_buf = std::get<0>(sample_outs);
-  seq_score = std::get<1>(sample_outs);
+  dec_tokens_buf = std::get<0>(generate_outs);
+  seq_score = std::get<1>(generate_outs);
   dec_tokens->malloc_memory(max_batch_tokens * tw_._beam_size);
   dec_tokens_buf->malloc_memory(max_batch_tokens * tw_._beam_size);
 
@@ -164,11 +167,19 @@ Transformer::Transformer(const std::string weight_path,
                                   sizeof(int) * start_id_vec.size(),
                                   cudaMemcpyHostToDevice,
                                   _context_ptr->get_stream()));
+  CHECK_GPU_ERROR(cudaMemcpyAsync(dec_tokens_buf->value(), start_id_vec.data(),
+                                  sizeof(int) * start_id_vec.size(),
+                                  cudaMemcpyHostToDevice,
+                                  _context_ptr->get_stream()));
+
+  _context_ptr->build();
+  printf("Finish construct network!\n");
 }
 
 Transformer::~Transformer() {}
 
 void Transformer::encoder_before_forward(int batch_size, int seq_len) {
+  inp_tokens->set_shape({size_t(batch_size), size_t(seq_len)});
   launch_enc_emb_layer->before_forward(batch_size, seq_len);
   int dec_layer_idx = 0;
   for (auto iter : enc_layer_vec) {
@@ -190,7 +201,7 @@ void Transformer::decoder_before_forward(int batch_size, int seq_len,
   int beam_batch_size = batch_size * tw_._beam_size;
   dec_norm_layer->before_forward(batch_size, tw_._beam_size);
   linear_layer->before_forward(beam_batch_size, 1);
-  sample_layer->before_forward(batch_size, cur_step);
+  _generator_layer->before_forward(batch_size, 1, cur_step);
 }
 
 void Transformer::Infer() {
@@ -219,10 +230,10 @@ void Transformer::Infer() {
   decoder_before_forward(batch_size, seq_len, 0);
 
   launch_enc_emb_layer->forward();
+  enc_norm_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
-  enc_norm_layer->forward();
   _enc_kv_layer->forward();
 
   int step = 0;
@@ -230,14 +241,17 @@ void Transformer::Infer() {
     decoder_before_forward(batch_size, seq_len, step);
 
     launch_dec_emb_layer->forward();
+    dec_norm_layer->forward();
     for (auto iter : dec_layer_vec) {
       iter->forward();
     }
-    dec_norm_layer->forward();
     linear_layer->forward();
-    sample_layer->forward();
-    if (sample_layer->is_stop()) {
+    _generator_layer->forward();
+    if (_generator_layer->is_stop()) {
       break;
+    }
+    if (_generate_method == GenerateMethod::BeamSearch) {
+      _generator_layer->refresh_cache(total_cache_k, total_cache_v);
     }
     Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
@@ -298,6 +312,7 @@ void Transformer::set_output_ptr(int index, void *output_ptr) {
       break;
   }
 }
+
 const void *Transformer::get_output_ptr(int index) {
   switch (index) {
     case 0:

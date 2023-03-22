@@ -7,8 +7,8 @@
 #include "util.h"
 
 #include "bert.h"
-// #include "bert_crf.h"
 #include "gpt.h"
+#include "transformer.h"
 
 namespace py = pybind11;
 namespace lightseq {
@@ -303,12 +303,11 @@ class PyGpt {
 PYBIND11_MODULE(inference, m) {
   m.attr("__name__") = "lightseq.inference";
 
-  // py::class_<PyTransformer>(m, "Transformer")
-  //     .def(py::init<const std::string, const int>(), py::arg("weight_path"),
-  //          py::arg("max_batch_size"))
-  //     .def("infer", &PyTransformer::infer,
-  //          py::return_value_policy::reference_internal,
-  //          py::arg("input_seq"));
+  py::class_<lightseq::cuda::PyTransformer>(m, "Transformer")
+      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+           py::arg("max_batch_size"))
+      .def("infer", &lightseq::cuda::PyTransformer::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"));
 
   py::class_<lightseq::cuda::PyBert>(m, "Bert")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
