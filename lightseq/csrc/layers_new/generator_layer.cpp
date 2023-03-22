@@ -80,10 +80,10 @@ template <typename T>
 int GeneratorLayer<T>::load_params(const std::vector<const T*>& para_vec,
                                    int offset) {  // for inference
   int size = 0;
-
-  _logit_bias->set_value((char*)para_vec[offset + size]), size++;
-  _logit_bias->set_shape({_trg_vocab_size});
-
+  if (_has_logits_bias) {
+    _logit_bias->set_value((char*)para_vec[offset + size]), size++;
+    _logit_bias->set_shape({_trg_vocab_size});
+  }
   return size;
 }
 

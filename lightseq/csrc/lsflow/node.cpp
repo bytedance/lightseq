@@ -80,6 +80,9 @@ void Node::recursive_forward() {
         this_op->parent(idx)->print_var(true);
       }
     }
+  } else if (node_type() == NodeType::Operator) {
+    printf("##### %s forward ##### fw node idx: %d\n", name().c_str(),
+           _fw_node_idx);
   }
   _context_ptr->synchronize();
   auto start = std::chrono::high_resolution_clock::now();
@@ -142,7 +145,9 @@ void Node::recursive_backward() {
       else
         this_op->child(idx)->print_var(false);
     }
-  }
+  } else if (node_type() == NodeType::Operator)
+    printf("##### %s backward ##### bw node idx: %d\n", name().c_str(),
+           _bw_node_idx);
   _context_ptr->synchronize();
   auto start = std::chrono::high_resolution_clock::now();
 #endif

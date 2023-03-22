@@ -105,7 +105,8 @@ DecSelfAttentionLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
     return std::make_tuple(attn_dropout_residual, cache_k_out, cache_v_out);
   }
 
-  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+  Variable* attn_ln_out =
+      (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
   set_outputs({attn_ln_out, cache_k_out, cache_v_out});
   return std::make_tuple(attn_ln_out, cache_k_out, cache_v_out);
 }

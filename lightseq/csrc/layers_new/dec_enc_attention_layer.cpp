@@ -56,8 +56,14 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                    Variable* enc_k,
                                                    Variable* enc_v) {
   set_inputs({inp, enc_mask, enc_k, enc_v});
-  Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
-  Variable* q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
+
+  Variable* q_linear_out = nullptr;
+  if (_is_pre_ln) {
+    Variable* attn_ln_out = (*_attn_ln)(inp, _attn_nw, _attn_nb);
+    q_linear_out = (*_q_linear)(attn_ln_out, _attn_qw);
+  } else {
+    q_linear_out = (*_q_linear)(inp, _attn_qw);
+  }
 
   Variable* transform_20314_out =
       (*_bias_add_transform_20314_q)(q_linear_out, _attn_qb);
@@ -73,17 +79,17 @@ Variable* DecEncAttentionLayer<T1, T2>::operator()(Variable* inp,
 
   Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
 
+  Variable* attn_dropout_residual =
+      (*_attn_dropout)(attn_linear, _attn_ob, inp);
   if (_is_pre_ln) {
-    Variable* attn_dropout_residual =
-        (*_attn_dropout)(attn_linear, _attn_ob, inp);
     set_outputs({attn_dropout_residual});
     return attn_dropout_residual;
   }
 
-  Variable* attn_dropout_residual =
-      (*_attn_dropout)(attn_linear, _attn_ob, attn_ln_out);
-  set_outputs({attn_dropout_residual});
-  return attn_dropout_residual;
+  Variable* attn_ln_out =
+      (*_attn_ln)(attn_dropout_residual, _attn_nw, _attn_nb);
+  set_outputs({attn_ln_out});
+  return attn_ln_out;
 }
 
 template <typename T1, typename T2>
