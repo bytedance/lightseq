@@ -10,6 +10,16 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
+bool check_divide_float4(int sz) {
+  return !(sz & 3);  // sz % 4 == 0
+}
+
+template <>
+bool check_divide_float4<__half>(int sz) {
+  return !(sz & 7);  // sz % 8 == 0
+}
+
+template <typename T>
 void divide_float4(int *sz) {
   if ((*sz) % 4 != 0) {
     throw std::runtime_error("size need to be a multiple of 4 when use float4");
@@ -39,8 +49,8 @@ input: [sz0, sz1, sz2, sz3]
 output: [sz0, sz2, sz1, sz3]
 */
 template <typename T>
-__global__ void ker_transform_0213(const T *input, T *output, int sz0, int sz1,
-                                   int sz2, int sz3) {
+__global__ void ker_transform_0213_float4(const T *input, T *output, int sz0,
+                                          int sz1, int sz2, int sz3) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   int num_all = sz0 * sz1 * sz2 * sz3;
   if (offset >= num_all) {
@@ -54,15 +64,36 @@ __global__ void ker_transform_0213(const T *input, T *output, int sz0, int sz1,
   trg[trg_offset] = src[offset];
 }
 
+template <typename T>
+__global__ void ker_transform_0213(const T *input, T *output, int sz0, int sz1,
+                                   int sz2, int sz3) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  int num_all = sz0 * sz1 * sz2 * sz3;
+  if (offset >= num_all) {
+    return;
+  }
+  int id0, id1, id2, id3;
+  decompose_4dim(offset, sz1, sz2, sz3, &id0, &id1, &id2, &id3);
+  int trg_offset = flat_4dim(id0, id2, id1, id3, sz2, sz1, sz3);
+  output[trg_offset] = input[offset];
+}
+
 //[sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
 template <typename T>
 void launch_transform_0213(const T *input, T *output, int sz0, int sz1, int sz2,
                            int sz3, cudaStream_t stream) {
-  divide_float4<T>(&sz3);
-  int num_all = sz0 * sz1 * sz2 * sz3;
-  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_transform_0213<T>
-      <<<nblock, MAX_THREADS, 0, stream>>>(input, output, sz0, sz1, sz2, sz3);
+  if (check_divide_float4<T>(sz3)) {
+    divide_float4<T>(&sz3);
+    int num_all = sz0 * sz1 * sz2 * sz3;
+    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+    ker_transform_0213_float4<T>
+        <<<nblock, MAX_THREADS, 0, stream>>>(input, output, sz0, sz1, sz2, sz3);
+  } else {
+    int num_all = sz0 * sz1 * sz2 * sz3;
+    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+    ker_transform_0213<T>
+        <<<nblock, MAX_THREADS, 0, stream>>>(input, output, sz0, sz1, sz2, sz3);
+  }
 }
 
 template void launch_transform_0213<float>(const float *input, float *output,
@@ -857,10 +888,11 @@ if qkv_num == 3:
   value[:,:,step:step+q_len,:] = func(v)
 */
 template <typename T>
-__global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
-                               T *value, int batch_size, int hidden_dim,
-                               int head_dim, int q_len, int kv_len, int step,
-                               int qkv_num, int num_all) {
+__global__ void ker_split_head_float4(const T *inp, const T *bias, T *query,
+                                      T *key, T *value, int batch_size,
+                                      int hidden_dim, int head_dim, int q_len,
+                                      int kv_len, int step, int qkv_num,
+                                      int num_all) {
   int offset = blockIdx.x * blockDim.x + threadIdx.x;
   if (offset >= num_all) {
     return;
@@ -893,16 +925,56 @@ __global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
 }
 
 template <typename T>
+__global__ void ker_split_head(const T *inp, const T *bias, T *query, T *key,
+                               T *value, int batch_size, int hidden_dim,
+                               int head_dim, int q_len, int kv_len, int step,
+                               int qkv_num, int num_all) {
+  int offset = blockIdx.x * blockDim.x + threadIdx.x;
+  if (offset >= num_all) {
+    return;
+  }
+  int nhead = hidden_dim / head_dim;
+  int batch_id, token_id, qkv_id, head_id, dim_id;
+  decompose_5dim(offset, q_len, qkv_num, nhead, head_dim, &batch_id, &token_id,
+                 &qkv_id, &head_id, &dim_id);
+  int bias_id = flat_3dim(qkv_id, head_id, dim_id, nhead, head_dim);
+
+  T *trg;
+  if (qkv_id == 0) {
+    trg = query;
+    trg +=
+        flat_4dim(batch_id, head_id, token_id, dim_id, nhead, q_len, head_dim);
+  } else {
+    if (qkv_id == 1) {
+      trg = key;
+    } else {
+      trg = value;
+    }
+    trg += flat_4dim(batch_id, head_id, token_id + step, dim_id, nhead, kv_len,
+                     head_dim);
+  }
+  *trg = inp[offset] + bias[bias_id];
+}
+
+template <typename T>
 void launch_split_head(const T *inp, const T *bias, T *query, T *key, T *value,
                        int batch_size, int hidden_dim, int head_dim, int q_len,
                        int kv_len, int step, int qkv_num, cudaStream_t stream) {
-  divide_float4<T>(&hidden_dim);
-  divide_float4<T>(&head_dim);
-  int num_all = batch_size * q_len * qkv_num * hidden_dim;
-  int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
-  ker_split_head<T><<<nblock, MAX_THREADS, 0, stream>>>(
-      inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
-      kv_len, step, qkv_num, num_all);
+  if (check_divide_float4<T>(hidden_dim) && check_divide_float4<T>(head_dim)) {
+    divide_float4<T>(&hidden_dim);
+    divide_float4<T>(&head_dim);
+    int num_all = batch_size * q_len * qkv_num * hidden_dim;
+    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+    ker_split_head_float4<T><<<nblock, MAX_THREADS, 0, stream>>>(
+        inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
+        kv_len, step, qkv_num, num_all);
+  } else {
+    int num_all = batch_size * q_len * qkv_num * hidden_dim;
+    int nblock = (num_all + MAX_THREADS - 1) / MAX_THREADS;
+    ker_split_head<T><<<nblock, MAX_THREADS, 0, stream>>>(
+        inp, bias, query, key, value, batch_size, hidden_dim, head_dim, q_len,
+        kv_len, step, qkv_num, num_all);
+  }
 }
 
 template void launch_split_head<float>(const float *inp, const float *bias,

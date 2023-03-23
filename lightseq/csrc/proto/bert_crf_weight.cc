@@ -130,8 +130,6 @@ std::string BertCrfWeight<T>::proto_parse_enc_wei(const BertCrf &bert) {
       return "wrong multihead_project_kernel_qkv_size !";
     for (float ele : enc_layer.multihead_project_kernel_qkv())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          3 * _hidden_size);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -147,8 +145,6 @@ std::string BertCrfWeight<T>::proto_parse_enc_wei(const BertCrf &bert) {
       return "wrong multihead_project_kernel_output_size !";
     for (float ele : enc_layer.multihead_project_kernel_output())
       value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -174,8 +170,6 @@ std::string BertCrfWeight<T>::proto_parse_enc_wei(const BertCrf &bert) {
     if (enc_layer.ffn_first_kernel_size() != _hidden_size * _inner_size)
       return "wrong ffn_first_kernel_size !";
     for (float ele : enc_layer.ffn_first_kernel()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -188,8 +182,6 @@ std::string BertCrfWeight<T>::proto_parse_enc_wei(const BertCrf &bert) {
     if (enc_layer.ffn_second_kernel_size() != _hidden_size * _inner_size)
       return "wrong ffn_second_kernel_size !";
     for (float ele : enc_layer.ffn_second_kernel()) value.push_back(ele);
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -408,8 +400,6 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          3 * _hidden_size);
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
@@ -426,8 +416,6 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         H5T_NATIVE_FLOAT, value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong multihead_project_kernel_output_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _hidden_size);
     idx += _hidden_size * _hidden_size;
 
     offset.push_back(idx);
@@ -458,8 +446,6 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _hidden_size,
-                          _inner_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
@@ -475,8 +461,6 @@ void BertCrfWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         value.data() + idx,
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
-    transform_param_shape(value.data() + idx, temp_buffer.data(), _inner_size,
-                          _hidden_size);
     idx += _hidden_size * _inner_size;
 
     offset.push_back(idx);
