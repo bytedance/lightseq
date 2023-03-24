@@ -73,8 +73,7 @@ void GeneratorLayer<T>::before_forward(int batch_size, int prompt_len,
   if (_generate_method == GenerateMethod::BeamSearch) {
     _beam_search->before_forward(batch_size, prompt_len, cur_step);
   } else {
-    _sampling->before_forward(batch_size, prompt_len + cur_step,
-                              cur_step ? 1 : prompt_len);
+    _sampling->before_forward(batch_size, prompt_len, cur_step, 1);
   }
 }
 

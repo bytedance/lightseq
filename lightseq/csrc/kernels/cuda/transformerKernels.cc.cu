@@ -1828,14 +1828,14 @@ curandstate: [batch_size]
 template <typename T, int k>
 __global__ void ker_topk_sample(const T* logits, const T* logit_bias,
                                 int* old_input_ids, int* new_input_ids,
-                                const int vocab_size, const int max_step,
+                                const int vocab_size, const int prompt_len, const int max_step,
                                 const int batch_seq_len, int logits_seq_len,
                                 int* unfinished, curandState* curandstate,
                                 int eos_id) {
   int last_token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (batch_seq_len > 1 && old_input_ids[last_token_idx_in_batch] == eos_id) {
+  if (batch_seq_len > prompt_len && old_input_ids[last_token_idx_in_batch] == eos_id) {
     if (threadIdx.x == 0) {
       old_input_ids[last_token_idx_in_batch + 1] = eos_id;
     }
@@ -1965,7 +1965,7 @@ __global__ void ker_topk_sample(const T* logits, const T* logit_bias,
 }
 
 template <typename T>
-void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
+void ker_topk_sample_launcher(int batch_size, int batch_seq_len, const int prompt_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
                               const T* logits, const T* logit_bias,
@@ -1975,27 +1975,27 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
                               int eos_id) {
   if (k == 1)
     ker_topk_sample<T, 1><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 2)
     ker_topk_sample<T, 2><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 4)
     ker_topk_sample<T, 4><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 8)
     ker_topk_sample<T, 8><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 16)
     ker_topk_sample<T, 16><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else if (k == 32)
     ker_topk_sample<T, 32><<<batch_size, max_thread_per_block, 0, stream>>>(
-        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+        logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
         batch_seq_len, logits_seq_len, unfinished, curandstate, eos_id);
   else {
     throw std::invalid_argument("topk argument should be in [1,2,4,8,16,32]");
@@ -2003,14 +2003,14 @@ void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
 }
 
 template void ker_topk_sample_launcher<float>(
-    int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
+    int batch_size, int batch_seq_len, const int prompt_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const float* logits,
     const float* logit_bias, int* old_input_ids, int* new_input_idx,
     const int vocab_size, const int k, int* unfinished,
     curandState* curandstate, int eos_id);
 
 template void ker_topk_sample_launcher<__half>(
-    int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
+    int batch_size, int batch_seq_len, const int prompt_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
     const __half* logit_bias, int* old_input_ids, int* new_input_idx,
     const int vocab_size, const int k, int* unfinished,
@@ -2034,14 +2034,14 @@ curandstate: [batch_size]
 template <typename T>
 __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
                                 int* old_input_ids, int* new_input_ids,
-                                const int vocab_size, const int max_step,
+                                const int vocab_size, const int prompt_len, const int max_step,
                                 const int batch_seq_len, int logits_seq_len,
                                 int* unfinished, float p,
                                 curandState* curandstate, int eos_id) {
   int token_idx_in_batch = blockIdx.x * max_step + batch_seq_len - 1;
 
   /* add EOS to end if last token is EOS */
-  if (batch_seq_len > 1 && old_input_ids[token_idx_in_batch] == eos_id) {
+  if (batch_seq_len > prompt_len && old_input_ids[token_idx_in_batch] == eos_id) {
     if (threadIdx.x == 0) {
       old_input_ids[token_idx_in_batch + 1] = eos_id;
     }
@@ -2178,7 +2178,7 @@ __global__ void ker_topp_sample(const T* logits, const T* logit_bias,
 }
 
 template <typename T>
-void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
+void ker_topp_sample_launcher(int batch_size, int batch_seq_len, const int prompt_len,
                               const int max_step, int logits_seq_len,
                               int max_thread_per_block, cudaStream_t stream,
                               const T* logits, const T* logit_bias,
@@ -2187,19 +2187,19 @@ void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
                               int* unfinished, curandState* curandstate,
                               int eos_id) {
   ker_topp_sample<T><<<batch_size, max_thread_per_block, 0, stream>>>(
-      logits, logit_bias, old_input_ids, new_input_ids, vocab_size, max_step,
+      logits, logit_bias, old_input_ids, new_input_ids, vocab_size, prompt_len, max_step,
       batch_seq_len, logits_seq_len, unfinished, p, curandstate, eos_id);
 }
 
 template void ker_topp_sample_launcher<float>(
-    int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
+    int batch_size, int batch_seq_len, const int prompt_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const float* logits,
     const float* logit_bias, int* old_input_ids, int* new_input_idx,
     const int vocab_size, const float p, int* unfinished,
     curandState* curandstate, int eos_id);
 
 template void ker_topp_sample_launcher<__half>(
-    int batch_size, int batch_seq_len, const int max_step, int logits_seq_len,
+    int batch_size, int batch_seq_len, const int prompt_len, const int max_step, int logits_seq_len,
     int max_thread_per_block, cudaStream_t stream, const __half* logits,
     const __half* logit_bias, int* old_input_ids, int* new_input_idx,
     const int vocab_size, const float p, int* unfinished,

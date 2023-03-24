@@ -21,6 +21,8 @@ class SamplingOp : public Operator {
   int _batch_size;
   int _seq_len;
   int _logits_seq_len;
+  int _prompt_len;
+  int _cur_step;
 
   int _h_unfinished;
 
@@ -29,6 +31,7 @@ class SamplingOp : public Operator {
 #endif
 
   Variable* _out_token_ids;
+  Variable* _seq_score;
 
  public:
   SamplingOp(GenerateMethod gm, int max_batch_size, int max_step,
@@ -36,12 +39,14 @@ class SamplingOp : public Operator {
              int eos_id);
 
   // output: new_token_ids
-  Variable* operator()(Variable* logits, Variable* logit_bias,
+  std::tuple<Variable*, Variable*> operator()(Variable* logits, Variable* logit_bias,
                        Variable* token_ids);
 
-  void before_forward(int batch_size, int seq_len, int logits_seq_len) {
+  void before_forward(int batch_size, int prompt_len, int cur_step, int logits_seq_len) {
     _batch_size = batch_size;
-    _seq_len = seq_len;
+    _prompt_len = prompt_len;
+    _cur_step = cur_step;
+    _seq_len = prompt_len + cur_step;
     _logits_seq_len = logits_seq_len;
   }
 

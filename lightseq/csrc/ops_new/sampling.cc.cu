@@ -57,13 +57,13 @@ void SamplingOp<T>::forward() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   if (_generate_method == GenerateMethod::Topk) {
     cuda::ker_topk_sample_launcher<T>(
-        _batch_size, _seq_len, _max_step, _logits_seq_len,
+        _batch_size, _seq_len, _prompt_len, _max_step, _logits_seq_len,
         _max_thread_per_block, _stream, logits_ptr, logits_bias_ptr,
         inp_tokens_ptr, out_tokens_ptr, _trg_vocab_size, _topk, _p_d_unfinished,
         _p_d_curandstate, _eos_id);
   } else if (_generate_method == GenerateMethod::Topp) {
     cuda::ker_topp_sample_launcher<T>(
-        _batch_size, _seq_len, _max_step, _logits_seq_len,
+        _batch_size, _seq_len, _prompt_len, _max_step, _logits_seq_len,
         _max_thread_per_block, _stream, logits_ptr, logits_bias_ptr,
         inp_tokens_ptr, out_tokens_ptr, _trg_vocab_size, _topp, _p_d_unfinished,
         _p_d_curandstate, _eos_id);
