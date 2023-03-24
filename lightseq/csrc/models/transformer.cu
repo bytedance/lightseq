@@ -172,8 +172,8 @@ Transformer::Transformer(const std::string weight_path,
                                   cudaMemcpyHostToDevice,
                                   _context_ptr->get_stream()));
 
-  _context_ptr->build();
   printf("Finish construct network!\n");
+  _context_ptr->build();
 }
 
 Transformer::~Transformer() {}

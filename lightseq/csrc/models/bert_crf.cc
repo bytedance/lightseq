@@ -29,6 +29,11 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
       max_batch_tokens, tw_._padding_id, tw_._hidden_size, tw_._multilg_type));
   launch_enc_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
 
+  // initial LayerNormalize layer
+  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
+      max_batch_tokens, tw_._hidden_size));
+  lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+
   // initial TransformerEncoder layers
   float attn_prob_dropout_ratio = 0.0;
   float activation_dropout_ratio = 0.0;
@@ -46,10 +51,7 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
     enc_layer_vec.push_back(enc_layer_);
   }
 
-  // initial LayerNormalize layer
-  lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
-      max_batch_tokens, tw_._hidden_size));
-  lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  printf("Finish initialize layers and assign weights!\n");
 
   // initial linear layer
   linear_layer.reset(new LinearLayer<OpType_, OpType_>(
@@ -66,25 +68,25 @@ BertCrf::BertCrf(const std::string weight_path, const int max_batch_size)
       (*launch_enc_emb_layer)(inp_tokens);
   Variable *enc_emb = std::get<0>(enc_emb_outs);
   Variable *pad_mask = std::get<1>(enc_emb_outs);
+  enc_emb = (*lyr_norm_layer)(enc_emb);
   for (auto iter : enc_layer_vec) {
     enc_emb = (*iter)(enc_emb, pad_mask);
   }
-  enc_emb = (*lyr_norm_layer)(enc_emb);
   enc_emb = (*linear_layer)(enc_emb);
   bert_out = (*crf_layer)(enc_emb, pad_mask);
+  printf("Finish construct network!\n");
+
+  _context_ptr->build();
 }
 
 BertCrf::~BertCrf() {}
 
 void BertCrf::before_forward(int batch_size, int seq_len) {
   launch_enc_emb_layer->before_forward(batch_size, seq_len);
-
+  lyr_norm_layer->before_forward(batch_size, seq_len);
   for (auto iter : enc_layer_vec) {
     iter->before_forward(batch_size, seq_len);
   }
-
-  lyr_norm_layer->before_forward(batch_size, seq_len);
-
   linear_layer->before_forward(batch_size, seq_len);
   crf_layer->before_forward(batch_size, seq_len, false, false);
 }
@@ -96,10 +98,10 @@ void BertCrf::Infer() {
 
   /* --- notice that the order of forward should be the same with network --- */
   launch_enc_emb_layer->forward();
+  lyr_norm_layer->forward();
   for (auto iter : enc_layer_vec) {
     iter->forward();
   }
-  lyr_norm_layer->forward();
   linear_layer->forward();
   crf_layer->forward();
 

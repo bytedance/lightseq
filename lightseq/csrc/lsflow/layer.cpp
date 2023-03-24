@@ -23,6 +23,7 @@ void Layer::forward() {
 
   forward_process();
   for (Variable* var : _out_var_vec) {
+    if (var == nullptr) continue;
     var->recursive_forward();
   }
 }
@@ -34,6 +35,7 @@ void Layer::backward() {
 
   backward_process();
   for (Variable* var : _inp_var_vec) {
+    if (var == nullptr) continue;
     var->recursive_backward();
   }
 }
