@@ -15,12 +15,12 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
+  printf("*** model max_batch_size: %d ***\n", max_batch_size);
+  _generate_method = get_generate_method(tw_._sampling_method);
   if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
   }
   tw_.print_model_config();
-  printf("*** model max_batch_size: %d ***\n", max_batch_size);
-  _generate_method = get_generate_method(tw_._sampling_method);
 
   _context_ptr->regress_begin();
 

@@ -1433,11 +1433,14 @@ __global__ void ker_refresh_result(const int* can_idx, const float* can_score,
         seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
             (can_score[can_pos] - blockIdx.x * min_log_probability) /
             length_norm;  // recover it
+        seq_score[blockIdx.x * gridDim.y + blockIdx.y] = can_score[can_pos];
       } else {
         seq_probs[blockIdx.x * gridDim.y + blockIdx.y] =
             (can_score[can_pos] - blockIdx.x * min_log_probability +
              diverse_lambda * (rank_id + 1)) /
             length_norm;
+        seq_score[blockIdx.x * gridDim.y + blockIdx.y] =
+            can_score[can_pos] + diverse_lambda * (rank_id + 1);
       }
     }
     return;
