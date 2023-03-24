@@ -15,6 +15,9 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
+  if (_generate_method != GenerateMethod::BeamSearch) {
+    tw_._beam_size = 1;
+  }
   tw_.print_model_config();
   printf("*** model max_batch_size: %d ***\n", max_batch_size);
   _generate_method = get_generate_method(tw_._sampling_method);
@@ -123,7 +126,7 @@ void Gpt::before_forward(int batch_size, int prompt_len, int steps) {
     }
     _lyr_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
     _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
-    _generator_layer->before_forward(batch_size, 1, prompt_len + steps - 1);
+    _generator_layer->before_forward(batch_size, prompt_len, steps);
   }
 }
 
@@ -177,31 +180,29 @@ void Gpt::Infer() {
     }
     if (_generate_method == GenerateMethod::BeamSearch) {
       _generator_layer->refresh_cache(_total_caches_k, _total_caches_v);
+      if (steps + prompt_len + 1 < tw_._max_step) {
+        Variable::swap_tensor(_inp_tokens, _out_tokens);
+      }
     }
-
     steps++;
-    if (steps + prompt_len < tw_._max_step) {
-      Variable::swap_tensor(_inp_tokens, _out_tokens);
-    }
   }
 
   for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
     for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
+      int *tmp_out_ptr = (_generate_method == GenerateMethod::BeamSearch)
+                             ? _out_tokens->value<int>()
+                             : _inp_tokens->value<int>();
       cudaMemcpyAsync(
           _gpt_out_ptr +
               (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
-          _out_tokens->value<int>() +
-              (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
           (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
           _context_ptr->get_stream());
     }
   }
 
   _context_ptr->synchronize();
-  if (_generate_method == GenerateMethod::BeamSearch)
-    set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
-  else
-    set_output_shape(0, {batch_size, 1, prompt_len + steps});
+  set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
 }
 
 void Gpt::set_input_ptr(int index, void *input_ptr) {

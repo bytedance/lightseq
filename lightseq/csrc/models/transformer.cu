@@ -20,6 +20,10 @@ Transformer::Transformer(const std::string weight_path,
   tw_.print_model_config();
   _generate_method = get_generate_method(tw_._sampling_method);
 
+  if (_generate_method != GenerateMethod::BeamSearch) {
+    tw_._beam_size = 1;
+  }
+
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
 
@@ -172,8 +176,8 @@ Transformer::Transformer(const std::string weight_path,
                                   cudaMemcpyHostToDevice,
                                   _context_ptr->get_stream()));
 
-  _context_ptr->build();
   printf("Finish construct network!\n");
+  _context_ptr->build();
 }
 
 Transformer::~Transformer() {}
@@ -193,7 +197,6 @@ void Transformer::encoder_before_forward(int batch_size, int seq_len) {
 void Transformer::decoder_before_forward(int batch_size, int seq_len,
                                          int cur_step) {
   launch_dec_emb_layer->before_forward(batch_size, cur_step);
-
   for (auto iter : dec_layer_vec) {
     iter->before_forward(batch_size, tw_._beam_size, seq_len, cur_step);
   }
@@ -252,8 +255,8 @@ void Transformer::Infer() {
     }
     if (_generate_method == GenerateMethod::BeamSearch) {
       _generator_layer->refresh_cache(total_cache_k, total_cache_v);
+      Variable::swap_tensor(dec_tokens, dec_tokens_buf);
     }
-    Variable::swap_tensor(dec_tokens, dec_tokens_buf);
   }
 
   if (_output_topk || _is_sampling) {

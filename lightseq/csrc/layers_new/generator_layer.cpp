@@ -58,7 +58,10 @@ std::tuple<Variable*, Variable*> GeneratorLayer<T>::operator()(
     alive_seq_out = std::get<0>(beam_search_outs);
     seq_score = std::get<1>(beam_search_outs);
   } else {
-    alive_seq_out = (*_sampling)(logits, _logit_bias, alive_seq);
+    std::tuple<Variable*, Variable*> sample_outs =
+        (*_sampling)(logits, _logit_bias, alive_seq);
+    alive_seq_out = std::get<0>(sample_outs);
+    seq_score = std::get<1>(sample_outs);
   }
 
   set_outputs({alive_seq_out, seq_score});
@@ -71,8 +74,7 @@ void GeneratorLayer<T>::before_forward(int batch_size, int prompt_len,
   if (_generate_method == GenerateMethod::BeamSearch) {
     _beam_search->before_forward(batch_size, prompt_len, cur_step);
   } else {
-    _sampling->before_forward(batch_size, prompt_len + cur_step,
-                              cur_step ? 1 : prompt_len);
+    _sampling->before_forward(batch_size, prompt_len, cur_step, 1);
   }
 }
 

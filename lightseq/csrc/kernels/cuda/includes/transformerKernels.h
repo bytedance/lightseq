@@ -140,23 +140,23 @@ __forceinline__ __host__ __device__ float length_norm(int length, float alpha) {
 
 template <typename T>
 void ker_topk_sample_launcher(int batch_size, int batch_seq_len,
-                              const int max_step, int logits_seq_len,
-                              int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, const T* logit_bias,
-                              int* old_input_ids, int* new_input_ids,
-                              const int vocab_size, const int k,
-                              int* all_finished, curandState* curandstate,
-                              int eos_id);
+                              const int prompt_len, const int max_step,
+                              int logits_seq_len, int max_thread_per_block,
+                              cudaStream_t stream, const T* logits,
+                              const T* logit_bias, int* old_input_ids,
+                              int* new_input_ids, const int vocab_size,
+                              const int k, int* all_finished,
+                              curandState* curandstate, int eos_id);
 
 template <typename T>
 void ker_topp_sample_launcher(int batch_size, int batch_seq_len,
-                              const int max_step, int logits_seq_len,
-                              int max_thread_per_block, cudaStream_t stream,
-                              const T* logits, const T* logit_bias,
-                              int* old_input_ids, int* new_input_ids,
-                              const int vocab_size, const float p,
-                              int* unfinished, curandState* curandstate,
-                              int eos_id);
+                              const int prompt_len, const int max_step,
+                              int logits_seq_len, int max_thread_per_block,
+                              cudaStream_t stream, const T* logits,
+                              const T* logit_bias, int* old_input_ids,
+                              int* new_input_ids, const int vocab_size,
+                              const float p, int* unfinished,
+                              curandState* curandstate, int eos_id);
 
 template <typename T>
 void ker_bias_gelu_launcher(int batch_token_num, int block_dim,

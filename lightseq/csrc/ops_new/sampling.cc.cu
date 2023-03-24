@@ -25,15 +25,19 @@ SamplingOp<T>::SamplingOp(GenerateMethod gm, int max_batch_size, int max_step,
 }
 
 template <typename T>
-Variable* SamplingOp<T>::operator()(Variable* logits, Variable* logit_bias,
-                                    Variable* token_ids) {
+std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(
+    Variable* logits, Variable* logit_bias, Variable* token_ids) {
   set_parents({logits, logit_bias, token_ids});
 
   _out_token_ids = new Variable("out_token_ids", _max_batch_size * _max_step,
                                 g_dtype<int>());
 
-  set_children({_out_token_ids});
-  return _out_token_ids;
+  _seq_score = new Variable("seq_score", _max_batch_size, g_dtype<float>(),
+                            cuda::DataType::kNotSupported,
+                            VariableType::RegressiveVariable);
+
+  set_children({_out_token_ids, _seq_score});
+  return std::make_tuple(_out_token_ids, _seq_score);
 }
 
 template <typename T>
@@ -53,13 +57,13 @@ void SamplingOp<T>::forward() {
   CHECK_GPU_ERROR(cudaMemsetAsync(_p_d_unfinished, 0, sizeof(int), _stream));
   if (_generate_method == GenerateMethod::Topk) {
     cuda::ker_topk_sample_launcher<T>(
-        _batch_size, _seq_len, _max_step, _logits_seq_len,
+        _batch_size, _seq_len, _prompt_len, _max_step, _logits_seq_len,
         _max_thread_per_block, _stream, logits_ptr, logits_bias_ptr,
         inp_tokens_ptr, out_tokens_ptr, _trg_vocab_size, _topk, _p_d_unfinished,
         _p_d_curandstate, _eos_id);
   } else if (_generate_method == GenerateMethod::Topp) {
     cuda::ker_topp_sample_launcher<T>(
-        _batch_size, _seq_len, _max_step, _logits_seq_len,
+        _batch_size, _seq_len, _prompt_len, _max_step, _logits_seq_len,
         _max_thread_per_block, _stream, logits_ptr, logits_bias_ptr,
         inp_tokens_ptr, out_tokens_ptr, _trg_vocab_size, _topp, _p_d_unfinished,
         _p_d_curandstate, _eos_id);
