@@ -58,7 +58,8 @@ std::tuple<Variable*, Variable*> GeneratorLayer<T>::operator()(
     alive_seq_out = std::get<0>(beam_search_outs);
     seq_score = std::get<1>(beam_search_outs);
   } else {
-    std::tuple<Variable*, Variable*> sample_outs = (*_sampling)(logits, _logit_bias, alive_seq);
+    std::tuple<Variable*, Variable*> sample_outs =
+        (*_sampling)(logits, _logit_bias, alive_seq);
     alive_seq_out = std::get<0>(sample_outs);
     seq_score = std::get<1>(sample_outs);
   }

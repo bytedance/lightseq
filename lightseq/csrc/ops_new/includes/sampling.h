@@ -39,10 +39,12 @@ class SamplingOp : public Operator {
              int eos_id);
 
   // output: new_token_ids
-  std::tuple<Variable*, Variable*> operator()(Variable* logits, Variable* logit_bias,
-                       Variable* token_ids);
+  std::tuple<Variable*, Variable*> operator()(Variable* logits,
+                                              Variable* logit_bias,
+                                              Variable* token_ids);
 
-  void before_forward(int batch_size, int prompt_len, int cur_step, int logits_seq_len) {
+  void before_forward(int batch_size, int prompt_len, int cur_step,
+                      int logits_seq_len) {
     _batch_size = batch_size;
     _prompt_len = prompt_len;
     _cur_step = cur_step;

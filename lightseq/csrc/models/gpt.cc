@@ -15,7 +15,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-  if(_generate_method != GenerateMethod::BeamSearch) {
+  if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
   }
   tw_.print_model_config();
@@ -189,12 +189,13 @@ void Gpt::Infer() {
 
   for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
     for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
-      int* tmp_out_ptr = (_generate_method == GenerateMethod::BeamSearch) ? _out_tokens->value<int>() : _inp_tokens->value<int>();
+      int *tmp_out_ptr = (_generate_method == GenerateMethod::BeamSearch)
+                             ? _out_tokens->value<int>()
+                             : _inp_tokens->value<int>();
       cudaMemcpyAsync(
           _gpt_out_ptr +
               (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
-          tmp_out_ptr +
-              (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
           (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
           _context_ptr->get_stream());
     }

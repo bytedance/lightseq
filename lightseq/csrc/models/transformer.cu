@@ -20,7 +20,7 @@ Transformer::Transformer(const std::string weight_path,
   tw_.print_model_config();
   _generate_method = get_generate_method(tw_._sampling_method);
 
-  if(_generate_method != GenerateMethod::BeamSearch) {
+  if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
   }
 

@@ -25,16 +25,16 @@ SamplingOp<T>::SamplingOp(GenerateMethod gm, int max_batch_size, int max_step,
 }
 
 template <typename T>
-std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(Variable* logits, Variable* logit_bias,
-                                    Variable* token_ids) {
+std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(
+    Variable* logits, Variable* logit_bias, Variable* token_ids) {
   set_parents({logits, logit_bias, token_ids});
 
   _out_token_ids = new Variable("out_token_ids", _max_batch_size * _max_step,
                                 g_dtype<int>());
 
-  _seq_score = new Variable(
-      "seq_score", _max_batch_size, g_dtype<float>(),
-      cuda::DataType::kNotSupported, VariableType::RegressiveVariable);
+  _seq_score = new Variable("seq_score", _max_batch_size, g_dtype<float>(),
+                            cuda::DataType::kNotSupported,
+                            VariableType::RegressiveVariable);
 
   set_children({_out_token_ids, _seq_score});
   return std::make_tuple(_out_token_ids, _seq_score);
