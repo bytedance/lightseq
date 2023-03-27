@@ -3,7 +3,8 @@
 namespace lightseq {
 namespace cuda {
 Gpt::Gpt(const std::string weight_path, const int max_batch_size)
-    : LSModel({"token_ids"}, {"gpt_out"}), _max_batch_size(max_batch_size) {
+    : LSModel({"token_ids"}, {"gpt_out", "gpt_scores"}),
+      _max_batch_size(max_batch_size) {
   /* --- step.1 initial context --- */
   Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
@@ -200,15 +201,23 @@ void Gpt::Infer() {
           _context_ptr->get_stream());
     }
   }
+  cudaMemcpyAsync(_gpt_scores_ptr, _out_scores->value<float>(),
+                              batch_size * sizeof(float),
+                              cudaMemcpyDefault, _context_ptr->get_stream());
 
   _context_ptr->synchronize();
-  set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
+  if (_generate_method == GenerateMethod::BeamSearch) {
+    set_output_shape(0, {batch_size, 1, prompt_len + steps});
+    set_output_shape(1, {batch_size, 1});
+  } else {
+    set_output_shape(0, {batch_size, 1, prompt_len + steps});
+    set_output_shape(1, {batch_size, 1});
+  }
 }
 
 void Gpt::set_input_ptr(int index, void *input_ptr) {
   switch (index) {
     case 0:
-      // _inp_tokens->set_value((char *)input_ptr);
       _input_ptr = (int *)input_ptr;
       break;
 
@@ -221,8 +230,11 @@ void Gpt::set_input_ptr(int index, void *input_ptr) {
 void Gpt::set_output_ptr(int index, void *output_ptr) {
   switch (index) {
     case 0:
-      // _out_tokens->set_value((char *)output_ptr);
       _gpt_out_ptr = (int *)output_ptr;
+      break;
+
+    case 1:
+      _gpt_scores_ptr = (float *)output_ptr;
       break;
 
     default:
@@ -234,8 +246,11 @@ void Gpt::set_output_ptr(int index, void *output_ptr) {
 const void *Gpt::get_output_ptr(int index) {
   switch (index) {
     case 0:
-      // return static_cast<void *>(_out_tokens->value());
       return static_cast<void *>(_gpt_out_ptr);
+
+    case 1:
+      return static_cast<void *>(_gpt_scores_ptr);
+
     default:
       throw std::runtime_error("invalid output index");
       break;
@@ -256,6 +271,10 @@ std::vector<int> Gpt::get_output_max_shape(int index) {
   switch (index) {
     case 0:
       return {_max_batch_size, tw_._beam_size, tw_._max_step};
+
+    case 1:
+      return {_max_batch_size, tw_._beam_size};
+      break;
 
     default:
       throw std::runtime_error("invalid output index");
@@ -279,6 +298,10 @@ DataType Gpt::get_output_dtype(int index) {
   switch (index) {
     case 0:
       return DataType::kInt32;
+      break;
+
+    case 1:
+      return DataType::kFloat32;
       break;
 
     default:
