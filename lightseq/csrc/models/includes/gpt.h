@@ -33,6 +33,7 @@ class Gpt : public LSModel {
 
   int* _gpt_out_ptr = nullptr;
   int* _input_ptr = nullptr;
+  float* _gpt_scores_ptr = nullptr;
 
   int _max_batch_size;
   GenerateMethod _generate_method;

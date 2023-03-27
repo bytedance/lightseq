@@ -263,7 +263,7 @@ class PyGpt {
     }
   }
 
-  py::array_t<int> infer(
+  std::tuple<py::array_t<int>, py::array_t<float>> infer(
       py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
     auto input_seq_out = input_seq.mutable_unchecked<2>();
     const int *input_seq_data = input_seq_out.data(0, 0);
@@ -293,7 +293,17 @@ class PyGpt {
                                sizeof(int) * output.size(),
                                cudaMemcpyDeviceToHost));
 
-    return output;
+    std::vector<int> score_shape = model_->get_output_shape(1);
+    auto scores = py::array_t<float>(score_shape);
+    float *scores_data = scores.mutable_data(0, 0);
+    const float *d_scores =
+        static_cast<const float *>(model_->get_output_ptr(1));
+
+    CHECK_GPU_ERROR(cudaMemcpy(scores_data, d_scores,
+                               sizeof(float) * scores.size(),
+                               cudaMemcpyDeviceToHost));
+
+    return std::make_tuple(output, scores);
   }
 };
 }  // namespace cuda

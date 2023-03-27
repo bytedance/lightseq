@@ -17,12 +17,11 @@ Transformer::Transformer(const std::string weight_path,
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-  tw_.print_model_config();
   _generate_method = get_generate_method(tw_._sampling_method);
-
   if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
   }
+  tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
