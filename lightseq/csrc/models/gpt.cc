@@ -202,8 +202,8 @@ void Gpt::Infer() {
     }
   }
   cudaMemcpyAsync(_gpt_scores_ptr, _out_scores->value<float>(),
-                              batch_size * sizeof(float),
-                              cudaMemcpyDefault, _context_ptr->get_stream());
+                  batch_size * sizeof(float), cudaMemcpyDefault,
+                  _context_ptr->get_stream());
 
   _context_ptr->synchronize();
   if (_generate_method == GenerateMethod::BeamSearch) {
