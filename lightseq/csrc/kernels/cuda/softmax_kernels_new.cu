@@ -34,7 +34,7 @@ attn_mask: [batch_size, to_len], padding tokens are -inf,
 */
 template <typename T, int block_dim, int ele_per_thread>
 __global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
-                                 int from_len, int to_len, bool mask_future) {
+                                 int from_len, int to_len, int kv_size, bool mask_future) {
   int batch_id = blockIdx.y;
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
@@ -50,7 +50,7 @@ __global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
 
   T mval[ele_per_thread];
   if (attn_mask) {
-    attn_mask += batch_id * to_len;
+    attn_mask += batch_id * kv_size;
     BlockLoad(ts_load).Load(attn_mask, mval, to_len, REDUCE_FLOAT_INF_NEG);
   }
 
@@ -129,7 +129,7 @@ __global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
 
 template <typename T, int block_dim, int ele_per_thread>
 __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
-                                      int from_len, int to_len,
+                                      int from_len, int to_len, int kv_size,
                                       bool mask_future) {
   int batch_id = blockIdx.y;
   int head_id = blockIdx.z;
@@ -146,7 +146,7 @@ __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
 
   T mval[ele_per_thread];
   if (attn_mask) {
-    attn_mask += batch_id * to_len;
+    attn_mask += batch_id * kv_size;
     BlockLoad(ts_load).Load(attn_mask, mval, to_len, REDUCE_FLOAT_INF_NEG);
   }
 
@@ -216,31 +216,31 @@ __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
 template <>
 void launch_attn_softmax_new<float>(float *out, float *inp,
                                     const float *attn_mask, int batch_size,
-                                    int nhead, int from_len, int to_len,
+                                    int nhead, int from_len, int to_len, int kv_size,
                                     bool mask_future, cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<float, 32, 1><<<grid_dim, 32, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 64) {
     ker_attn_softmax_lt32<float, 32, 2><<<grid_dim, 32, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 128) {
     grid_dim.x = 16;
     ker_attn_softmax<float, 64, 2><<<grid_dim, 64, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 256) {
     grid_dim.x = 32;
     ker_attn_softmax<float, 128, 2><<<grid_dim, 128, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 512) {
     grid_dim.x = 64;
     ker_attn_softmax<float, 256, 2><<<grid_dim, 256, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 1024) {
     grid_dim.x = 128;
     ker_attn_softmax<float, 512, 2><<<grid_dim, 512, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else {
     throw std::runtime_error(
         "Sequence length greater than 512 is currently not supported");
@@ -250,31 +250,31 @@ void launch_attn_softmax_new<float>(float *out, float *inp,
 template <>
 void launch_attn_softmax_new<__half>(__half *out, __half *inp,
                                      const __half *attn_mask, int batch_size,
-                                     int nhead, int from_len, int to_len,
+                                     int nhead, int from_len, int to_len, int kv_size,
                                      bool mask_future, cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<__half, 32, 1><<<grid_dim, 32, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 64) {
     ker_attn_softmax_lt32<__half, 32, 2><<<grid_dim, 32, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 128) {
     grid_dim.x = 8;
     ker_attn_softmax<__half, 64, 2><<<grid_dim, 64, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 256) {
     grid_dim.x = 16;
     ker_attn_softmax<__half, 128, 2><<<grid_dim, 128, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 512) {
     grid_dim.x = 32;
     ker_attn_softmax<__half, 256, 2><<<grid_dim, 256, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else if (to_len <= 1024) {
     grid_dim.x = 64;
     ker_attn_softmax<__half, 512, 2><<<grid_dim, 512, 0, stream>>>(
-        out, inp, attn_mask, from_len, to_len, mask_future);
+        out, inp, attn_mask, from_len, to_len, kv_size, mask_future);
   } else {
     throw std::runtime_error(
         "Sequence length greater than 1024 is currently not supported");

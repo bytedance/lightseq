@@ -53,7 +53,8 @@ GptAttentionLayer<T1, T2>::GptAttentionLayer(int max_batch_tokens,
 template <typename T1, typename T2>
 Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                 Variable* cache_k,
-                                                Variable* cache_v) {
+                                                Variable* cache_v,
+                                                Variable* pad_mask) {
   set_inputs({inp});
 
   Variable* qkv_out = nullptr;
@@ -68,7 +69,7 @@ Variable* GptAttentionLayer<T1, T2>::operator()(Variable* inp,
   Variable* q_out = (*_split_head)(qkv_out, _attn_qkvb, cache_k, cache_v);
 
   // result of Scaled Dot Product Attention
-  Variable* sdpa_res = (*_sdpa)(q_out, cache_k, cache_v);
+  Variable* sdpa_res = (*_sdpa)(q_out, cache_k, cache_v, pad_mask);
 
   // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
   Variable* transform_0213_out = (*_transform_0213)(sdpa_res);
@@ -102,7 +103,6 @@ void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
   }
   // all token number in this batch
   int batch_tokens = batch_size * query_len;
-  int attn_from_len = query_len;
   int attn_to_len = (steps <= 0) ? query_len : steps + 1;
 
   _attn_ln->before_forward(batch_size, query_len);
@@ -113,10 +113,10 @@ void GptAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
   _split_head->before_forward(batch_size, query_len, steps);
 
   // mask future when training or (inference and steps=0)
-  _sdpa->before_forward(batch_size, attn_from_len, attn_to_len, _max_seq_len,
+  _sdpa->before_forward(batch_size, query_len, attn_to_len, _max_seq_len,
                         steps <= 0);
 
-  _transform_0213->before_forward(batch_size, _nhead, attn_from_len, _head_dim);
+  _transform_0213->before_forward(batch_size, _nhead, query_len, _head_dim);
 
   _attn_out_linear->before_forward(batch_tokens);
 

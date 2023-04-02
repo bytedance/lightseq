@@ -23,8 +23,6 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   }
   tw_.print_model_config();
 
-  _context_ptr->regress_begin();
-
   /* --- step.3 initial input Variable node --- */
   _inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
 
@@ -33,7 +31,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 
   // initial LaunchEncEmb layer
   _launch_gpt_emb_layer.reset(new LaunchGptEmbLayer<OpType_>(
-      max_batch_tokens, tw_._max_step, tw_._beam_size, tw_._padding_id,
+      max_batch_tokens, tw_._max_step, _max_batch_size, tw_._beam_size, tw_._padding_id,
       tw_._hidden_size));
   _launch_gpt_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
 
@@ -69,7 +67,6 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
       tw_._diverse_lambda, tw_._dim_per_head, tw_._eos_id, tw_._head_num,
       tw_._length_penalty, tw_._topk, tw_._topp, false));
 
-  _context_ptr->regress_end();
   printf("Finish initialize layers and assign weights!\n");
 
   /* --- step.5 construct network --- */
@@ -80,16 +77,22 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   _total_caches_v = new Variable(
       "total_caches_v", cache_size * tw_._n_enc_layer, g_dtype<OpType_>(),
       DataType::kNotSupported, VariableType::RegressiveVariable);
-  std::tuple<Variable *, Variable *> gpt_emb_outs =
+
+  // note regress begin
+  _context_ptr->regress_begin();
+
+  std::tuple<Variable *, Variable *, Variable*> gpt_emb_outs =
       (*_launch_gpt_emb_layer)(_inp_tokens);
   Variable *gpt_emb = std::get<0>(gpt_emb_outs);
+  _pad_mask = std::get<1>(gpt_emb_outs);
+  _pad_mask->set_regress_var();
   size_t cache_offset = 0;
   for (auto iter : _gpt_layers_vec) {
     Variable *cache_k = new Variable("cache_k", _total_caches_k);
-    cache_k->set_offset(cache_offset, {cache_offset});
+    cache_k->set_offset(cache_offset, {cache_size});
     Variable *cache_v = new Variable("cache_v", _total_caches_v);
-    cache_v->set_offset(cache_offset, {cache_offset});
-    gpt_emb = (*iter)(gpt_emb, cache_k, cache_v);
+    cache_v->set_offset(cache_offset, {cache_size});
+    gpt_emb = (*iter)(gpt_emb, cache_k, cache_v, _pad_mask);
     cache_offset += cache_size;
   }
   gpt_emb = (*_lyr_norm_layer)(gpt_emb);
@@ -97,6 +100,10 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 
   std::tuple<Variable *, Variable *> gen_outs =
       (*_generator_layer)(logits_prob, _inp_tokens);
+
+  // note regress_end
+  _context_ptr->regress_end();
+
   _out_tokens = std::get<0>(gen_outs);
   _out_scores = std::get<1>(gen_outs);
   _inp_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step);
@@ -137,12 +144,13 @@ void Gpt::Infer() {
   /* --- notice that the order of forward should be the same with network --- */
 
 #ifdef LIGHTSEQ_cuda
-  for (int i = 0; i < batch_size; i++) {
-    for (int j = 0; j < tw_._beam_size; j++) {
+  for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
+    for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
       CHECK_GPU_ERROR(cudaMemcpyAsync(
-          _inp_tokens->value<int>() + (i * tw_._beam_size + j) * tw_._max_step,
-          _input_ptr, prompt_len * sizeof(int), cudaMemcpyDefault,
-          _context_ptr->get_stream()));
+          _inp_tokens->value<int>() +
+              (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          _input_ptr + batch_idx * prompt_len, prompt_len * sizeof(int),
+          cudaMemcpyDefault, _context_ptr->get_stream()));
     }
   }
 #endif
@@ -202,13 +210,13 @@ void Gpt::Infer() {
     }
   }
   cudaMemcpyAsync(_gpt_scores_ptr, _out_scores->value<float>(),
-                  batch_size * sizeof(float), cudaMemcpyDefault,
+                  batch_size * tw_._beam_size * sizeof(float), cudaMemcpyDefault,
                   _context_ptr->get_stream());
 
   _context_ptr->synchronize();
   if (_generate_method == GenerateMethod::BeamSearch) {
-    set_output_shape(0, {batch_size, 1, prompt_len + steps});
-    set_output_shape(1, {batch_size, 1});
+    set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
+    set_output_shape(1, {batch_size, tw_._beam_size});
   } else {
     set_output_shape(0, {batch_size, 1, prompt_len + steps});
     set_output_shape(1, {batch_size, 1});

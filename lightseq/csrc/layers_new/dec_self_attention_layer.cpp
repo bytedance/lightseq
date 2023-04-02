@@ -143,7 +143,7 @@ void DecSelfAttentionLayer<T1, T2>::before_forward(size_t batch_size,
   _concat_cache_v->before_forward(_batch_size * _heads, _step, from_len,
                                   _context_ptr->is_training());
 
-  _softmax->before_forward(_batch_size, from_len, to_len,
+  _softmax->before_forward(_batch_size, from_len, to_len, to_len,
                            _context_ptr->is_training());
 
   _attn_prob_dropout->before_forward(_batch_heads * from_len * to_len);

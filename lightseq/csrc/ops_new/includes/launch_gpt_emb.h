@@ -18,15 +18,18 @@ class LaunchGptEmbOp : public Operator {
   int _max_step;
   int _beam_size;
   int _offset;
+  int _max_batch_size;
 
   Variable* _result;
-  Variable* _result_seq_len;
+  Variable* _pad_mask;
+  Variable* _left_pad_len;
 
  public:
-  LaunchGptEmbOp(size_t max_batch_tokens, int max_step, int beam_size,
+  LaunchGptEmbOp(size_t max_batch_tokens, int max_step, int max_batch_size, int beam_size,
                  int pad_id, size_t hidden_dim)
       : Operator("LaunchGptEmbOp"),
         _max_batch_tokens(max_batch_tokens),
+        _max_batch_size(max_batch_size),
         _pad_id(pad_id),
         _max_step(max_step),
         _beam_size(beam_size),
@@ -34,14 +37,14 @@ class LaunchGptEmbOp : public Operator {
 
   virtual ~LaunchGptEmbOp() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* inp_tokens,
+  std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp_tokens,
                                               Variable* token_emb,
                                               Variable* pos_emb);
 
   void before_forward(size_t batch_size, size_t seq_len, int offset) {
     _batch_size = batch_size, _seq_len = seq_len, _offset = offset;
     _result->set_shape({batch_size * seq_len, _hidden_dim});
-    _result_seq_len->set_shape({batch_size});
+    _pad_mask->set_shape({batch_size, seq_len + offset});
   }
 
   void forward() override;

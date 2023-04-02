@@ -54,7 +54,7 @@ void launch_attn_softmax_bw(T *out_grad, const T *soft_inp, int rows,
 
 template <typename T>
 void launch_attn_softmax_new(T *out, T *inp, const T *attn_mask, int batch_size,
-                             int heads, int from_len, int to_len,
+                             int heads, int from_len, int to_len, int kv_size,
                              bool mask_future, cudaStream_t stream);
 
 template <typename T>
