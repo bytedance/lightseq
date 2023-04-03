@@ -35,8 +35,8 @@ class SoftmaxOp : public Operator {
 
   void forward() override;
 
-  void before_forward(size_t batchs, size_t from_len, size_t to_len, int kv_size = -1,
-                      bool mask_future = false) {
+  void before_forward(size_t batchs, size_t from_len, size_t to_len,
+                      int kv_size = -1, bool mask_future = false) {
     _batchs = batchs;
     _from_len = from_len;
     _to_len = to_len;

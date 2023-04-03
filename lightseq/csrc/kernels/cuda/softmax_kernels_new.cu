@@ -34,7 +34,8 @@ attn_mask: [batch_size, to_len], padding tokens are -inf,
 */
 template <typename T, int block_dim, int ele_per_thread>
 __global__ void ker_attn_softmax(T *out, T *inp, const T *attn_mask,
-                                 int from_len, int to_len, int kv_size, bool mask_future) {
+                                 int from_len, int to_len, int kv_size,
+                                 bool mask_future) {
   int batch_id = blockIdx.y;
   int head_id = blockIdx.z;
   const int nhead = gridDim.z;
@@ -216,8 +217,9 @@ __global__ void ker_attn_softmax_lt32(T *out, T *inp, const T *attn_mask,
 template <>
 void launch_attn_softmax_new<float>(float *out, float *inp,
                                     const float *attn_mask, int batch_size,
-                                    int nhead, int from_len, int to_len, int kv_size,
-                                    bool mask_future, cudaStream_t stream) {
+                                    int nhead, int from_len, int to_len,
+                                    int kv_size, bool mask_future,
+                                    cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<float, 32, 1><<<grid_dim, 32, 0, stream>>>(
@@ -250,8 +252,9 @@ void launch_attn_softmax_new<float>(float *out, float *inp,
 template <>
 void launch_attn_softmax_new<__half>(__half *out, __half *inp,
                                      const __half *attn_mask, int batch_size,
-                                     int nhead, int from_len, int to_len, int kv_size,
-                                     bool mask_future, cudaStream_t stream) {
+                                     int nhead, int from_len, int to_len,
+                                     int kv_size, bool mask_future,
+                                     cudaStream_t stream) {
   dim3 grid_dim(1, batch_size, nhead);
   if (to_len <= 32) {
     ker_attn_softmax_lt32<__half, 32, 1><<<grid_dim, 32, 0, stream>>>(

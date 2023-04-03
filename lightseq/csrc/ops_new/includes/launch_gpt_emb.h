@@ -25,8 +25,8 @@ class LaunchGptEmbOp : public Operator {
   Variable* _left_pad_len;
 
  public:
-  LaunchGptEmbOp(size_t max_batch_tokens, int max_step, int max_batch_size, int beam_size,
-                 int pad_id, size_t hidden_dim)
+  LaunchGptEmbOp(size_t max_batch_tokens, int max_step, int max_batch_size,
+                 int beam_size, int pad_id, size_t hidden_dim)
       : Operator("LaunchGptEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _max_batch_size(max_batch_size),
@@ -38,8 +38,8 @@ class LaunchGptEmbOp : public Operator {
   virtual ~LaunchGptEmbOp() {}
 
   std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp_tokens,
-                                              Variable* token_emb,
-                                              Variable* pos_emb);
+                                                         Variable* token_emb,
+                                                         Variable* pos_emb);
 
   void before_forward(size_t batch_size, size_t seq_len, int offset) {
     _batch_size = batch_size, _seq_len = seq_len, _offset = offset;

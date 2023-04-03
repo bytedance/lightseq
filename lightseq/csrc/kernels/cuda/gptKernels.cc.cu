@@ -121,7 +121,8 @@ pos_offset: get real pos when decoding which gridDim.y=1
 
 template <typename T>
 __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
-                                     const int* token_ids, T* output, T* pad_mask_ptr, int* left_pad_len_ptr,
+                                     const int* token_ids, T* output,
+                                     T* pad_mask_ptr, int* left_pad_len_ptr,
                                      int batch_size, int beam_size, int seq_len,
                                      int hidden_dim, int padding_id,
                                      int max_step, int step_offset) {
@@ -139,7 +140,7 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
 
   float4& output_val = ((float4*)output)[idx];
   if (token_id == padding_id) {
-    if(state_idx == 0){
+    if (state_idx == 0) {
       pad_mask_ptr[token_idx] = CUDA_FLOAT_INF_NEG;
       atomicAdd(left_pad_len_ptr + batch_beam_idx, 1);
     }
@@ -151,14 +152,16 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
 
   __syncthreads();
 
-  if (token_id != padding_id){
+  if (token_id != padding_id) {
     if (state_idx == 0) {
       pad_mask_ptr[token_idx] = 0;
     }
     float4 token_emb_val =
         ((float4*)token_emb)[token_id * hidden_dim + state_idx];
-    float4 pos_emb_val =
-        ((float4*)pos_emb)[(seq_idx + step_offset - left_pad_len_ptr[batch_beam_idx]) * hidden_dim + state_idx];
+    float4 pos_emb_val = ((float4*)pos_emb)[(seq_idx + step_offset -
+                                             left_pad_len_ptr[batch_beam_idx]) *
+                                                hidden_dim +
+                                            state_idx];
 
     output_val.x = token_emb_val.x + pos_emb_val.x;
     output_val.y = token_emb_val.y + pos_emb_val.y;
@@ -170,9 +173,9 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
 template <>
 __global__ void kernel_gpt_embedding<__half>(
     const __half* token_emb, const __half* pos_emb, const int* token_ids,
-    __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr,
-    int batch_size, int beam_size, int seq_len, int hidden_dim,
-    int padding_id, int max_step, int step_offset) {
+    __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size,
+    int beam_size, int seq_len, int hidden_dim, int padding_id, int max_step,
+    int step_offset) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
     return;
@@ -205,8 +208,10 @@ __global__ void kernel_gpt_embedding<__half>(
     }
     float4 token_emb_val =
         ((float4*)token_emb)[token_id * hidden_dim + state_idx];
-    float4 pos_emb_val =
-        ((float4*)pos_emb)[(seq_idx + step_offset - left_pad_len_ptr[batch_beam_idx]) * hidden_dim + state_idx];
+    float4 pos_emb_val = ((float4*)pos_emb)[(seq_idx + step_offset -
+                                             left_pad_len_ptr[batch_beam_idx]) *
+                                                hidden_dim +
+                                            state_idx];
     __half2* value_h2 = (__half2*)(&token_emb_val);
     __half2* pemb_h2 = (__half2*)(&pos_emb_val);
 #pragma unroll
@@ -223,8 +228,8 @@ __global__ void kernel_gpt_embedding<__half>(
 
 template <>
 void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
-                                 const int* tokens, float* output, float* pad_mask_ptr,
-                                 int* left_pad_len_ptr,
+                                 const int* tokens, float* output,
+                                 float* pad_mask_ptr, int* left_pad_len_ptr,
                                  int batch_size, int beam_size, int hidden_dim,
                                  int step_offset, int seq_len, int max_step,
                                  int padding_id, cudaStream_t stream) {
@@ -238,18 +243,19 @@ void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
   int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_gpt_embedding<float><<<nblock, MAX_THREADS, 0, stream>>>(
-      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size, beam_size, seq_len,
-      hidden_dim, padding_id, max_step, step_offset);
+      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
+      batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,
+      step_offset);
 }
 
 template <>
 void launch_gpt_embedding<__half>(const __half* token_emb,
                                   const __half* pos_emb, const int* tokens,
-                                  __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr,
-                                  int batch_size, int beam_size,
-                                  int hidden_dim, int step_offset, int seq_len,
-                                  int max_step, int padding_id,
-                                  cudaStream_t stream) {
+                                  __half* output, __half* pad_mask_ptr,
+                                  int* left_pad_len_ptr, int batch_size,
+                                  int beam_size, int hidden_dim,
+                                  int step_offset, int seq_len, int max_step,
+                                  int padding_id, cudaStream_t stream) {
   if (seq_len + step_offset >= max_step) {
     throw std::runtime_error("violate seq_len + step_offset < max_step");
   }
@@ -260,27 +266,22 @@ void launch_gpt_embedding<__half>(const __half* token_emb,
   int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_gpt_embedding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
-      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size, beam_size, seq_len,
-      hidden_dim, padding_id, max_step, step_offset);
+      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
+      batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,
+      step_offset);
 }
 
-template void launch_gpt_embedding<float>(const float* token_emb,
-                                          const float* pos_emb,
-                                          const int* tokens, float* output,
-                                          float* pad_mask_ptr, int* left_pad_len_ptr,
-                                          int batch_size, int beam_size,
-                                          int hidden_dim, int step_offset,
-                                          int seq_len, int max_step,
-                                          int padding_id, cudaStream_t stream);
+template void launch_gpt_embedding<float>(
+    const float* token_emb, const float* pos_emb, const int* tokens,
+    float* output, float* pad_mask_ptr, int* left_pad_len_ptr, int batch_size,
+    int beam_size, int hidden_dim, int step_offset, int seq_len, int max_step,
+    int padding_id, cudaStream_t stream);
 
-template void launch_gpt_embedding<__half>(const __half* token_emb,
-                                           const __half* pos_emb,
-                                           const int* tokens, __half* output,
-                                           __half* pad_mask_ptr, int* left_pad_len_ptr,
-                                           int batch_size, int beam_size,
-                                           int hidden_dim, int step_offset,
-                                           int seq_len, int max_step,
-                                           int padding_id, cudaStream_t stream);
+template void launch_gpt_embedding<__half>(
+    const __half* token_emb, const __half* pos_emb, const int* tokens,
+    __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size,
+    int beam_size, int hidden_dim, int step_offset, int seq_len, int max_step,
+    int padding_id, cudaStream_t stream);
 
 /**
 @brief: ker_correlation_softmax_gpt

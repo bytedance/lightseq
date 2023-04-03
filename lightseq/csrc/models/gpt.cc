@@ -31,8 +31,8 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 
   // initial LaunchEncEmb layer
   _launch_gpt_emb_layer.reset(new LaunchGptEmbLayer<OpType_>(
-      max_batch_tokens, tw_._max_step, _max_batch_size, tw_._beam_size, tw_._padding_id,
-      tw_._hidden_size));
+      max_batch_tokens, tw_._max_step, _max_batch_size, tw_._beam_size,
+      tw_._padding_id, tw_._hidden_size));
   _launch_gpt_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
 
   // initial TransformerEncoder layers
@@ -81,7 +81,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   // note regress begin
   _context_ptr->regress_begin();
 
-  std::tuple<Variable *, Variable *, Variable*> gpt_emb_outs =
+  std::tuple<Variable *, Variable *, Variable *> gpt_emb_outs =
       (*_launch_gpt_emb_layer)(_inp_tokens);
   Variable *gpt_emb = std::get<0>(gpt_emb_outs);
   _pad_mask = std::get<1>(gpt_emb_outs);
@@ -117,8 +117,7 @@ Gpt::~Gpt() {}
 
 void Gpt::before_forward(int batch_size, int prompt_len, int steps) {
   if (steps == 0) {
-    _launch_gpt_emb_layer->before_forward(batch_size,
-                                          prompt_len, 0);
+    _launch_gpt_emb_layer->before_forward(batch_size, prompt_len, 0);
     for (auto iter : _gpt_layers_vec) {
       iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
     }
@@ -210,8 +209,8 @@ void Gpt::Infer() {
     }
   }
   cudaMemcpyAsync(_gpt_scores_ptr, _out_scores->value<float>(),
-                  batch_size * tw_._beam_size * sizeof(float), cudaMemcpyDefault,
-                  _context_ptr->get_stream());
+                  batch_size * tw_._beam_size * sizeof(float),
+                  cudaMemcpyDefault, _context_ptr->get_stream());
 
   _context_ptr->synchronize();
   if (_generate_method == GenerateMethod::BeamSearch) {

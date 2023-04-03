@@ -15,11 +15,12 @@ class LaunchGptEmbLayer : public Layer {
   Variable* _pos_emb;
 
  public:
-  LaunchGptEmbLayer(int max_batch_tokens, int max_step, int max_batch_size, int beam_size,
-                    int pad_id, int hidden_dim)
+  LaunchGptEmbLayer(int max_batch_tokens, int max_step, int max_batch_size,
+                    int beam_size, int pad_id, int hidden_dim)
       : Layer("LaunchGptEmbLayer"),
-        _launch_gpt_op(new LaunchGptEmbOp<T>(max_batch_tokens, max_step, max_batch_size,
-                                             beam_size, pad_id, hidden_dim)) {
+        _launch_gpt_op(new LaunchGptEmbOp<T>(max_batch_tokens, max_step,
+                                             max_batch_size, beam_size, pad_id,
+                                             hidden_dim)) {
     _token_emb = new Variable("token_emb", g_dtype<T>());
     _pos_emb = new Variable("pos_emb", g_dtype<T>());
 
