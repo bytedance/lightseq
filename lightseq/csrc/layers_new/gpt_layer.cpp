@@ -25,10 +25,10 @@ GptLayer<T1, T2>::GptLayer(int layer_id, int max_batch_tokens, int max_seq_len,
 
 template <typename T1, typename T2>
 Variable* GptLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
-                                       Variable* cache_v) {
+                                       Variable* cache_v, Variable* pad_mask) {
   set_inputs({inp, cache_k, cache_v});
 
-  Variable* attn_out = (*_attn_layer)(inp, cache_k, cache_v);
+  Variable* attn_out = (*_attn_layer)(inp, cache_k, cache_v, pad_mask);
 
   Variable* ffn_out = (*_ffn_layer)(attn_out);
 

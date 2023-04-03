@@ -15,11 +15,12 @@ class LaunchGptEmbLayer : public Layer {
   Variable* _pos_emb;
 
  public:
-  LaunchGptEmbLayer(int max_batch_tokens, int max_step, int beam_size,
-                    int pad_id, int hidden_dim)
+  LaunchGptEmbLayer(int max_batch_tokens, int max_step, int max_batch_size,
+                    int beam_size, int pad_id, int hidden_dim)
       : Layer("LaunchGptEmbLayer"),
         _launch_gpt_op(new LaunchGptEmbOp<T>(max_batch_tokens, max_step,
-                                             beam_size, pad_id, hidden_dim)) {
+                                             max_batch_size, beam_size, pad_id,
+                                             hidden_dim)) {
     _token_emb = new Variable("token_emb", g_dtype<T>());
     _pos_emb = new Variable("pos_emb", g_dtype<T>());
 
@@ -28,13 +29,13 @@ class LaunchGptEmbLayer : public Layer {
 
   virtual ~LaunchGptEmbLayer() {}
 
-  std::tuple<Variable*, Variable*> operator()(Variable* inp) {
+  std::tuple<Variable*, Variable*, Variable*> operator()(Variable* inp) {
     set_inputs({inp});
 
-    std::tuple<Variable*, Variable*> out =
+    std::tuple<Variable*, Variable*, Variable*> out =
         (*_launch_gpt_op)(inp, _token_emb, _pos_emb);
 
-    set_outputs({std::get<0>(out), std::get<1>(out)});
+    set_outputs({std::get<0>(out), std::get<1>(out), std::get<2>(out)});
     return out;
   }
 

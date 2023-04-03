@@ -27,6 +27,7 @@ class Gpt : public LSModel {
   Variable* _inp_tokens;  // need to allocate
   Variable* _out_tokens;
   Variable* _out_scores;
+  Variable* _pad_mask;
 
   Variable* _total_caches_k;
   Variable* _total_caches_v;

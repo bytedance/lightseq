@@ -21,7 +21,8 @@ class GptLayer : public Layer {
            int beam_size = 1);
   virtual ~GptLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v);
+  Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v,
+                       Variable* pad_mask);
 
   void before_forward(int batch_size, int seq_len, int steps) {
     _attn_layer->before_forward(batch_size, seq_len, steps);

@@ -52,7 +52,8 @@ class GptAttentionLayer : public Layer {
 
   virtual ~GptAttentionLayer() {}
 
-  Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v);
+  Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v,
+                       Variable* pad_mask);
 
   void before_forward(int batch_size, int trg_seq_len, int steps);
 

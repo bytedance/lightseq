@@ -23,10 +23,10 @@ pos_offset: get real pos when decoding which gridDim.y=1
 
 template <typename T>
 void launch_gpt_embedding(const T* token_emb, const T* pos_emb,
-                          const int* tokens, T* output, int batch_size,
-                          int beam_size, int hidden_dim, int step_offset,
-                          int seq_len, int max_step, int padding_id,
-                          cudaStream_t stream);
+                          const int* tokens, T* output, T* pad_mask_ptr,
+                          int* left_pad_len_ptr, int batch_size, int beam_size,
+                          int hidden_dim, int step_offset, int seq_len,
+                          int max_step, int padding_id, cudaStream_t stream);
 
 template <typename T>
 void ker_correlation_softmax_gpt_launcher(int batch_size, int batch_seq_len,

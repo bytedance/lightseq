@@ -56,7 +56,7 @@ template <typename T1, typename T2>
 void SDPALayer<T1, T2>::before_forward(int batch_size, int query_len,
                                        int kv_len, int kv_size,
                                        bool mask_future) {
-  _softmax->before_forward(batch_size, query_len, kv_len, mask_future);
+  _softmax->before_forward(batch_size, query_len, kv_len, kv_size, mask_future);
 
   _attn_prob_dropout->before_forward(batch_size * query_len * kv_len * _nhead);
 
