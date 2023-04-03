@@ -117,7 +117,7 @@ Gpt::~Gpt() {}
 
 void Gpt::before_forward(int batch_size, int prompt_len, int steps) {
   if (steps == 0) {
-    _launch_gpt_emb_layer->before_forward(batch_size * tw_._beam_size,
+    _launch_gpt_emb_layer->before_forward(batch_size,
                                           prompt_len, 0);
     for (auto iter : _gpt_layers_vec) {
       iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
@@ -126,7 +126,7 @@ void Gpt::before_forward(int batch_size, int prompt_len, int steps) {
     _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     _generator_layer->before_forward(batch_size, prompt_len, 0);
   } else {
-    _launch_gpt_emb_layer->before_forward(batch_size * tw_._beam_size, 1,
+    _launch_gpt_emb_layer->before_forward(batch_size, 1,
                                           prompt_len + steps - 1);
     for (auto iter : _gpt_layers_vec) {
       iter->before_forward(batch_size * tw_._beam_size, 1,
