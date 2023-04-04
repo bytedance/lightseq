@@ -140,7 +140,7 @@ void Tensor::set_tensor(const char* inp) { set_tensor(const_cast<char*>(inp)); }
 
 void Tensor::set_shape(Shape shape) { _shape = shape; }
 
-void Tensor::set_offset(int offset, Shape shape) {
+void Tensor::set_offset(size_t offset, Shape shape) {
   if (_original_tensor == nullptr) {
     printf("Error! tensor %s set_offset without original tensor",
            _name.c_str());
@@ -226,7 +226,7 @@ void Tensor::print_tensor(int size) {
     printf(", tensor dtype: %d", _dtype);
 
     if (_mtype == LSMemoryType::OffsetMemory) {
-      printf(", offset is %d\n", _offset);
+      printf(", offset is %zu\n", _offset);
     } else {
       printf("\n");
     }
