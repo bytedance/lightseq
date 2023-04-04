@@ -9,9 +9,11 @@ std::tuple<Variable*, Variable*, Variable*> LaunchGptEmbOp<T>::operator()(
 
   size_t max_size = _max_batch_tokens * _hidden_dim;
 
-  _result = new Variable("LaunchGptEmbOp_out", _max_batch_tokens * _hidden_dim,
-                         g_dtype<T>());
-  _pad_mask = new Variable("_pad_mask", _max_batch_tokens, g_dtype<T>());
+  _result =
+      new Variable("LaunchGptEmbOp_out",
+                   _max_batch_tokens * _hidden_dim * _beam_size, g_dtype<T>());
+  _pad_mask =
+      new Variable("_pad_mask", _max_batch_tokens * _beam_size, g_dtype<T>());
 
   _left_pad_len = new Variable("_left_pad_len", _max_batch_size * _beam_size,
                                g_dtype<int>(), cuda::DataType::kNotSupported,

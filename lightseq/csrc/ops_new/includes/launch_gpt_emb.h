@@ -45,6 +45,7 @@ class LaunchGptEmbOp : public Operator {
     _batch_size = batch_size, _seq_len = seq_len, _offset = offset;
     _result->set_shape({batch_size * seq_len, _hidden_dim});
     _pad_mask->set_shape({batch_size, seq_len + offset});
+    _left_pad_len->set_shape({_batch_size, size_t(_beam_size)});
   }
 
   void forward() override;

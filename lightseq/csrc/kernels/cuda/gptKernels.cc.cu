@@ -120,12 +120,12 @@ pos_offset: get real pos when decoding which gridDim.y=1
 //     __half* output, int* real_seq_len, int padding_id, int pos_offset);
 
 template <typename T>
-__global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
-                                     const int* token_ids, T* output,
-                                     T* pad_mask_ptr, int* left_pad_len_ptr,
-                                     int batch_size, int beam_size, int seq_len,
-                                     int hidden_dim, int padding_id,
-                                     int max_step, int step_offset) {
+__global__ void kernel_gpt_padding(const T* token_emb, const T* pos_emb,
+                                   const int* token_ids, T* output,
+                                   T* pad_mask_ptr, int* left_pad_len_ptr,
+                                   int batch_size, int beam_size, int seq_len,
+                                   int hidden_dim, int padding_id, int max_step,
+                                   int step_offset) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
     return;
@@ -149,9 +149,28 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
     output_val.z = 0.;
     output_val.w = 0.;
   }
+}
 
-  __syncthreads();
+template <typename T>
+__global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
+                                     const int* token_ids, T* output,
+                                     T* pad_mask_ptr, int* left_pad_len_ptr,
+                                     int batch_size, int beam_size, int seq_len,
+                                     int hidden_dim, int padding_id,
+                                     int max_step, int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
 
+  float4& output_val = ((float4*)output)[idx];
   if (token_id != padding_id) {
     if (state_idx == 0) {
       pad_mask_ptr[token_idx] = 0;
@@ -171,7 +190,7 @@ __global__ void kernel_gpt_embedding(const T* token_emb, const T* pos_emb,
 }
 
 template <>
-__global__ void kernel_gpt_embedding<__half>(
+__global__ void kernel_gpt_padding<__half>(
     const __half* token_emb, const __half* pos_emb, const int* token_ids,
     __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size,
     int beam_size, int seq_len, int hidden_dim, int padding_id, int max_step,
@@ -199,8 +218,27 @@ __global__ void kernel_gpt_embedding<__half>(
     output_val.z = 0.f;
     output_val.w = 0.f;
   }
+}
 
-  __syncthreads();
+template <>
+__global__ void kernel_gpt_embedding<__half>(
+    const __half* token_emb, const __half* pos_emb, const int* token_ids,
+    __half* output, __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size,
+    int beam_size, int seq_len, int hidden_dim, int padding_id, int max_step,
+    int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
+
+  float4& output_val = ((float4*)output)[idx];
 
   if (token_id != padding_id) {
     if (state_idx == 0) {
@@ -242,6 +280,11 @@ void launch_gpt_embedding<float>(const float* token_emb, const float* pos_emb,
   hidden_dim >>= 2;
   int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_gpt_padding<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
+      batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,
+      step_offset);
+
   kernel_gpt_embedding<float><<<nblock, MAX_THREADS, 0, stream>>>(
       token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
       batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,
@@ -265,6 +308,10 @@ void launch_gpt_embedding<__half>(const __half* token_emb,
   hidden_dim >>= 3;
   int nele = (batch_size * beam_size * seq_len * hidden_dim);
   int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_gpt_padding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
+      batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,
+      step_offset);
   kernel_gpt_embedding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
       token_emb, pos_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr,
       batch_size, beam_size, seq_len, hidden_dim, padding_id, max_step,

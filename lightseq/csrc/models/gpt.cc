@@ -24,7 +24,7 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
   tw_.print_model_config();
 
   /* --- step.3 initial input Variable node --- */
-  _inp_tokens = new Variable("inp_tokens", g_dtype<OpType_>());
+  _inp_tokens = new Variable("inp_tokens", g_dtype<int>());
 
   /* --- step.4 inital operator & layer --- */
   int max_batch_tokens = tw_._max_step * _max_batch_size;
@@ -106,8 +106,8 @@ Gpt::Gpt(const std::string weight_path, const int max_batch_size)
 
   _out_tokens = std::get<0>(gen_outs);
   _out_scores = std::get<1>(gen_outs);
-  _inp_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step);
-  _out_tokens->malloc_memory(_max_batch_size * tw_._beam_size * tw_._max_step);
+  _inp_tokens->malloc_memory(max_batch_size * tw_._beam_size * tw_._max_step);
+  _out_tokens->malloc_memory(max_batch_size * tw_._beam_size * tw_._max_step);
 
   _context_ptr->build();
   printf("Finish construct network!\n");
