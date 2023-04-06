@@ -26,8 +26,8 @@ class SDPALayer : public Layer {
   int _head_dim;
 
  public:
-  SDPALayer(int max_batch_tokens, int max_seq_len, int head_dim, int num_heads,
-            float attn_prob_dropout_ratio);
+  SDPALayer(size_t max_batch_tokens, size_t max_seq_len, size_t head_dim,
+            size_t num_heads, float attn_prob_dropout_ratio);
 
   virtual ~SDPALayer() {}
 

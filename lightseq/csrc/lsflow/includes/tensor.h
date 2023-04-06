@@ -34,7 +34,7 @@ class Tensor {
 
   static int global_tensor_id;
   TensorPtr _original_tensor;
-  int _offset = 0;
+  size_t _offset = 0;
 
  public:
   // Applies to tensors using FixedMemory and SharedMemory memory types.
@@ -63,7 +63,7 @@ class Tensor {
   // Set a specific offset value for a tensor whose memory type is OffsetMemory.
   // Note that the `offset` value here represents the number of elements, not
   // bytes.
-  void set_offset(int offset, Shape shape);
+  void set_offset(size_t offset, Shape shape);
 
   // This method executes logic differently in different situations.
   //
