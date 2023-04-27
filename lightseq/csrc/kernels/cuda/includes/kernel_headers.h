@@ -20,3 +20,4 @@
 #include "transformerKernels.h"
 #include "cuda_util.h"
 #include "cublas_wrappers.h"
+#include "llama_kernels.h"

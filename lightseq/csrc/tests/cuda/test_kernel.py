@@ -1575,40 +1575,127 @@ def test_torch_launch_fake_quantize():
     return custom, baseline
 
 
+@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
+def test_rotary_position_qk():
+    batch_size, offset_seq_len = kt.bs_sl()
+    nhead = kt.nhead
+    head_dim = 128
+    seq_len = 1
+    input_tensor = kt.rand((batch_size, nhead, seq_len, head_dim))
+    output_tensor = torch.empty_like(input_tensor)
+
+    func = None
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_rotary_position_fp32
+    elif kt.dtype == torch.half:
+        func = cuda_module.torch_launch_rotary_position_fp16
+
+    def custom():
+        inp_clone = input_tensor.clone()
+        out_clone = output_tensor.clone()
+        func(inp_clone, out_clone, batch_size, nhead, offset_seq_len, seq_len, head_dim)
+        return [out_clone.contiguous()]
+
+    tmp_device = input_tensor.device
+    inv_freq = 1.0 / (
+        10000 ** (torch.arange(0, head_dim, 2).float().to(tmp_device) / head_dim)
+    )
+    t = torch.arange(2048, device=tmp_device, dtype=inv_freq.dtype)
+    freqs = torch.einsum("i,j->ij", t, inv_freq)
+    # Different from paper, but it uses a different permutation in order to obtain the same calculation
+    emb = torch.cat((freqs, freqs), dim=-1)
+    cos_cached = emb.cos()[None, None, :, :].to(tmp_device, dtype=kt.dtype)
+    sin_cached = emb.sin()[None, None, :, :].to(tmp_device, dtype=kt.dtype)
+
+    def baseline():
+        inp_clone = input_tensor.clone()
+        # out_clone = output_tensor.clone()
+        kv_seq_len = offset_seq_len + seq_len
+        cos = cos_cached[:, :, :kv_seq_len, ...]
+        sin = sin_cached[:, :, :kv_seq_len, ...]
+        gather_indices = (
+            (torch.arange(seq_len) + offset_seq_len)[None, None, :, None]
+            .repeat(batch_size, cos.shape[1], 1, cos.shape[3])
+            .to(tmp_device)
+        )
+        cos = torch.gather(
+            cos.repeat(gather_indices.shape[0], 1, 1, 1), 2, gather_indices
+        )
+        sin = torch.gather(
+            sin.repeat(gather_indices.shape[0], 1, 1, 1), 2, gather_indices
+        )
+
+        def rotate_half(x):
+            """Rotates half the hidden dims of the input."""
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return torch.cat((-x2, x1), dim=-1)
+
+        out_clone = (inp_clone * cos) + (rotate_half(inp_clone) * sin)
+        return [out_clone.contiguous()]
+
+    return custom, baseline
+
+from transformers import LlamaModel
+from transformers.activations import SiLUActivation
+
+@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
+def test_elewise_product_silu():
+    batch_size, seq_len = 1, 256
+    hidden_size = 13824
+    inpA = kt.rand((batch_size, seq_len, hidden_size))
+    inpB = kt.rand((batch_size, seq_len, hidden_size))
+    custom_outC = torch.empty_like(inpA)
+
+    act_func = SiLUActivation()
+    func = cuda_module.torch_elewise_product_silu_fp32 if kt.dtype == torch.float else cuda_module.torch_elewise_product_silu_fp16
+
+    def custom():
+        func(inpA, inpB, custom_outC, batch_size, seq_len, hidden_size)
+        return [custom_outC.contiguous()]
+
+    def baseline():
+        output = act_func(inpA) * inpB
+        return [output.contiguous()]
+
+    return custom, baseline
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_launch_transform_0213",
-            "test_launch_bias_add_transform_20314",
-            "test_launch_transform4d_0213",
-            "test_launch_bias_add_transform_20314_new",
-            "test_launch_fused_add2",
-            "test_launch_ffn_bias_bwd",
-            # "test_launch_attn_softmax", # need to fix
-            "test_launch_attn_softmax_new",
-            # "test_launch_attn_softmax_bw", # need to fix
-            "test_launch_attn_softmax_bw_new",
-            "test_launch_layer_norm",
-            # "test_launch_ln_bw", # need to fix
-            "test_launch_concat3_dim1",
-            # "test_adam", # need to fix
-            "test_launch_dropout_relu_bias",
-            "test_launch_dropout_relu_bias_bwd",
-            "test_launch_dropout_gelu_bias",
-            # "test_launch_dropout_gelu_bias_bwd", # need to fix
-            # "test_launch_layer_norm_i8O", # need to fix
-            # "test_launch_ln_i8O_bw", # need to fix
-            "test_launch_dropout_relu_bias_i8I_i8O",
-            # "test_launch_dropout_relu_bias_i8I_i8O_bwd", # need to fix
-            "test_launch_dropout_gelu_bias_i8I_i8O",
-            # "test_launch_dropout_gelu_bias_i8I_i8O_bwd", # need to fix
-            "test_launch_quant_bias_dropout_residual",
-            "test_launch_quant_bias_add_transform_20314",
-            # "test_launch_quant_transform4d_0213", # need to fix
-            # "test_torch_launch_ls_quantize", # need to fix
-            "test_torch_launch_ls_dequantize",
-            # "test_torch_launch_fake_quantize", # need to fix
-            # "test_crf", # need to fix
+            "test_elewise_product_silu",
+            # "test_rotary_position_qk",
+            # "test_launch_transform_0213",
+            # "test_launch_bias_add_transform_20314",
+            # "test_launch_transform4d_0213",
+            # "test_launch_bias_add_transform_20314_new",
+            # "test_launch_fused_add2",
+            # "test_launch_ffn_bias_bwd",
+            # # "test_launch_attn_softmax", # need to fix
+            # "test_launch_attn_softmax_new",
+            # # "test_launch_attn_softmax_bw", # need to fix
+            # "test_launch_attn_softmax_bw_new",
+            # "test_launch_layer_norm",
+            # # "test_launch_ln_bw", # need to fix
+            # "test_launch_concat3_dim1",
+            # # "test_adam", # need to fix
+            # "test_launch_dropout_relu_bias",
+            # "test_launch_dropout_relu_bias_bwd",
+            # "test_launch_dropout_gelu_bias",
+            # # "test_launch_dropout_gelu_bias_bwd", # need to fix
+            # # "test_launch_layer_norm_i8O", # need to fix
+            # # "test_launch_ln_i8O_bw", # need to fix
+            # "test_launch_dropout_relu_bias_i8I_i8O",
+            # # "test_launch_dropout_relu_bias_i8I_i8O_bwd", # need to fix
+            # "test_launch_dropout_gelu_bias_i8I_i8O",
+            # # "test_launch_dropout_gelu_bias_i8I_i8O_bwd", # need to fix
+            # "test_launch_quant_bias_dropout_residual",
+            # "test_launch_quant_bias_add_transform_20314",
+            # # "test_launch_quant_transform4d_0213", # need to fix
+            # # "test_torch_launch_ls_quantize", # need to fix
+            # "test_torch_launch_ls_dequantize",
+            # # "test_torch_launch_fake_quantize", # need to fix
+            # # "test_crf", # need to fix
         ]
     )

@@ -11,6 +11,7 @@ set(cuda_kernel_files
     # fused_adam_kernel.cu
     general_kernels.cu
     gptKernels.cc.cu
+    llama_kernels.cu
     normalize_kernels.cu
     softmax_kernels.cu
     softmax_kernels_new.cu
