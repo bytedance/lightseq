@@ -1636,8 +1636,10 @@ def test_rotary_position_qk():
 
     return custom, baseline
 
+
 from transformers import LlamaModel
 from transformers.activations import SiLUActivation
+
 
 @kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
 def test_elewise_product_silu():
@@ -1648,7 +1650,11 @@ def test_elewise_product_silu():
     custom_outC = torch.empty_like(inpA)
 
     act_func = SiLUActivation()
-    func = cuda_module.torch_elewise_product_silu_fp32 if kt.dtype == torch.float else cuda_module.torch_elewise_product_silu_fp16
+    func = (
+        cuda_module.torch_elewise_product_silu_fp32
+        if kt.dtype == torch.float
+        else cuda_module.torch_elewise_product_silu_fp16
+    )
 
     def custom():
         func(inpA, inpB, custom_outC, batch_size, seq_len, hidden_size)
@@ -1659,6 +1665,7 @@ def test_elewise_product_silu():
         return [output.contiguous()]
 
     return custom, baseline
+
 
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)

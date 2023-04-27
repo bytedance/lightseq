@@ -524,9 +524,12 @@ void torch_launch_rotary_position(const torch::Tensor &input,
 }
 
 template <typename T>
-void torch_elewise_product_silu(const torch::Tensor &inpA, const torch::Tensor &inpB, torch::Tensor outC, int batch_size, int seq_len, int inner_size) {
-      cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-      launch_elewise_product_silu<T>(rptr<T>(inpA), rptr<T>(inpB), rptr<T>(outC), batch_size, seq_len, inner_size, stream);
+void torch_elewise_product_silu(const torch::Tensor &inpA,
+                                const torch::Tensor &inpB, torch::Tensor outC,
+                                int batch_size, int seq_len, int inner_size) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_elewise_product_silu<T>(rptr<T>(inpA), rptr<T>(inpB), rptr<T>(outC),
+                                 batch_size, seq_len, inner_size, stream);
 }
 
 }  // namespace cuda
