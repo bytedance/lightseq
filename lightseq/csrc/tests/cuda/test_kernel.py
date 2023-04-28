@@ -1644,7 +1644,7 @@ from transformers import LlamaModel
 from transformers.activations import SiLUActivation
 
 
-@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
+@kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
 def test_elewise_product_silu():
     batch_size, seq_len = 1, 256
     hidden_size = 13824
@@ -1670,7 +1670,7 @@ def test_elewise_product_silu():
     return custom, baseline
 
 
-@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float])
+@kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
 def test_rms_layer_norm(): # torch_rms_layer_norm
     batch_size, seq_len = 1, 1 # kt.bs_sl()
     hidden_size = 5120
@@ -1679,9 +1679,7 @@ def test_rms_layer_norm(): # torch_rms_layer_norm
     custom_out = torch.empty_like(inp)
     rms_out = kt.rand((batch_size, seq_len))
 
-    func = cuda_module.torch_rms_layer_norm_fp32
-        # if kt.dtype == torch.float
-        # else cuda_module.torch_rms_layer_norm
+    func = cuda_module.torch_rms_layer_norm_fp32 if kt.dtype == torch.float else cuda_module.torch_rms_layer_norm_fp16
     
 
     def custom():
@@ -1691,9 +1689,9 @@ def test_rms_layer_norm(): # torch_rms_layer_norm
     def baseline():
         # output = act_func(inpA) * inpB
         variance = inp.to(torch.float32).pow(2).mean(-1, keepdim=True)
-        rms_var = torch.rsqrt(variance + 1e-6)
+        rms_var = torch.rsqrt(variance + 1e-6).to(dtype=kt.dtype)
         hidden_states = inp * rms_var
-        output = scale * hidden_states
+        output = (scale * hidden_states).to(dtype=kt.dtype)
         return [rms_var.contiguous(), output.contiguous()]
 
     return custom, baseline

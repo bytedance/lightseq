@@ -1,3 +1,7 @@
+/* 
+  Copyright 2023 Bytedance Lab-nlp
+*/
+
 #include "kernels.h"
 #include "llama_kernels.h"
 #include "common.h"
@@ -120,8 +124,6 @@ __global__ void ker_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_
   float l_square_sum = 0;
   const T* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
   for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
-    // T val = thread_inp[idx];
-    // l_sum += val.x + val.y + val.z + val.w;
     l_square_sum += thread_inp[idx] * thread_inp[idx];
   }
   
@@ -143,6 +145,34 @@ __global__ void ker_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_
   } 
 }
 
+template <>
+__global__ void ker_rms_layer_norm<__half>(const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr, __half* rms_ptr, size_t hidden_dim, const float ln_epsilon) {
+  // step 0. compute local sum
+  float l_square_sum = 0;
+  const __half* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    float float_inp = __half2float(thread_inp[idx]);
+    l_square_sum += float_inp * float_inp;
+  }
+  
+  // step 1. compute reduce sum
+  float mean_dim = float(hidden_dim);
+  float kReduce[1] = {l_square_sum};
+  blockReduce<ReduceType::kSum, 1>(kReduce);
+  __shared__ __half s_var;
+  if (threadIdx.x == 0) {
+    s_var = __float2half(rsqrtf(kReduce[0] / mean_dim + ln_epsilon));
+    rms_ptr[blockIdx.x] = s_var;
+  }
+  __syncthreads();
+  
+  // step 2. layer norm result
+  __half* thread_out = out_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    thread_out[idx] = thread_inp[idx] * scale_ptr[idx] * s_var;
+  } 
+}
+
 template <typename T>
 void launch_rms_layer_norm(const T *inp_ptr, const T *scale_ptr, T *out_ptr, T* rms_ptr,
                            size_t batch_tokens, size_t hidden_dim,
@@ -157,6 +187,10 @@ void launch_rms_layer_norm(const T *inp_ptr, const T *scale_ptr, T *out_ptr, T* 
 
 
 template void launch_rms_layer_norm<float>(const float* inp_ptr, const float* scale_ptr, float* out_ptr, float* rms_ptr,
+                           size_t batch_tokens, size_t hidden_dim,
+                           cudaStream_t stream,
+                           const float ln_epsilon);
+template void launch_rms_layer_norm<__half>(const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr, __half* rms_ptr,
                            size_t batch_tokens, size_t hidden_dim,
                            cudaStream_t stream,
                            const float ln_epsilon);

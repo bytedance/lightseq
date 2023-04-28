@@ -761,4 +761,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_rms_layer_norm_fp32",
         &lightseq::cuda::torch_rms_layer_norm<float>,
         "Test llama rms layer norm kernel");
+  m.def("torch_rms_layer_norm_fp16",
+        &lightseq::cuda::torch_rms_layer_norm<__half>,
+        "Test llama rms layer norm kernel");
 }
