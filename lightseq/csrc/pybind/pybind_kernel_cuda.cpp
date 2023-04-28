@@ -447,7 +447,7 @@ class RotaryPositionWeight {
       : _max_step(max_step), _head_dim(head_dim) {
     if (head_dim & 1) {
       printf(
-          "Error! head dim should be even number while using RataryPositionQK "
+          "Error! head dim should be even number while using RotaryPositionQk "
           "Operator.\n");
       exit(0);
     }
@@ -494,7 +494,7 @@ template <typename T>
 void torch_launch_rotary_position(const torch::Tensor &input,
                                   torch::Tensor output, int batch_size,
                                   int nhead, int offset_seq_len,
-                                  int query_seq_len, int head_dim) {
+                                  int query_seq_len, int head_dim, bool append_cache) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (query_seq_len + offset_seq_len > _rotary_position_instance._max_step) {
     printf(
@@ -510,14 +510,14 @@ void torch_launch_rotary_position(const torch::Tensor &input,
     launch_rotary_position_qk<float>(
         rptr<float>(input), _rotary_position_instance._device_sin_ptr,
         _rotary_position_instance._device_cos_ptr, rptr<float>(output),
-        _rotary_position_instance._max_step, batch_size, nhead, offset_seq_len,
-        query_seq_len, head_dim, stream);
+        append_cache ? offset_seq_len + query_seq_len : query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, append_cache, stream);
   } else {
     launch_rotary_position_qk<__half>(
         rptr<__half>(input), _rotary_position_instance._device_sin_half_ptr,
         _rotary_position_instance._device_cos_half_ptr, rptr<__half>(output),
-        _rotary_position_instance._max_step, batch_size, nhead, offset_seq_len,
-        query_seq_len, head_dim, stream);
+        append_cache ? offset_seq_len + query_seq_len : query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, append_cache, stream);
   }
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
@@ -533,9 +533,14 @@ void torch_elewise_product_silu(const torch::Tensor &inpA,
 }
 
 template <typename T>
-void torch_rms_layer_norm(const torch::Tensor &inp, const torch::Tensor &scale, torch::Tensor &out, torch::Tensor &rms_out, int batch_tokens, int hidden_dim, const float epsilon = 1e-6) {
+void torch_rms_layer_norm(const torch::Tensor &inp, const torch::Tensor &scale,
+                          torch::Tensor &out, torch::Tensor &rms_out,
+                          int batch_tokens, int hidden_dim,
+                          const float epsilon = 1e-6) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out), rptr<T>(rms_out), batch_tokens, hidden_dim, stream, epsilon);
+  launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out),
+                           rptr<T>(rms_out), batch_tokens, hidden_dim, stream,
+                           epsilon);
 }
 
 }  // namespace cuda

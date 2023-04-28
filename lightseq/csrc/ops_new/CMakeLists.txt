@@ -12,6 +12,7 @@ set(operator_files
     layer_normalize.cpp
     split_head_op.cpp
     linear.cpp
+    rms_layer_norm.cpp
     rotary_position_qk.cpp
     sampling.cc.cu
     softmax.cpp

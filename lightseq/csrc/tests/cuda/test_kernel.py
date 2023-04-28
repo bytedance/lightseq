@@ -1583,9 +1583,15 @@ def test_rotary_position_qk():
     seq_len = 1
     seq_len = random.randint(1, 2048)
     offset_seq_len = random.randint(0, 2048 - seq_len)
-    print(f"offset_seq_len, seq_len: {offset_seq_len}, {seq_len}")
     input_tensor = kt.rand((batch_size, nhead, seq_len, head_dim))
-    output_tensor = torch.empty_like(input_tensor)
+    cache_tensor = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+
+    append_cache = random.randint(0, 1)
+    print(f"offset_seq_len, seq_len, append_cache: {offset_seq_len}, {seq_len}, {append_cache}")
+    if append_cache:
+        output_tensor = torch.cat((cache_tensor, input_tensor), dim=2)
+    else:
+        output_tensor = torch.empty_like(input_tensor)
 
     func = None
     if kt.dtype == torch.float:
@@ -1596,7 +1602,7 @@ def test_rotary_position_qk():
     def custom():
         inp_clone = input_tensor.clone()
         out_clone = output_tensor.clone()
-        func(inp_clone, out_clone, batch_size, nhead, offset_seq_len, seq_len, head_dim)
+        func(inp_clone, out_clone, batch_size, nhead, offset_seq_len, seq_len, head_dim, append_cache)
         return [out_clone.contiguous()]
 
     tmp_device = input_tensor.device
@@ -1612,7 +1618,6 @@ def test_rotary_position_qk():
 
     def baseline():
         inp_clone = input_tensor.clone()
-        # out_clone = output_tensor.clone()
         kv_seq_len = offset_seq_len + seq_len
         cos = cos_cached[:, :, :kv_seq_len, ...]
         sin = sin_cached[:, :, :kv_seq_len, ...]
@@ -1635,6 +1640,8 @@ def test_rotary_position_qk():
             return torch.cat((-x2, x1), dim=-1)
 
         out_clone = (inp_clone * cos) + (rotate_half(inp_clone) * sin)
+        if append_cache:
+            out_clone = torch.cat((cache_tensor, out_clone), dim=2)
         return [out_clone.contiguous()]
 
     return custom, baseline
@@ -1671,16 +1678,19 @@ def test_elewise_product_silu():
 
 
 @kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
-def test_rms_layer_norm(): # torch_rms_layer_norm
-    batch_size, seq_len = 1, 1 # kt.bs_sl()
+def test_rms_layer_norm():  # torch_rms_layer_norm
+    batch_size, seq_len = 1, 1  # kt.bs_sl()
     hidden_size = 5120
     inp = kt.rand((batch_size, seq_len, hidden_size))
     scale = kt.rand((hidden_size))
     custom_out = torch.empty_like(inp)
     rms_out = kt.rand((batch_size, seq_len))
 
-    func = cuda_module.torch_rms_layer_norm_fp32 if kt.dtype == torch.float else cuda_module.torch_rms_layer_norm_fp16
-    
+    func = (
+        cuda_module.torch_rms_layer_norm_fp32
+        if kt.dtype == torch.float
+        else cuda_module.torch_rms_layer_norm_fp16
+    )
 
     def custom():
         func(inp, scale, custom_out, rms_out, batch_size * seq_len, hidden_size, 1e-6)
@@ -1696,12 +1706,13 @@ def test_rms_layer_norm(): # torch_rms_layer_norm
 
     return custom, baseline
 
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_rms_layer_norm",
-            "test_elewise_product_silu",
+            # "test_rms_layer_norm",
+            # "test_elewise_product_silu",
             "test_rotary_position_qk",
             # "test_launch_transform_0213",
             # "test_launch_bias_add_transform_20314",
