@@ -6,7 +6,8 @@ template <typename T1, typename T2>
 RMSLayerNormalizeOp<T1, T2>::~RMSLayerNormalizeOp() {}
 
 template <typename T1, typename T2>
-Variable* RMSLayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* scale) {
+Variable* RMSLayerNormalizeOp<T1, T2>::operator()(Variable* inp,
+                                                  Variable* scale) {
   size_t max_size = _max_batch_tokens * _hidden_dim;
   _result =
       new Variable("RMSLayerNormalizeOp_out", _max_batch_tokens * _hidden_dim,
@@ -18,7 +19,7 @@ Variable* RMSLayerNormalizeOp<T1, T2>::operator()(Variable* inp, Variable* scale
 
 template <typename T1, typename T2>
 void RMSLayerNormalizeOp<T1, T2>::before_forward(size_t batch_size,
-                                              size_t seq_len) {
+                                                 size_t seq_len) {
   _batch_tokens = batch_size * seq_len;
   _result->set_shape({batch_size, seq_len, _hidden_dim});
 }
@@ -36,10 +37,10 @@ void RMSLayerNormalizeOp<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  cuda::launch_rms_layer_norm(inp_val, scale_val, out_val, rms_vars_val, _batch_tokens, _hidden_dim, stream);
+  cuda::launch_rms_layer_norm(inp_val, scale_val, out_val, rms_vars_val,
+                              _batch_tokens, _hidden_dim, stream);
 #endif
 }
-
 
 template class RMSLayerNormalizeOp<float, float>;
 #ifdef LIGHTSEQ_cuda

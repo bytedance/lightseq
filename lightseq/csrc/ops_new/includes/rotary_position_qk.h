@@ -32,7 +32,7 @@ class RotaryPositionQk : public Operator {
         _max_batch_size(max_batch_size),
         _max_step(max_step),
         _head_num(head_num),
-        _head_dim(head_dim){
+        _head_dim(head_dim) {
     if (head_dim & 1) {
       printf(
           "Error! head dim should be even number while using RotaryPositionQk "
@@ -66,10 +66,10 @@ class RotaryPositionQk : public Operator {
         (T1*)_context_ptr->allocator()->malloc_mem(total_size * sizeof(T1));
     _device_cos_ptr =
         (T1*)_context_ptr->allocator()->malloc_mem(total_size * sizeof(T1));
-    CHECK_GPU_ERROR(
-        cudaMemcpy(_device_sin_ptr, _sin_ptr, total_size * sizeof(T1), cudaMemcpyDefault));
-    CHECK_GPU_ERROR(
-        cudaMemcpy(_device_cos_ptr, _cos_ptr, total_size * sizeof(T1), cudaMemcpyDefault));
+    CHECK_GPU_ERROR(cudaMemcpy(_device_sin_ptr, _sin_ptr,
+                               total_size * sizeof(T1), cudaMemcpyDefault));
+    CHECK_GPU_ERROR(cudaMemcpy(_device_cos_ptr, _cos_ptr,
+                               total_size * sizeof(T1), cudaMemcpyDefault));
     free(_sin_ptr);
     _sin_ptr = nullptr;
     free(_cos_ptr);
@@ -86,7 +86,8 @@ class RotaryPositionQk : public Operator {
     _batch_size = batch_size;
     _offset_seq_len = offset_seq_len;
     _query_len = query_len;
-    _result->set_shape({_batch_size, _head_num, _append_cache ? _max_step : _query_len, _head_dim});
+    _result->set_shape({_batch_size, _head_num,
+                        _append_cache ? _max_step : _query_len, _head_dim});
   }
 
   Variable* operator()(Variable* inp_tensor, Variable* cache_states);
@@ -95,7 +96,6 @@ class RotaryPositionQk : public Operator {
   void forward() override;
 
   void backward() override {}
-
 };
 
 }  // namespace lightseq

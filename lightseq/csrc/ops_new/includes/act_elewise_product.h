@@ -13,7 +13,6 @@ class ActElewiseProductOp : public Operator {
 
   Variable* _result;
 
-
  public:
   ActElewiseProductOp(size_t max_batch_tokens, size_t inner_size)
       : Operator("ActElewiseProductOp"),

@@ -1587,7 +1587,9 @@ def test_rotary_position_qk():
     cache_tensor = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
 
     append_cache = random.randint(0, 1)
-    print(f"offset_seq_len, seq_len, append_cache: {offset_seq_len}, {seq_len}, {append_cache}")
+    print(
+        f"offset_seq_len, seq_len, append_cache: {offset_seq_len}, {seq_len}, {append_cache}"
+    )
     if append_cache:
         output_tensor = torch.cat((cache_tensor, input_tensor), dim=2)
     else:
@@ -1602,7 +1604,16 @@ def test_rotary_position_qk():
     def custom():
         inp_clone = input_tensor.clone()
         out_clone = output_tensor.clone()
-        func(inp_clone, out_clone, batch_size, nhead, offset_seq_len, seq_len, head_dim, append_cache)
+        func(
+            inp_clone,
+            out_clone,
+            batch_size,
+            nhead,
+            offset_seq_len,
+            seq_len,
+            head_dim,
+            append_cache,
+        )
         return [out_clone.contiguous()]
 
     tmp_device = input_tensor.device

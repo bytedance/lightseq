@@ -18,15 +18,14 @@ class RMSLayerNormalizeOp : public Operator {
   Variable* _result;
 
  public:
-  RMSLayerNormalizeOp(size_t max_batch_tokens, size_t hidden_dim, float epsilon = 1e-6)
+  RMSLayerNormalizeOp(size_t max_batch_tokens, size_t hidden_dim,
+                      float epsilon = 1e-6)
       : Operator("RMSLayerNormalizeOp"),
         _max_batch_tokens(max_batch_tokens),
         _hidden_dim(hidden_dim),
         _epsilon(epsilon) {
     _rms_vars.reset(new Tensor("rms_vars", g_dtype<T1>(), max_batch_tokens));
   }
-
-  
 
   Variable* operator()(Variable* inp, Variable* scale);
 

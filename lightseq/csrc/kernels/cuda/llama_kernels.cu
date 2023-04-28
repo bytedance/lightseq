@@ -34,9 +34,9 @@ __global__ void kernel_rotary_position_qk(
                 (head_dim_idx % (head_dim / 2)));
   T sin_val = *(sin_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
                 (head_dim_idx % (head_dim / 2)));
-  size_t output_idx = flat_4dim(
-      batch_idx, head_idx, append_cache * offset_seq_len + seq_idx,
-      head_dim_idx, nhead, max_step, head_dim);
+  size_t output_idx =
+      flat_4dim(batch_idx, head_idx, append_cache * offset_seq_len + seq_idx,
+                head_dim_idx, nhead, max_step, head_dim);
   if (head_dim_idx < head_dim / 2) {
     T state_val2 = *(input_ptr + idx + head_dim / 2);
     *(output_ptr + output_idx) = state_val1 * cos_val - state_val2 * sin_val;
@@ -51,7 +51,8 @@ void launch_rotary_position_qk(const T* input_ptr, const T* sin_ptr,
                                const T* cos_ptr, T* output_ptr, size_t max_step,
                                size_t batch_size, size_t nhead,
                                size_t offset_seq_len, size_t query_len,
-                               size_t head_dim, bool append_cache, cudaStream_t stream) {
+                               size_t head_dim, bool append_cache,
+                               cudaStream_t stream) {
   size_t nele = batch_size * nhead * query_len * head_dim;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_rotary_position_qk<T><<<nblock, MAX_THREADS, 0, stream>>>(

@@ -494,7 +494,8 @@ template <typename T>
 void torch_launch_rotary_position(const torch::Tensor &input,
                                   torch::Tensor output, int batch_size,
                                   int nhead, int offset_seq_len,
-                                  int query_seq_len, int head_dim, bool append_cache) {
+                                  int query_seq_len, int head_dim,
+                                  bool append_cache) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (query_seq_len + offset_seq_len > _rotary_position_instance._max_step) {
     printf(
@@ -510,14 +511,16 @@ void torch_launch_rotary_position(const torch::Tensor &input,
     launch_rotary_position_qk<float>(
         rptr<float>(input), _rotary_position_instance._device_sin_ptr,
         _rotary_position_instance._device_cos_ptr, rptr<float>(output),
-        append_cache ? offset_seq_len + query_seq_len : query_seq_len, batch_size, nhead, offset_seq_len,
-        query_seq_len, head_dim, append_cache, stream);
+        append_cache ? offset_seq_len + query_seq_len : query_seq_len,
+        batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
+        append_cache, stream);
   } else {
     launch_rotary_position_qk<__half>(
         rptr<__half>(input), _rotary_position_instance._device_sin_half_ptr,
         _rotary_position_instance._device_cos_half_ptr, rptr<__half>(output),
-        append_cache ? offset_seq_len + query_seq_len : query_seq_len, batch_size, nhead, offset_seq_len,
-        query_seq_len, head_dim, append_cache, stream);
+        append_cache ? offset_seq_len + query_seq_len : query_seq_len,
+        batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
+        append_cache, stream);
   }
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());

@@ -13,7 +13,8 @@ void launch_rotary_position_qk(const T *input_ptr, const T *sin_ptr,
                                const T *cos_ptr, T *output_ptr, size_t max_step,
                                size_t batch_size, size_t nhead,
                                size_t offset_seq_len, size_t query_len,
-                               size_t head_dim, bool append_cache, cudaStream_t stream);
+                               size_t head_dim, bool append_cache,
+                               cudaStream_t stream);
 
 template <typename T>
 void launch_silu_elewise_product(const T *inpA_ptr, const T *inpB_ptr,
