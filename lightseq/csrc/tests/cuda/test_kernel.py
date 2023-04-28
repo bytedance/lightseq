@@ -1652,7 +1652,7 @@ from transformers.activations import SiLUActivation
 
 
 @kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
-def test_elewise_product_silu():
+def test_silu_elewise_product():
     batch_size, seq_len = 1, 256
     hidden_size = 13824
     inpA = kt.rand((batch_size, seq_len, hidden_size))
@@ -1661,9 +1661,9 @@ def test_elewise_product_silu():
 
     act_func = SiLUActivation()
     func = (
-        cuda_module.torch_elewise_product_silu_fp32
+        cuda_module.torch_silu_elewise_product_fp32
         if kt.dtype == torch.float
-        else cuda_module.torch_elewise_product_silu_fp16
+        else cuda_module.torch_silu_elewise_product_fp16
     )
 
     def custom():
@@ -1712,7 +1712,7 @@ if __name__ == "__main__":
     kt.run(
         [
             # "test_rms_layer_norm",
-            # "test_elewise_product_silu",
+            # "test_silu_elewise_product",
             "test_rotary_position_qk",
             # "test_launch_transform_0213",
             # "test_launch_bias_add_transform_20314",

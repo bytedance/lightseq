@@ -72,7 +72,7 @@ template void launch_rotary_position_qk<__half>(
     cudaStream_t stream);
 
 template <typename T>
-__global__ void kernel_elewise_product_silu(const T* inpA_ptr,
+__global__ void kernel_silu_elewise_product(const T* inpA_ptr,
                                             const T* inpB_ptr, T* out_ptr,
                                             size_t seq_len, size_t inner_size,
                                             size_t max_thread_num) {
@@ -88,7 +88,7 @@ __global__ void kernel_elewise_product_silu(const T* inpA_ptr,
 }
 
 template <>
-__global__ void kernel_elewise_product_silu<__half>(
+__global__ void kernel_silu_elewise_product<__half>(
     const __half* inpA_ptr, const __half* inpB_ptr, __half* out_ptr,
     size_t seq_len, size_t inner_size, size_t max_thread_num) {
   size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
@@ -103,19 +103,19 @@ __global__ void kernel_elewise_product_silu<__half>(
 }
 
 template <typename T>
-void launch_elewise_product_silu(const T* inpA_ptr, const T* inpB_ptr,
+void launch_silu_elewise_product(const T* inpA_ptr, const T* inpB_ptr,
                                  T* out_ptr, size_t batch_size, size_t seq_len,
                                  size_t inner_size, cudaStream_t stream) {
   size_t nele = batch_size * seq_len * inner_size;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
-  kernel_elewise_product_silu<T><<<nblock, MAX_THREADS, 0, stream>>>(
+  kernel_silu_elewise_product<T><<<nblock, MAX_THREADS, 0, stream>>>(
       inpA_ptr, inpB_ptr, out_ptr, seq_len, inner_size, nele);
 }
 
-template void launch_elewise_product_silu<float>(
+template void launch_silu_elewise_product<float>(
     const float* inpA_ptr, const float* inpB_ptr, float* out_ptr,
     size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
-template void launch_elewise_product_silu<__half>(
+template void launch_silu_elewise_product<__half>(
     const __half* inpA_ptr, const __half* inpB_ptr, __half* out_ptr,
     size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
 

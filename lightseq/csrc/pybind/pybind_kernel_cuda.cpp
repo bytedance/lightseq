@@ -302,7 +302,7 @@ void torch_launch_concat3_dim1(const torch::Tensor &inp1,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_concat3_dim1(rptr<T>(inp1), rptr<T>(inp2), rptr<T>(output), sz0, sz2,
                       sz1_1, sz1_2, stream);
-  // cudaStreamSynchronize(stream);
+  cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -524,12 +524,14 @@ void torch_launch_rotary_position(const torch::Tensor &input,
 }
 
 template <typename T>
-void torch_elewise_product_silu(const torch::Tensor &inpA,
+void torch_silu_elewise_product(const torch::Tensor &inpA,
                                 const torch::Tensor &inpB, torch::Tensor outC,
                                 int batch_size, int seq_len, int inner_size) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_elewise_product_silu<T>(rptr<T>(inpA), rptr<T>(inpB), rptr<T>(outC),
+  launch_silu_elewise_product<T>(rptr<T>(inpA), rptr<T>(inpB), rptr<T>(outC),
                                  batch_size, seq_len, inner_size, stream);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 template <typename T>
@@ -541,6 +543,8 @@ void torch_rms_layer_norm(const torch::Tensor &inp, const torch::Tensor &scale,
   launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out),
                            rptr<T>(rms_out), batch_tokens, hidden_dim, stream,
                            epsilon);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 }  // namespace cuda
@@ -756,11 +760,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_rotary_position_fp16",
         &lightseq::cuda::torch_launch_rotary_position<half>,
         "Test llama rotary position kernel");
-  m.def("torch_elewise_product_silu_fp32",
-        &lightseq::cuda::torch_elewise_product_silu<float>,
+  m.def("torch_silu_elewise_product_fp32",
+        &lightseq::cuda::torch_silu_elewise_product<float>,
         "Test llama rotary position kernel");
-  m.def("torch_elewise_product_silu_fp16",
-        &lightseq::cuda::torch_elewise_product_silu<__half>,
+  m.def("torch_silu_elewise_product_fp16",
+        &lightseq::cuda::torch_silu_elewise_product<__half>,
         "Test llama rotary position kernel");
 
   m.def("torch_rms_layer_norm_fp32",
