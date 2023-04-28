@@ -1581,6 +1581,9 @@ def test_rotary_position_qk():
     nhead = kt.nhead
     head_dim = 128
     seq_len = 1
+    seq_len = random.randint(1, 2048)
+    offset_seq_len = random.randint(0, 2048 - seq_len)
+    print(f"offset_seq_len, seq_len: {offset_seq_len}, {seq_len}")
     input_tensor = kt.rand((batch_size, nhead, seq_len, head_dim))
     output_tensor = torch.empty_like(input_tensor)
 
@@ -1667,12 +1670,41 @@ def test_elewise_product_silu():
     return custom, baseline
 
 
+@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float])
+def test_rms_layer_norm(): # torch_rms_layer_norm
+    batch_size, seq_len = 1, 1 # kt.bs_sl()
+    hidden_size = 5120
+    inp = kt.rand((batch_size, seq_len, hidden_size))
+    scale = kt.rand((hidden_size))
+    custom_out = torch.empty_like(inp)
+    rms_out = kt.rand((batch_size, seq_len))
+
+    func = cuda_module.torch_rms_layer_norm_fp32
+        # if kt.dtype == torch.float
+        # else cuda_module.torch_rms_layer_norm
+    
+
+    def custom():
+        func(inp, scale, custom_out, rms_out, batch_size * seq_len, hidden_size, 1e-6)
+        return [rms_out.contiguous(), custom_out.contiguous()]
+
+    def baseline():
+        # output = act_func(inpA) * inpB
+        variance = inp.to(torch.float32).pow(2).mean(-1, keepdim=True)
+        rms_var = torch.rsqrt(variance + 1e-6)
+        hidden_states = inp * rms_var
+        output = scale * hidden_states
+        return [rms_var.contiguous(), output.contiguous()]
+
+    return custom, baseline
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
+            "test_rms_layer_norm",
             "test_elewise_product_silu",
-            # "test_rotary_position_qk",
+            "test_rotary_position_qk",
             # "test_launch_transform_0213",
             # "test_launch_bias_add_transform_20314",
             # "test_launch_transform4d_0213",
