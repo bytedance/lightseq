@@ -1,6 +1,8 @@
 set(layers_files
     feed_forward_layer.cpp
     linear_layer.cpp
+    # llama_attention_layer.cpp
+    # llama_mlp_layer.cpp
     generator_layer.cpp
     gpt_attention_layer.cpp
     gpt_layer.cpp

@@ -10,6 +10,8 @@ class ActElewiseProductOp : public Operator {
   size_t _inner_size;
   size_t _max_batch_tokens;
   size_t _batch_tokens;
+  size_t _batch_size;
+  size_t _seq_len;
 
   Variable* _result;
 
@@ -19,15 +21,17 @@ class ActElewiseProductOp : public Operator {
         _max_batch_tokens(max_batch_tokens),
         _inner_size(inner_size) {}
 
-  ~ActElewiseProductOp() {}
+  virtual ~ActElewiseProductOp() {}
 
   Variable* operator()(Variable* inpA, Variable* inpB);
 
   void forward() override;
 
-  void before_forward(size_t batch_tokens) {
-    _batch_tokens = batch_tokens;
-    _result->set_shape({batch_tokens, _output_size});
+  void before_forward(size_t batch_size, size_t seq_len) {
+    _batch_size = batch_size;
+    _seq_len = seq_len;
+    _batch_tokens = batch_size * seq_len;
+    _result->set_shape({_batch_tokens, _inner_size});
   }
 
   void backward() override;

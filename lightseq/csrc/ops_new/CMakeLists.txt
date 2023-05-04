@@ -1,4 +1,5 @@
 set(operator_files
+    act_elewise_product.cpp
     beam_search_topk.cu
     bias_act_dropout.cpp
     bias_add_transform_20314.cpp

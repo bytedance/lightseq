@@ -81,8 +81,6 @@ __global__ void kernel_silu_elewise_product(const T* inpA_ptr,
   if (idx >= max_thread_num) {
     return;
   }
-  int batch_idx, seq_idx, dim_idx;
-  decompose_3dim(idx, seq_len, inner_size, &batch_idx, &seq_idx, &dim_idx);
   T ele_product = *(inpA_ptr + idx);
   *(out_ptr + idx) =
       ele_product / (1.f + expf(-ele_product)) * (*(inpB_ptr + idx));
@@ -96,8 +94,6 @@ __global__ void kernel_silu_elewise_product<__half>(
   if (idx >= max_thread_num) {
     return;
   }
-  int batch_idx, seq_idx, dim_idx;
-  decompose_3dim(idx, seq_len, inner_size, &batch_idx, &seq_idx, &dim_idx);
   const __half& ele_product = *(inpA_ptr + idx);
   *(out_ptr + idx) = ele_product / __float2half(1.f + expf(-ele_product)) *
                      (*(inpB_ptr + idx));
