@@ -9,20 +9,18 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
-void launch_llama_embedding(const T *token_emb, const T *pos_emb,
-                            const int *tokens, T *output, T *pad_mask_ptr,
-                            int *left_pad_len_ptr, int batch_size,
-                            int beam_size, int hidden_dim, int step_offset,
-                            int seq_len, int max_step, int padding_id,
-                            cudaStream_t stream);
+void launch_llama_embedding(const T *token_emb, const int *tokens, T *output,
+                            T *pad_mask_ptr, int *left_pad_len_ptr,
+                            int batch_size, int beam_size, int hidden_dim,
+                            int step_offset, int seq_len, int max_step,
+                            int padding_id, cudaStream_t stream);
 
 template <typename T>
-void launch_rotary_position_qk(const T *input_ptr, const T *sin_ptr,
-                               const T *cos_ptr, T *output_ptr, size_t max_step,
-                               size_t batch_size, size_t nhead,
-                               size_t offset_seq_len, size_t query_len,
-                               size_t head_dim, bool append_cache,
-                               cudaStream_t stream);
+void launch_split_rotary_position_qk(
+    const T *input_ptr, const T *sin_ptr, const T *cos_ptr,
+    const int *left_pad_len_ptr, T *q_out, T *cache_k_out, T *cache_v_out,
+    size_t max_step, size_t batch_size, size_t nhead, size_t offset_seq_len,
+    size_t query_len, size_t head_dim, cudaStream_t stream);
 
 template <typename T>
 void launch_silu_elewise_product(const T *inpA_ptr, const T *inpB_ptr,

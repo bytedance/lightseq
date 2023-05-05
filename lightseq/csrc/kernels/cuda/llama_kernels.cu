@@ -65,7 +65,6 @@ __global__ void kernel_llama_embedding(const T* token_emb, const int* token_ids,
   int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
                             beam_size, max_step);
   int token_id = token_ids[token_idx];
-  int batch_beam_idx = batch_idx * beam_size + beam_idx;
 
   float4& output_val = ((float4*)output)[idx];
   if (token_id != padding_id) {
@@ -123,7 +122,6 @@ __global__ void kernel_llama_embedding<__half>(
   int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
                             beam_size, max_step);
   int token_id = token_ids[token_idx];
-  int batch_beam_idx = batch_idx * beam_size + beam_idx;
 
   float4& output_val = ((float4*)output)[idx];
 
@@ -197,59 +195,93 @@ template void launch_llama_embedding<__half>(
     cudaStream_t stream);
 
 template <typename T>
-__global__ void kernel_rotary_position_qk(
-    const T* input_ptr, const T* sin_ptr, const T* cos_ptr, T* output_ptr,
+__global__ void kernel_split_rotary_position_qkv(
+    const T* input_ptr, const T* sin_ptr, const T* cos_ptr,
+    const int* left_pad_len_ptr, T* q_out, T* cache_k_out, T* cache_v_out, size_t batch_size,
     size_t max_step, size_t nhead, size_t offset_seq_len, size_t query_len,
-    size_t head_dim, size_t max_thread_num, int append_cache) {
+    size_t head_dim, size_t max_thread_num) {
   size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= max_thread_num) {
     return;
   }
-  int batch_idx, head_idx, seq_idx, head_dim_idx;
-  decompose_4dim(idx, nhead, query_len, head_dim, &batch_idx, &head_idx,
-                 &seq_idx, &head_dim_idx);
+  int qkv_idx, batch_idx, head_idx, seq_idx, head_dim_idx;
+  decompose_5dim(idx, batch_size, nhead, query_len, head_dim, &qkv_idx,
+                 &batch_idx, &head_idx, &seq_idx, &head_dim_idx);
+
+  size_t output_idx = 0;
+  if (qkv_idx) {
+    output_idx = flat_4dim(batch_idx, head_idx, offset_seq_len + seq_idx,
+                           head_dim_idx, nhead, max_step, head_dim);
+  } else {
+    output_idx = flat_4dim(batch_idx, head_idx, seq_idx, head_dim_idx, nhead,
+                           query_len, head_dim);
+  }
+  size_t inp_idx = flat_4dim(batch_idx, qkv_idx, seq_idx, head_idx, head_dim_idx, 3, query_len, nhead, head_dim);
+
   // cos part
   T state_val1 = *(input_ptr + idx);
-  T cos_val = *(cos_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
-                (head_dim_idx % (head_dim / 2)));
-  T sin_val = *(sin_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
-                (head_dim_idx % (head_dim / 2)));
-  size_t output_idx =
-      flat_4dim(batch_idx, head_idx, append_cache * offset_seq_len + seq_idx,
-                head_dim_idx, nhead, max_step, head_dim);
-  if (head_dim_idx < head_dim / 2) {
-    T state_val2 = *(input_ptr + idx + head_dim / 2);
-    *(output_ptr + output_idx) = state_val1 * cos_val - state_val2 * sin_val;
-  } else {
-    T state_val2 = *(input_ptr + idx - head_dim / 2);
-    *(output_ptr + output_idx) = state_val1 * cos_val + state_val2 * sin_val;
+  if (seq_idx < left_pad_len_ptr[batch_idx]) {
+    if(qkv_idx == 0) {
+      *(q_out + output_idx) = 0;
+    } else if (qkv_idx == 1) {
+      *(cache_k_out + output_idx) = 0.;
+    } else {
+      *(cache_v_out + output_idx) = 0.;
+    }
+    return ;
+  }
+
+  if(qkv_idx == 2) {
+    *(cache_v_out + output_idx) = state_val1;
+  }
+  else {
+    T cos_val = *(cos_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
+                  (head_dim_idx % (head_dim / 2)) - left_pad_len_ptr[batch_idx]);
+    T sin_val = *(sin_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
+                  (head_dim_idx % (head_dim / 2)) - left_pad_len_ptr[batch_idx]);
+    T out_val = 0.;
+    if (head_dim_idx < head_dim / 2) {
+      T state_val2 = *(input_ptr + idx + head_dim / 2);
+      out_val = state_val1 * cos_val - state_val2 * sin_val;
+    } else {
+      T state_val2 = *(input_ptr + idx - head_dim / 2);
+      out_val = state_val1 * cos_val + state_val2 * sin_val;
+    }
+
+    if (qkv_idx == 0) {
+      *(q_out + output_idx) = out_val;
+    }
+    else {
+      *(cache_k_out + output_idx) = out_val;
+    }
   }
 }
 
 template <typename T>
-void launch_rotary_position_qk(const T* input_ptr, const T* sin_ptr,
-                               const T* cos_ptr, T* output_ptr, size_t max_step,
-                               size_t batch_size, size_t nhead,
-                               size_t offset_seq_len, size_t query_len,
-                               size_t head_dim, bool append_cache,
-                               cudaStream_t stream) {
-  size_t nele = batch_size * nhead * query_len * head_dim;
+void launch_split_rotary_position_qk(
+    const T* input_ptr, const T* sin_ptr, const T* cos_ptr,
+    const int* left_pad_len_ptr, T* q_out, T* cache_k_out, T* cache_v_out,
+    size_t max_step, size_t batch_size, size_t nhead, size_t offset_seq_len,
+    size_t query_len, size_t head_dim, cudaStream_t stream) {
+  size_t nele = 3 * batch_size * nhead * query_len * head_dim;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
-  kernel_rotary_position_qk<T><<<nblock, MAX_THREADS, 0, stream>>>(
-      input_ptr, sin_ptr, cos_ptr, output_ptr, max_step, nhead, offset_seq_len,
-      query_len, head_dim, nele, append_cache);
+  kernel_split_rotary_position_qkv<T><<<nblock, MAX_THREADS, 0, stream>>>(
+      input_ptr, sin_ptr, cos_ptr, left_pad_len_ptr, q_out, cache_k_out, cache_v_out, batch_size, max_step, nhead,
+      offset_seq_len, query_len, head_dim, nele);
 }
 
-template void launch_rotary_position_qk<float>(
+template void launch_split_rotary_position_qk<float>(
     const float* input_ptr, const float* sin_ptr, const float* cos_ptr,
-    float* output_ptr, size_t max_step, size_t batch_size, size_t nhead,
-    size_t offset_seq_len, size_t query_len, size_t head_dim, bool append_cache,
+    const int* left_pad_len_ptr, float* q_out, float* cache_k_out,
+    float* cache_v_out, size_t max_step, size_t batch_size, size_t nhead,
+    size_t offset_seq_len, size_t query_len, size_t head_dim,
     cudaStream_t stream);
 
-template void launch_rotary_position_qk<__half>(
+template void launch_split_rotary_position_qk<__half>(
     const __half* input_ptr, const __half* sin_ptr, const __half* cos_ptr,
-    __half* output_ptr, size_t max_step, size_t batch_size, size_t nhead,
-    size_t offset_seq_len, size_t query_len, size_t head_dim, bool append_cache,
+    const int* left_pad_len_ptr, __half* q_out, __half* cache_k_out,
+    __half* cache_v_out, size_t max_step, size_t batch_size, size_t nhead,
+    size_t offset_seq_len, size_t query_len, size_t head_dim,
     cudaStream_t stream);
 
 template <typename T>
