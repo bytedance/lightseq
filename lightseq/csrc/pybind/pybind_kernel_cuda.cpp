@@ -491,10 +491,10 @@ class RotaryPositionWeight {
 } _rotary_position_instance(2048, 128);
 
 template <typename T>
-void torch_launch_split_rotary_position(const torch::Tensor &input,
-                                  torch::Tensor &q_out, torch::Tensor &cache_k_out, torch::Tensor &cache_v_out,
-                                  int batch_size, int nhead, int offset_seq_len,
-                                  int query_seq_len, int head_dim) {
+void torch_launch_split_rotary_position(
+    const torch::Tensor &input, torch::Tensor &q_out,
+    torch::Tensor &cache_k_out, torch::Tensor &cache_v_out, int batch_size,
+    int nhead, int offset_seq_len, int query_seq_len, int head_dim) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (query_seq_len + offset_seq_len > _rotary_position_instance._max_step) {
     printf(
@@ -509,27 +509,28 @@ void torch_launch_split_rotary_position(const torch::Tensor &input,
   if (std::is_same<T, float>::value) {
     launch_split_rotary_position_qkv<float>(
         rptr<float>(input), _rotary_position_instance._device_sin_ptr,
-        _rotary_position_instance._device_cos_ptr, rptr<float>(q_out), rptr<float>(cache_k_out), rptr<float>(cache_v_out),
-        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
-        stream);
+        _rotary_position_instance._device_cos_ptr, rptr<float>(q_out),
+        rptr<float>(cache_k_out), rptr<float>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, stream);
   } else {
     launch_split_rotary_position_qkv<__half>(
         rptr<__half>(input), _rotary_position_instance._device_sin_half_ptr,
-        _rotary_position_instance._device_cos_half_ptr, rptr<__half>(q_out), rptr<__half>(cache_k_out), rptr<__half>(cache_v_out),
-        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
-        stream);
+        _rotary_position_instance._device_cos_half_ptr, rptr<__half>(q_out),
+        rptr<__half>(cache_k_out), rptr<__half>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, stream);
   }
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
 template <typename T>
-void torch_silu_elewise_product(const torch::Tensor &inpA,
-                                const torch::Tensor &inpB, torch::Tensor outC,
+void torch_silu_elewise_product(const torch::Tensor &inp, torch::Tensor out,
                                 int batch_size, int seq_len, int inner_size) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_silu_elewise_product<T>(rptr<T>(inpA), rptr<T>(inpB), rptr<T>(outC),
-                                 batch_size, seq_len, inner_size, stream);
+  launch_silu_elewise_product<T>(rptr<T>(inp), rptr<T>(out), batch_size,
+                                 seq_len, inner_size, stream);
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }

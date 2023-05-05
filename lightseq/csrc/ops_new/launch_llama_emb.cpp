@@ -42,10 +42,10 @@ void LaunchLlamaEmbOp<T>::forward() {
     cudaMemsetAsync(left_pad_len_ptr, 0, _batch_size * _beam_size * sizeof(int),
                     _stream);
   }
-  cuda::launch_gpt_embedding<T>(token_emb, inp_tokens, output_ptr,
-                                pad_mask_ptr, left_pad_len_ptr, _batch_size,
-                                _beam_size, _hidden_dim, _offset, _seq_len,
-                                _max_step, _pad_id, _stream);
+  cuda::launch_gpt_embedding<T>(token_emb, inp_tokens, output_ptr, pad_mask_ptr,
+                                left_pad_len_ptr, _batch_size, _beam_size,
+                                _hidden_dim, _offset, _seq_len, _max_step,
+                                _pad_id, _stream);
 #endif
 }
 

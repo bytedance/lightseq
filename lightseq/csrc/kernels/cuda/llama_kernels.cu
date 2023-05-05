@@ -196,16 +196,17 @@ template void launch_llama_embedding<__half>(
 
 template <typename T>
 __global__ void kernel_split_rotary_position_qkv(
-    const T* input_ptr, const T* sin_ptr, const T* cos_ptr,
-    T* q_out, T* cache_k_out, T* cache_v_out, size_t batch_size,
-    size_t max_step, size_t nhead, size_t offset_seq_len, size_t query_len,
-    size_t head_dim, size_t max_thread_num) {
+    const T* input_ptr, const T* sin_ptr, const T* cos_ptr, T* q_out,
+    T* cache_k_out, T* cache_v_out, size_t batch_size, size_t max_step,
+    size_t nhead, size_t offset_seq_len, size_t query_len, size_t head_dim,
+    size_t max_thread_num) {
   size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= max_thread_num) {
     return;
   }
   int batch_idx, qkv_idx, head_idx, seq_idx, head_dim_idx;
-  decompose_5dim(idx, query_len, 3, nhead, head_dim, &batch_idx, &seq_idx, &qkv_idx, &head_idx, &head_dim_idx);
+  decompose_5dim(idx, query_len, 3, nhead, head_dim, &batch_idx, &seq_idx,
+                 &qkv_idx, &head_idx, &head_dim_idx);
 
   size_t output_idx = 0;
   if (qkv_idx) {
@@ -219,10 +220,9 @@ __global__ void kernel_split_rotary_position_qkv(
   // cos part
   T state_val1 = *(input_ptr + idx);
 
-  if(qkv_idx == 2) {
+  if (qkv_idx == 2) {
     *(cache_v_out + output_idx) = state_val1;
-  }
-  else {
+  } else {
     T cos_val = *(cos_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
                   (head_dim_idx % (head_dim / 2)));
     T sin_val = *(sin_ptr + (offset_seq_len + seq_idx) * head_dim / 2 +
@@ -238,82 +238,89 @@ __global__ void kernel_split_rotary_position_qkv(
 
     if (qkv_idx == 0) {
       *(q_out + output_idx) = out_val;
-    }
-    else {
+    } else {
       *(cache_k_out + output_idx) = out_val;
     }
   }
 }
 
 template <typename T>
-void launch_split_rotary_position_qkv(
-    const T* input_ptr, const T* sin_ptr, const T* cos_ptr,
-    T* q_out, T* cache_k_out, T* cache_v_out,
-    size_t max_step, size_t batch_size, size_t nhead, size_t offset_seq_len,
-    size_t query_len, size_t head_dim, cudaStream_t stream) {
+void launch_split_rotary_position_qkv(const T* input_ptr, const T* sin_ptr,
+                                      const T* cos_ptr, T* q_out,
+                                      T* cache_k_out, T* cache_v_out,
+                                      size_t max_step, size_t batch_size,
+                                      size_t nhead, size_t offset_seq_len,
+                                      size_t query_len, size_t head_dim,
+                                      cudaStream_t stream) {
   size_t nele = 3 * batch_size * nhead * query_len * head_dim;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_split_rotary_position_qkv<T><<<nblock, MAX_THREADS, 0, stream>>>(
-      input_ptr, sin_ptr, cos_ptr, q_out, cache_k_out, cache_v_out, batch_size, max_step, nhead,
-      offset_seq_len, query_len, head_dim, nele);
+      input_ptr, sin_ptr, cos_ptr, q_out, cache_k_out, cache_v_out, batch_size,
+      max_step, nhead, offset_seq_len, query_len, head_dim, nele);
 }
 
 template void launch_split_rotary_position_qkv<float>(
     const float* input_ptr, const float* sin_ptr, const float* cos_ptr,
-    float* q_out, float* cache_k_out,
-    float* cache_v_out, size_t max_step, size_t batch_size, size_t nhead,
-    size_t offset_seq_len, size_t query_len, size_t head_dim,
-    cudaStream_t stream);
+    float* q_out, float* cache_k_out, float* cache_v_out, size_t max_step,
+    size_t batch_size, size_t nhead, size_t offset_seq_len, size_t query_len,
+    size_t head_dim, cudaStream_t stream);
 
 template void launch_split_rotary_position_qkv<__half>(
     const __half* input_ptr, const __half* sin_ptr, const __half* cos_ptr,
-    __half* q_out, __half* cache_k_out,
-    __half* cache_v_out, size_t max_step, size_t batch_size, size_t nhead,
-    size_t offset_seq_len, size_t query_len, size_t head_dim,
-    cudaStream_t stream);
+    __half* q_out, __half* cache_k_out, __half* cache_v_out, size_t max_step,
+    size_t batch_size, size_t nhead, size_t offset_seq_len, size_t query_len,
+    size_t head_dim, cudaStream_t stream);
 
 template <typename T>
-__global__ void kernel_silu_elewise_product(const T* inpA_ptr,
-                                            const T* inpB_ptr, T* out_ptr,
+__global__ void kernel_silu_elewise_product(const T* inp_ptr, T* out_ptr,
                                             size_t seq_len, size_t inner_size,
                                             size_t max_thread_num) {
   size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= max_thread_num) {
     return;
   }
-  T ele_product = *(inpA_ptr + idx);
-  *(out_ptr + idx) =
-      ele_product / (1.f + expf(-ele_product)) * (*(inpB_ptr + idx));
+  int inpA_idx =
+      idx / inner_size * inner_size * 2 + idx % inner_size;
+  int inpB_idx = inpA_idx + inner_size;
+  const T& inpA = *(inp_ptr + inpA_idx);
+  const T& inpB = *(inp_ptr + inpB_idx);
+  *(out_ptr + idx) = inpA / (1.f + __expf(-inpA)) * inpB;
 }
 
 template <>
-__global__ void kernel_silu_elewise_product<__half>(
-    const __half* inpA_ptr, const __half* inpB_ptr, __half* out_ptr,
-    size_t seq_len, size_t inner_size, size_t max_thread_num) {
+__global__ void kernel_silu_elewise_product<__half>(const __half* inp_ptr,
+                                                    __half* out_ptr,
+                                                    size_t seq_len,
+                                                    size_t inner_size,
+                                                    size_t max_thread_num) {
   size_t idx = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= max_thread_num) {
     return;
   }
-  const __half& ele_product = *(inpA_ptr + idx);
-  *(out_ptr + idx) = ele_product / __float2half(1.f + expf(-ele_product)) *
-                     (*(inpB_ptr + idx));
+  // const __half& ele_product = *(inpA_ptr + idx);
+  int inpA_idx =
+      idx / inner_size * inner_size * 2 + idx % inner_size;
+  int inpB_idx = inpA_idx + inner_size;
+  const __half& inpA = *(inp_ptr + inpA_idx);
+  const __half& inpB = *(inp_ptr + inpB_idx);
+  *(out_ptr + idx) = inpA / __float2half(1.f + __expf(-inpA)) * inpB;
 }
 
 template <typename T>
-void launch_silu_elewise_product(const T* inpA_ptr, const T* inpB_ptr,
+void launch_silu_elewise_product(const T* inp_ptr,
                                  T* out_ptr, size_t batch_size, size_t seq_len,
                                  size_t inner_size, cudaStream_t stream) {
   size_t nele = batch_size * seq_len * inner_size;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
   kernel_silu_elewise_product<T><<<nblock, MAX_THREADS, 0, stream>>>(
-      inpA_ptr, inpB_ptr, out_ptr, seq_len, inner_size, nele);
+      inp_ptr, out_ptr, seq_len, inner_size, nele);
 }
 
 template void launch_silu_elewise_product<float>(
-    const float* inpA_ptr, const float* inpB_ptr, float* out_ptr,
+    const float* inp_ptr, float* out_ptr,
     size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
 template void launch_silu_elewise_product<__half>(
-    const __half* inpA_ptr, const __half* inpB_ptr, __half* out_ptr,
+    const __half* inp_ptr, __half* out_ptr,
     size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
 
 template <typename T>

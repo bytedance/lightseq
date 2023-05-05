@@ -16,15 +16,17 @@ void launch_llama_embedding(const T *token_emb, const int *tokens, T *output,
                             int padding_id, cudaStream_t stream);
 
 template <typename T>
-void launch_split_rotary_position_qkv(
-    const T *input_ptr, const T *sin_ptr, const T *cos_ptr,
-    T *q_out, T *cache_k_out, T *cache_v_out,
-    size_t max_step, size_t batch_size, size_t nhead, size_t offset_seq_len,
-    size_t query_len, size_t head_dim, cudaStream_t stream);
+void launch_split_rotary_position_qkv(const T *input_ptr, const T *sin_ptr,
+                                      const T *cos_ptr, T *q_out,
+                                      T *cache_k_out, T *cache_v_out,
+                                      size_t max_step, size_t batch_size,
+                                      size_t nhead, size_t offset_seq_len,
+                                      size_t query_len, size_t head_dim,
+                                      cudaStream_t stream);
 
 template <typename T>
-void launch_silu_elewise_product(const T *inpA_ptr, const T *inpB_ptr,
-                                 T *out_ptr, size_t batch_size, size_t seq_len,
+void launch_silu_elewise_product(const T *inp_ptr, T *out_ptr,
+                                 size_t batch_size, size_t seq_len,
                                  size_t inner_size, cudaStream_t stream);
 
 template <typename T>
