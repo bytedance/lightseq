@@ -50,9 +50,7 @@ def extract_llama_weights(
     arguments: ModelArguements,
 ):
     # load var names
-    state_dict = torch.load(
-        arguments.model_file
-    )
+    state_dict = torch.load(arguments.model_file)
 
     head_num = arguments.head_num
     enc_var_name_list = list(state_dict.keys())
@@ -94,12 +92,20 @@ def extract_llama_weights(
     )
 
     # save number of layers metadata
-    hdf5_file.create_dataset("model_conf/hidden_size", data=arguments.hidden_size, dtype="i4")
-    hdf5_file.create_dataset("model_conf/inner_size", data=arguments.inner_size, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/hidden_size", data=arguments.hidden_size, dtype="i4"
+    )
+    hdf5_file.create_dataset(
+        "model_conf/inner_size", data=arguments.inner_size, dtype="i4"
+    )
     hdf5_file.create_dataset("model_conf/max_step", data=arguments.max_step, dtype="i4")
     hdf5_file.create_dataset("model_conf/head_num", data=arguments.head_num, dtype="i4")
-    hdf5_file.create_dataset("model_conf/layer_num", data=arguments.layer_num, dtype="i4")
-    hdf5_file.create_dataset("model_conf/src_padding_id", data=arguments.padding_id, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/layer_num", data=arguments.layer_num, dtype="i4"
+    )
+    hdf5_file.create_dataset(
+        "model_conf/src_padding_id", data=arguments.padding_id, dtype="i4"
+    )
     hdf5_file.create_dataset(
         "model_conf/generate_method",
         data=np.array([ord(c) for c in arguments.generation_method]).astype(np.int8),
@@ -108,8 +114,12 @@ def extract_llama_weights(
     hdf5_file.create_dataset("model_conf/topp", data=arguments.topp, dtype="f4")
     hdf5_file.create_dataset("model_conf/topk", data=arguments.topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=arguments.eos_id, dtype="i4")
-    hdf5_file.create_dataset("model_conf/extra_decode_length", data=arguments.extra_decode_length, dtype="i4")
-    hdf5_file.create_dataset("model_conf/src_vocab_size", data=arguments.vocab_size, dtype="i4")
+    hdf5_file.create_dataset(
+        "model_conf/extra_decode_length", data=arguments.extra_decode_length, dtype="i4"
+    )
+    hdf5_file.create_dataset(
+        "model_conf/src_vocab_size", data=arguments.vocab_size, dtype="i4"
+    )
 
     hdf5_file.close()
     # read-in again to double check
@@ -132,14 +142,11 @@ if __name__ == "__main__":
     basename = os.path.basename(arguments.model_repo)
     output_lightseq_model_name = "_".join(["lightseq_llama", basename])
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
-    
-    arguments.eos_id = 2 # need to set
-    arguments.padding_id = 0 # need to set
+
+    arguments.eos_id = 2  # need to set
+    arguments.padding_id = 0  # need to set
 
     if not check_arguements(arguments):
         exit(0)
-    
-    extract_llama_weights(
-        output_lightseq_model_name,
-        arguments
-    )
+
+    extract_llama_weights(output_lightseq_model_name, arguments)

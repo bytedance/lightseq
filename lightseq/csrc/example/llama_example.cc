@@ -67,7 +67,8 @@ int main(int argc, char* argv[]) {
   //   }
   // }
 
-  // std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
+  // std::cout << "lightseq inference latency: " << elapsed.count() * 1000 /
+  // iter
   //           << " ms" << std::endl;
 
   // for (int i = 0; i < model->get_output_size(); i++) {

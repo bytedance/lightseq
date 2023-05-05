@@ -17,6 +17,186 @@ namespace lightseq {
 namespace cuda {
 
 template <typename T>
+__global__ void kernel_llama_padding(const T* token_emb, const int* token_ids,
+                                     T* output, T* pad_mask_ptr,
+                                     int* left_pad_len_ptr, int batch_size,
+                                     int beam_size, int seq_len, int hidden_dim,
+                                     int padding_id, int max_step,
+                                     int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
+
+  float4& output_val = ((float4*)output)[idx];
+  if (token_id == padding_id) {
+    if (state_idx == 0) {
+      pad_mask_ptr[token_idx] = CUDA_FLOAT_INF_NEG;
+      atomicAdd(left_pad_len_ptr + batch_beam_idx, 1);
+    }
+    output_val.x = 0.;
+    output_val.y = 0.;
+    output_val.z = 0.;
+    output_val.w = 0.;
+  }
+}
+
+template <typename T>
+__global__ void kernel_llama_embedding(const T* token_emb, const int* token_ids,
+                                       T* output, T* pad_mask_ptr,
+                                       int* left_pad_len_ptr, int batch_size,
+                                       int beam_size, int seq_len,
+                                       int hidden_dim, int padding_id,
+                                       int max_step, int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
+
+  float4& output_val = ((float4*)output)[idx];
+  if (token_id != padding_id) {
+    if (state_idx == 0) {
+      pad_mask_ptr[token_idx] = 0;
+    }
+    output_val = ((float4*)token_emb)[token_id * hidden_dim + state_idx];
+  }
+}
+
+template <>
+__global__ void kernel_llama_padding<__half>(
+    const __half* token_emb, const int* token_ids, __half* output,
+    __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size, int beam_size,
+    int seq_len, int hidden_dim, int padding_id, int max_step,
+    int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
+
+  float4& output_val = ((float4*)output)[idx];
+  if (token_id == padding_id) {
+    if (state_idx == 0) {
+      pad_mask_ptr[token_idx] = __float2half(CUDA_FLOAT_INF_NEG);
+      atomicAdd(left_pad_len_ptr + batch_beam_idx, 1);
+    }
+    output_val.x = 0.f;
+    output_val.y = 0.f;
+    output_val.z = 0.f;
+    output_val.w = 0.f;
+  }
+}
+
+template <>
+__global__ void kernel_llama_embedding<__half>(
+    const __half* token_emb, const int* token_ids, __half* output,
+    __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size, int beam_size,
+    int seq_len, int hidden_dim, int padding_id, int max_step,
+    int step_offset) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batch_size * beam_size * seq_len * hidden_dim) {
+    return;
+  }
+  int batch_idx, beam_idx, seq_idx, state_idx;
+  decompose_4dim(idx, beam_size, seq_len, hidden_dim, &batch_idx, &beam_idx,
+                 &seq_idx, &state_idx);
+  int token_idx = flat_3dim(batch_idx, beam_idx, seq_idx + step_offset,
+                            beam_size, max_step);
+  int token_id = token_ids[token_idx];
+  int batch_beam_idx = batch_idx * beam_size + beam_idx;
+
+  float4& output_val = ((float4*)output)[idx];
+
+  if (token_id != padding_id) {
+    if (state_idx == 0) {
+      pad_mask_ptr[token_idx] = __float2half(0.f);
+    }
+    output_val = ((float4*)token_emb)[token_id * hidden_dim + state_idx];
+  }
+}
+
+template <>
+void launch_llama_embedding<float>(const float* token_emb, const int* tokens,
+                                   float* output, float* pad_mask_ptr,
+                                   int* left_pad_len_ptr, int batch_size,
+                                   int beam_size, int hidden_dim,
+                                   int step_offset, int seq_len, int max_step,
+                                   int padding_id, cudaStream_t stream) {
+  if (seq_len + step_offset >= max_step) {
+    throw std::runtime_error("violate seq_len + step_offset < max_step");
+  }
+  if (hidden_dim % 4) {
+    throw std::runtime_error("violate hidden_dim % 4 = 0");
+  }
+  hidden_dim >>= 2;
+  int nele = (batch_size * beam_size * seq_len * hidden_dim);
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_llama_padding<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size,
+      beam_size, seq_len, hidden_dim, padding_id, max_step, step_offset);
+
+  kernel_llama_embedding<float><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size,
+      beam_size, seq_len, hidden_dim, padding_id, max_step, step_offset);
+}
+
+template <>
+void launch_llama_embedding<__half>(const __half* token_emb, const int* tokens,
+                                    __half* output, __half* pad_mask_ptr,
+                                    int* left_pad_len_ptr, int batch_size,
+                                    int beam_size, int hidden_dim,
+                                    int step_offset, int seq_len, int max_step,
+                                    int padding_id, cudaStream_t stream) {
+  if (seq_len + step_offset >= max_step) {
+    throw std::runtime_error("violate seq_len + step_offset < max_step");
+  }
+  if (hidden_dim % 8) {
+    throw std::runtime_error("violate hidden_dim % 8 = 0");
+  }
+  hidden_dim >>= 3;
+  int nele = (batch_size * beam_size * seq_len * hidden_dim);
+  int nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
+  kernel_llama_padding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size,
+      beam_size, seq_len, hidden_dim, padding_id, max_step, step_offset);
+  kernel_llama_embedding<__half><<<nblock, MAX_THREADS, 0, stream>>>(
+      token_emb, tokens, output, pad_mask_ptr, left_pad_len_ptr, batch_size,
+      beam_size, seq_len, hidden_dim, padding_id, max_step, step_offset);
+}
+
+template void launch_llama_embedding<float>(
+    const float* token_emb, const int* tokens, float* output,
+    float* pad_mask_ptr, int* left_pad_len_ptr, int batch_size, int beam_size,
+    int hidden_dim, int step_offset, int seq_len, int max_step, int padding_id,
+    cudaStream_t stream);
+
+template void launch_llama_embedding<__half>(
+    const __half* token_emb, const int* tokens, __half* output,
+    __half* pad_mask_ptr, int* left_pad_len_ptr, int batch_size, int beam_size,
+    int hidden_dim, int step_offset, int seq_len, int max_step, int padding_id,
+    cudaStream_t stream);
+
+template <typename T>
 __global__ void kernel_rotary_position_qk(
     const T* input_ptr, const T* sin_ptr, const T* cos_ptr, T* output_ptr,
     size_t max_step, size_t nhead, size_t offset_seq_len, size_t query_len,

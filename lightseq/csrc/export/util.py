@@ -71,9 +71,9 @@ def check_arguements(args):
 
     if args.beam_size == None:
         args.beam_size = 1
-    
+
     if args.topp == None:
-        args.topp = 1.
+        args.topp = 1.0
 
     if args.topk == None:
         args.topk = 1
@@ -100,17 +100,22 @@ class ModelArguements(object):
             raise Exception(f"there is no such config file {self.config_path}")
 
         config_file = open(self.config_path)
-        config = json.load(config_file) 
+        config = json.load(config_file)
         config_file.close()
 
-        self.padding_id = config.get('pad_token_id')
+        self.padding_id = config.get("pad_token_id")
         self.max_step = config.get("max_sequence_length")
         self.hidden_size = config.get("hidden_size")
         self.inner_size = config.get("intermediate_size")
         self.head_num = config.get("num_attention_heads")
         self.vocab_size = config.get("vocab_size")
         self.layer_num = config.get("num_hidden_layers")
-        self.extra_decode_length = self.max_step if args.extra_decode_length is None else args.extra_decode_length
+        self.extra_decode_length = (
+            self.max_step
+            if args.extra_decode_length is None
+            else args.extra_decode_length
+        )
+
 
 def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
     def check_rule(tensor_name, rule):

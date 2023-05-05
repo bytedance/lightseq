@@ -14,7 +14,6 @@ class Llama : public LSModel {
   LlamaWeight<OpType_> tw_;
   std::shared_ptr<Context> _context_ptr;
 
-
   LinearLayerPtr<OpType_, OpType_> _linear_layer;
   GeneratorLayerPtr<OpType_> _generator_layer;
 

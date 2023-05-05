@@ -51,8 +51,8 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/layer_num", H5T_NATIVE_INT,
                            &_layer_num);
 
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id", H5T_NATIVE_INT,
-                           &_padding_id);
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
+                           H5T_NATIVE_INT, &_padding_id);
 
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
@@ -117,7 +117,6 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   }
 
   _dim_per_head = _hidden_size / _head_num;
-
 }
 
 /**
@@ -167,7 +166,8 @@ template <typename T>
 void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
       (_hidden_size + _hidden_size * _hidden_size * 3 +
-       _hidden_size * _hidden_size + _hidden_size + _hidden_size * _inner_size * 2 + _hidden_size * _inner_size) *
+       _hidden_size * _hidden_size + _hidden_size +
+       _hidden_size * _inner_size * 2 + _hidden_size * _inner_size) *
       _layer_num;
   std::vector<size_t> offset;
   std::vector<float> value(value_size);
@@ -187,16 +187,16 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/attention_project_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        hdf5_file, dataset_prefix + "/attention_project_qkv", H5T_NATIVE_FLOAT,
+        value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong attention_project_q_size !");
     idx += _hidden_size * _hidden_size * 3;
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
-        hdf5_file, dataset_prefix + "/attention_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        hdf5_file, dataset_prefix + "/attention_output", H5T_NATIVE_FLOAT,
+        value.data() + idx,
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong attention_output_size !");
     idx += _hidden_size * _hidden_size;
