@@ -1576,66 +1576,68 @@ def test_torch_launch_fake_quantize():
 
 
 @kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
-def test_rotary_position_qk():
+def test_split_rotary_position_qkv():
     batch_size, offset_seq_len = kt.bs_sl()
     nhead = kt.nhead
     head_dim = 128
     seq_len = 1
     seq_len = random.randint(1, 2048)
     offset_seq_len = random.randint(0, 2048 - seq_len)
-    input_tensor = kt.rand((batch_size, nhead, seq_len, head_dim))
-    cache_tensor = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+    outshape = kt.rand((batch_size, nhead, seq_len, head_dim))
+    
+    cachek = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+    cachev = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+    q_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    k_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    v_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    qkv_tensor = torch.cat((q_tensor, k_tensor, v_tensor), dim=2)
 
-    append_cache = random.randint(0, 1)
-    print(
-        f"offset_seq_len, seq_len, append_cache: {offset_seq_len}, {seq_len}, {append_cache}"
-    )
-    if append_cache:
-        output_tensor = torch.cat((cache_tensor, input_tensor), dim=2)
-    else:
-        output_tensor = torch.empty_like(input_tensor)
-
+    out_cachek = torch.cat((cachek, outshape), dim=2)
+    out_cachev = torch.cat((cachev, outshape), dim=2)
+ 
     func = None
     if kt.dtype == torch.float:
-        func = cuda_module.torch_launch_rotary_position_fp32
+        func = cuda_module.torch_launch_split_rotary_position_fp32
     elif kt.dtype == torch.half:
-        func = cuda_module.torch_launch_rotary_position_fp16
+        func = cuda_module.torch_launch_split_rotary_position_fp16
 
+    custom_q = torch.empty_like(q_tensor)
     def custom():
-        inp_clone = input_tensor.clone()
-        out_clone = output_tensor.clone()
         func(
-            inp_clone,
-            out_clone,
+            qkv_tensor,
+            custom_q,
+            out_cachek,
+            out_cachev,
             batch_size,
             nhead,
             offset_seq_len,
             seq_len,
             head_dim,
-            append_cache,
         )
-        return [out_clone.contiguous()]
+        return [custom_q.contiguous(), out_cachek.contiguous(), out_cachev.contiguous()]
 
-    tmp_device = input_tensor.device
     inv_freq = 1.0 / (
-        10000 ** (torch.arange(0, head_dim, 2).float().to(tmp_device) / head_dim)
+        10000 ** (torch.arange(0, head_dim, 2).float().to(device="cuda:0") / head_dim)
     )
-    t = torch.arange(2048, device=tmp_device, dtype=inv_freq.dtype)
+    t = torch.arange(2048, device="cuda:0", dtype=inv_freq.dtype)
     freqs = torch.einsum("i,j->ij", t, inv_freq)
     # Different from paper, but it uses a different permutation in order to obtain the same calculation
     emb = torch.cat((freqs, freqs), dim=-1)
-    cos_cached = emb.cos()[None, None, :, :].to(tmp_device, dtype=kt.dtype)
-    sin_cached = emb.sin()[None, None, :, :].to(tmp_device, dtype=kt.dtype)
+    cos_cached = emb.cos()[None, None, :, :].to(device="cuda:0", dtype=kt.dtype)
+    sin_cached = emb.sin()[None, None, :, :].to(device="cuda:0", dtype=kt.dtype)
 
     def baseline():
-        inp_clone = input_tensor.clone()
+        # inp_clone = input_tensor.clone()
+        trans_q = q_tensor.transpose(1, 2)
+        trans_k = k_tensor.transpose(1, 2)
+        trans_v = v_tensor.transpose(1, 2)
         kv_seq_len = offset_seq_len + seq_len
         cos = cos_cached[:, :, :kv_seq_len, ...]
         sin = sin_cached[:, :, :kv_seq_len, ...]
         gather_indices = (
             (torch.arange(seq_len) + offset_seq_len)[None, None, :, None]
             .repeat(batch_size, cos.shape[1], 1, cos.shape[3])
-            .to(tmp_device)
+            .to("cuda:0")
         )
         cos = torch.gather(
             cos.repeat(gather_indices.shape[0], 1, 1, 1), 2, gather_indices
@@ -1650,15 +1652,16 @@ def test_rotary_position_qk():
             x2 = x[..., x.shape[-1] // 2 :]
             return torch.cat((-x2, x1), dim=-1)
 
-        out_clone = (inp_clone * cos) + (rotate_half(inp_clone) * sin)
-        if append_cache:
-            out_clone = torch.cat((cache_tensor, out_clone), dim=2)
-        return [out_clone.contiguous()]
+        q_out = (trans_q * cos) + (rotate_half(trans_q) * sin)
+        k_out = (trans_k * cos) + (rotate_half(trans_k) * sin)
+        k_out = torch.cat((cachek, k_out), dim=2)
+        v_out = torch.cat((cachev, trans_v), dim=2)
+        return [q_out.contiguous(), k_out.contiguous(), v_out.contiguous()]
 
     return custom, baseline
 
 
-from transformers import LlamaModel
+# from transformers import LlamaModel
 from transformers.activations import SiLUActivation
 
 
@@ -1724,7 +1727,7 @@ if __name__ == "__main__":
         [
             # "test_rms_layer_norm",
             # "test_silu_elewise_product",
-            "test_rotary_position_qk",
+            "test_split_rotary_position_qkv",
             # "test_launch_transform_0213",
             # "test_launch_bias_add_transform_20314",
             # "test_launch_transform4d_0213",

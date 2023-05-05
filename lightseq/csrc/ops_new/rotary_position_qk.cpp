@@ -35,10 +35,10 @@ void RotaryPositionQk<T1, T2>::forward() {
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t stream = _context_ptr->get_stream();
-  cuda::launch_rotary_position_qk(inp_val, _device_sin_ptr, _device_cos_ptr,
-                                  out_val, _max_step, _batch_size, _head_num,
-                                  _offset_seq_len, _query_len, _head_dim,
-                                  _append_cache, stream);
+  // cuda::launch_rotary_position_qk(inp_val, _device_sin_ptr, _device_cos_ptr,
+  //                                 out_val, _max_step, _batch_size, _head_num,
+  //                                 _offset_seq_len, _query_len, _head_dim,
+  //                                 _append_cache, stream);
 #endif
 }
 

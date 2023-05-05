@@ -491,11 +491,10 @@ class RotaryPositionWeight {
 } _rotary_position_instance(2048, 128);
 
 template <typename T>
-void torch_launch_rotary_position(const torch::Tensor &input,
-                                  torch::Tensor output, int batch_size,
-                                  int nhead, int offset_seq_len,
-                                  int query_seq_len, int head_dim,
-                                  bool append_cache) {
+void torch_launch_split_rotary_position(const torch::Tensor &input,
+                                  torch::Tensor &q_out, torch::Tensor &cache_k_out, torch::Tensor &cache_v_out,
+                                  int batch_size, int nhead, int offset_seq_len,
+                                  int query_seq_len, int head_dim) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   if (query_seq_len + offset_seq_len > _rotary_position_instance._max_step) {
     printf(
@@ -508,19 +507,17 @@ void torch_launch_rotary_position(const torch::Tensor &input,
     return;
   }
   if (std::is_same<T, float>::value) {
-    launch_rotary_position_qk<float>(
+    launch_split_rotary_position_qkv<float>(
         rptr<float>(input), _rotary_position_instance._device_sin_ptr,
-        _rotary_position_instance._device_cos_ptr, rptr<float>(output),
-        append_cache ? offset_seq_len + query_seq_len : query_seq_len,
-        batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
-        append_cache, stream);
+        _rotary_position_instance._device_cos_ptr, rptr<float>(q_out), rptr<float>(cache_k_out), rptr<float>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
+        stream);
   } else {
-    launch_rotary_position_qk<__half>(
+    launch_split_rotary_position_qkv<__half>(
         rptr<__half>(input), _rotary_position_instance._device_sin_half_ptr,
-        _rotary_position_instance._device_cos_half_ptr, rptr<__half>(output),
-        append_cache ? offset_seq_len + query_seq_len : query_seq_len,
-        batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
-        append_cache, stream);
+        _rotary_position_instance._device_cos_half_ptr, rptr<__half>(q_out), rptr<__half>(cache_k_out), rptr<__half>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len, query_seq_len, head_dim,
+        stream);
   }
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
@@ -757,11 +754,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_viterbi_fp32",
         &lightseq::cuda::torch_launch_viterbi<float>, "Test kernel wrapper");
 
-  m.def("torch_launch_rotary_position_fp32",
-        &lightseq::cuda::torch_launch_rotary_position<float>,
+  m.def("torch_launch_split_rotary_position_fp32",
+        &lightseq::cuda::torch_launch_split_rotary_position<float>,
         "Test llama rotary position kernel");
-  m.def("torch_launch_rotary_position_fp16",
-        &lightseq::cuda::torch_launch_rotary_position<half>,
+  m.def("torch_launch_split_rotary_position_fp16",
+        &lightseq::cuda::torch_launch_split_rotary_position<half>,
         "Test llama rotary position kernel");
   m.def("torch_silu_elewise_product_fp32",
         &lightseq::cuda::torch_silu_elewise_product<float>,
