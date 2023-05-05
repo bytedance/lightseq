@@ -6,7 +6,7 @@ import os
 import h5py
 import numpy as np
 from collections import OrderedDict
-from export_util import parse_args, check_arguements, ModelArguements, fill_hdf5_layer
+from util import parse_args, check_arguements, ModelArguements, fill_hdf5_layer
 import torch
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -23,47 +23,32 @@ and the expression will finally be concatenated on axis = -1.
 
 
 """
-'gpt.transformer.h.0.ln_1.weight', 'gpt.transformer.h.0.ln_1.bias', 'gpt.transformer.h.0.ln_2.weight', 'gpt.transformer.h.0.ln_2.bias', 'gpt.transformer.h.0.attn.c_attn.weight', 'gpt.transformer.h.0.attn.c_attn.bias', 'gpt.transformer.h.0.attn.c_proj.weight', 'gpt.transformer.h.0.attn.c_proj.bias', 'gpt.transformer.h.0.attn.bias', 'gpt.transformer.h.0.attn.masked_bias', 'gpt.transformer.h.0.mlp.c_fc.weight', 'gpt.transformer.h.0.mlp.c_fc.bias', 'gpt.transformer.h.0.mlp.c_proj.weight', 'gpt.transformer.h.0.mlp.c_proj.bias'
+'model.layers.0.self_attn.q_proj.weight', 'model.layers.0.self_attn.k_proj.weight', 'model.layers.0.self_attn.v_proj.weight', 'model.layers.0.self_attn.o_proj.weight', 'model.layers.0.self_attn.rotary_emb.inv_freq', 'model.layers.0.mlp.gate_proj.weight', 'model.layers.0.mlp.down_proj.weight', 'model.layers.0.mlp.up_proj.weight', 'model.layers.0.input_layernorm.weight', 'model.layers.0.post_attention_layernorm.weight'
 """
 
-enc_layer_mapping_dict = OrderedDict(
+dec_layer_mapping_dict = OrderedDict(
     {
-        "multihead_norm_scale": "ln_1 weight",
-        "multihead_norm_bias": "ln_1 bias",
-        # GPT2's Conv1D don't need transpose
-        # https://github.com/huggingface/transformers/blob/9ec0f01b6c3aff4636869aee735859fb6f89aa98/src/transformers/modeling_utils.py#L1400
-        "multihead_project_kernel_qkv": "attn c_attn weight",
-        "multihead_project_bias_qkv": "attn c_attn bias",
-        "multihead_project_kernel_output": "attn c_proj weight",
-        "multihead_project_bias_output": "attn c_proj bias",
-        "ffn_norm_scale": "ln_2 weight",
-        "ffn_norm_bias": "ln_2 bias",
-        "ffn_first_kernel": "mlp c_fc weight",
-        "ffn_first_bias": "mlp c_fc bias",
-        "ffn_second_kernel": "mlp c_proj weight",
-        "ffn_second_bias": "mlp c_proj bias",
+        "attention_norm_scale": "input_layernorm weight",
+        "attention_project_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight",
+        "attention_output": "self_attn o_proj weight",
+        "ffn_norm_scale": "post_attention_layernorm weight",
+        "gate_up_project_weight": "mlp gate_proj weight&&mlp up_proj weight",
+        "down_project_weight": "mlp down_proj weight",
     }
 )
 
 src_emb_mapping_dict = OrderedDict(
     {
-        "norm_scale": "ln_f weight",
-        "norm_bias": "ln_f bias",
-        "position_emb": "wpe",
-        "token_embedding": "wte",
-        "pre_token_proj_weight": "pre_token_proj weight",
-        "pre_token_proj_bias": "pre_token_proj bias",
-        "post_token_proj_weight": "post_token_proj weight",
-        "post_token_proj_bias": "post_token_proj bias",
+        "post_norm_scale": "norm weight",
+        "token_embedding": "embed_tokens weight",
     }
 )
 
 
-def extract_gpt_weights(
+def extract_llama_weights(
     output_file: str,
     arguments: ModelArguements,
 ):
-
     # load var names
     state_dict = torch.load(
         arguments.model_file
@@ -84,9 +69,9 @@ def extract_gpt_weights(
     enc_tensor_names = {}
     for name in enc_var_name_list:
         name_split = name.split(".")
-        if len(name_split) <= 3 or not name_split[3].isdigit():
+        if len(name_split) <= 2 or not name_split[2].isdigit():
             continue
-        layer_id = int(name_split[3])
+        layer_id = int(name_split[2])
         enc_tensor_names.setdefault(layer_id, []).append(name)
 
     # fill encoder_stack
@@ -95,8 +80,8 @@ def extract_gpt_weights(
             enc_tensor_names[layer_id],
             state_dict,
             hdf5_file,
-            f"encoder_stack/{layer_id}/",
-            enc_layer_mapping_dict,
+            f"decoder_layers/{layer_id}/",
+            dec_layer_mapping_dict,
         )
 
     # fill src_embedding - except for position embedding
@@ -109,31 +94,29 @@ def extract_gpt_weights(
     )
 
     # save number of layers metadata
-    hdf5_file.create_dataset(
-        "model_conf/n_encoder_stack", data=len(enc_tensor_names), dtype="i4"
-    )
-    # fill in model_conf
-    hdf5_file.create_dataset("model_conf/head_num", data=head_num, dtype="i4")
+    hdf5_file.create_dataset("model_conf/hidden_size", data=arguments.hidden_size, dtype="i4")
+    hdf5_file.create_dataset("model_conf/inner_size", data=arguments.inner_size, dtype="i4")
+    hdf5_file.create_dataset("model_conf/max_step", data=arguments.max_step, dtype="i4")
+    hdf5_file.create_dataset("model_conf/head_num", data=arguments.head_num, dtype="i4")
+    hdf5_file.create_dataset("model_conf/layer_num", data=arguments.layer_num, dtype="i4")
     hdf5_file.create_dataset("model_conf/src_padding_id", data=arguments.padding_id, dtype="i4")
     hdf5_file.create_dataset(
-        "model_conf/sampling_method",
+        "model_conf/generate_method",
         data=np.array([ord(c) for c in arguments.generation_method]).astype(np.int8),
         dtype="i1",
     )
-    hdf5_file.create_dataset("model_conf/beam_size", data=arguments.beam_size, dtype="i4")
     hdf5_file.create_dataset("model_conf/topp", data=arguments.topp, dtype="f4")
     hdf5_file.create_dataset("model_conf/topk", data=arguments.topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=arguments.eos_id, dtype="i4")
-    # hdf5_file.create_dataset(
-    #     "model_conf/extra_decode_length", data=arguments.extra_decode_length, dtype="i4"
-    # )
+    hdf5_file.create_dataset("model_conf/extra_decode_length", data=arguments.extra_decode_length, dtype="i4")
+    # hdf5_file.create_dataset("model_conf/beam_size", data=arguments.beam_size, dtype="i4")
 
     hdf5_file.close()
     # read-in again to double check
     hdf5_file = h5py.File(output_file, "r")
 
     def _print_pair(key, value):
-        if key == "sampling_method":
+        if key == "generate_method":
             value = "".join(map(chr, value[()]))
         else:
             value = value[()]
@@ -156,7 +139,7 @@ if __name__ == "__main__":
     if not check_arguements(arguments):
         exit(0)
     
-    extract_gpt_weights(
+    extract_llama_weights(
         output_lightseq_model_name,
         arguments
     )

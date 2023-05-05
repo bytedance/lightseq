@@ -41,6 +41,12 @@ def parse_args():
         required=False,
         default=None,
     )
+    parser.add_argument(
+        "--extra_decode_length",
+        type=int,
+        required=False,
+        default=None,
+    )
     args = parser.parse_args()
     return args
 
@@ -86,7 +92,6 @@ class ModelArguements(object):
         self.beam_size = args.beam_size
         self.topk = args.topk
         self.topp = args.topp
-        self.padding_id = None
         self.eos_id = None
         self.bos_id = None
         self.config_path = os.path.join(self.model_repo, "config.json")
@@ -98,10 +103,14 @@ class ModelArguements(object):
         config = json.load(config_file) 
         config_file.close()
 
-        self.max_step = config.get("n_positions")
-        self.embed_dim = config.get("n_embd")
-        self.head_num = config.get("n_head")
+        self.padding_id = config.get('pad_token_id')
+        self.max_step = config.get("max_sequence_length")
+        self.hidden_size = config.get("hidden_size")
+        self.inner_size = config.get("intermediate_size")
+        self.head_num = config.get("num_attention_heads")
         self.vocab_size = config.get("vocab_size")
+        self.layer_num = config.get("num_hidden_layers")
+        self.extra_decode_length = self.max_step if args.extra_decode_length is None else args.extra_decode_length
 
 def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
     def check_rule(tensor_name, rule):
@@ -145,7 +154,7 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
                 tmp.append(tn)
         assert len(tmp) == 1
         target_tn.extend(tmp)
-    target_tensor = [state_dict[name] for name in target_tn]
+    target_tensor = [state_dict[name].float() for name in target_tn]
     tt = {}
     if target_tensor:
         exec("tt['save'] = [ele%s for ele in target_tensor]" % expression)
@@ -162,7 +171,7 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
         "%s -> %s, convert finished!"
         % (target_tn if target_tn else "created", proto_name)
     )
-    return target_tensor
+    return target_tensor[0] if type(target_tensor) is list else target_tensor
 
 
 def fill_hdf5_layer(

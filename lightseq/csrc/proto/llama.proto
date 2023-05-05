@@ -29,7 +29,6 @@ message LlamaEmbeddingLayer {
   // for encoder, it is in [src_vocab_size, hidden_size]
   // so, look it up directly will get the input token embedding
   repeated float token_embedding = 1;
-  repeated float position_embedding = 2;
   // the last layer_norm
   repeated float post_norm_scale = 3;
 }
@@ -41,7 +40,7 @@ message LlamaModelConf {
   int32 head_num = 4;
   int32 layer_num = 5;
   int32 src_padding_id = 6;
-  string sampling_method = 7;
+  string generate_method = 7;
   float topp = 8;
   int32 topk = 9;
   int32 eos_id = 10;
@@ -56,6 +55,6 @@ message LlamaModelConf {
 
 message Llama {
   LlamaEmbeddingLayer src_embedding = 1;
-  repeated LlamaDecoderLayer encoder_stack = 2;
+  repeated LlamaDecoderLayer decoder_layers = 2;
   LlamaModelConf model_conf = 3;
 }
