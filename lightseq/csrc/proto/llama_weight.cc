@@ -57,24 +57,15 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
   // hence needed to be read as an char array here
-  char _sampling_method_buf[128];  // get 128 character for sampling method
-  int _sampling_method_strlen = read_hdf5_dataset_data(
-      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
-      _sampling_method_buf, [](int size) { return size > 128; },
-      "Expect model_conf/sampling_method to have less than 128 characters.");
-  std::string _sampling_method_read =
-      std::string(_sampling_method_buf, _sampling_method_strlen);
-  if (_sampling_method_read != "") {
-    _sampling_method = _sampling_method_read;
-  }
-
-  int _extra_decode_length_read;
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
-                           H5T_NATIVE_INT, &_extra_decode_length_read);
-  if (_extra_decode_length_read > 0) {
-    _extra_decode_length = _extra_decode_length_read;
-  } else {
-    _extra_decode_length = _max_step;
+  char _generate_method_buf[128];  // get 128 character for sampling method
+  int _generate_method_strlen = read_hdf5_dataset_data(
+      hdf5_file, "model_conf/generate_method", H5T_NATIVE_CHAR,
+      _generate_method_buf, [](int size) { return size > 128; },
+      "Expect model_conf/generate_method to have less than 128 characters.");
+  std::string _generate_method_read =
+      std::string(_generate_method_buf, _generate_method_strlen);
+  if (_generate_method_read != "") {
+    _generate_method = _generate_method_read;
   }
 
   int _topk_read;
@@ -98,6 +89,12 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
     _eos_id = _eos_id_read;
   }
 
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
+                           H5T_NATIVE_INT, &_extra_decode_length);
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_vocab_size",
+                           H5T_NATIVE_INT, &_src_vocab_size);
+
   try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
                              &_beam_size);
@@ -119,6 +116,8 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
     _diverse_lambda = 0.;
   }
 
+  _dim_per_head = _hidden_size / _head_num;
+
 }
 
 /**
@@ -129,11 +128,11 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
   size_t value_size = _src_vocab_size * _hidden_size + _hidden_size;
 
-  std::vector<int> offset;
+  std::vector<size_t> offset;
   std::vector<float> value(value_size);  // preallocate vector for performance
   std::cout << "loading " << value_size / (1024 * 1024)
             << " M of embedding weight." << std::endl;
-  int idx = 0;
+  size_t idx = 0;
 
   offset.push_back(idx);
   read_hdf5_dataset_data(
@@ -167,19 +166,17 @@ Load the weights of encoder into GPU memory.
 template <typename T>
 void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
   size_t value_size =
-      (_hidden_size * 2 + _hidden_size * _hidden_size * 3 + _hidden_size * 3 +
-       _hidden_size * _hidden_size + _hidden_size * 3 +
-       _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
-       _hidden_size) *
-      _n_enc_layer;
-  std::vector<int> offset;
+      (_hidden_size + _hidden_size * _hidden_size * 3 +
+       _hidden_size * _hidden_size + _hidden_size + _hidden_size * _inner_size * 2 + _hidden_size * _inner_size) *
+      _layer_num;
+  std::vector<size_t> offset;
   std::vector<float> value(value_size);
-  std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
-            << " MB of encoder weight." << std::endl;
+  std::cout << "loading " << value_size / (1024 * 1024)
+            << " M of decoder weight." << std::endl;
 
-  int idx = 0;
-  for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
-    std::string dataset_prefix = "decoder_layer/" + std::to_string(layer_id);
+  size_t idx = 0;
+  for (int layer_id = 0; layer_id < _layer_num; ++layer_id) {
+    std::string dataset_prefix = "decoder_layers/" + std::to_string(layer_id);
 
     offset.push_back(idx);
     read_hdf5_dataset_data(
@@ -215,7 +212,7 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/gate_up_project_weight", H5T_NATIVE_FLOAT,
         value.data() + idx,
-        [=](int size) { return size != _hidden_size * _inner_size; },
+        [=](int size) { return size != _hidden_size * _inner_size * 2; },
         "Wrong gate_up_project_weight_size !");
     idx += _hidden_size * _inner_size * 2;
 
@@ -226,6 +223,7 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong down_project_weight_size !");
     idx += _hidden_size * _inner_size;
+    printf("finish initialize #%d dec_wei\n", layer_id);
   }
 
   std::vector<T> raw_value;
@@ -234,7 +232,7 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 
   for (int e : offset)
     _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
-  std::cout << "finish initializing enc_wei from host to device" << std::endl;
+  std::cout << "finish initializing dec_wei from host to device" << std::endl;
 }
 
 /**

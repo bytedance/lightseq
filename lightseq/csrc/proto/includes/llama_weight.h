@@ -1,5 +1,4 @@
 #pragma once
-#include "gpt.pb.h"
 #include "proto_headers.h"
 #include "proto_util.h"
 
@@ -43,19 +42,18 @@ class LlamaWeight {
     return _p_d_enc_wei;
   }
 
-  int _layer_num;
-  int _hidden_size;
+  size_t _hidden_size;
   int _inner_size;
   int _max_step;
   int _extra_decode_length;
   int _src_vocab_size;
-  int _n_enc_layer;  // number of encoder layer
+  int _layer_num;  // number of encoder layer
   int _dim_per_head;
   int _weight_per_enc_layer;  // 12
 
   int _head_num;
   int _padding_id;  // for src
-  std::string _sampling_method = "topk";
+  std::string _generate_method = "topk";
   int _topk = 1;
   float _topp = 0.75;
   int _eos_id;
@@ -67,7 +65,7 @@ class LlamaWeight {
 
   void print_model_config() {
     std::cout << "***model config***" << std::endl;
-    std::cout << "encoder layers: " << _n_enc_layer << std::endl;
+    std::cout << "decoder layers: " << _layer_num << std::endl;
     std::cout << "hidden size: " << _hidden_size << std::endl;
     std::cout << "inner size: " << _inner_size << std::endl;
     std::cout << "head number: " << _head_num << std::endl;
@@ -84,7 +82,7 @@ class LlamaWeight {
               << _extra_decode_length << std::endl;
     std::cout << "length penalty: " << _length_penalty << std::endl;
     std::cout << "diverse lambda: " << _diverse_lambda << std::endl;
-    std::cout << "sampling method: " << _sampling_method << std::endl;
+    std::cout << "generate method: " << _generate_method << std::endl;
     std::cout << "topk: " << _topk << std::endl;
     std::cout << "topp: " << _topp << std::endl;
   }

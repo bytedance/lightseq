@@ -8,3 +8,6 @@ target_link_libraries(transformer_example PUBLIC liblightseq)
 
 add_executable(gpt_example gpt_example.cc)
 target_link_libraries(gpt_example PUBLIC liblightseq)
+
+add_executable(llama_example llama_example.cc)
+target_link_libraries(llama_example PUBLIC liblightseq)

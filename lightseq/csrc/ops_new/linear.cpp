@@ -31,7 +31,6 @@ void LinearOp<T1, T2>::forward() {
                        _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
                        cublasGemmAlgo_t(_gemm_algos[0]));
 #elif defined LIGHTSEQ_x86
-
   x86::matrix_gemm(weights, input_ptr, out_ptr, _output_size, _batch_tokens,
                    _input_size);
 #endif

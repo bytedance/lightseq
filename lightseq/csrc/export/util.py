@@ -177,7 +177,6 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
 def fill_hdf5_layer(
     tensor_names, state_dict, hdf5_file, hdf5_dataset_prefix, mapping_dict
 ):
-    print(tensor_names)
     for proto_name, ckpt_rule in mapping_dict.items():
         target_tensor = apply_rule(proto_name, ckpt_rule, tensor_names, state_dict)
         hdf5_file.create_dataset(

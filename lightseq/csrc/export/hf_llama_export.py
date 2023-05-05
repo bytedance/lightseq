@@ -109,7 +109,7 @@ def extract_llama_weights(
     hdf5_file.create_dataset("model_conf/topk", data=arguments.topk, dtype="i4")
     hdf5_file.create_dataset("model_conf/eos_id", data=arguments.eos_id, dtype="i4")
     hdf5_file.create_dataset("model_conf/extra_decode_length", data=arguments.extra_decode_length, dtype="i4")
-    # hdf5_file.create_dataset("model_conf/beam_size", data=arguments.beam_size, dtype="i4")
+    hdf5_file.create_dataset("model_conf/src_vocab_size", data=arguments.vocab_size, dtype="i4")
 
     hdf5_file.close()
     # read-in again to double check
@@ -130,11 +130,11 @@ if __name__ == "__main__":
 
     arguments = ModelArguements(args)
     basename = os.path.basename(arguments.model_repo)
-    output_lightseq_model_name = "_".join(["lightseq_gpt", basename])
+    output_lightseq_model_name = "_".join(["lightseq_llama", basename])
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
     
     arguments.eos_id = 2 # need to set
-    arguments.padding_id = 1 # need to set
+    arguments.padding_id = 0 # need to set
 
     if not check_arguements(arguments):
         exit(0)

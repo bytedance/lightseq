@@ -1,4 +1,4 @@
-add_library(liblightseq SHARED bert.cc bert_crf.cc transformer.cu gpt.cc
+add_library(liblightseq SHARED bert.cc bert_crf.cc transformer.cu gpt.cc llama.cc
                                model_util.cc)
 
 target_link_libraries(liblightseq PUBLIC lightseq_layers)
