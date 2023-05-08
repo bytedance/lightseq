@@ -50,7 +50,7 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/layer_num", H5T_NATIVE_INT,
                            &_layer_num);
-
+  // _layer_num = 1;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
                            H5T_NATIVE_INT, &_padding_id);
 
@@ -127,36 +127,47 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
   size_t value_size = _src_vocab_size * _hidden_size + _hidden_size;
 
-  std::vector<size_t> offset;
-  std::vector<float> value(value_size);  // preallocate vector for performance
-  std::cout << "loading " << value_size / (1024 * 1024)
-            << " M of embedding weight." << std::endl;
-  size_t idx = 0;
+  size_t max_value_size = _src_vocab_size * _hidden_size;
 
-  offset.push_back(idx);
+  std::vector<size_t> offset;
+  std::vector<float> value(max_value_size);
+  std::cout << "loading " << value_size / (1024 * 1024)
+            << " M of decoder weight." << std::endl;
+
+  const size_t max_buffer_size = max_value_size; 
+  float* source_buffer;
+  T* target_buffer;
+  cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
+  cudaMalloc(&target_buffer, max_buffer_size * sizeof(T));
+  T* addr = nullptr;
+
+  size_t buffer_size;
+
+  buffer_size = _src_vocab_size * _hidden_size;
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) { return size != _src_vocab_size * _hidden_size; },
+      value.data(),
+      [=](int size) { return size != buffer_size; },
       "Wrong token_embedding_size !");
-  idx += _src_vocab_size * _hidden_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-  offset.push_back(idx);
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/post_norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
+      value.data(), [=](int size) { return size != _hidden_size; },
       "Wrong norm_scale_size !");
-  idx += _hidden_size;
-
-  std::vector<T> raw_value;
-  raw_value.reserve(value.size());
-  for (float e : value) raw_value.push_back(float2required(e));
-  _d_src_emb_wei = raw_value;
-  for (int e : offset)
-    _p_d_src_emb_wei.push_back(thrust::raw_pointer_cast(_d_src_emb_wei.data()) +
-                               e);
+  buffer_size = _hidden_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
+
+  value.clear();
+  value.shrink_to_fit();
+  cudaFree(source_buffer);
+  cudaFree(target_buffer);
 }
 
 /**
@@ -169,70 +180,94 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
        _hidden_size * _hidden_size + _hidden_size +
        _hidden_size * _inner_size * 2 + _hidden_size * _inner_size) *
       _layer_num;
+
+  std::vector<size_t> value_size_vec =
+      {_hidden_size, _hidden_size * _hidden_size * 3,
+       _hidden_size * _hidden_size, _hidden_size,
+       _hidden_size * _inner_size * 2, _hidden_size * _inner_size};
+  size_t max_value_size = *max_element(value_size_vec.begin(), value_size_vec.end());
+
   std::vector<size_t> offset;
-  std::vector<float> value(value_size);
+  std::vector<float> value(max_value_size);
   std::cout << "loading " << value_size / (1024 * 1024)
             << " M of decoder weight." << std::endl;
 
-  size_t idx = 0;
+  const size_t max_buffer_size = max_value_size; 
+  float* source_buffer;
+  T* target_buffer;
+  cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
+  cudaMalloc(&target_buffer, max_buffer_size * sizeof(T));
+
+  T* addr = nullptr;
+  size_t buffer_size;
   for (int layer_id = 0; layer_id < _layer_num; ++layer_id) {
     std::string dataset_prefix = "decoder_layers/" + std::to_string(layer_id);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/attention_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong attention_norm_scale_size !");
-    idx += _hidden_size;
+    buffer_size = _hidden_size;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/attention_project_qkv", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        value.data(),
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong attention_project_q_size !");
-    idx += _hidden_size * _hidden_size * 3;
+    buffer_size = _hidden_size * _hidden_size * 3;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/attention_output", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        value.data(),
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong attention_output_size !");
-    idx += _hidden_size * _hidden_size;
+    buffer_size = _hidden_size * _hidden_size;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+        value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong ffn_norm_scale_size !");
-    idx += _hidden_size;
+    buffer_size = _hidden_size;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/gate_up_project_weight", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        value.data(),
         [=](int size) { return size != _hidden_size * _inner_size * 2; },
         "Wrong gate_up_project_weight_size !");
-    idx += _hidden_size * _inner_size * 2;
+    buffer_size = _hidden_size * _inner_size * 2;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
 
-    offset.push_back(idx);
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/down_project_weight", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+        value.data(),
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong down_project_weight_size !");
-    idx += _hidden_size * _inner_size;
-    printf("finish initialize #%d dec_wei\n", layer_id);
+    buffer_size = _hidden_size * _inner_size;
+    addr = malloc_memory<T>(buffer_size);
+    _p_d_enc_wei.push_back(addr);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
   }
-
-  std::vector<T> raw_value;
-  for (float e : value) raw_value.push_back(float2required(e));
-  _d_enc_wei = raw_value;
-
-  for (int e : offset)
-    _p_d_enc_wei.push_back(thrust::raw_pointer_cast(_d_enc_wei.data()) + e);
+  
   std::cout << "finish initializing dec_wei from host to device" << std::endl;
+
+  value.clear();
+  value.shrink_to_fit();
+  cudaFree(source_buffer);
+  cudaFree(target_buffer);
 }
 
 /**
@@ -240,6 +275,7 @@ Load the proto file into CPU memory and parse it.
 */
 template <typename T>
 std::string LlamaWeight<T>::initializing(std::string weight_path) {
+  cudaStreamCreate(&stream);
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".hdf5")) {
     std::cout << "Parsing hdf5: " << weight_path << std::endl;
@@ -255,6 +291,7 @@ std::string LlamaWeight<T>::initializing(std::string weight_path) {
     hdf5_parse_enc_wei(hdf5_file);
     H5Fclose(hdf5_file);
 
+    cudaStreamSynchronize(stream);
     std::cout << "Finish loading all weight from host to device" << std::endl;
     return "";
   } else {

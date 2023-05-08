@@ -7,7 +7,7 @@ Variable* RotaryPositionQk<T1, T2>::operator()(Variable* inp, Variable* cache_k,
   size_t max_size = _max_batch_size * _max_step * _head_num * _head_dim;
   _result = new Variable("RotaryPositionQk_out", max_size, g_dtype<T1>(),
                          g_dtype<T2>());
-  set_parents({inp});
+  set_parents({inp, cache_k, cache_v});
   this->set_children({_result});
   return _result;
 }

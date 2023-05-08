@@ -9,18 +9,19 @@ LlamaMLPLayer<T1, T2>::LlamaMLPLayer(int max_batch_tokens, int hidden_dim,
       _max_batch_tokens(max_batch_tokens),
       _hidden_dim(hidden_dim),
       _inner_dim(inner_dim),
-      _mlp_ln(new RMSLayerNormalizeOp<T1, T2>(_max_batch_tokens, hidden_dim)),
+      _mlp_ln(new RMSLayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_dim)),
       _gate_up_linear(
           new LinearOp<T1, T2>(max_batch_tokens, 2 * inner_dim, hidden_dim)),
       _act_product(
           new ActElewiseProductOp<T1, T2>(max_batch_tokens, inner_dim)),
       _down_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_dim, inner_dim)),
-      _add_residual(new FuseAdd2Op<T1, T2>(_max_batch_tokens, hidden_dim)) {
+      _add_residual(new FuseAdd2Op<T1, T2>(max_batch_tokens, hidden_dim)) {
   _gate_up_linear_weight =
       new Variable("_gate_up_linear_weight", g_dtype<T1>(), g_dtype<T2>());
   _down_linear_weight =
       new Variable("_down_linear_weight", g_dtype<T1>(), g_dtype<T2>());
+  this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>

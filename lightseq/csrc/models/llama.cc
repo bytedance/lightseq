@@ -35,7 +35,7 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   int enc_wei_offset = 0;
   for (int idx = 0; idx < tw_._layer_num; idx++) {
     LlamaLayerPtr<OpType_, OpType_> llama_layer(
-        new LlamaLayer<OpType_, OpType_>(max_batch_tokens, tw_._max_step,
+        new LlamaLayer<OpType_, OpType_>(max_batch_size, tw_._max_step,
                                          tw_._hidden_size, tw_._inner_size,
                                          tw_._head_num, tw_._beam_size));
     enc_wei_offset += llama_layer->load_params(tw_.get_enc_wei(), enc_wei_offset);

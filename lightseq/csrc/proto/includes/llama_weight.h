@@ -1,6 +1,7 @@
 #pragma once
 #include "proto_headers.h"
 #include "proto_util.h"
+#include "hdf5_util.h"
 
 namespace lightseq {
 
@@ -10,6 +11,7 @@ Load the model weights which stored in custom proto file into GPU memory.
 template <typename T>
 class LlamaWeight {
  private:
+  cudaStream_t stream;
   T float2required(float value);
 
   // parsing function for hdf5
@@ -22,8 +24,8 @@ class LlamaWeight {
   std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
 
   // store the weights on gpu memory
-  thrust::device_vector<T> _d_src_emb_wei;
-  thrust::device_vector<T> _d_enc_wei;
+  std::vector<T*> _d_src_emb_wei;
+  std::vector<T*> _d_enc_wei;
 
  public:
   std::string initializing(std::string weight_path);
