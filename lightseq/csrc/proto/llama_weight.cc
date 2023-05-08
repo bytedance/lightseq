@@ -50,7 +50,7 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/layer_num", H5T_NATIVE_INT,
                            &_layer_num);
-  // _layer_num = 1;
+  _layer_num = 1;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
                            H5T_NATIVE_INT, &_padding_id);
 

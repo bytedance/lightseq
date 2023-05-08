@@ -8,64 +8,62 @@ Example of how to run gpt inference using our implementation.
 
 int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
-  // std::vector<int> example_input = {40, 1842, 345, 11, 475, 345, 910, 326};
-  // int eg_seq_len = example_input.size();
+  std::vector<int> example_input = {1, 21784, 26539,   338,   263,  4933,  6509,  6890};
+  int eg_seq_len = example_input.size();
 
-  // int batch_size = 1;
-  // int batch_seq_len = eg_seq_len;
+  int batch_size = 1;
+  int batch_seq_len = eg_seq_len;
 
-  // if (argc == 4) {
-  //   batch_size = atoi(argv[2]);
-  //   batch_seq_len = atoi(argv[3]);
-  // }
+  if (argc == 4) {
+    batch_size = atoi(argv[2]);
+    batch_seq_len = atoi(argv[3]);
+  }
 
-  // int max_batch_size = std::max(8, batch_size);
+  int max_batch_size = std::max(8, batch_size);
 
-  // std::vector<int> host_input;
-  // for (int i = 0; i < batch_size; ++i) {
-  //   for (int j = 0; j < batch_seq_len; ++j) {
-  //     host_input.push_back(example_input[j % eg_seq_len]);
-  //   }
-  // }
+  std::vector<int> host_input;
+  for (int i = 0; i < batch_size; ++i) {
+    for (int j = 0; j < batch_seq_len; ++j) {
+      host_input.push_back(example_input[j % eg_seq_len]);
+    }
+  }
 
   auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
       "Llama", model_weights_path, 1);
 
-  // void* d_input;
-  // CHECK_GPU_ERROR(
-  //     cudaMalloc(&d_input, sizeof(int) * batch_size * batch_seq_len));
-  // CHECK_GPU_ERROR(cudaMemcpy(d_input, host_input.data(),
-  //                            sizeof(int) * batch_size * batch_seq_len,
-  //                            cudaMemcpyHostToDevice));
+  void* d_input;
+  CHECK_GPU_ERROR(
+      cudaMalloc(&d_input, sizeof(int) * batch_size * batch_seq_len));
+  CHECK_GPU_ERROR(cudaMemcpy(d_input, host_input.data(),
+                             sizeof(int) * batch_size * batch_seq_len,
+                             cudaMemcpyHostToDevice));
 
-  // model->set_input_ptr(0, d_input);
-  // model->set_input_shape(0, {batch_size, batch_seq_len});
+  printf("example step.1\n");
 
-  // for (int i = 0; i < model->get_output_size(); i++) {
-  //   void* d_output;
-  //   std::vector<int> shape = model->get_output_max_shape(i);
-  //   int total_size = 1;
-  //   for (int j = 0; j < shape.size(); j++) {
-  //     total_size *= shape[j];
-  //   }
-  //   CHECK_GPU_ERROR(cudaMalloc(&d_output, total_size * sizeof(int)));
-  //   model->set_output_ptr(i, d_output);
-  // }
-  // CHECK_GPU_ERROR(cudaStreamSynchronize(0));
-  // std::cout << "infer preprocessing finished" << std::endl;
+  model->set_input_ptr(0, d_input);
+  model->set_input_shape(0, {batch_size, batch_seq_len});
+
+  for (int i = 0; i < model->get_output_size(); i++) {
+    void* d_output;
+    std::vector<int> shape = model->get_output_max_shape(i);
+    int total_size = 1;
+    for (int j = 0; j < shape.size(); j++) {
+      total_size *= shape[j];
+    }
+    CHECK_GPU_ERROR(cudaMalloc(&d_output, total_size * sizeof(int)));
+    model->set_output_ptr(i, d_output);
+  }
+  printf("example step.2\n");
+  CHECK_GPU_ERROR(cudaStreamSynchronize(0));
+  std::cout << "infer preprocessing finished" << std::endl;
+  printf("example step.2-1\n");
+  std::cout << "infer preprocessing finished 2" << std::endl;
+
+  model->Infer();
+  printf("example step.3\n");
 
   // std::chrono::duration<double> elapsed;
-  // int iter = 0;
-  // /* ---step5. infer and log--- */
-  // for (int i = 0; i < 1; i++) {
-  //   auto start = std::chrono::high_resolution_clock::now();
-  //   model->Infer();
-  //   auto finish = std::chrono::high_resolution_clock::now();
-  //   if (i >= 5) {
-  //     iter++;
-  //     elapsed += finish - start;
-  //   }
-  // }
+  int iter = 0;
 
   // std::cout << "lightseq inference latency: " << elapsed.count() * 1000 /
   // iter

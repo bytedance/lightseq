@@ -22,8 +22,12 @@ class LlamaLayer : public Layer {
                        Variable* pad_mask);
 
   void before_forward(int batch_size, int seq_len, int prompt_len) {
+    
+    std::cout << "step.1-2-1\n" << std::endl;
     _attn_layer->before_forward(batch_size, seq_len, prompt_len);
+    std::cout << "step.1-2-2\n" << std::endl;
     _mlp_layer->before_forward(batch_size, seq_len);
+    std::cout << "step.1-2-3\n" << std::endl;
   }
 
   size_t load_para_and_grad(const T1* para_ptr, T2* grad_ptr);

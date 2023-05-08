@@ -104,14 +104,18 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
 Llama::~Llama() {}
 
 void Llama::before_forward(int batch_size, int prompt_len, int steps) {
+    std::cout << "step.1-1\n" << std::endl;
     if (steps == 0) {
       _launch_llama_emb_layer->before_forward(batch_size, prompt_len, 0);
+      std::cout << "step.1-2\n" << std::endl;
       for (auto iter : _llama_layer_vec) {
         iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
       }
+      std::cout << "step.1-3\n" << std::endl;
       _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
       _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
       _generator_layer->before_forward(batch_size, prompt_len, 0);
+      std::cout << "step.1-4\n" << std::endl;
     } else {
       _launch_llama_emb_layer->before_forward(batch_size, 1,
                                             prompt_len + steps - 1);
@@ -126,10 +130,12 @@ void Llama::before_forward(int batch_size, int prompt_len, int steps) {
 }
 
 void Llama::Infer() {
+  std::cout << "step.-1\n" << std::endl;
   int batch_size = input_shapes_[0][0], prompt_len = input_shapes_[0][1];
 
   /* --- notice that the order of forward should be the same with network --- */
 
+  std::cout << "step.0\n" << std::endl;
 #ifdef LIGHTSEQ_cuda
   for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
     for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
@@ -142,14 +148,19 @@ void Llama::Infer() {
   }
 #endif
 
+  std::cout << "step.1\n" << std::endl;
+
   int steps = 0;
   while (steps + prompt_len < tw_._max_step) {
     before_forward(batch_size, prompt_len, steps);
 
+    std::cout << "step.2\n" << std::endl;
     _launch_llama_emb_layer->forward();
     for (auto iter : _llama_layer_vec) {
       iter->forward();
     }
+    break;
+    std::cout << "step.3\n" << std::endl;
 
     if (steps == 0) {
       OpType_ *linear_inp_ptr = _rms_norm_layer->input(0)->value<OpType_>();
@@ -170,6 +181,7 @@ void Llama::Infer() {
     _linear_layer->forward();
 
     _generator_layer->forward();
+
 
     if (_generator_layer->is_stop()) {
       break;

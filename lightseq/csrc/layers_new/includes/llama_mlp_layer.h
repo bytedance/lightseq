@@ -19,6 +19,7 @@ class LlamaMLPLayer : public Layer {
   FuseAdd2Op<T1, T2>* _add_residual = nullptr;
 
   // parameters
+  Variable* _norm_scale;
   Variable* _gate_up_linear_weight;
   Variable* _down_linear_weight;
 

@@ -29,11 +29,11 @@ and the expression will finally be concatenated on axis = -1.
 dec_layer_mapping_dict = OrderedDict(
     {
         "attention_norm_scale": "input_layernorm weight",
-        "attention_project_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight",
-        "attention_output": "self_attn o_proj weight",
+        "attention_project_qkv": "self_attn q_proj weight&&self_attn k_proj weight&&self_attn v_proj weight&&expression_.transpose(0, 1)",
+        "attention_output": "self_attn o_proj weight&&expression_.transpose(0, 1)",
         "ffn_norm_scale": "post_attention_layernorm weight",
-        "gate_up_project_weight": "mlp gate_proj weight&&mlp up_proj weight",
-        "down_project_weight": "mlp down_proj weight",
+        "gate_up_project_weight": "mlp gate_proj weight&&mlp up_proj weight&&expression_.transpose(0, 1)",
+        "down_project_weight": "mlp down_proj weight&&expression_.transpose(0, 1)",
     }
 )
 
@@ -55,6 +55,8 @@ def extract_llama_weights(
     head_num = arguments.head_num
     enc_var_name_list = list(state_dict.keys())
 
+    print(state_dict["model.layers.0.mlp.gate_proj.weight"])
+    # exit(0)
     # initialize output file
     output_file += ".hdf5"
     print("Saving model to hdf5...")
@@ -68,6 +70,8 @@ def extract_llama_weights(
     for name in enc_var_name_list:
         name_split = name.split(".")
         if len(name_split) <= 2 or not name_split[2].isdigit():
+            continue
+        if not int(name_split[2]) == 0:
             continue
         layer_id = int(name_split[2])
         enc_tensor_names.setdefault(layer_id, []).append(name)

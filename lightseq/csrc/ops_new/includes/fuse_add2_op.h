@@ -30,6 +30,7 @@ class FuseAdd2Op : public Operator {
   void before_forward(size_t batch_size, size_t seq_len) {
     _batch_size = batch_size;
     _seq_len = seq_len;
+    _result->set_shape({batch_size, seq_len, _hidden_dim});
   }
 
   void backward() override {}
