@@ -7,14 +7,16 @@ set(operator_files
     concat3_dim1.cpp
     crf.cpp
     dropout.cpp
+    fuse_add2_op.cpp
     launch_dec_emb_op.cpp
     launch_enc_emb.cpp
     launch_gpt_emb.cpp
+    launch_llama_emb.cpp
     layer_normalize.cpp
     split_head_op.cpp
     linear.cpp
     rms_layer_norm.cpp
-    rotary_position_qk.cpp
+    fuse_rotary_position_qkv.cpp
     sampling.cc.cu
     softmax.cpp
     strided_batch_gemm.cpp

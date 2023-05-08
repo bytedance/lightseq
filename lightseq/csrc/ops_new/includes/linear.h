@@ -14,6 +14,7 @@ class LinearOp : public Operator {
   std::array<int, 3> _gemm_algos;
 
   float _alpha;
+  float _beta;
   MATRIX_OP _opA;
   MATRIX_OP _opB;
 
@@ -28,7 +29,7 @@ class LinearOp : public Operator {
  public:
   LinearOp(size_t max_batch_tokens, size_t output_size, size_t input_size,
            MATRIX_OP opA = weight_op, MATRIX_OP opB = MATRIX_OP::NonTranspose,
-           float alpha = float(1.))
+           float alpha = float(1.), float beta = float(0.))
       : Operator("LinearOp"),
         _max_batch_tokens(max_batch_tokens),
         _output_size(output_size),
@@ -36,7 +37,8 @@ class LinearOp : public Operator {
         _opA(opA),
         _opB(opB),
         _gemm_algos(std::array<int, 3>({99, 99, 99})),
-        _alpha(alpha) {}
+        _alpha(alpha),
+        _beta(beta) {}
 
   ~LinearOp() {}
 

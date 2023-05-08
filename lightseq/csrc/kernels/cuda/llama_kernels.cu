@@ -279,8 +279,7 @@ __global__ void kernel_silu_elewise_product(const T* inp_ptr, T* out_ptr,
   if (idx >= max_thread_num) {
     return;
   }
-  int inpA_idx =
-      idx / inner_size * inner_size * 2 + idx % inner_size;
+  int inpA_idx = idx / inner_size * inner_size * 2 + idx % inner_size;
   int inpB_idx = inpA_idx + inner_size;
   const T& inpA = *(inp_ptr + inpA_idx);
   const T& inpB = *(inp_ptr + inpB_idx);
@@ -298,8 +297,7 @@ __global__ void kernel_silu_elewise_product<__half>(const __half* inp_ptr,
     return;
   }
   // const __half& ele_product = *(inpA_ptr + idx);
-  int inpA_idx =
-      idx / inner_size * inner_size * 2 + idx % inner_size;
+  int inpA_idx = idx / inner_size * inner_size * 2 + idx % inner_size;
   int inpB_idx = inpA_idx + inner_size;
   const __half& inpA = *(inp_ptr + inpA_idx);
   const __half& inpB = *(inp_ptr + inpB_idx);
@@ -307,8 +305,8 @@ __global__ void kernel_silu_elewise_product<__half>(const __half* inp_ptr,
 }
 
 template <typename T>
-void launch_silu_elewise_product(const T* inp_ptr,
-                                 T* out_ptr, size_t batch_size, size_t seq_len,
+void launch_silu_elewise_product(const T* inp_ptr, T* out_ptr,
+                                 size_t batch_size, size_t seq_len,
                                  size_t inner_size, cudaStream_t stream) {
   size_t nele = batch_size * seq_len * inner_size;
   size_t nblock = (nele + MAX_THREADS - 1) / MAX_THREADS;
@@ -317,11 +315,11 @@ void launch_silu_elewise_product(const T* inp_ptr,
 }
 
 template void launch_silu_elewise_product<float>(
-    const float* inp_ptr, float* out_ptr,
-    size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
+    const float* inp_ptr, float* out_ptr, size_t batch_size, size_t seq_len,
+    size_t inner_size, cudaStream_t stream);
 template void launch_silu_elewise_product<__half>(
-    const __half* inp_ptr, __half* out_ptr,
-    size_t batch_size, size_t seq_len, size_t inner_size, cudaStream_t stream);
+    const __half* inp_ptr, __half* out_ptr, size_t batch_size, size_t seq_len,
+    size_t inner_size, cudaStream_t stream);
 
 template <typename T>
 __global__ void ker_rms_layer_norm(const T* inp_ptr, const T* scale_ptr,

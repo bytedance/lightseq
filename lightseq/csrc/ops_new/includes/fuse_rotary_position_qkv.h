@@ -8,8 +8,6 @@ namespace lightseq {
 template <typename T1, typename T2>
 class RotaryPositionQk : public Operator {
  private:
-  // std::vector<float> sin_pos;
-  // std::vector<float> cos_pos;
   T1* _sin_ptr;
   T1* _cos_ptr;
   size_t _max_step;
@@ -24,7 +22,6 @@ class RotaryPositionQk : public Operator {
   T1* _device_cos_ptr;
 
   Variable* _result;
-  bool _append_cache;
 
  public:
   RotaryPositionQk(int max_batch_size, int max_step, int head_num, int head_dim)
@@ -86,12 +83,10 @@ class RotaryPositionQk : public Operator {
     _batch_size = batch_size;
     _offset_seq_len = offset_seq_len;
     _query_len = query_len;
-    _result->set_shape({_batch_size, _head_num,
-                        _append_cache ? _max_step : _query_len, _head_dim});
+    _result->set_shape({_batch_size, _head_num, _query_len, _head_dim});
   }
 
-  Variable* operator()(Variable* inp_tensor, Variable* cache_states);
-  Variable* operator()(Variable* inp);
+  Variable* operator()(Variable* inp_tensor,  Variable* cache_k, Variable* cache_v);
 
   void forward() override;
 

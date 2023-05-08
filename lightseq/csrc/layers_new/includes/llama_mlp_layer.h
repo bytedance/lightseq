@@ -1,7 +1,9 @@
 #pragma once
 
+#include "rms_layer_norm.h"
 #include "linear.h"
 #include "act_elewise_product.h"
+#include "fuse_add2_op.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -10,15 +12,15 @@ template <class T1, class T2>
 class LlamaMLPLayer : public Layer {
  private:
   // operators
-  LinearOp<T1, T2>* _up_linear = nullptr;
+  RMSLayerNormalizeOp<T1, T2>* _mlp_ln = nullptr;
+  LinearOp<T1, T2>* _gate_up_linear = nullptr;
   LinearOp<T1, T2>* _down_linear = nullptr;
-  LinearOp<T1, T2>* _gate_linear = nullptr;
   ActElewiseProductOp<T1, T2>* _act_product = nullptr;
+  FuseAdd2Op<T1, T2>* _add_residual = nullptr;
 
   // parameters
-  Variable* _up_linear_weight;
+  Variable* _gate_up_linear_weight;
   Variable* _down_linear_weight;
-  Variable* _gate_linear_weight;
 
   // shape related
   int _max_batch_tokens;

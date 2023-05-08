@@ -1584,7 +1584,7 @@ def test_split_rotary_position_qkv():
     seq_len = random.randint(1, 2048)
     offset_seq_len = random.randint(0, 2048 - seq_len)
     outshape = kt.rand((batch_size, nhead, seq_len, head_dim))
-    
+
     cachek = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
     cachev = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
     q_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
@@ -1594,7 +1594,7 @@ def test_split_rotary_position_qkv():
 
     out_cachek = torch.cat((cachek, outshape), dim=2)
     out_cachev = torch.cat((cachev, outshape), dim=2)
- 
+
     func = None
     if kt.dtype == torch.float:
         func = cuda_module.torch_launch_split_rotary_position_fp32
@@ -1602,6 +1602,7 @@ def test_split_rotary_position_qkv():
         func = cuda_module.torch_launch_split_rotary_position_fp16
 
     custom_q = torch.empty_like(q_tensor)
+
     def custom():
         func(
             qkv_tensor,
@@ -1627,7 +1628,6 @@ def test_split_rotary_position_qkv():
     sin_cached = emb.sin()[None, None, :, :].to(device="cuda:0", dtype=kt.dtype)
 
     def baseline():
-        # inp_clone = input_tensor.clone()
         trans_q = q_tensor.transpose(1, 2)
         trans_k = k_tensor.transpose(1, 2)
         trans_v = v_tensor.transpose(1, 2)
@@ -1661,7 +1661,7 @@ def test_split_rotary_position_qkv():
     return custom, baseline
 
 
-# from transformers import LlamaModel
+from transformers import LlamaModel
 from transformers.activations import SiLUActivation
 
 
