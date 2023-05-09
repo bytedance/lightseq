@@ -41,6 +41,7 @@ src_emb_mapping_dict = OrderedDict(
     {
         "post_norm_scale": "norm weight",
         "token_embedding": "embed_tokens weight",
+        "logits_linear_weight": "lm_head weight&&expression_.transpose(0, 1)"
     }
 )
 
@@ -55,8 +56,6 @@ def extract_llama_weights(
     head_num = arguments.head_num
     enc_var_name_list = list(state_dict.keys())
 
-    print(state_dict["model.layers.0.mlp.gate_proj.weight"])
-    # exit(0)
     # initialize output file
     output_file += ".hdf5"
     print("Saving model to hdf5...")

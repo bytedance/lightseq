@@ -48,8 +48,8 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   // intial Project hidden states to vocab logits
   _linear_layer.reset(new LinearLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._src_vocab_size,
-      MATRIX_OP::Transpose, MATRIX_OP::NonTranspose, 1.f));
-  _linear_layer->load_params(tw_.get_src_emb_wei(), 0);
+      MATRIX_OP::NonTranspose, MATRIX_OP::NonTranspose, 1.f));
+  _linear_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   _generator_layer.reset(new GeneratorLayer<OpType_>(
       _generate_method, tw_._layer_num, max_batch_size, tw_._max_step,
@@ -146,7 +146,7 @@ void Llama::Infer() {
 
 
   int steps = 0;
-  tw_._max_step = 100;
+  tw_._max_step = 20;
   while (steps + prompt_len < tw_._max_step) {
     before_forward(batch_size, prompt_len, steps);
 
@@ -175,7 +175,6 @@ void Llama::Infer() {
 
     _generator_layer->forward();
 
-    break;
     if (_generator_layer->is_stop()) {
       break;
     }

@@ -74,6 +74,7 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   if (_topk_read != 0) {
     _topk = _topk_read;
   }
+  // _topk = 1;
 
   float _topp_read;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/topp", H5T_NATIVE_FLOAT,
@@ -158,6 +159,15 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
       value.data(), [=](int size) { return size != _hidden_size; },
       "Wrong norm_scale_size !");
   buffer_size = _hidden_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/logits_linear_weight", H5T_NATIVE_FLOAT,
+      value.data(), [=](int size) { return size != _src_vocab_size * _hidden_size; },
+      "Wrong norm_scale_size !");
+  buffer_size = _src_vocab_size * _hidden_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
   convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
