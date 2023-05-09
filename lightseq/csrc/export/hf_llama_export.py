@@ -71,8 +71,6 @@ def extract_llama_weights(
         name_split = name.split(".")
         if len(name_split) <= 2 or not name_split[2].isdigit():
             continue
-        if not int(name_split[2]) == 0:
-            continue
         layer_id = int(name_split[2])
         enc_tensor_names.setdefault(layer_id, []).append(name)
 

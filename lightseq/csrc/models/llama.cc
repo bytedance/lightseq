@@ -104,18 +104,14 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
 Llama::~Llama() {}
 
 void Llama::before_forward(int batch_size, int prompt_len, int steps) {
-    std::cout << "step.1-1\n" << std::endl;
     if (steps == 0) {
       _launch_llama_emb_layer->before_forward(batch_size, prompt_len, 0);
-      std::cout << "step.1-2\n" << std::endl;
       for (auto iter : _llama_layer_vec) {
         iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
       }
-      std::cout << "step.1-3\n" << std::endl;
       _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
       _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
       _generator_layer->before_forward(batch_size, prompt_len, 0);
-      std::cout << "step.1-4\n" << std::endl;
     } else {
       _launch_llama_emb_layer->before_forward(batch_size, 1,
                                             prompt_len + steps - 1);
@@ -148,19 +144,16 @@ void Llama::Infer() {
   }
 #endif
 
-  std::cout << "step.1\n" << std::endl;
 
   int steps = 0;
+  tw_._max_step = 100;
   while (steps + prompt_len < tw_._max_step) {
     before_forward(batch_size, prompt_len, steps);
 
-    std::cout << "step.2\n" << std::endl;
     _launch_llama_emb_layer->forward();
     for (auto iter : _llama_layer_vec) {
       iter->forward();
     }
-    break;
-    std::cout << "step.3\n" << std::endl;
 
     if (steps == 0) {
       OpType_ *linear_inp_ptr = _rms_norm_layer->input(0)->value<OpType_>();
@@ -182,7 +175,7 @@ void Llama::Infer() {
 
     _generator_layer->forward();
 
-
+    break;
     if (_generator_layer->is_stop()) {
       break;
     }
@@ -206,12 +199,13 @@ void Llama::Infer() {
           tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
           (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
           _context_ptr->get_stream());
+      
     }
   }
 
+  print_vec(_llama_out_ptr, "_llama_out_ptr", 15);
   _context_ptr->synchronize();
   set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
-  set_output_shape(1, {batch_size, tw_._beam_size});
 }
 
 void Llama::set_input_ptr(int index, void *input_ptr) {
