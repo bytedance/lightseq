@@ -176,8 +176,6 @@ def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):
         "%s -> %s, convert finished!"
         % (target_tn if target_tn else "created", proto_name)
     )
-    print(target_tensor.shape)
-    print(target_tensor)
     return target_tensor[0] if type(target_tensor) is list else target_tensor
 
 

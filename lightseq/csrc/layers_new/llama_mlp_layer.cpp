@@ -43,11 +43,8 @@ void LlamaMLPLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   _mlp_ln->before_forward(batch_size, seq_len);
   _gate_up_linear->before_forward(batch_size * seq_len);
   _act_product->before_forward(batch_size, seq_len);
-  std::cout << "step.1-2-2-4\n" << std::endl;
   _down_linear->before_forward(batch_size * seq_len);
-  std::cout << "step.1-2-2-5\n" << std::endl;
   _add_residual->before_forward(batch_size, seq_len);
-  std::cout << "step.1-2-2-6\n" << std::endl;
 }
 
 template <typename T1, typename T2>
@@ -58,11 +55,9 @@ int LlamaMLPLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
   _norm_scale->set_value((char*)para_vec[offset + size]), size++;
   _norm_scale->set_shape({_hidden_dim});
   
-  std::cout << "gate up idx" << offset + size << std::endl;
   _gate_up_linear_weight->set_value((char*)para_vec[offset + size]), size++;
   _gate_up_linear_weight->set_shape({_hidden_dim, 2 * _inner_dim});
 
-  std::cout << "down idx" << offset + size << std::endl;
   _down_linear_weight->set_value((char*)para_vec[offset + size]), size++;
   _down_linear_weight->set_shape({_inner_dim, _hidden_dim});
 

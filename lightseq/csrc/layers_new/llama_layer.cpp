@@ -3,13 +3,12 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-LlamaLayer<T1, T2>::LlamaLayer(int max_batch_tokens, int max_seq_len, int hidden_size, int inner_dim,
+LlamaLayer<T1, T2>::LlamaLayer(int max_batch_size, int max_seq_len, int hidden_size, int inner_dim,
             int num_heads, int beam_size)
     : Layer("LlamaLayer"){
   _attn_layer.reset(new LlamaAttentionLayer<T1, T2>(
-      max_batch_tokens, max_seq_len, hidden_size, num_heads, beam_size));
-
-  _mlp_layer.reset(new LlamaMLPLayer<T1, T2>(max_batch_tokens, hidden_size, inner_dim));
+      max_batch_size, max_seq_len, hidden_size, num_heads, beam_size));
+  _mlp_layer.reset(new LlamaMLPLayer<T1, T2>(max_batch_size * max_seq_len, hidden_size, inner_dim));
 
   this->_context_ptr->exit_layer();  // necessary
 }

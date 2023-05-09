@@ -4,7 +4,6 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
-  // size_t max_size = _max_batch_tokens * _output_size;
   _result = new Variable("LinearOp_out", _max_batch_tokens * _output_size,
                          g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, weight});

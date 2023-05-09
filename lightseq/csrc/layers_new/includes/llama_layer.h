@@ -14,7 +14,7 @@ class LlamaLayer : public Layer {
   int _layer_id;
 
  public:
-  LlamaLayer(int max_batch_tokens, int max_seq_len, int hidden_size, int inner_dim,
+  LlamaLayer(int max_batch_size, int max_seq_len, int hidden_size, int inner_dim,
             int num_heads, int beam_size);
   virtual ~LlamaLayer() {}
 
