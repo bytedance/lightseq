@@ -67,7 +67,8 @@ void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
   }
 }
 
-__global__ void kernel_convert_dtype(float* source_buffer, __half* target_buffer, size_t nele) {
+__global__ void kernel_convert_dtype(float* source_buffer,
+                                     __half* target_buffer, size_t nele) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= nele) {
     return;
@@ -75,9 +76,11 @@ __global__ void kernel_convert_dtype(float* source_buffer, __half* target_buffer
   *(target_buffer + idx) = __float2half(*(source_buffer + idx));
 }
 
-void launch_convert_dtype(float* source_buffer, __half* target_buffer, size_t size, int max_thread, cudaStream_t stream) {
+void launch_convert_dtype(float* source_buffer, __half* target_buffer,
+                          size_t size, int max_thread, cudaStream_t stream) {
   int nblock = (size + max_thread - 1) / max_thread;
-  kernel_convert_dtype<<<nblock, max_thread, 0, stream>>>(source_buffer, target_buffer, size);
+  kernel_convert_dtype<<<nblock, max_thread, 0, stream>>>(source_buffer,
+                                                          target_buffer, size);
 }
 
 }  // namespace cuda

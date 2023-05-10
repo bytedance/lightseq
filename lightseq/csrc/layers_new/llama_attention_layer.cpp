@@ -54,7 +54,8 @@ Variable* LlamaAttentionLayer<T1, T2>::operator()(Variable* inp,
   // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
   Variable* transform_0213_out = (*_transform_0213)(sdpa_res);
 
-  Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow, std::get<1>(ln_out));
+  Variable* attn_linear =
+      (*_attn_out_linear)(transform_0213_out, _attn_ow, std::get<1>(ln_out));
 
   // Variable* attn_out = (*_add_residual)(inp, attn_linear);
 

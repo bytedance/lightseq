@@ -34,7 +34,6 @@ class FuseAdd2Op : public Operator {
   }
 
   void backward() override {}
-
 };
 
 }  // namespace lightseq

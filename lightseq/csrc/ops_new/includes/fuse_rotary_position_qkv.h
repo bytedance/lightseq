@@ -86,7 +86,8 @@ class RotaryPositionQk : public Operator {
     _result->set_shape({_batch_size, _head_num, _query_len, _head_dim});
   }
 
-  Variable* operator()(Variable* inp_tensor,  Variable* cache_k, Variable* cache_v);
+  Variable* operator()(Variable* inp_tensor, Variable* cache_k,
+                       Variable* cache_v);
 
   void forward() override;
 

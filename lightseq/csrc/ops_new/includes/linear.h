@@ -50,7 +50,7 @@ class LinearOp : public Operator {
 
   void before_forward(size_t batch_tokens) {
     _batch_tokens = batch_tokens;
-    if(_use_residual) {
+    if (_use_residual) {
       _result->set_offset(0, {batch_tokens, _output_size});
     } else {
       _result->set_shape({batch_tokens, _output_size});

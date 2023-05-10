@@ -14,15 +14,14 @@ class LlamaLayer : public Layer {
   int _layer_id;
 
  public:
-  LlamaLayer(int max_batch_size, int max_seq_len, int hidden_size, int inner_dim,
-            int num_heads, int beam_size);
+  LlamaLayer(int max_batch_size, int max_seq_len, int hidden_size,
+             int inner_dim, int num_heads, int beam_size);
   virtual ~LlamaLayer() {}
 
   Variable* operator()(Variable* inp, Variable* cache_k, Variable* cache_v,
                        Variable* pad_mask);
 
   void before_forward(int batch_size, int seq_len, int prompt_len) {
-    
     _attn_layer->before_forward(batch_size, seq_len, prompt_len);
     _mlp_layer->before_forward(batch_size, seq_len);
   }

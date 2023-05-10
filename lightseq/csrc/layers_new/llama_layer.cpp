@@ -3,19 +3,22 @@
 namespace lightseq {
 
 template <typename T1, typename T2>
-LlamaLayer<T1, T2>::LlamaLayer(int max_batch_size, int max_seq_len, int hidden_size, int inner_dim,
-            int num_heads, int beam_size)
-    : Layer("LlamaLayer"){
+LlamaLayer<T1, T2>::LlamaLayer(int max_batch_size, int max_seq_len,
+                               int hidden_size, int inner_dim, int num_heads,
+                               int beam_size)
+    : Layer("LlamaLayer") {
   _attn_layer.reset(new LlamaAttentionLayer<T1, T2>(
       max_batch_size, max_seq_len, hidden_size, num_heads, beam_size));
-  _mlp_layer.reset(new LlamaMLPLayer<T1, T2>(max_batch_size * max_seq_len, hidden_size, inner_dim));
+  _mlp_layer.reset(new LlamaMLPLayer<T1, T2>(max_batch_size * max_seq_len,
+                                             hidden_size, inner_dim));
 
   this->_context_ptr->exit_layer();  // necessary
 }
 
 template <typename T1, typename T2>
 Variable* LlamaLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
-                                       Variable* cache_v, Variable* pad_mask) {
+                                         Variable* cache_v,
+                                         Variable* pad_mask) {
   set_inputs({inp, cache_k, cache_v, pad_mask});
 
   Variable* attn_out = (*_attn_layer)(inp, cache_k, cache_v, pad_mask);
@@ -28,7 +31,7 @@ Variable* LlamaLayer<T1, T2>::operator()(Variable* inp, Variable* cache_k,
 
 template <typename T1, typename T2>
 int LlamaLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
-                                  int offset) {  // for inference
+                                    int offset) {  // for inference
   int size = 0;
 
   size += _attn_layer->load_params(para_vec, offset + size);

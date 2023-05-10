@@ -24,8 +24,8 @@ class LlamaWeight {
   std::vector<const T *> _p_d_enc_wei;      // size: 12 * enc_layer_num
 
   // store the weights on gpu memory
-  std::vector<T*> _d_src_emb_wei;
-  std::vector<T*> _d_enc_wei;
+  std::vector<T *> _d_src_emb_wei;
+  std::vector<T *> _d_enc_wei;
 
  public:
   std::string initializing(std::string weight_path);

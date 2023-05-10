@@ -21,10 +21,9 @@ class RMSNormLayer : public Layer {
       : Layer("RMSNormLayer"),
         _hidden_size(hidden_size),
         _max_batch_tokens(max_batch_tokens),
-        _rms_norm(
-            new RMSLayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)) {
-    _norm_scale =
-        new Variable("_norm_scale", g_dtype<T1>(), g_dtype<T2>());
+        _rms_norm(new RMSLayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size,
+                                                  false)) {
+    _norm_scale = new Variable("_norm_scale", g_dtype<T1>(), g_dtype<T2>());
 
     this->_context_ptr->exit_layer();  // necessary
   }

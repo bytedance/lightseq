@@ -16,9 +16,8 @@ LlamaMLPLayer<T1, T2>::LlamaMLPLayer(int max_batch_tokens, int hidden_dim,
           new ActElewiseProductOp<T1, T2>(max_batch_tokens, inner_dim)),
       _down_linear(
           new LinearOp<T1, T2>(max_batch_tokens, hidden_dim, inner_dim))
-      // _add_residual(new FuseAdd2Op<T1, T2>(max_batch_tokens, hidden_dim)) 
-      {
-
+// _add_residual(new FuseAdd2Op<T1, T2>(max_batch_tokens, hidden_dim))
+{
   _norm_scale = new Variable("_norm_scale", g_dtype<T1>(), g_dtype<T2>());
   _gate_up_linear_weight =
       new Variable("_gate_up_linear_weight", g_dtype<T1>(), g_dtype<T2>());
@@ -31,9 +30,11 @@ template <typename T1, typename T2>
 Variable* LlamaMLPLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   std::tuple<Variable*, Variable*> ln_out = (*_mlp_ln)(inp, _norm_scale);
-  Variable* gate_up_out = (*_gate_up_linear)(std::get<0>(ln_out), _gate_up_linear_weight);
+  Variable* gate_up_out =
+      (*_gate_up_linear)(std::get<0>(ln_out), _gate_up_linear_weight);
   Variable* act_out = (*_act_product)(gate_up_out);
-  Variable* down_out = (*_down_linear)(act_out, _down_linear_weight, std::get<1>(ln_out));
+  Variable* down_out =
+      (*_down_linear)(act_out, _down_linear_weight, std::get<1>(ln_out));
   // Variable* mlp_out = (*_add_residual)(down_out, inp);
   set_outputs({down_out});
   return down_out;
@@ -55,7 +56,7 @@ int LlamaMLPLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
 
   _norm_scale->set_value((char*)para_vec[offset + size]), size++;
   _norm_scale->set_shape({_hidden_dim});
-  
+
   _gate_up_linear_weight->set_value((char*)para_vec[offset + size]), size++;
   _gate_up_linear_weight->set_shape({_hidden_dim, 2 * _inner_dim});
 

@@ -308,7 +308,6 @@ class PyGpt {
   }
 };
 
-
 class PyLlama {
  private:
   LSModel *model_;
@@ -405,7 +404,6 @@ PYBIND11_MODULE(inference, m) {
            py::arg("max_batch_size"))
       .def("infer", &lightseq::cuda::PyGpt::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
-
 
   py::class_<lightseq::cuda::PyLlama>(m, "Llama")
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),

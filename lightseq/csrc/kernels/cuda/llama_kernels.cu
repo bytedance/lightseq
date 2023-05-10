@@ -382,11 +382,12 @@ __global__ void ker_rms_layer_norm<__half>(const __half* inp_ptr,
   }
 }
 
-
 template <typename T>
-__global__ void ker_rms_layer_norm_with_res(const T* inp_ptr, const T* scale_ptr,
-                                   T* out_ptr, T* res_ptr, T* rms_ptr, size_t hidden_dim,
-                                   const float ln_epsilon) {
+__global__ void ker_rms_layer_norm_with_res(const T* inp_ptr,
+                                            const T* scale_ptr, T* out_ptr,
+                                            T* res_ptr, T* rms_ptr,
+                                            size_t hidden_dim,
+                                            const float ln_epsilon) {
   // step 0. compute local sum
   float l_square_sum = 0;
   const T* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
@@ -415,11 +416,10 @@ __global__ void ker_rms_layer_norm_with_res(const T* inp_ptr, const T* scale_ptr
 }
 
 template <>
-__global__ void ker_rms_layer_norm_with_res<__half>(const __half* inp_ptr,
-                                           const __half* scale_ptr,
-                                           __half* out_ptr, __half* res_ptr, __half* rms_ptr,
-                                           size_t hidden_dim,
-                                           const float ln_epsilon) {
+__global__ void ker_rms_layer_norm_with_res<__half>(
+    const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr,
+    __half* res_ptr, __half* rms_ptr, size_t hidden_dim,
+    const float ln_epsilon) {
   // step 0. compute local sum
   float l_square_sum = 0;
   const __half* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
@@ -449,14 +449,15 @@ __global__ void ker_rms_layer_norm_with_res<__half>(const __half* inp_ptr,
 }
 
 template <typename T>
-void launch_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_ptr, T* res_ptr,
-                           T* rms_ptr, size_t batch_tokens, size_t hidden_dim,
-                           cudaStream_t stream, const float ln_epsilon) {
+void launch_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_ptr,
+                           T* res_ptr, T* rms_ptr, size_t batch_tokens,
+                           size_t hidden_dim, cudaStream_t stream,
+                           const float ln_epsilon) {
   int nthread = std::min(((hidden_dim + 31) / 32) * 32, size_t(MAX_THREADS));
   dim3 grid_dim(batch_tokens);
   dim3 block_dim(nthread);
 
-  if(res_ptr == nullptr){
+  if (res_ptr == nullptr) {
     ker_rms_layer_norm<T><<<grid_dim, block_dim, 0, stream>>>(
         inp_ptr, scale_ptr, out_ptr, rms_ptr, hidden_dim, ln_epsilon);
   } else {
@@ -466,12 +467,12 @@ void launch_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_ptr, T* 
 }
 
 template void launch_rms_layer_norm<float>(
-    const float* inp_ptr, const float* scale_ptr, float* out_ptr, float* res_ptr,
-    float* rms_ptr, size_t batch_tokens, size_t hidden_dim, cudaStream_t stream,
-    const float ln_epsilon);
+    const float* inp_ptr, const float* scale_ptr, float* out_ptr,
+    float* res_ptr, float* rms_ptr, size_t batch_tokens, size_t hidden_dim,
+    cudaStream_t stream, const float ln_epsilon);
 template void launch_rms_layer_norm<__half>(
-    const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr, __half* res_ptr,
-    __half* rms_ptr, size_t batch_tokens, size_t hidden_dim,
+    const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr,
+    __half* res_ptr, __half* rms_ptr, size_t batch_tokens, size_t hidden_dim,
     cudaStream_t stream, const float ln_epsilon);
 
 }  // namespace cuda

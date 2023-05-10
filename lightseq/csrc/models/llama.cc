@@ -38,11 +38,13 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
         new LlamaLayer<OpType_, OpType_>(max_batch_size, tw_._max_step,
                                          tw_._hidden_size, tw_._inner_size,
                                          tw_._head_num, tw_._beam_size));
-    enc_wei_offset += llama_layer->load_params(tw_.get_enc_wei(), enc_wei_offset);
+    enc_wei_offset +=
+        llama_layer->load_params(tw_.get_enc_wei(), enc_wei_offset);
     _llama_layer_vec.push_back(llama_layer);
   }
 
-  _rms_norm_layer.reset(new RMSNormLayer<OpType_, OpType_>(max_batch_tokens, tw_._hidden_size));
+  _rms_norm_layer.reset(
+      new RMSNormLayer<OpType_, OpType_>(max_batch_tokens, tw_._hidden_size));
   _rms_norm_layer->load_params(tw_.get_src_emb_wei(), 1);
 
   // intial Project hidden states to vocab logits
@@ -57,15 +59,14 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
       tw_._diverse_lambda, tw_._dim_per_head, tw_._eos_id, tw_._head_num,
       tw_._length_penalty, tw_._topk, tw_._topp, false));
 
-  
   /* --- step.5 construct network --- */
   size_t cache_size = max_batch_tokens * tw_._beam_size * tw_._hidden_size;
-  _total_caches_k = new Variable(
-      "total_caches_k", cache_size * tw_._layer_num, g_dtype<OpType_>(),
-      DataType::kNotSupported, VariableType::RegressiveVariable);
-  _total_caches_v = new Variable(
-      "total_caches_v", cache_size * tw_._layer_num, g_dtype<OpType_>(),
-      DataType::kNotSupported, VariableType::RegressiveVariable);
+  _total_caches_k = new Variable("total_caches_k", cache_size * tw_._layer_num,
+                                 g_dtype<OpType_>(), DataType::kNotSupported,
+                                 VariableType::RegressiveVariable);
+  _total_caches_v = new Variable("total_caches_v", cache_size * tw_._layer_num,
+                                 g_dtype<OpType_>(), DataType::kNotSupported,
+                                 VariableType::RegressiveVariable);
 
   // note regress begin
   _context_ptr->regress_begin();
@@ -73,7 +74,7 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   std::tuple<Variable *, Variable *, Variable *> llama_emb_outs =
       (*_launch_llama_emb_layer)(_inp_tokens);
   Variable *llama_emb = std::get<0>(llama_emb_outs);
-  Variable* pad_mask = std::get<1>(llama_emb_outs);
+  Variable *pad_mask = std::get<1>(llama_emb_outs);
   pad_mask->set_regress_var();
   size_t cache_offset = 0;
   for (auto iter : _llama_layer_vec) {
@@ -104,25 +105,25 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
 Llama::~Llama() {}
 
 void Llama::before_forward(int batch_size, int prompt_len, int steps) {
-    if (steps == 0) {
-      _launch_llama_emb_layer->before_forward(batch_size, prompt_len, 0);
-      for (auto iter : _llama_layer_vec) {
-        iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
-      }
-      _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
-      _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
-      _generator_layer->before_forward(batch_size, prompt_len, 0);
-    } else {
-      _launch_llama_emb_layer->before_forward(batch_size, 1,
-                                            prompt_len + steps - 1);
-      for (auto iter : _llama_layer_vec) {
-        iter->before_forward(batch_size * tw_._beam_size, 1,
-                             prompt_len + steps - 1);
-      }
-      _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
-      _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
-      _generator_layer->before_forward(batch_size, prompt_len, steps);
+  if (steps == 0) {
+    _launch_llama_emb_layer->before_forward(batch_size, prompt_len, 0);
+    for (auto iter : _llama_layer_vec) {
+      iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
     }
+    _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
+    _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
+    _generator_layer->before_forward(batch_size, prompt_len, 0);
+  } else {
+    _launch_llama_emb_layer->before_forward(batch_size, 1,
+                                            prompt_len + steps - 1);
+    for (auto iter : _llama_layer_vec) {
+      iter->before_forward(batch_size * tw_._beam_size, 1,
+                           prompt_len + steps - 1);
+    }
+    _rms_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
+    _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
+    _generator_layer->before_forward(batch_size, prompt_len, steps);
+  }
 }
 
 void Llama::Infer() {
@@ -141,7 +142,6 @@ void Llama::Infer() {
     }
   }
 #endif
-
 
   int steps = 0;
   while (steps + prompt_len < tw_._max_step) {
@@ -195,7 +195,6 @@ void Llama::Infer() {
           tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
           (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
           _context_ptr->get_stream());
-      
     }
   }
 

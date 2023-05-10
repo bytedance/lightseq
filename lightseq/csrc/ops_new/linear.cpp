@@ -12,7 +12,8 @@ Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
 }
 
 template <typename T1, typename T2>
-Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight, Variable* residual) {
+Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight,
+                                       Variable* residual) {
   _use_residual = true;
   _beta = float(1.);
   _result = new Variable("LinearOp_out", residual);

@@ -13,7 +13,6 @@ Variable* FuseAdd2Op<T1, T2>::operator()(Variable* inpA, Variable* inpB) {
 
 template <typename T1, typename T2>
 void FuseAdd2Op<T1, T2>::forward() {
-
   T1* inpA_ptr = (T1*)parent(0)->value();
   T1* inpB_ptr = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
@@ -23,11 +22,11 @@ void FuseAdd2Op<T1, T2>::forward() {
   }
 
 #ifdef LIGHTSEQ_cuda
-    cudaStream_t stream = _context_ptr->get_stream();
-    cuda::launch_fused_add2(out_ptr, inpA_ptr, inpB_ptr, _batch_size, _seq_len, _hidden_dim, stream);
-#endif 
+  cudaStream_t stream = _context_ptr->get_stream();
+  cuda::launch_fused_add2(out_ptr, inpA_ptr, inpB_ptr, _batch_size, _seq_len,
+                          _hidden_dim, stream);
+#endif
 }
-
 
 template class FuseAdd2Op<float, float>;
 #ifdef LIGHTSEQ_cuda

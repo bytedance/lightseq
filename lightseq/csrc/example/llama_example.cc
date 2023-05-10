@@ -8,7 +8,8 @@ Example of how to run gpt inference using our implementation.
 
 int main(int argc, char* argv[]) {
   std::string model_weights_path = argv[1];
-  std::vector<int> example_input = {1, 21784, 26539,   338,   263,  4933,  6509,  6890};
+  std::vector<int> example_input = {1,   21784, 26539, 338,
+                                    263, 4933,  6509,  6890};
   int eg_seq_len = example_input.size();
 
   int batch_size = 1;

@@ -30,7 +30,7 @@ class RMSLayerNormalizeOp : public Operator {
     _rms_vars.reset(new Tensor("rms_vars", g_dtype<T1>(), max_batch_tokens));
   }
 
-  std::tuple<Variable*, Variable*>operator()(Variable* inp, Variable* scale);
+  std::tuple<Variable*, Variable*> operator()(Variable* inp, Variable* scale);
 
   virtual ~RMSLayerNormalizeOp();
 

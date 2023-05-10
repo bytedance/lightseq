@@ -41,7 +41,7 @@ src_emb_mapping_dict = OrderedDict(
     {
         "post_norm_scale": "norm weight",
         "token_embedding": "embed_tokens weight",
-        "logits_linear_weight": "lm_head weight&&expression_.transpose(0, 1)"
+        "logits_linear_weight": "lm_head weight&&expression_.transpose(0, 1)",
     }
 )
 

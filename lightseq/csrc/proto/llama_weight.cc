@@ -99,21 +99,21 @@ void LlamaWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
   try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/beam_size", H5T_NATIVE_INT,
                              &_beam_size);
-  } catch (HDF5DatasetNotFoundError &e) {
+  } catch (HDF5DatasetNotFoundError& e) {
     _beam_size = 1;
   }
 
   try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/length_penalty",
                              H5T_NATIVE_FLOAT, &_length_penalty);
-  } catch (HDF5DatasetNotFoundError &e) {
+  } catch (HDF5DatasetNotFoundError& e) {
     _length_penalty = 1.0;
   }
 
   try {
     read_hdf5_dataset_scalar(hdf5_file, "model_conf/diverse_lambda",
                              H5T_NATIVE_FLOAT, &_diverse_lambda);
-  } catch (HDF5DatasetNotFoundError &e) {
+  } catch (HDF5DatasetNotFoundError& e) {
     _diverse_lambda = 0.;
   }
 
@@ -135,7 +135,7 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::cout << "loading " << value_size / (1024 * 1024)
             << " M of decoder weight." << std::endl;
 
-  const size_t max_buffer_size = max_value_size; 
+  const size_t max_buffer_size = max_value_size;
   float* source_buffer;
   T* target_buffer;
   cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
@@ -147,12 +147,12 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   buffer_size = _src_vocab_size * _hidden_size;
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
-      value.data(),
-      [=](int size) { return size != buffer_size; },
+      value.data(), [=](int size) { return size != buffer_size; },
       "Wrong token_embedding_size !");
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
-  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
 
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/post_norm_scale", H5T_NATIVE_FLOAT,
@@ -161,16 +161,19 @@ void LlamaWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   buffer_size = _hidden_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
-  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
 
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/logits_linear_weight", H5T_NATIVE_FLOAT,
-      value.data(), [=](int size) { return size != _src_vocab_size * _hidden_size; },
+      value.data(),
+      [=](int size) { return size != _src_vocab_size * _hidden_size; },
       "Wrong norm_scale_size !");
   buffer_size = _src_vocab_size * _hidden_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
-  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
 
   std::cout << "finish initializing emb_wei from host to device" << std::endl;
 
@@ -191,18 +194,21 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
        _hidden_size * _inner_size * 2 + _hidden_size * _inner_size) *
       _layer_num;
 
-  std::vector<size_t> value_size_vec =
-      {_hidden_size, _hidden_size * _hidden_size * 3,
-       _hidden_size * _hidden_size, _hidden_size,
-       _hidden_size * _inner_size * 2, _hidden_size * _inner_size};
-  size_t max_value_size = *max_element(value_size_vec.begin(), value_size_vec.end());
+  std::vector<size_t> value_size_vec = {_hidden_size,
+                                        _hidden_size * _hidden_size * 3,
+                                        _hidden_size * _hidden_size,
+                                        _hidden_size,
+                                        _hidden_size * _inner_size * 2,
+                                        _hidden_size * _inner_size};
+  size_t max_value_size =
+      *max_element(value_size_vec.begin(), value_size_vec.end());
 
   std::vector<size_t> offset;
   std::vector<float> value(max_value_size);
   std::cout << "loading " << value_size / (1024 * 1024)
             << " M of decoder weight." << std::endl;
 
-  const size_t max_buffer_size = max_value_size; 
+  const size_t max_buffer_size = max_value_size;
   float* source_buffer;
   T* target_buffer;
   cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
@@ -220,7 +226,8 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
 
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/attention_project_qkv", H5T_NATIVE_FLOAT,
@@ -230,7 +237,8 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size * _hidden_size * 3;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
 
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/attention_output", H5T_NATIVE_FLOAT,
@@ -240,7 +248,8 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size * _hidden_size;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
 
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
@@ -249,7 +258,8 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
 
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/gate_up_project_weight", H5T_NATIVE_FLOAT,
@@ -259,7 +269,8 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size * _inner_size * 2;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
 
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/down_project_weight", H5T_NATIVE_FLOAT,
@@ -269,9 +280,10 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
     buffer_size = _hidden_size * _inner_size;
     addr = malloc_memory<T>(buffer_size);
     _p_d_enc_wei.push_back(addr);
-    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr, buffer_size, stream);
+    convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                            buffer_size, stream);
   }
-  
+
   std::cout << "finish initializing dec_wei from host to device" << std::endl;
 
   value.clear();
