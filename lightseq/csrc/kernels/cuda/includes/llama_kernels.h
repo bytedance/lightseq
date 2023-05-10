@@ -30,7 +30,7 @@ void launch_silu_elewise_product(const T *inp_ptr, T *out_ptr,
                                  size_t inner_size, cudaStream_t stream);
 
 template <typename T>
-void launch_rms_layer_norm(const T *inp_ptr, const T *scale_ptr, T *out_ptr,
+void launch_rms_layer_norm(const T *inp_ptr, const T *scale_ptr, T *out_ptr, T* res_ptr,
                            T *rms_ptr, size_t batch_tokens, size_t hidden_dim,
                            cudaStream_t stream, const float ln_epsilon = 1e-6f);
 

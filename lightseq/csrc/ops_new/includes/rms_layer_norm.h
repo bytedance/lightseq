@@ -13,21 +13,24 @@ class RMSLayerNormalizeOp : public Operator {
   float _epsilon;
 
   bool _use_mean;
+  bool _use_residual;
 
   TensorPtr _rms_vars;
   Variable* _result;
+  Variable* _residual;
 
  public:
   RMSLayerNormalizeOp(size_t max_batch_tokens, size_t hidden_dim,
-                      float epsilon = 1e-6)
+                      bool use_residual = true, float epsilon = 1e-6)
       : Operator("RMSLayerNormalizeOp"),
         _max_batch_tokens(max_batch_tokens),
         _hidden_dim(hidden_dim),
+        _use_residual(use_residual),
         _epsilon(epsilon) {
     _rms_vars.reset(new Tensor("rms_vars", g_dtype<T1>(), max_batch_tokens));
   }
 
-  Variable* operator()(Variable* inp, Variable* scale);
+  std::tuple<Variable*, Variable*>operator()(Variable* inp, Variable* scale);
 
   virtual ~RMSLayerNormalizeOp();
 

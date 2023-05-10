@@ -27,7 +27,7 @@ LlamaAttentionLayer<T1, T2>::LlamaAttentionLayer(int max_batch_size,
       new Transform0213OP<T1, T2>(_max_batch_tokens * hidden_size);
   _attn_out_linear =
       new LinearOp<T1, T2>(_max_batch_tokens, hidden_size, hidden_size);
-  _add_residual = new FuseAdd2Op<T1, T2>(_max_batch_tokens, hidden_size);
+  // _add_residual = new FuseAdd2Op<T1, T2>(_max_batch_tokens, hidden_size);
   // parameters init
   _norm_scale = new Variable("_norm_scale", g_dtype<T1>(), g_dtype<T2>());
   _attn_qkvw = new Variable("_attn_qkvw", g_dtype<T1>(), g_dtype<T2>());
@@ -43,8 +43,8 @@ Variable* LlamaAttentionLayer<T1, T2>::operator()(Variable* inp,
                                                   Variable* pad_mask) {
   set_inputs({inp, cache_k, cache_v, pad_mask});
 
-  Variable* ln_res = (*_attn_ln)(inp, _norm_scale);
-  Variable* qkv_out = (*_qkv_linear)(ln_res, _attn_qkvw);
+  std::tuple<Variable*, Variable*> ln_out = (*_attn_ln)(inp, _norm_scale);
+  Variable* qkv_out = (*_qkv_linear)(std::get<0>(ln_out), _attn_qkvw);
 
   Variable* q_out = (*_fuse_rotary)(qkv_out, cache_k, cache_v);
 
@@ -54,12 +54,12 @@ Variable* LlamaAttentionLayer<T1, T2>::operator()(Variable* inp,
   // [sz0, sz1, sz2, sz3] -> [sz0, sz2, sz1, sz3]
   Variable* transform_0213_out = (*_transform_0213)(sdpa_res);
 
-  Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow);
+  Variable* attn_linear = (*_attn_out_linear)(transform_0213_out, _attn_ow, std::get<1>(ln_out));
 
-  Variable* attn_out = (*_add_residual)(inp, attn_linear);
+  // Variable* attn_out = (*_add_residual)(inp, attn_linear);
 
-  set_outputs({attn_out});
-  return attn_out;
+  set_outputs({attn_linear});
+  return attn_linear;
 }
 
 template <typename T1, typename T2>
@@ -83,7 +83,7 @@ void LlamaAttentionLayer<T1, T2>::before_forward(int batch_size, int query_len,
 
   _attn_out_linear->before_forward(batch_tokens);
 
-  _add_residual->before_forward(batch_size, query_len);
+  // _add_residual->before_forward(batch_size, query_len);
 }
 
 template <typename T1, typename T2>

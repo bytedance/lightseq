@@ -22,7 +22,7 @@ class RMSNormLayer : public Layer {
         _hidden_size(hidden_size),
         _max_batch_tokens(max_batch_tokens),
         _rms_norm(
-            new RMSLayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size)) {
+            new RMSLayerNormalizeOp<T1, T2>(max_batch_tokens, hidden_size, false)) {
     _norm_scale =
         new Variable("_norm_scale", g_dtype<T1>(), g_dtype<T2>());
 
@@ -34,7 +34,7 @@ class RMSNormLayer : public Layer {
   Variable* operator()(Variable* inp) {
     set_inputs({inp});
 
-    Variable* out = (*_rms_norm)(inp, _norm_scale);
+    Variable* out = std::get<0>((*_rms_norm)(inp, _norm_scale));
 
     set_outputs({out});
     return out;

@@ -382,24 +382,95 @@ __global__ void ker_rms_layer_norm<__half>(const __half* inp_ptr,
   }
 }
 
+
 template <typename T>
-void launch_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_ptr,
+__global__ void ker_rms_layer_norm_with_res(const T* inp_ptr, const T* scale_ptr,
+                                   T* out_ptr, T* res_ptr, T* rms_ptr, size_t hidden_dim,
+                                   const float ln_epsilon) {
+  // step 0. compute local sum
+  float l_square_sum = 0;
+  const T* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
+  T* res_thread_out = res_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    l_square_sum += thread_inp[idx] * thread_inp[idx];
+    res_thread_out[idx] = thread_inp[idx];
+  }
+
+  // step 1. compute reduce sum
+  float mean_dim = float(hidden_dim);
+  float kReduce[1] = {l_square_sum};
+  blockReduce<ReduceType::kSum, 1>(kReduce);
+  __shared__ float s_var;
+  if (threadIdx.x == 0) {
+    s_var = rsqrtf(kReduce[0] / mean_dim + ln_epsilon);
+    rms_ptr[blockIdx.x] = s_var;
+  }
+  __syncthreads();
+
+  // step 2. layer norm result
+  T* thread_out = out_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    thread_out[idx] = thread_inp[idx] * scale_ptr[idx] * s_var;
+  }
+}
+
+template <>
+__global__ void ker_rms_layer_norm_with_res<__half>(const __half* inp_ptr,
+                                           const __half* scale_ptr,
+                                           __half* out_ptr, __half* res_ptr, __half* rms_ptr,
+                                           size_t hidden_dim,
+                                           const float ln_epsilon) {
+  // step 0. compute local sum
+  float l_square_sum = 0;
+  const __half* thread_inp = inp_ptr + blockIdx.x * hidden_dim;
+  __half* res_thread_out = res_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    float float_inp = __half2float(thread_inp[idx]);
+    l_square_sum += float_inp * float_inp;
+    res_thread_out[idx] = thread_inp[idx];
+  }
+
+  // step 1. compute reduce sum
+  float mean_dim = float(hidden_dim);
+  float kReduce[1] = {l_square_sum};
+  blockReduce<ReduceType::kSum, 1>(kReduce);
+  __shared__ __half s_var;
+  if (threadIdx.x == 0) {
+    s_var = __float2half(rsqrtf(kReduce[0] / mean_dim + ln_epsilon));
+    if (rms_ptr != nullptr) rms_ptr[blockIdx.x] = s_var;
+  }
+  __syncthreads();
+
+  // step 2. layer norm result
+  __half* thread_out = out_ptr + blockIdx.x * hidden_dim;
+  for (uint idx = threadIdx.x; idx < hidden_dim; idx += blockDim.x) {
+    thread_out[idx] = thread_inp[idx] * scale_ptr[idx] * s_var;
+  }
+}
+
+template <typename T>
+void launch_rms_layer_norm(const T* inp_ptr, const T* scale_ptr, T* out_ptr, T* res_ptr,
                            T* rms_ptr, size_t batch_tokens, size_t hidden_dim,
                            cudaStream_t stream, const float ln_epsilon) {
   int nthread = std::min(((hidden_dim + 31) / 32) * 32, size_t(MAX_THREADS));
   dim3 grid_dim(batch_tokens);
   dim3 block_dim(nthread);
 
-  ker_rms_layer_norm<T><<<grid_dim, block_dim, 0, stream>>>(
-      inp_ptr, scale_ptr, out_ptr, rms_ptr, hidden_dim, ln_epsilon);
+  if(res_ptr == nullptr){
+    ker_rms_layer_norm<T><<<grid_dim, block_dim, 0, stream>>>(
+        inp_ptr, scale_ptr, out_ptr, rms_ptr, hidden_dim, ln_epsilon);
+  } else {
+    ker_rms_layer_norm_with_res<T><<<grid_dim, block_dim, 0, stream>>>(
+        inp_ptr, scale_ptr, out_ptr, res_ptr, rms_ptr, hidden_dim, ln_epsilon);
+  }
 }
 
 template void launch_rms_layer_norm<float>(
-    const float* inp_ptr, const float* scale_ptr, float* out_ptr,
+    const float* inp_ptr, const float* scale_ptr, float* out_ptr, float* res_ptr,
     float* rms_ptr, size_t batch_tokens, size_t hidden_dim, cudaStream_t stream,
     const float ln_epsilon);
 template void launch_rms_layer_norm<__half>(
-    const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr,
+    const __half* inp_ptr, const __half* scale_ptr, __half* out_ptr, __half* res_ptr,
     __half* rms_ptr, size_t batch_tokens, size_t hidden_dim,
     cudaStream_t stream, const float ln_epsilon);
 

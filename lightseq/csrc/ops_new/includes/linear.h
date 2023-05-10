@@ -17,6 +17,7 @@ class LinearOp : public Operator {
   float _beta;
   MATRIX_OP _opA;
   MATRIX_OP _opB;
+  bool _use_residual = false;
 
   Variable* _result;
 
@@ -43,12 +44,17 @@ class LinearOp : public Operator {
   ~LinearOp() {}
 
   Variable* operator()(Variable* inp, Variable* weight);
+  Variable* operator()(Variable* inp, Variable* weight, Variable* residual);
 
   void forward() override;
 
   void before_forward(size_t batch_tokens) {
     _batch_tokens = batch_tokens;
-    _result->set_shape({batch_tokens, _output_size});
+    if(_use_residual) {
+      _result->set_offset(0, {batch_tokens, _output_size});
+    } else {
+      _result->set_shape({batch_tokens, _output_size});
+    }
   }
 
   void backward() override;

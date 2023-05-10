@@ -541,7 +541,7 @@ void torch_rms_layer_norm(const torch::Tensor &inp, const torch::Tensor &scale,
                           int batch_tokens, int hidden_dim,
                           const float epsilon = 1e-6) {
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out),
+  launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out), nullptr,
                            rptr<T>(rms_out), batch_tokens, hidden_dim, stream,
                            epsilon);
   cudaStreamSynchronize(stream);

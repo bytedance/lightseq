@@ -126,12 +126,10 @@ void Llama::before_forward(int batch_size, int prompt_len, int steps) {
 }
 
 void Llama::Infer() {
-  std::cout << "step.-1\n" << std::endl;
   int batch_size = input_shapes_[0][0], prompt_len = input_shapes_[0][1];
 
   /* --- notice that the order of forward should be the same with network --- */
 
-  std::cout << "step.0\n" << std::endl;
 #ifdef LIGHTSEQ_cuda
   for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
     for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
@@ -146,7 +144,6 @@ void Llama::Infer() {
 
 
   int steps = 0;
-  tw_._max_step = 136;
   while (steps + prompt_len < tw_._max_step) {
     before_forward(batch_size, prompt_len, steps);
 
@@ -202,7 +199,6 @@ void Llama::Infer() {
     }
   }
 
-  print_vec(_llama_out_ptr, "_llama_out_ptr", 15);
   _context_ptr->synchronize();
   set_output_shape(0, {batch_size, tw_._beam_size, prompt_len + steps});
 }
