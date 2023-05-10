@@ -59,29 +59,35 @@ int main(int argc, char* argv[]) {
   printf("example step.2-1\n");
   std::cout << "infer preprocessing finished 2" << std::endl;
 
-  model->Infer();
-  printf("example step.3\n");
-
-  // std::chrono::duration<double> elapsed;
+  std::chrono::duration<double> elapsed;
   int iter = 0;
+  /* ---step5. infer and log--- */
+  for (int i = 0; i < 5; i++) {
+    auto start = std::chrono::high_resolution_clock::now();
+    model->Infer();
+    auto finish = std::chrono::high_resolution_clock::now();
+    if (i) {
+      iter++;
+      elapsed += finish - start;
+    }
+  }
 
-  // std::cout << "lightseq inference latency: " << elapsed.count() * 1000 /
-  // iter
-  //           << " ms" << std::endl;
+  std::cout << "lightseq inference latency: " << elapsed.count() * 1000 / iter
+            << " ms" << std::endl;
 
-  // for (int i = 0; i < model->get_output_size(); i++) {
-  //   const int* d_output;
-  //   d_output = static_cast<const int*>(model->get_output_ptr(i));
-  //   std::vector<int> shape = model->get_output_shape(i);
-  //   std::cout << "output shape: ";
-  //   for (int j = 0; j < shape.size(); j++) {
-  //     std::cout << shape[j] << " ";
-  //   }
-  //   std::cout << std::endl;
-  //   if (i == 0) {
-  //     lightseq::print_vec(d_output, "d_output", shape[2]);
-  //   }
-  // }
+  for (int i = 0; i < model->get_output_size(); i++) {
+    const int* d_output;
+    d_output = static_cast<const int*>(model->get_output_ptr(i));
+    std::vector<int> shape = model->get_output_shape(i);
+    std::cout << "output shape: ";
+    for (int j = 0; j < shape.size(); j++) {
+      std::cout << shape[j] << " ";
+    }
+    std::cout << std::endl;
+    if (i == 0) {
+      lightseq::print_vec(d_output, "d_output", shape[2]);
+    }
+  }
 
   return 0;
 }

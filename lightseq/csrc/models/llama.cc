@@ -146,7 +146,7 @@ void Llama::Infer() {
 
 
   int steps = 0;
-  tw_._max_step = 20;
+  tw_._max_step = 136;
   while (steps + prompt_len < tw_._max_step) {
     before_forward(batch_size, prompt_len, steps);
 
