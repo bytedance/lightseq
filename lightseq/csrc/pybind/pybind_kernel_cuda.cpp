@@ -3,9 +3,15 @@
 #include <torch/extension.h>
 
 #include <cuda.h>
-
 #include "cuda_util.h"
 #include "kernels.h"
+#include "llama_kernels.h"
+#include "cmath"
+#include "memory"
+#include <cuda.h>
+#include <cuda_fp16.h>
+#include <curand_kernel.h>
+#include <stdexcept>
 
 typedef const torch::Tensor cts;
 typedef torch::Tensor ts;
@@ -113,22 +119,23 @@ void torch_launch_attn_softmax(torch::Tensor &vals,
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
-template <typename T>
-void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
-                                   const torch::Tensor &attn_mask,
-                                   int batch_size, int nhead, int from_len,
-                                   int to_len, bool is_dec_self_attn,
-                                   bool mask_future) {
-  const T *attn_mask_ptr = rptr<T>(attn_mask);
-  if (is_dec_self_attn) {
-    attn_mask_ptr = nullptr;
-  }
-  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
-  launch_attn_softmax_new(rptr<T>(out), rptr<T>(inp), attn_mask_ptr, batch_size,
-                          nhead, from_len, to_len, mask_future, stream);
-  //     cudaStreamSynchronize(stream);
-  CHECK_GPU_ERROR(cudaGetLastError());
-}
+// template <typename T>
+// void torch_launch_attn_softmax_new(torch::Tensor &out, torch::Tensor &inp,
+//                                    const torch::Tensor &attn_mask,
+//                                    int batch_size, int nhead, int from_len,
+//                                    int to_len, bool is_dec_self_attn,
+//                                    bool mask_future) {
+//   const T *attn_mask_ptr = rptr<T>(attn_mask);
+//   if (is_dec_self_attn) {
+//     attn_mask_ptr = nullptr;
+//   }
+//   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+//   launch_attn_softmax_new(rptr<T>(out), rptr<T>(inp), attn_mask_ptr,
+//   batch_size,
+//                           nhead, from_len, to_len, mask_future, stream);
+//   //     cudaStreamSynchronize(stream);
+//   CHECK_GPU_ERROR(cudaGetLastError());
+// }
 
 template <typename T>
 void torch_launch_attn_softmax_bw(torch::Tensor &out_grad,
@@ -295,7 +302,7 @@ void torch_launch_concat3_dim1(const torch::Tensor &inp1,
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   launch_concat3_dim1(rptr<T>(inp1), rptr<T>(inp2), rptr<T>(output), sz0, sz2,
                       sz1_1, sz1_2, stream);
-  // cudaStreamSynchronize(stream);
+  cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
 
@@ -420,10 +427,134 @@ void torch_launch_viterbi(const torch::Tensor &start_transition,
   cudaStreamSynchronize(stream);
   CHECK_GPU_ERROR(cudaGetLastError());
 }
+
+class RotaryPositionWeight {
+ public:
+  float *_device_sin_ptr;
+  float *_device_cos_ptr;
+  float *_sin_ptr;
+  float *_cos_ptr;
+
+  __half *_device_sin_half_ptr;
+  __half *_device_cos_half_ptr;
+  __half *_sin_half_ptr;
+  __half *_cos_half_ptr;
+
+  int _max_step;
+  int _head_dim;
+
+  RotaryPositionWeight(int max_step, int head_dim)
+      : _max_step(max_step), _head_dim(head_dim) {
+    if (head_dim & 1) {
+      printf(
+          "Error! head dim should be even number while using RotaryPositionQk "
+          "Operator.\n");
+      exit(0);
+    }
+
+    int total_size = max_step * head_dim / 2;
+    _sin_ptr = (float *)malloc(total_size * sizeof(float));
+    _cos_ptr = (float *)malloc(total_size * sizeof(float));
+
+    _sin_half_ptr = (__half *)malloc(total_size * sizeof(__half));
+    _cos_half_ptr = (__half *)malloc(total_size * sizeof(__half));
+
+    for (int i = 0; i < head_dim / 2; i++) {
+      float theta = std::pow(10000, -2. * i / head_dim);
+      for (int j = 0; j < max_step; j++) {
+        *(_sin_ptr + j * head_dim / 2 + i) =
+            sin(j * theta);  // shape: [max_step, head_dim / 2]
+        *(_cos_ptr + j * head_dim / 2 + i) =
+            cos(j * theta);  // shape: [max_step, head_dim / 2]
+
+        *(_sin_half_ptr + j * head_dim / 2 + i) =
+            __float2half_rn(sin(j * theta));  // shape: [max_step, head_dim / 2]
+        *(_cos_half_ptr + j * head_dim / 2 + i) =
+            __float2half_rn(cos(j * theta));  // shape: [max_step, head_dim / 2]
+      }
+    }
+
+    cudaMalloc(&_device_sin_ptr, total_size * sizeof(float));
+    cudaMalloc(&_device_cos_ptr, total_size * sizeof(float));
+    cudaMemcpy(_device_sin_ptr, _sin_ptr, total_size * sizeof(float),
+               cudaMemcpyDefault);
+    cudaMemcpy(_device_cos_ptr, _cos_ptr, total_size * sizeof(float),
+               cudaMemcpyDefault);
+
+    cudaMalloc(&_device_sin_half_ptr, total_size * sizeof(__half));
+    cudaMalloc(&_device_cos_half_ptr, total_size * sizeof(__half));
+    cudaMemcpy(_device_sin_half_ptr, _sin_half_ptr, total_size * sizeof(__half),
+               cudaMemcpyDefault);
+    cudaMemcpy(_device_cos_half_ptr, _cos_half_ptr, total_size * sizeof(__half),
+               cudaMemcpyDefault);
+  }
+} _rotary_position_instance(2048, 128);
+
+template <typename T>
+void torch_launch_split_rotary_position(
+    const torch::Tensor &input, torch::Tensor &q_out,
+    torch::Tensor &cache_k_out, torch::Tensor &cache_v_out, int batch_size,
+    int nhead, int offset_seq_len, int query_seq_len, int head_dim) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  if (query_seq_len + offset_seq_len > _rotary_position_instance._max_step) {
+    printf(
+        "Error! query_seq_len + offset_seq_len > "
+        "_rotary_position_instance._max_step\n");
+    return;
+  }
+  if (_rotary_position_instance._head_dim != head_dim) {
+    printf("Error! _rotary_position_instance._head_dim != head_dim\n");
+    return;
+  }
+  if (std::is_same<T, float>::value) {
+    launch_split_rotary_position_qkv<float>(
+        rptr<float>(input), _rotary_position_instance._device_sin_ptr,
+        _rotary_position_instance._device_cos_ptr, rptr<float>(q_out),
+        rptr<float>(cache_k_out), rptr<float>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, stream);
+  } else {
+    launch_split_rotary_position_qkv<__half>(
+        rptr<__half>(input), _rotary_position_instance._device_sin_half_ptr,
+        _rotary_position_instance._device_cos_half_ptr, rptr<__half>(q_out),
+        rptr<__half>(cache_k_out), rptr<__half>(cache_v_out),
+        offset_seq_len + query_seq_len, batch_size, nhead, offset_seq_len,
+        query_seq_len, head_dim, stream);
+  }
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_silu_elewise_product(const torch::Tensor &inp, torch::Tensor out,
+                                int batch_size, int seq_len, int inner_size) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_silu_elewise_product<T>(rptr<T>(inp), rptr<T>(out), batch_size,
+                                 seq_len, inner_size, stream);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
+template <typename T>
+void torch_rms_layer_norm(const torch::Tensor &inp, const torch::Tensor &scale,
+                          torch::Tensor &out, torch::Tensor &rms_out,
+                          int batch_tokens, int hidden_dim,
+                          const float epsilon = 1e-6) {
+  cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+  launch_rms_layer_norm<T>(rptr<T>(inp), rptr<T>(scale), rptr<T>(out), nullptr,
+                           rptr<T>(rms_out), batch_tokens, hidden_dim, stream,
+                           epsilon);
+  cudaStreamSynchronize(stream);
+  CHECK_GPU_ERROR(cudaGetLastError());
+}
+
 }  // namespace cuda
 }  // namespace lightseq
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+  //   lightseq::cuda::_rotary_position_instance =
+  //   lightseq::cuda::RotaryPositionWeight(2048, 128);
+
   m.def("torch_launch_transform_0213_fp32",
         &lightseq::cuda::torch_launch_transform_0213<float>,
         "Test kernel wrapper");
@@ -468,12 +599,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("torch_launch_attn_softmax_fp16",
         &lightseq::cuda::torch_launch_attn_softmax<__half>,
         "Test kernel wrapper");
-  m.def("torch_launch_attn_softmax_new_fp32",
-        &lightseq::cuda::torch_launch_attn_softmax_new<float>,
-        "Test kernel wrapper");
-  m.def("torch_launch_attn_softmax_new_fp16",
-        &lightseq::cuda::torch_launch_attn_softmax_new<__half>,
-        "Test kernel wrapper");
+  //   m.def("torch_launch_attn_softmax_new_fp32",
+  //         &lightseq::cuda::torch_launch_attn_softmax_new<float>,
+  //         "Test kernel wrapper");
+  //   m.def("torch_launch_attn_softmax_new_fp16",
+  //         &lightseq::cuda::torch_launch_attn_softmax_new<__half>,
+  //         "Test kernel wrapper");
   m.def("torch_launch_attn_softmax_bw_fp32",
         &lightseq::cuda::torch_launch_attn_softmax_bw<float>,
         "Test kernel wrapper");
@@ -623,4 +754,24 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         &lightseq::cuda::torch_launch_viterbi<__half>, "Test kernel wrapper");
   m.def("torch_launch_viterbi_fp32",
         &lightseq::cuda::torch_launch_viterbi<float>, "Test kernel wrapper");
+
+  m.def("torch_launch_split_rotary_position_fp32",
+        &lightseq::cuda::torch_launch_split_rotary_position<float>,
+        "Test llama rotary position kernel");
+  m.def("torch_launch_split_rotary_position_fp16",
+        &lightseq::cuda::torch_launch_split_rotary_position<half>,
+        "Test llama rotary position kernel");
+  m.def("torch_silu_elewise_product_fp32",
+        &lightseq::cuda::torch_silu_elewise_product<float>,
+        "Test llama rotary position kernel");
+  m.def("torch_silu_elewise_product_fp16",
+        &lightseq::cuda::torch_silu_elewise_product<__half>,
+        "Test llama rotary position kernel");
+
+  m.def("torch_rms_layer_norm_fp32",
+        &lightseq::cuda::torch_rms_layer_norm<float>,
+        "Test llama rms layer norm kernel");
+  m.def("torch_rms_layer_norm_fp16",
+        &lightseq::cuda::torch_rms_layer_norm<__half>,
+        "Test llama rms layer norm kernel");
 }

@@ -31,6 +31,7 @@ class CudaKernelBuilder(CUDAOpBuilder):
             "csrc/kernels/cuda/dropout_kernels.cu",
             "csrc/kernels/cuda/embedding_kernels.cu",
             "csrc/kernels/cuda/quantize_kernels.cu",
+            "csrc/kernels/cuda/llama_kernels.cu",
             "csrc/kernels/cuda/crf.cu",
             "csrc/pybind/pybind_kernel_cuda.cpp",
         ]

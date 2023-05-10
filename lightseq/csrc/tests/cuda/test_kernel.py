@@ -1575,40 +1575,189 @@ def test_torch_launch_fake_quantize():
     return custom, baseline
 
 
+@kt.case(atol=1e-2, rtol=1e-3, dtypes=[torch.float, torch.half])
+def test_split_rotary_position_qkv():
+    batch_size, offset_seq_len = kt.bs_sl()
+    nhead = kt.nhead
+    head_dim = 128
+    seq_len = 1
+    seq_len = random.randint(1, 2048)
+    offset_seq_len = random.randint(0, 2048 - seq_len)
+    outshape = kt.rand((batch_size, nhead, seq_len, head_dim))
+
+    cachek = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+    cachev = kt.rand((batch_size, nhead, offset_seq_len, head_dim))
+    q_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    k_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    v_tensor = kt.rand((batch_size, seq_len, nhead, head_dim))
+    qkv_tensor = torch.cat((q_tensor, k_tensor, v_tensor), dim=2)
+
+    out_cachek = torch.cat((cachek, outshape), dim=2)
+    out_cachev = torch.cat((cachev, outshape), dim=2)
+
+    func = None
+    if kt.dtype == torch.float:
+        func = cuda_module.torch_launch_split_rotary_position_fp32
+    elif kt.dtype == torch.half:
+        func = cuda_module.torch_launch_split_rotary_position_fp16
+
+    custom_q = torch.empty_like(q_tensor)
+
+    def custom():
+        func(
+            qkv_tensor,
+            custom_q,
+            out_cachek,
+            out_cachev,
+            batch_size,
+            nhead,
+            offset_seq_len,
+            seq_len,
+            head_dim,
+        )
+        return [custom_q.contiguous(), out_cachek.contiguous(), out_cachev.contiguous()]
+
+    inv_freq = 1.0 / (
+        10000 ** (torch.arange(0, head_dim, 2).float().to(device="cuda:0") / head_dim)
+    )
+    t = torch.arange(2048, device="cuda:0", dtype=inv_freq.dtype)
+    freqs = torch.einsum("i,j->ij", t, inv_freq)
+    # Different from paper, but it uses a different permutation in order to obtain the same calculation
+    emb = torch.cat((freqs, freqs), dim=-1)
+    cos_cached = emb.cos()[None, None, :, :].to(device="cuda:0", dtype=kt.dtype)
+    sin_cached = emb.sin()[None, None, :, :].to(device="cuda:0", dtype=kt.dtype)
+
+    def baseline():
+        trans_q = q_tensor.transpose(1, 2)
+        trans_k = k_tensor.transpose(1, 2)
+        trans_v = v_tensor.transpose(1, 2)
+        kv_seq_len = offset_seq_len + seq_len
+        cos = cos_cached[:, :, :kv_seq_len, ...]
+        sin = sin_cached[:, :, :kv_seq_len, ...]
+        gather_indices = (
+            (torch.arange(seq_len) + offset_seq_len)[None, None, :, None]
+            .repeat(batch_size, cos.shape[1], 1, cos.shape[3])
+            .to("cuda:0")
+        )
+        cos = torch.gather(
+            cos.repeat(gather_indices.shape[0], 1, 1, 1), 2, gather_indices
+        )
+        sin = torch.gather(
+            sin.repeat(gather_indices.shape[0], 1, 1, 1), 2, gather_indices
+        )
+
+        def rotate_half(x):
+            """Rotates half the hidden dims of the input."""
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return torch.cat((-x2, x1), dim=-1)
+
+        q_out = (trans_q * cos) + (rotate_half(trans_q) * sin)
+        k_out = (trans_k * cos) + (rotate_half(trans_k) * sin)
+        k_out = torch.cat((cachek, k_out), dim=2)
+        v_out = torch.cat((cachev, trans_v), dim=2)
+        return [q_out.contiguous(), k_out.contiguous(), v_out.contiguous()]
+
+    return custom, baseline
+
+
+from transformers import LlamaModel
+from transformers.activations import SiLUActivation
+
+
+@kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
+def test_silu_elewise_product():
+    batch_size, seq_len = 1, 256
+    hidden_size = 13824
+    inpA = kt.rand((batch_size, seq_len, hidden_size))
+    inpB = kt.rand((batch_size, seq_len, hidden_size))
+    custom_outC = torch.empty_like(inpA)
+
+    act_func = SiLUActivation()
+    func = (
+        cuda_module.torch_silu_elewise_product_fp32
+        if kt.dtype == torch.float
+        else cuda_module.torch_silu_elewise_product_fp16
+    )
+
+    def custom():
+        func(inpA, inpB, custom_outC, batch_size, seq_len, hidden_size)
+        return [custom_outC.contiguous()]
+
+    def baseline():
+        output = act_func(inpA) * inpB
+        return [output.contiguous()]
+
+    return custom, baseline
+
+
+@kt.case(atol=1e-3, rtol=1e-4, dtypes=[torch.float, torch.half])
+def test_rms_layer_norm():  # torch_rms_layer_norm
+    batch_size, seq_len = 1, 1  # kt.bs_sl()
+    hidden_size = 5120
+    inp = kt.rand((batch_size, seq_len, hidden_size))
+    scale = kt.rand((hidden_size))
+    custom_out = torch.empty_like(inp)
+    rms_out = kt.rand((batch_size, seq_len))
+
+    func = (
+        cuda_module.torch_rms_layer_norm_fp32
+        if kt.dtype == torch.float
+        else cuda_module.torch_rms_layer_norm_fp16
+    )
+
+    def custom():
+        func(inp, scale, custom_out, rms_out, batch_size * seq_len, hidden_size, 1e-6)
+        return [rms_out.contiguous(), custom_out.contiguous()]
+
+    def baseline():
+        # output = act_func(inpA) * inpB
+        variance = inp.to(torch.float32).pow(2).mean(-1, keepdim=True)
+        rms_var = torch.rsqrt(variance + 1e-6).to(dtype=kt.dtype)
+        hidden_states = inp * rms_var
+        output = (scale * hidden_states).to(dtype=kt.dtype)
+        return [rms_var.contiguous(), output.contiguous()]
+
+    return custom, baseline
+
+
 if __name__ == "__main__":
     kt.init(device="cuda:0", nhead=16)
     kt.run(
         [
-            "test_launch_transform_0213",
-            "test_launch_bias_add_transform_20314",
-            "test_launch_transform4d_0213",
-            "test_launch_bias_add_transform_20314_new",
-            "test_launch_fused_add2",
-            "test_launch_ffn_bias_bwd",
-            # "test_launch_attn_softmax", # need to fix
-            "test_launch_attn_softmax_new",
-            # "test_launch_attn_softmax_bw", # need to fix
-            "test_launch_attn_softmax_bw_new",
-            "test_launch_layer_norm",
-            # "test_launch_ln_bw", # need to fix
-            "test_launch_concat3_dim1",
-            # "test_adam", # need to fix
-            "test_launch_dropout_relu_bias",
-            "test_launch_dropout_relu_bias_bwd",
-            "test_launch_dropout_gelu_bias",
-            # "test_launch_dropout_gelu_bias_bwd", # need to fix
-            # "test_launch_layer_norm_i8O", # need to fix
-            # "test_launch_ln_i8O_bw", # need to fix
-            "test_launch_dropout_relu_bias_i8I_i8O",
-            # "test_launch_dropout_relu_bias_i8I_i8O_bwd", # need to fix
-            "test_launch_dropout_gelu_bias_i8I_i8O",
-            # "test_launch_dropout_gelu_bias_i8I_i8O_bwd", # need to fix
-            "test_launch_quant_bias_dropout_residual",
-            "test_launch_quant_bias_add_transform_20314",
-            # "test_launch_quant_transform4d_0213", # need to fix
-            # "test_torch_launch_ls_quantize", # need to fix
-            "test_torch_launch_ls_dequantize",
-            # "test_torch_launch_fake_quantize", # need to fix
-            # "test_crf", # need to fix
+            # "test_rms_layer_norm",
+            # "test_silu_elewise_product",
+            "test_split_rotary_position_qkv",
+            # "test_launch_transform_0213",
+            # "test_launch_bias_add_transform_20314",
+            # "test_launch_transform4d_0213",
+            # "test_launch_bias_add_transform_20314_new",
+            # "test_launch_fused_add2",
+            # "test_launch_ffn_bias_bwd",
+            # # "test_launch_attn_softmax", # need to fix
+            # "test_launch_attn_softmax_new",
+            # # "test_launch_attn_softmax_bw", # need to fix
+            # "test_launch_attn_softmax_bw_new",
+            # "test_launch_layer_norm",
+            # # "test_launch_ln_bw", # need to fix
+            # "test_launch_concat3_dim1",
+            # # "test_adam", # need to fix
+            # "test_launch_dropout_relu_bias",
+            # "test_launch_dropout_relu_bias_bwd",
+            # "test_launch_dropout_gelu_bias",
+            # # "test_launch_dropout_gelu_bias_bwd", # need to fix
+            # # "test_launch_layer_norm_i8O", # need to fix
+            # # "test_launch_ln_i8O_bw", # need to fix
+            # "test_launch_dropout_relu_bias_i8I_i8O",
+            # # "test_launch_dropout_relu_bias_i8I_i8O_bwd", # need to fix
+            # "test_launch_dropout_gelu_bias_i8I_i8O",
+            # # "test_launch_dropout_gelu_bias_i8I_i8O_bwd", # need to fix
+            # "test_launch_quant_bias_dropout_residual",
+            # "test_launch_quant_bias_add_transform_20314",
+            # # "test_launch_quant_transform4d_0213", # need to fix
+            # # "test_torch_launch_ls_quantize", # need to fix
+            # "test_torch_launch_ls_dequantize",
+            # # "test_torch_launch_fake_quantize", # need to fix
+            # # "test_crf", # need to fix
         ]
     )

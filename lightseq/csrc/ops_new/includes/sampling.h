@@ -38,6 +38,8 @@ class SamplingOp : public Operator {
              int max_thread_per_block, int trg_vocab_size, int topk, float topp,
              int eos_id);
 
+  virtual ~SamplingOp() {}
+
   // output: new_token_ids
   std::tuple<Variable*, Variable*> operator()(Variable* logits,
                                               Variable* logit_bias,

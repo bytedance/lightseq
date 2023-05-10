@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdexcept>
 #include <vector>
+#include "cmath"
 
 #define MAX_THREADS 1024
 #define WARP_SIZE 32

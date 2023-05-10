@@ -98,5 +98,7 @@ float dequantize(unsigned char i, float scale, float clip_max);
 void dequantize_array(std::vector<unsigned char>& i8, std::vector<float>& f,
                       float clip_max, float quant_range, int start, int num);
 
+void launch_convert_dtype(float* source_buffer, __half* target_buffer,
+                          size_t size, int max_thread, cudaStream_t stream);
 }  // namespace cuda
 }  // namespace lightseq

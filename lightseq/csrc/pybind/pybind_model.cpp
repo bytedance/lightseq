@@ -9,6 +9,7 @@
 #include "bert.h"
 #include "bert_crf.h"
 #include "gpt.h"
+#include "llama.h"
 #include "transformer.h"
 
 namespace py = pybind11;
@@ -306,6 +307,74 @@ class PyGpt {
     return std::make_tuple(output, scores);
   }
 };
+
+class PyLlama {
+ private:
+  LSModel *model_;
+  int *d_input_;
+  std::vector<void *> d_outputs_;
+
+ public:
+  PyLlama(std::string weight_path, int max_batch_size) {
+    model_ = LSModelFactory::GetInstance().CreateModel("Llama", weight_path,
+                                                       max_batch_size);
+    std::vector<int> max_input_shape = model_->get_input_max_shape(0);
+    int max_size =
+        std::accumulate(max_input_shape.begin(), max_input_shape.end(), 1,
+                        std::multiplies<int>());
+    CHECK_GPU_ERROR(cudaMalloc(&d_input_, sizeof(int) * max_size));
+
+    for (int i = 0; i < model_->get_output_size(); i++) {
+      void *d_output;
+      std::vector<int> shape = model_->get_output_max_shape(i);
+      int output_size = std::accumulate(shape.begin(), shape.end(), 1,
+                                        std::multiplies<int>());
+      CHECK_GPU_ERROR(cudaMalloc(&d_output, output_size * sizeof(int)));
+      model_->set_output_ptr(i, d_output);
+      d_outputs_.push_back(d_output);
+    }
+  }
+  ~PyLlama() {
+    delete model_;
+    CHECK_GPU_ERROR(cudaFree(d_input_));
+    for (auto d_output : d_outputs_) {
+      CHECK_GPU_ERROR(cudaFree(d_output));
+    }
+  }
+
+  py::array_t<int> infer(
+      py::array_t<int, py::array::c_style | py::array::forcecast> input_seq) {
+    auto input_seq_out = input_seq.mutable_unchecked<2>();
+    const int *input_seq_data = input_seq_out.data(0, 0);
+    int batch_size = input_seq_out.shape(0);
+    int batch_seq_len = input_seq_out.shape(1);
+    if (model_->get_output_dtype(0) != DataType::kInt32) {
+      throw std::runtime_error(
+          "This model is not for sample, maybe you have set the "
+          "sampling_method to "
+          "ppl");
+    }
+
+    CHECK_GPU_ERROR(cudaMemcpy(d_input_, input_seq_data,
+                               sizeof(int) * input_seq_out.size(),
+                               cudaMemcpyHostToDevice));
+
+    model_->set_input_ptr(0, d_input_);
+    model_->set_input_shape(0, {batch_size, batch_seq_len});
+
+    model_->Infer();
+
+    std::vector<int> output_shape = model_->get_output_shape(0);
+    auto output = py::array_t<int>(output_shape);
+    int *output_data = output.mutable_data(0, 0);
+    const int *d_output = static_cast<const int *>(model_->get_output_ptr(0));
+    CHECK_GPU_ERROR(cudaMemcpy(output_data, d_output,
+                               sizeof(int) * output.size(),
+                               cudaMemcpyDeviceToHost));
+
+    return output;
+  }
+};
 }  // namespace cuda
 }  // namespace lightseq
 
@@ -334,5 +403,11 @@ PYBIND11_MODULE(inference, m) {
       .def(py::init<const std::string, const int>(), py::arg("weight_path"),
            py::arg("max_batch_size"))
       .def("infer", &lightseq::cuda::PyGpt::infer,
+           py::return_value_policy::reference_internal, py::arg("input_seq"));
+
+  py::class_<lightseq::cuda::PyLlama>(m, "Llama")
+      .def(py::init<const std::string, const int>(), py::arg("weight_path"),
+           py::arg("max_batch_size"))
+      .def("infer", &lightseq::cuda::PyLlama::infer,
            py::return_value_policy::reference_internal, py::arg("input_seq"));
 }

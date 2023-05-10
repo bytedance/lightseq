@@ -4,7 +4,6 @@ namespace lightseq {
 
 template <typename T1, typename T2>
 Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
-  // size_t max_size = _max_batch_tokens * _output_size;
   _result = new Variable("LinearOp_out", _max_batch_tokens * _output_size,
                          g_dtype<T1>(), g_dtype<T2>());
   set_parents({inp, weight});
@@ -13,9 +12,18 @@ Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight) {
 }
 
 template <typename T1, typename T2>
-void LinearOp<T1, T2>::forward() {
-  float beta = float(0.);
+Variable* LinearOp<T1, T2>::operator()(Variable* inp, Variable* weight,
+                                       Variable* residual) {
+  _use_residual = true;
+  _beta = float(1.);
+  _result = new Variable("LinearOp_out", residual);
+  set_parents({inp, weight, residual});
+  this->set_children({_result});
+  return _result;
+}
 
+template <typename T1, typename T2>
+void LinearOp<T1, T2>::forward() {
   T1* input_ptr = (T1*)parent(0)->value();
   T1* weights = (T1*)parent(1)->value();
   T1* out_ptr = (T1*)child(0)->value();
@@ -23,15 +31,14 @@ void LinearOp<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-
+  // _beta = float(0.);
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   cuda::cublas_gemm_ex(_cublasHandle, op_from_custom(_opA),
                        op_from_custom(_opB), _output_size, _batch_tokens,
-                       _input_size, &_alpha, &beta, weights, input_ptr, out_ptr,
-                       cublasGemmAlgo_t(_gemm_algos[0]));
+                       _input_size, &_alpha, &_beta, weights, input_ptr,
+                       out_ptr, cublasGemmAlgo_t(_gemm_algos[0]));
 #elif defined LIGHTSEQ_x86
-
   x86::matrix_gemm(weights, input_ptr, out_ptr, _output_size, _batch_tokens,
                    _input_size);
 #endif
