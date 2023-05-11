@@ -255,7 +255,7 @@ std::string Decoder<OpType_>::check() {
   if (_tw._multilg_type != 0 && _p_d_lang_id == nullptr) {
     return "lang id should not be null when multilg";
   }
-  if (_tw._max_step > 1024) {
+  if (_tw._max_step > 1026) {
     return "max_step should not greater than 1024";
   }
   return "";
