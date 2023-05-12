@@ -26,6 +26,7 @@ enum DataType {
 
 class GenerateConfig {
  public:
+  bool _use_sampling;
   int _bos_id;
   int _eos_id;
   int _pad_id;
@@ -36,23 +37,23 @@ class GenerateConfig {
   // Note: After the model instance is initialized, the value of beam_size cannot be modified, 
   //       because it will participate in the model's GPU memory development calculation
   GenerateConfig() {}
-  GenerateConfig(int bos_id, int eos_id, int pad_id, float temperature,
+  GenerateConfig(int bos_id, int eos_id, int pad_id, float temperature, bool use_sampling,
                  float top_p, int top_k, int max_new_tokens);
   void print_config();
 };
 
 #define SET_FLOAT_GEN_FIELD(field) \
-void set_##field(float value) { _generate_config->_##field = value; }
+void set_##field(float value) { _gen_conf->_##field = value; }
 
 #define SET_INT_GEN_FIELD(field) \
-void set_##field(int value) { _generate_config->_##field = value; }
+void set_##field(int value) { _gen_conf->_##field = value; }
 
 class LSModel {
  public:
   LSModel(std::vector<std::string> input_names,
           std::vector<std::string> output_names)
       : kInputNames(input_names), kOutputNames(output_names) {
-    _generate_config = new GenerateConfig();
+    _gen_conf = new GenerateConfig();
     input_shapes_ = std::vector<std::vector<int>>(input_names.size());
     output_shapes_ = std::vector<std::vector<int>>(output_names.size());
   }
@@ -98,7 +99,7 @@ class LSModel {
   const std::vector<std::string> kOutputNames;
   std::vector<std::vector<int>> input_shapes_;
   std::vector<std::vector<int>> output_shapes_;
-  GenerateConfig* _generate_config;
+  GenerateConfig* _gen_conf;
 };
 
 typedef LSModel* (*LSModelConstructor)(const std::string, const int);

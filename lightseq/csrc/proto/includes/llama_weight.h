@@ -13,7 +13,7 @@ template <typename T>
 class LlamaWeight {
  private:
   cudaStream_t stream;
-  // GenerateConfig* _gen_config;
+  GenerateConfig* _gen_conf;
   T float2required(float value);
 
   // parsing function for hdf5
@@ -30,7 +30,7 @@ class LlamaWeight {
   std::vector<T *> _d_enc_wei;
 
  public:
-  std::string initializing(std::string weight_path);
+  std::string initializing(std::string weight_path, GenerateConfig* gen_conf);
 
   const std::vector<const T *> &get_src_emb_wei() const {
     // {token_emb, pos_emb, norm_scale, norm_bias}
@@ -75,20 +75,15 @@ class LlamaWeight {
     std::cout << "head number: " << _head_num << std::endl;
     std::cout << "dim per head: " << _dim_per_head << std::endl;
     std::cout << "src vocab size: " << _src_vocab_size << std::endl;
-    std::cout << "use_gelu: " << _use_gelu << std::endl;
-    std::cout << "end_id: " << _eos_id << std::endl;
-    std::cout << "padding_id: " << _padding_id << std::endl;
     std::cout << std::endl;
     std::cout << "***generator config***" << std::endl;
+    std::cout << "generate method: " << _generate_method << std::endl;
     std::cout << "beam size: " << _beam_size << std::endl;
     std::cout << "max step: " << _max_step << std::endl;
-    std::cout << "extra decode length(max decode length - src input length): "
-              << _extra_decode_length << std::endl;
     std::cout << "length penalty: " << _length_penalty << std::endl;
     std::cout << "diverse lambda: " << _diverse_lambda << std::endl;
-    std::cout << "generate method: " << _generate_method << std::endl;
-    std::cout << "topk: " << _topk << std::endl;
-    std::cout << "topp: " << _topp << std::endl;
+    std::cout << std::endl;
+    _gen_conf->print_config();
   }
 };
 

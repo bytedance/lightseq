@@ -3,7 +3,7 @@
 
 namespace lightseq {
 
-GenerateConfig::GenerateConfig(int bos_id, int eos_id, int pad_id, float temperature,
+GenerateConfig::GenerateConfig(int bos_id, int eos_id, int pad_id, float temperature, bool use_sampling,
                  float top_p, int top_k, int max_new_tokens):
         _eos_id(eos_id),
         _bos_id(bos_id),
@@ -11,6 +11,7 @@ GenerateConfig::GenerateConfig(int bos_id, int eos_id, int pad_id, float tempera
         _temperature(temperature),
         _top_p(top_p),
         _top_k(top_k),
+        _use_sampling(use_sampling),
         _max_new_tokens(max_new_tokens) {}
 
 void GenerateConfig::print_config() {
@@ -19,8 +20,10 @@ void GenerateConfig::print_config() {
     std::cout << "_bos_id: " << _bos_id << std::endl;
     std::cout << "_pad_id: " << _pad_id << std::endl;
     std::cout << "_temperature: " << _temperature << std::endl;
-    std::cout << "_top_p: " << _top_p << std::endl;
-    std::cout << "_top_k: " << _top_k << std::endl;
+    if(_use_sampling) {
+        std::cout << "_top_p: " << _top_p << std::endl;
+        std::cout << "_top_k: " << _top_k << std::endl;
+    }
     std::cout << "_max_new_tokens: " << _max_new_tokens << std::endl;
     std::cout << std::endl;
 }

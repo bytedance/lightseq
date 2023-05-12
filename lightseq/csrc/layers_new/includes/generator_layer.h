@@ -26,8 +26,7 @@ class GeneratorLayer : public Layer {
                  int max_step, int trg_vocab_size, int hidden_size,
                  int max_thread_per_block, int beam_size = 0,
                  float diverse_lambda = 0., int dim_per_head = 0,
-                 int end_id = 0, int head_num = 0, float length_penalty = 0.,
-                 int topk = 0, float topp = 0, bool has_logits_bias = false);
+                 int head_num = 0, float length_penalty = 0., bool has_logits_bias = false);
 
   virtual ~GeneratorLayer() {}
 

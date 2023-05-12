@@ -296,7 +296,7 @@ void LlamaWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
 Load the proto file into CPU memory and parse it.
 */
 template <typename T>
-std::string LlamaWeight<T>::initializing(std::string weight_path) {
+std::string LlamaWeight<T>::initializing(std::string weight_path, GenerateConfig* gen_conf) {
   cudaStreamCreate(&stream);
   // If weight is of type pb, parse using proto parser.
   if (endswith(weight_path, ".hdf5")) {
@@ -318,8 +318,10 @@ std::string LlamaWeight<T>::initializing(std::string weight_path) {
     return "";
   } else {
     return "Unsupported weight extention for [" + weight_path +
-           "]; Supported extensions: .pb, .hdf5\n";
+           "]; Supported extensions: .hdf5\n";
   }
+  _gen_conf = gen_conf;
+  *gen_conf = GenerateConfig(-1, _eos_id, _padding_id, 1., _generate_method != "beam_search", _topp, _topk, _extra_decode_length);
 }
 #ifdef LIGHTSEQ_cuda
 template class LlamaWeight<__half>;

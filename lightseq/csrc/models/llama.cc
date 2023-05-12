@@ -3,6 +3,7 @@
 namespace lightseq {
 Llama::Llama(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"llama_out"}), _max_batch_size(max_batch_size) {
+  printf("*** model max_batch_size: %d ***\n", max_batch_size);
   /* --- step.1 initial context --- */
   Context::create_global_context(StatusType::Inference);
   _context_ptr = Context::global_instance();
@@ -10,11 +11,10 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   /* --- step.2 load model weights into GPU memory --- */
   // saved in custom proto file
   std::string model_weights_path = weight_path;
-  std::string res = tw_.initializing(model_weights_path);
+  std::string res = tw_.initializing(model_weights_path, _gen_conf);
   if (!res.empty()) {
     throw std::runtime_error(res);
   }
-  printf("*** model max_batch_size: %d ***\n", max_batch_size);
   _generate_method = get_generate_method(tw_._generate_method);
   if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
@@ -28,7 +28,7 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   int max_batch_tokens = tw_._max_step * _max_batch_size;
   _launch_llama_emb_layer.reset(new LaunchLlamaEmbLayer<OpType_>(
       max_batch_tokens, tw_._max_step, _max_batch_size, tw_._beam_size,
-      tw_._padding_id, tw_._hidden_size));
+      tw_._hidden_size));
   _launch_llama_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
 
   int enc_wei_offset = 0;
@@ -55,8 +55,8 @@ Llama::Llama(const std::string weight_path, const int max_batch_size)
   _generator_layer.reset(new GeneratorLayer<OpType_>(
       _generate_method, tw_._layer_num, max_batch_size, tw_._max_step,
       tw_._src_vocab_size, tw_._hidden_size, 1024, tw_._beam_size,
-      tw_._diverse_lambda, tw_._dim_per_head, tw_._eos_id, tw_._head_num,
-      tw_._length_penalty, tw_._topk, tw_._topp, false));
+      tw_._diverse_lambda, tw_._dim_per_head, tw_._head_num,
+      tw_._length_penalty, false));
 
   /* --- step.5 construct network --- */
   size_t cache_size = max_batch_tokens * tw_._beam_size * tw_._hidden_size;
@@ -143,7 +143,7 @@ void Llama::Infer() {
 #endif
 
   int steps = 0;
-  while (steps + prompt_len < tw_._max_step) {
+  while (steps + prompt_len < tw_._max_step && steps < _gen_conf->_max_new_tokens) {
     before_forward(batch_size, prompt_len, steps);
 
     _launch_llama_emb_layer->forward();
@@ -185,13 +185,13 @@ void Llama::Infer() {
 
   for (int batch_idx = 0; batch_idx < batch_size; batch_idx++) {
     for (int beam_idx = 0; beam_idx < tw_._beam_size; beam_idx++) {
+      int tmp_idx = batch_idx * tw_._beam_size + beam_idx;
       int *tmp_out_ptr = (_generate_method == GenerateMethod::BeamSearch)
                              ? _out_tokens->value<int>()
                              : _inp_tokens->value<int>();
       cudaMemcpyAsync(
-          _llama_out_ptr +
-              (batch_idx * tw_._beam_size + beam_idx) * (steps + prompt_len),
-          tmp_out_ptr + (batch_idx * tw_._beam_size + beam_idx) * tw_._max_step,
+          _llama_out_ptr + tmp_idx * (steps + prompt_len),
+          tmp_out_ptr + tmp_idx * tw_._max_step,
           (steps + prompt_len) * sizeof(int), cudaMemcpyDefault,
           _context_ptr->get_stream());
     }
@@ -246,6 +246,7 @@ std::vector<int> Llama::get_input_max_shape(int index) {
       break;
   }
 }
+
 std::vector<int> Llama::get_output_max_shape(int index) {
   switch (index) {
     case 0:

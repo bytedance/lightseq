@@ -38,6 +38,7 @@ class Context {
   // just for pybind interface.
   static std::unordered_map<std::string, std::shared_ptr<void>> pybind_layers;
   std::unordered_map<std::string, void*> _resources_pool;
+  GenerateConfig* _gen_config;
 
   std::vector<Node*> _all_node_vec{};
   std::vector<Operator*> _model_ops{};
@@ -70,6 +71,8 @@ class Context {
   virtual ~Context();
 
   AllocatorPtr allocator() { return _allocator_ptr; }
+  void set_generate_config(GenerateConfig* gen_conf) { _gen_config = gen_conf; }
+  GenerateConfig* generate_config() { return _gen_config; }
 
   void convert_into_train();
   void convert_into_eval();

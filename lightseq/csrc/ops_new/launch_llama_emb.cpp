@@ -35,6 +35,7 @@ void LaunchLlamaEmbOp<T>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
+  int pad_id = _context_ptr->generate_config()->_pad_id;
 
 #ifdef LIGHTSEQ_cuda
   cudaStream_t _stream = _context_ptr->get_stream();
@@ -45,7 +46,7 @@ void LaunchLlamaEmbOp<T>::forward() {
   cuda::launch_llama_embedding<T>(token_emb, inp_tokens, output_ptr,
                                   pad_mask_ptr, left_pad_len_ptr, _batch_size,
                                   _beam_size, _hidden_dim, _offset, _seq_len,
-                                  _max_step, _pad_id, _stream);
+                                  _max_step, pad_id, _stream);
 #endif
 }
 

@@ -26,11 +26,10 @@ class LaunchLlamaEmbOp : public Operator {
 
  public:
   LaunchLlamaEmbOp(size_t max_batch_tokens, int max_step, int max_batch_size,
-                   int beam_size, int pad_id, size_t hidden_dim)
+                   int beam_size, size_t hidden_dim)
       : Operator("LaunchLlamaEmbOp"),
         _max_batch_tokens(max_batch_tokens),
         _max_batch_size(max_batch_size),
-        _pad_id(pad_id),
         _max_step(max_step),
         _beam_size(beam_size),
         _hidden_dim(hidden_dim) {}
