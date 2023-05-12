@@ -16,7 +16,7 @@ std::tuple<Variable*, Variable*, Variable*> LaunchGptEmbOp<T>::operator()(
       new Variable("_pad_mask", _max_batch_tokens * _beam_size, g_dtype<T>());
 
   _left_pad_len = new Variable("_left_pad_len", _max_batch_size * _beam_size,
-                               g_dtype<int>(), cuda::DataType::kNotSupported,
+                               g_dtype<int>(), DataType::kNotSupported,
                                VariableType::RegressiveVariable);
 
   this->set_children({_result, _pad_mask, _left_pad_len});

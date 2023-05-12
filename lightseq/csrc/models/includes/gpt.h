@@ -10,7 +10,7 @@
 #include "generator_layer.h"
 
 namespace lightseq {
-namespace cuda {
+
 class Gpt : public LSModel {
  private:
   GptWeight<OpType_> tw_;
@@ -57,5 +57,4 @@ class Gpt : public LSModel {
 };
 
 LSMODEL_REGISTER(Gpt);
-}  // namespace cuda
 }  // namespace lightseq

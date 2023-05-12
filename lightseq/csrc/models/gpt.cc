@@ -1,7 +1,6 @@
 #include "gpt.h"
 
 namespace lightseq {
-namespace cuda {
 Gpt::Gpt(const std::string weight_path, const int max_batch_size)
     : LSModel({"token_ids"}, {"gpt_out", "gpt_scores"}),
       _max_batch_size(max_batch_size) {
@@ -316,5 +315,4 @@ DataType Gpt::get_output_dtype(int index) {
       break;
   }
 }
-}  // namespace cuda
 }  // namespace lightseq

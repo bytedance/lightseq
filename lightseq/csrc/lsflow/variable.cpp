@@ -2,8 +2,8 @@
 
 namespace lightseq {
 
-Variable::Variable(std::string name, cuda::DataType fw_dtype,
-                   cuda::DataType bw_dtype)
+Variable::Variable(std::string name, DataType fw_dtype,
+                   DataType bw_dtype)
     : Node(name, NodeType::Variable),
       _mx_shape_size(0),
       _fw_dtype(fw_dtype),
@@ -14,7 +14,7 @@ Variable::Variable(std::string name, cuda::DataType fw_dtype,
 }
 
 Variable::Variable(std::string name, size_t mx_shape_size,
-                   cuda::DataType fw_dtype, cuda::DataType bw_dtype,
+                   DataType fw_dtype, DataType bw_dtype,
                    VariableType vt)
     : Node(name, NodeType::Variable),
       _mx_shape_size(mx_shape_size),
@@ -22,7 +22,7 @@ Variable::Variable(std::string name, size_t mx_shape_size,
       _bw_dtype(bw_dtype),
       _variable_type(vt) {
   _value.reset(new Tensor("value", _fw_dtype, _mx_shape_size));
-  if (_context_ptr->is_training() && bw_dtype != cuda::DataType::kNotSupported)
+  if (_context_ptr->is_training() && bw_dtype != DataType::kNotSupported)
     _grad.reset(new Tensor("grad", _bw_dtype, _mx_shape_size));
   if (vt == VariableType::SharedVariable) {
     return;

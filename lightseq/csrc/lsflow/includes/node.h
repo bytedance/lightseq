@@ -88,8 +88,8 @@ class Variable : public Node {
   Variable* _parent_variable = nullptr;
   std::unordered_set<Variable*> _children_variable;
 
-  cuda::DataType _fw_dtype;
-  cuda::DataType _bw_dtype;
+  DataType _fw_dtype;
+  DataType _bw_dtype;
 
   // If mx_shape is constructed by default, then tensor's memory type is
   // FixedMemory or OffsetMemory.
@@ -103,8 +103,8 @@ class Variable : public Node {
  public:
   // Applicable to variables using fixed memory, usually as input or output
   // nodes of the entire network.
-  Variable(std::string name, cuda::DataType fw_dtype,
-           cuda::DataType bw_dtype = cuda::DataType::kNotSupported);
+  Variable(std::string name, DataType fw_dtype,
+           DataType bw_dtype = DataType::kNotSupported);
 
   /*
     Applicable to the situation of self-developed memory.
@@ -114,9 +114,9 @@ class Variable : public Node {
         to the op node that produces the var node.
       Shape   shape
         Represents the shape of the tensor recorded by the var node.
-      cuda::DataType      fw_dtype
+      DataType      fw_dtype
         Data type representing the forward pass tensor.
-      cuda::DataType      bw_dtype
+      DataType      bw_dtype
         Data type representing the backward pass tensor.
       VariableType  vt
         FixedVariable   - The memory is allocated by the var node itself.
@@ -126,8 +126,8 @@ class Variable : public Node {
     across steps in autoregressive models.
   */
   Variable(
-      std::string name, size_t mx_shape_size, cuda::DataType fw_dtype,
-      cuda::DataType bw_dtype = cuda::DataType::kNotSupported,
+      std::string name, size_t mx_shape_size, DataType fw_dtype,
+      DataType bw_dtype = DataType::kNotSupported,
       VariableType vt = VariableType::SharedVariable);  // for Shared memory
 
   /*
@@ -144,8 +144,8 @@ class Variable : public Node {
   virtual void forward() {}
   virtual void backward() {}
 
-  const cuda::DataType& fw_dtype() const { return _fw_dtype; }
-  const cuda::DataType& bw_dtype() const { return _bw_dtype; }
+  const DataType& fw_dtype() const { return _fw_dtype; }
+  const DataType& bw_dtype() const { return _bw_dtype; }
 
   // This method is to switch the current VariableType to FixedMemory.
   // This method will not execute the memory development logic internally,

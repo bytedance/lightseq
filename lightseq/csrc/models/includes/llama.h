@@ -11,7 +11,6 @@
 #include "generator_layer.h"
 
 namespace lightseq {
-namespace cuda {
 class Llama : public LSModel {
  private:
   LlamaWeight<OpType_> tw_;
@@ -57,5 +56,4 @@ class Llama : public LSModel {
 };
 
 LSMODEL_REGISTER(Llama);
-}  // namespace cuda
 }  // namespace lightseq

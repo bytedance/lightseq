@@ -10,7 +10,6 @@
 #include "crf_layer.h"
 
 namespace lightseq {
-namespace cuda {
 
 class BertCrf : public LSModel {
  private:
@@ -49,5 +48,4 @@ class BertCrf : public LSModel {
 
 LSMODEL_REGISTER(BertCrf);
 
-}  // namespace cuda
 }  // namespace lightseq

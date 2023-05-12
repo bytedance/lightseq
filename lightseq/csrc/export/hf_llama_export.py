@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
     arguments = ModelArguements(args)
     basename = os.path.basename(arguments.model_repo)
-    output_lightseq_model_name = "_".join(["lightseq_llama", basename, "7b"])
+    output_lightseq_model_name = "_".join(["lightseq_llama", basename, "13b"])
     # default eos_id from https://huggingface.co/transformers/model_doc/gpt2.html#gpt2lmheadmodel
 
     arguments.eos_id = 2  # need to set

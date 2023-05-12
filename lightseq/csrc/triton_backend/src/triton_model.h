@@ -290,7 +290,7 @@ ModelInstanceState::ModelInstanceState(
   cudaSetDevice(DeviceId());
 #endif
   lightseq_model_ptr_ = std::shared_ptr<::lightseq::cuda::LSModel>(
-      ::lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+      ::lightseq::LSModelFactory::GetInstance().CreateModel(
           model_state->GetModelType(), file_name,
           model_state_->MaxBatchSize()));
 

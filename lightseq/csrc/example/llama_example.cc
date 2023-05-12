@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  auto model = lightseq::cuda::LSModelFactory::GetInstance().CreateModel(
+  auto model = lightseq::LSModelFactory::GetInstance().CreateModel(
       "Llama", model_weights_path, 1);
 
   void* d_input;

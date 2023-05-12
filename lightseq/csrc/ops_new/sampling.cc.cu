@@ -33,7 +33,7 @@ std::tuple<Variable*, Variable*> SamplingOp<T>::operator()(
                                 g_dtype<int>());
 
   _seq_score = new Variable("seq_score", _max_batch_size, g_dtype<float>(),
-                            cuda::DataType::kNotSupported,
+                            DataType::kNotSupported,
                             VariableType::RegressiveVariable);
 
   set_children({_out_token_ids, _seq_score});

@@ -2,6 +2,7 @@
 #include "proto_headers.h"
 #include "proto_util.h"
 #include "hdf5_util.h"
+#include "model_base.h"
 
 namespace lightseq {
 
@@ -12,6 +13,7 @@ template <typename T>
 class LlamaWeight {
  private:
   cudaStream_t stream;
+  // GenerateConfig* _gen_config;
   T float2required(float value);
 
   // parsing function for hdf5

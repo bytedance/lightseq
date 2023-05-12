@@ -14,7 +14,6 @@
 #include "model_util.h"
 
 namespace lightseq {
-namespace cuda {
 class Transformer : public LSModel {
  private:
   TransformerWeight<OpType_> tw_;
@@ -76,5 +75,4 @@ class Transformer : public LSModel {
 };
 
 LSMODEL_REGISTER(Transformer);
-}  // namespace cuda
 }  // namespace lightseq
