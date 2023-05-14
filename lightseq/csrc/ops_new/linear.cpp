@@ -31,7 +31,6 @@ void LinearOp<T1, T2>::forward() {
   if (!_context_ptr->is_built()) {
     return;
   }
-  // _beta = float(0.);
 #ifdef LIGHTSEQ_cuda
   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
   cuda::cublas_gemm_ex(_cublasHandle, op_from_custom(_opA),
@@ -46,39 +45,39 @@ void LinearOp<T1, T2>::forward() {
 
 template <typename T1, typename T2>
 void LinearOp<T1, T2>::backward() {
-  float bw_alpha = 1. / _alpha;
-  float w_beta = (float)0.0, inp_beta = (float)0.0;
+//   float bw_alpha = 1. / _alpha;
+//   float w_beta = (float)0.0, inp_beta = (float)0.0;
 
-  T2* out_grad = (T2*)child(0)->grad();
-  T1* input_ptr = (T1*)parent(0)->value();
-  T1* weights = (T1*)parent(1)->value();
+//   T2* out_grad = (T2*)child(0)->grad();
+//   T1* input_ptr = (T1*)parent(0)->value();
+//   T1* weights = (T1*)parent(1)->value();
 
-  T2* inp_grad = (T2*)parent(0)->grad();
-  T2* weights_grad = (T2*)parent(1)->grad();
+//   T2* inp_grad = (T2*)parent(0)->grad();
+//   T2* weights_grad = (T2*)parent(1)->grad();
 
-  if (!parent(0)->is_cover()) {
-    inp_beta = (float)1.0;
-  }
+//   if (!parent(0)->is_cover()) {
+//     inp_beta = (float)1.0;
+//   }
 
-  if (!_context_ptr->is_built()) {
-    return;
-  }
+//   if (!_context_ptr->is_built()) {
+//     return;
+//   }
 
-#ifdef LIGHTSEQ_cuda
-  cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
-  // Q: how to adpat _opA & _opB
-  // calculate weights_grad
-  cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
-                       _output_size, _batch_tokens, &bw_alpha, &w_beta,
-                       input_ptr, out_grad, weights_grad,
-                       cublasGemmAlgo_t(_gemm_algos[1]));
+// #ifdef LIGHTSEQ_cuda
+//   cublasHandle_t _cublasHandle = _context_ptr->get_cublashandle();
+//   // Q: how to adpat _opA & _opB
+//   // calculate weights_grad
+//   cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, _input_size,
+//                        _output_size, _batch_tokens, &bw_alpha, &w_beta,
+//                        input_ptr, out_grad, weights_grad,
+//                        cublasGemmAlgo_t(_gemm_algos[1]));
 
-  // calculate inp_grad
-  cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
-                       _batch_tokens, _output_size, &bw_alpha, &inp_beta,
-                       weights, out_grad, inp_grad,
-                       cublasGemmAlgo_t(_gemm_algos[2]));
-#endif
+//   // calculate inp_grad
+//   cuda::cublas_gemm_ex(_cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, _input_size,
+//                        _batch_tokens, _output_size, &bw_alpha, &inp_beta,
+//                        weights, out_grad, inp_grad,
+//                        cublasGemmAlgo_t(_gemm_algos[2]));
+// #endif
 }
 
 template class LinearOp<float, float>;

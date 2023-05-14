@@ -13,8 +13,8 @@ class StridedBatchGemmOp : public Operator {
   size_t _k;
   size_t _max_ele_num;
   size_t _batch_heads;
-  float _alpha;
-  float _beta;
+  T1 _alpha;
+  T1 _beta;
   std::array<int, 3> _gemm_algos;
   int _max_seq;
   MATRIX_OP _opA;
@@ -29,8 +29,8 @@ class StridedBatchGemmOp : public Operator {
                      MATRIX_OP opA, MATRIX_OP opB)
       : Operator("StridedBatchGemmOp"),
         _max_ele_num(max_ele_num),
-        _alpha(param_alpha),
-        _beta(param_beta),
+        _alpha(__float2half_rn(param_alpha)),
+        _beta(__float2half_rn(param_beta)),
         _opA(opA),
         _opB(opB),
         _gemm_algos(std::array<int, 3>({99, 99, 99})) {}

@@ -274,6 +274,7 @@ std::vector<int> Gpt::get_input_max_shape(int index) {
       break;
   }
 }
+
 std::vector<int> Gpt::get_output_max_shape(int index) {
   switch (index) {
     case 0:

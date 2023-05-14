@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   std::chrono::duration<double> elapsed;
   int iter = 0;
   /* ---step5. infer and log--- */
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 2; i++) {
     auto start = std::chrono::high_resolution_clock::now();
     model->Infer();
     auto finish = std::chrono::high_resolution_clock::now();

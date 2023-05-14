@@ -144,7 +144,7 @@ void Llama::Infer() {
 #endif
 
   int steps = 0;
-  while (steps + prompt_len < tw_._max_step) {
+  while (steps < 512) {
     before_forward(batch_size, prompt_len, steps);
 
     _launch_llama_emb_layer->forward();
@@ -172,9 +172,9 @@ void Llama::Infer() {
 
     _generator_layer->forward();
 
-    if (_generator_layer->is_stop()) {
-      break;
-    }
+    // if (_generator_layer->is_stop()) {
+    //   break;
+    // }
     if (_generate_method == GenerateMethod::BeamSearch) {
       _generator_layer->refresh_cache(_total_caches_k, _total_caches_v);
       if (steps + prompt_len + 1 < tw_._max_step) {

@@ -13,8 +13,8 @@ class LinearOp : public Operator {
   size_t _batch_tokens;
   std::array<int, 3> _gemm_algos;
 
-  float _alpha;
-  float _beta;
+  T1 _alpha;
+  T1 _beta;
   MATRIX_OP _opA;
   MATRIX_OP _opB;
   bool _use_residual = false;
@@ -38,8 +38,9 @@ class LinearOp : public Operator {
         _opA(opA),
         _opB(opB),
         _gemm_algos(std::array<int, 3>({99, 99, 99})),
-        _alpha(alpha),
-        _beta(beta) {}
+        _alpha(__float2half_rn(alpha)),
+        _beta(__float2half_rn(beta)) 
+        {}
 
   ~LinearOp() {}
 
