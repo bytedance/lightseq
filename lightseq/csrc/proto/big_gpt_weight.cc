@@ -36,21 +36,29 @@ Read model config stored in custom hdf5 file.
 */
 template <typename T>
 void BigGptWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
-  _hidden_size = get_hdf5_dataset_size(hdf5_file, "src_embedding/norm_scale");
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/hidden_size", H5T_NATIVE_INT,
+                           &_hidden_size);
 
-  _inner_size =
-      get_hdf5_dataset_size(hdf5_file, "encoder_stack/0/ffn_first_kernel") /
-      _hidden_size;
+  try {
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/embed_size", H5T_NATIVE_INT,
+                          &_embed_size);
+  } catch (HDF5DatasetNotFoundError &e) {
+    _embed_size = 2560;
+  }
 
-  _max_step =
-      get_hdf5_dataset_size(hdf5_file, "src_embedding/position_embedding") /
-      _hidden_size;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/inner_size", H5T_NATIVE_INT,
+                           &_inner_size);
 
-  _src_vocab_size =
-      get_hdf5_dataset_size(hdf5_file, "src_embedding/token_embedding") /
-      _hidden_size;
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/max_step", H5T_NATIVE_INT,
+                           &_max_step);
 
-  read_hdf5_dataset_scalar(hdf5_file, "model_conf/n_encoder_stack",
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/head_num", H5T_NATIVE_INT,
+                           &_head_num);
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
+                           H5T_NATIVE_INT, &_padding_id);
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/layer_num",
                            H5T_NATIVE_INT, &_n_enc_layer);
 
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/head_num", H5T_NATIVE_INT,
@@ -58,33 +66,28 @@ void BigGptWeight<T>::hdf5_get_model_config(hid_t hdf5_file) {
 
   _dim_per_head = _hidden_size / _head_num;
 
-  _weight_per_enc_layer = 12;
-
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_padding_id",
                            H5T_NATIVE_INT, &_padding_id);
 
   // special handling for string reading
   // string were converted to numpy array of np.int8 in python
   // hence needed to be read as an char array here
-  char _sampling_method_buf[128];  // get 128 character for sampling method
-  int _sampling_method_strlen = read_hdf5_dataset_data(
-      hdf5_file, "model_conf/sampling_method", H5T_NATIVE_CHAR,
-      _sampling_method_buf, [](int size) { return size > 128; },
-      "Expect model_conf/sampling_method to have less than 128 characters.");
-  std::string _sampling_method_read =
-      std::string(_sampling_method_buf, _sampling_method_strlen);
-  if (_sampling_method_read != "") {
-    _sampling_method = _sampling_method_read;
+  char _generate_method_buf[128];  // get 128 character for sampling method
+  int _generate_method_strlen = read_hdf5_dataset_data(
+      hdf5_file, "model_conf/generate_method", H5T_NATIVE_CHAR,
+      _generate_method_buf, [](int size) { return size > 128; },
+      "Expect model_conf/generate_method to have less than 128 characters.");
+  std::string _generate_method_read =
+      std::string(_generate_method_buf, _generate_method_strlen);
+  if (_generate_method_read != "") {
+    _generate_method = _generate_method_read;
   }
 
-  int _extra_decode_length_read;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/extra_decode_length",
-                           H5T_NATIVE_INT, &_extra_decode_length_read);
-  if (_extra_decode_length_read > 0) {
-    _extra_decode_length = _extra_decode_length_read;
-  } else {
-    _extra_decode_length = _max_step;
-  }
+                           H5T_NATIVE_INT, &_extra_decode_length);
+
+  read_hdf5_dataset_scalar(hdf5_file, "model_conf/src_vocab_size",
+                           H5T_NATIVE_INT, &_src_vocab_size);
 
   int _topk_read;
   read_hdf5_dataset_scalar(hdf5_file, "model_conf/topk", H5T_NATIVE_INT,
@@ -142,65 +145,113 @@ Load the weights of embedding layer into GPU memory.
 template <typename T>
 void BigGptWeight<T>::hdf5_parse_emb_wei(hid_t hdf5_file) {
   std::string dataset_prefix = "src_embedding";
-  size_t value_size = _src_vocab_size * _hidden_size +
-                      _max_step * _hidden_size + _hidden_size * 2;
+  size_t value_size = size_t(_src_vocab_size) * _embed_size + _max_step * _embed_size + 
+                      _embed_size * _hidden_size + _hidden_size + _embed_size * _hidden_size + 
+                      _embed_size + _embed_size + _embed_size + size_t(_src_vocab_size) * _embed_size;
 
-  std::vector<int> offset;
-  std::vector<float> value(value_size);  // preallocate vector for performance
-  std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
+  std::vector<size_t> value_size_vec = {size_t(_src_vocab_size) * _embed_size, _max_step * _embed_size,
+                      _embed_size * _hidden_size, _hidden_size, _embed_size * _hidden_size, 
+                      _embed_size, _embed_size, _embed_size, size_t(_src_vocab_size) * _embed_size};
+
+  std::cout << "loading " << 1. * value_size * sizeof(T) / (1024 * 1024)
             << " MB of embedding weight." << std::endl;
-  int idx = 0;
 
-  const size_t max_buffer_size = std::max(_src_vocab_size, _max_step) * _hidden_size;
+  const size_t max_value_size = *max_element(value_size_vec.begin(), value_size_vec.end());;
+  std::vector<float> value(max_value_size);
   float* source_buffer;
   T* target_buffer;
-  cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
-  cudaMalloc(&target_buffer, max_buffer_size * sizeof(T));
+  cudaMalloc(&source_buffer, max_value_size * sizeof(float));
+  cudaMalloc(&target_buffer, max_value_size * sizeof(T));
   T* addr = nullptr;
   size_t buffer_size;
-
   
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/token_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) { return size != _src_vocab_size * _hidden_size; },
+       value.data(),
+      [=](int size) { return size != size_t(_src_vocab_size) * _embed_size; },
       "Wrong token_embedding_size !");
-  buffer_size = _src_vocab_size * _hidden_size;
+  buffer_size = size_t(_src_vocab_size) * _embed_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
   convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                           buffer_size, stream);
 
-
-  
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/position_embedding", H5T_NATIVE_FLOAT,
-      value.data() + idx,
-      [=](int size) { return size != _max_step * _hidden_size; },
+       value.data(),
+      [=](int size) { return size != _max_step * _embed_size; },
       "Wrong position_embedding_size !");
-  buffer_size = _max_step * _hidden_size;
+  buffer_size = _max_step * _embed_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
   convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                           buffer_size, stream);
 
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/pre_token_proj_weight", H5T_NATIVE_FLOAT,
+       value.data(), [=](int size) { return size != _hidden_size * _embed_size; },
+      "Wrong pre_token_proj_weight_size !");
+  buffer_size = _hidden_size * _embed_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
+
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/pre_token_proj_bias", H5T_NATIVE_FLOAT,
+       value.data(), [=](int size) { return size != _hidden_size; },
+      "Wrong pre_token_proj_bias_size !");
+  buffer_size = _hidden_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
+
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/post_token_proj_weight", H5T_NATIVE_FLOAT,
+       value.data(), [=](int size) { return size != _hidden_size * _embed_size; },
+      "Wrong post_token_proj_weight_size !");
+  buffer_size = _hidden_size * _embed_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
+
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/post_token_proj_bias", H5T_NATIVE_FLOAT,
+       value.data(), [=](int size) { return size != _embed_size; },
+      "Wrong post_token_proj_bias_size !");
+  buffer_size = _embed_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
   
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/norm_scale", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
+       value.data(), [=](int size) { return size != _embed_size; },
       "Wrong norm_scale_size !");
-  buffer_size = _hidden_size;
+  buffer_size = _embed_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
   convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                           buffer_size, stream);
 
-  
   read_hdf5_dataset_data(
       hdf5_file, dataset_prefix + "/norm_bias", H5T_NATIVE_FLOAT,
-      value.data() + idx, [=](int size) { return size != _hidden_size; },
+       value.data(), [=](int size) { return size != _embed_size; },
       "Wrong norm_bias_size !");
-  buffer_size = _hidden_size;
+  buffer_size = _embed_size;
+  addr = malloc_memory<T>(buffer_size);
+  _p_d_src_emb_wei.push_back(addr);
+  convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
+                          buffer_size, stream);
+
+  read_hdf5_dataset_data(
+      hdf5_file, dataset_prefix + "/logits_linear_weight", H5T_NATIVE_FLOAT,
+       value.data(), [=](int size) { return size != size_t(_src_vocab_size) * _embed_size; },
+      "Wrong logits_linear_weight_size !");
+  buffer_size = size_t(_src_vocab_size) * _embed_size;
   addr = malloc_memory<T>(buffer_size);
   _p_d_src_emb_wei.push_back(addr);
   convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
@@ -225,11 +276,8 @@ void BigGptWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
        _hidden_size * _inner_size + _inner_size + _hidden_size * _inner_size +
        _hidden_size) *
       _n_enc_layer;
-  std::vector<int> offset;
-  std::vector<float> value(value_size);
-  std::cout << "loading " << value_size * sizeof(T) / (1024 * 1024)
+  std::cout << "loading " << 1. * value_size * sizeof(T) / (1024 * 1024)
             << " MB of encoder weight." << std::endl;
-
 
   std::vector<size_t> value_size_vec =
       {_hidden_size * 2 , _hidden_size * _hidden_size * 3 , _hidden_size * 3 ,
@@ -238,159 +286,144 @@ void BigGptWeight<T>::hdf5_parse_enc_wei(hid_t hdf5_file) {
        _hidden_size};
   size_t max_value_size =  *max_element(value_size_vec.begin(), value_size_vec.end());
 
-
-  const size_t max_buffer_size = max_value_size;
+  std::vector<float> value(max_value_size);
   float* source_buffer;
   T* target_buffer;
-  cudaMalloc(&source_buffer, max_buffer_size * sizeof(float));
-  cudaMalloc(&target_buffer, max_buffer_size * sizeof(T));
+  cudaMalloc(&source_buffer, max_value_size * sizeof(float));
+  cudaMalloc(&target_buffer, max_value_size * sizeof(T));
   T* addr = nullptr;
   size_t buffer_size;
 
-
   int idx = 0;
   for (int layer_id = 0; layer_id < _n_enc_layer; ++layer_id) {
-    std::string dataset_prefix = "encoder_stack/" + std::to_string(layer_id);
+    std::string dataset_prefix = "decoder_layers/" + std::to_string(layer_id);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+         value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong multihead_norm_scale_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+         value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong multihead_norm_bias_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_FLOAT,  value.data(),
         [=](int size) { return size != _hidden_size * _hidden_size * 3; },
         "Wrong multihead_project_kernel_qkv_size !");
     buffer_size = _hidden_size * _hidden_size * 3;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
-
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_bias_qkv",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_FLOAT,  value.data(),
         [=](int size) { return size != _hidden_size * 3; },
         "Wrong multihead_project_bias_qkv_size !");
     buffer_size = _hidden_size * 3;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_kernel_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_FLOAT,  value.data(),
         [=](int size) { return size != _hidden_size * _hidden_size; },
         "Wrong multihead_project_kernel_output_size !");
     buffer_size = _hidden_size * _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
-
     
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/multihead_project_bias_output",
-        H5T_NATIVE_FLOAT, value.data() + idx,
+        H5T_NATIVE_FLOAT,  value.data(),
         [=](int size) { return size != _hidden_size; },
         "Wrong multihead_project_bias_output_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_norm_scale", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+         value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong ffn_norm_scale_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_norm_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+         value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong ffn_norm_bias_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_kernel", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+         value.data(),
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_first_kernel_size !");
     buffer_size = _hidden_size * _inner_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_first_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _inner_size; },
+         value.data(), [=](int size) { return size != _inner_size; },
         "Wrong ffn_first_bias_size !");
     buffer_size = _inner_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_second_kernel", H5T_NATIVE_FLOAT,
-        value.data() + idx,
+         value.data(),
         [=](int size) { return size != _hidden_size * _inner_size; },
         "Wrong ffn_second_kernel_size !");
     buffer_size = _hidden_size * _inner_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
 
-    
     read_hdf5_dataset_data(
         hdf5_file, dataset_prefix + "/ffn_second_bias", H5T_NATIVE_FLOAT,
-        value.data() + idx, [=](int size) { return size != _hidden_size; },
+         value.data(), [=](int size) { return size != _hidden_size; },
         "Wrong ffn_second_bias_size !");
     buffer_size = _hidden_size;
     addr = malloc_memory<T>(buffer_size);
-    _p_d_src_emb_wei.push_back(addr);
+    _p_d_enc_wei.push_back(addr);
     convert_dtype_by_gpu<T>(value.data(), source_buffer, target_buffer, addr,
                             buffer_size, stream);
-  }  // for
+  }
 
   value.clear();
   value.shrink_to_fit();
@@ -412,7 +445,9 @@ std::string BigGptWeight<T>::initializing(std::string weight_path) {
     if (hdf5_file < 0) {
       return "Unable to read HDF5 file from " + weight_path;
     }
+    printf("Running!\n");
     hdf5_get_model_config(hdf5_file);
+    print_model_config();
 
     // hdf5_parse_* would throw std::runtime_error on error
     hdf5_parse_emb_wei(hdf5_file);

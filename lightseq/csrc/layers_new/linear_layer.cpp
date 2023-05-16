@@ -5,16 +5,21 @@ namespace lightseq {
 template <typename T1, typename T2>
 LinearLayer<T1, T2>::LinearLayer(int max_batch_tokens, int input_size,
                                  int output_size, MATRIX_OP opA, MATRIX_OP opB,
-                                 float alpha)
+                                 float alpha, bool add_bias)
     : Layer("LinearLayer"),
       _max_batch_tokens(max_batch_tokens),
       _input_size(input_size),
       _output_size(output_size),
+      _add_bias(add_bias),
       // operators
       _linear(new LinearOp<T1, T2>(max_batch_tokens, output_size, input_size,
                                    opA, opB, alpha)) {
+  if (add_bias) {
+    _add2 = new FuseAdd2Op<T1, T2>(max_batch_tokens, output_size);
+  }
   // parameters node
   _linear_w = new Variable("_linear_w", g_dtype<T1>(), g_dtype<T2>());
+  _linear_b = new Variable("_linear_b", g_dtype<T1>(), g_dtype<T2>());
 
   this->_context_ptr->exit_layer();  // necessary
 }
@@ -23,6 +28,11 @@ template <typename T1, typename T2>
 Variable* LinearLayer<T1, T2>::operator()(Variable* inp) {
   set_inputs({inp});
   Variable* linear_out = (*_linear)(inp, _linear_w);
+  if (_add_bias) {
+    Variable* add_bias = (*_add2)(linear_out, _linear_b);
+    set_outputs({add_bias});
+    return add_bias;
+  }
 
   set_outputs({linear_out});
   return linear_out;
@@ -33,6 +43,8 @@ void LinearLayer<T1, T2>::before_forward(int batch_size, int seq_len) {
   int batch_tokens = batch_size * seq_len;
 
   _linear->before_forward(batch_tokens);
+  if(_add_bias)
+    _add2->before_forward(batch_size, seq_len);
 }
 
 template <typename T1, typename T2>
@@ -54,10 +66,15 @@ size_t LinearLayer<T1, T2>::load_para_and_grad(const T1* para_ptr,
 template <typename T1, typename T2>
 int LinearLayer<T1, T2>::load_params(const std::vector<const T1*>& para_vec,
                                      int offset) {  // for inference
+  printf("linear layer load params\n");
   int size = 0;
   _linear_w->set_value((char*)para_vec[offset + size]), size++;
   _linear_w->set_shape({_input_size, _output_size});
 
+  if(_add_bias){
+    _linear_b->set_value((char*)para_vec[offset + size]), size++;
+    _linear_b->set_shape({_output_size});
+  }
   return size;
 }
 

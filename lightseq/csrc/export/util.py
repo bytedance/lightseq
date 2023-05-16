@@ -104,17 +104,18 @@ class ModelArguements(object):
         config_file.close()
 
         self.padding_id = config.get("pad_token_id")
-        self.max_step = config.get("max_sequence_length")
-        self.hidden_size = config.get("hidden_size")
-        self.inner_size = config.get("intermediate_size")
-        self.head_num = config.get("num_attention_heads")
+        self.max_step = config.get("max_sequence_length") if "max_sequence_length" in config else config.get("n_positions")
+        self.hidden_size = config.get("hidden_size") 
+        self.inner_size = config.get("intermediate_size") if "intermediate_size" in config else config.get("n_inner")
+        self.head_num = config.get("num_attention_heads") if "num_attention_heads" in config else config.get("n_head")
         self.vocab_size = config.get("vocab_size")
-        self.layer_num = config.get("num_hidden_layers")
+        self.layer_num = config.get("num_hidden_layers") if "num_hidden_layers" in config else config.get("n_layer")
         self.extra_decode_length = (
             self.max_step
             if args.extra_decode_length is None
             else args.extra_decode_length
         )
+        self.embed_size = config.get("n_embd", None)
 
 
 def apply_rule(proto_name, ckpt_rule, tensor_names, state_dict):

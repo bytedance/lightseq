@@ -53,8 +53,8 @@ src_emb_mapping_dict = OrderedDict(
         "token_embedding": "wte",
         "position_embedding": "wpe",
         # manually process position_embedding to customize for max_step
-        "pre_token_project_weight": "pre_token_proj weight&&expression_.transpose(0, 1)",
-        "pre_token_project_bias": "pre_token_proj bias",
+        "pre_token_proj_weight": "pre_token_proj weight&&expression_.transpose(0, 1)",
+        "pre_token_proj_bias": "pre_token_proj bias",
         "post_token_proj_weight": "post_token_proj weight&&expression_.transpose(0, 1)",
         "post_token_proj_bias": "post_token_proj bias",
         "logits_linear_weight": "lm_head weight&&expression_.transpose(0, 1)",
@@ -73,6 +73,11 @@ def extract_llama_weights(
     enc_var_name_list = list(state_dict.keys())
     # print(enc_var_name_list)
 
+    s = ['transformer.wte.weight', 'transformer.wpe.weight', 'transformer.h.0.ln_1.weight', 'transformer.h.0.ln_1.bias', 'transformer.h.0.attn.bias', 'transformer.h.0.attn.masked_bias', 'transformer.h.0.attn.c_attn.weight', 'transformer.h.0.attn.c_attn.bias', 'transformer.h.0.attn.c_proj.weight', 'transformer.h.0.attn.c_proj.bias', 'transformer.h.0.ln_2.weight', 'transformer.h.0.ln_2.bias', 'transformer.h.0.mlp.c_fc.weight', 'transformer.h.0.mlp.c_fc.bias', 'transformer.h.0.mlp.c_proj.weight', 'transformer.h.0.mlp.c_proj.bias',
+'transformer.ln_f.weight', 'transformer.ln_f.bias', 'transformer.pre_token_proj.weight', 'transformer.pre_token_proj.bias', 'transformer.post_token_proj.weight', 'transformer.post_token_proj.bias', 'lm_head.weight'] 
+
+    for k in s:
+        print(k, state_dict[k].shape, state_dict[k].dtype)
     # exit(0)
 
     # initialize output file
@@ -91,6 +96,8 @@ def extract_llama_weights(
             continue
         layer_id = int(name_split[2])
         enc_tensor_names.setdefault(layer_id, []).append(name)
+
+    
 
     # fill encoder_stack
     # for layer_id in sorted(enc_tensor_names.keys()):
@@ -114,6 +121,9 @@ def extract_llama_weights(
     # save number of layers metadata
     hdf5_file.create_dataset(
         "model_conf/hidden_size", data=arguments.hidden_size, dtype="i4"
+    )
+    hdf5_file.create_dataset(
+        "model_conf/embed_size", data=arguments.embed_size, dtype="i4"
     )
     hdf5_file.create_dataset(
         "model_conf/inner_size", data=arguments.inner_size, dtype="i4"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "linear.h"
+#include "fuse_add2_op.h"
 #include "layer.h"
 
 namespace lightseq {
@@ -10,19 +11,22 @@ class LinearLayer : public Layer {
  private:
   // operators
   LinearOp<T1, T2>* _linear = nullptr;
+  FuseAdd2Op<T1, T2>* _add2 = nullptr;
 
   // parameters
   Variable* _linear_w;
+  Variable* _linear_b;
 
   // shape related
   int _max_batch_tokens;
   size_t _input_size;
   size_t _output_size;
+  bool _add_bias;
 
  public:
   LinearLayer(int max_batch_tokens, int input_size, int output_size,
               MATRIX_OP opA = MATRIX_OP::Transpose,
-              MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.));
+              MATRIX_OP opB = MATRIX_OP::NonTranspose, float alpha = float(1.), bool add_bias = false);
 
   virtual ~LinearLayer() {}
 

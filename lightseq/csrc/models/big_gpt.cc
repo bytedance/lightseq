@@ -17,7 +17,7 @@ BigGpt::BigGpt(const std::string weight_path, const int max_batch_size)
     throw std::runtime_error(res);
   }
   printf("*** model max_batch_size: %d ***\n", max_batch_size);
-  _generate_method = get_generate_method(tw_._sampling_method);
+  _generate_method = get_generate_method(tw_._generate_method);
   if (_generate_method != GenerateMethod::BeamSearch) {
     tw_._beam_size = 1;
   }
@@ -32,8 +32,13 @@ BigGpt::BigGpt(const std::string weight_path, const int max_batch_size)
   // initial LaunchEncEmb layer
   _launch_gpt_emb_layer.reset(new LaunchGptEmbLayer<OpType_>(
       max_batch_tokens, tw_._max_step, _max_batch_size, tw_._beam_size,
-      tw_._padding_id, tw_._hidden_size));
+      tw_._padding_id, tw_._embed_size));
   _launch_gpt_emb_layer->load_params(tw_.get_src_emb_wei(), 0);
+
+  _pre_linear_layer.reset(new LinearLayer<OpType_, OpType_>(
+      max_batch_size * tw_._beam_size, tw_._embed_size, tw_._hidden_size,
+      MATRIX_OP::Transpose, MATRIX_OP::NonTranspose, 1.f, true));
+  _linear_layer->load_params(tw_.get_src_emb_wei(), 2);
 
   // initial TransformerEncoder layers
   float attn_prob_dropout_ratio = 0.0;
@@ -50,16 +55,21 @@ BigGpt::BigGpt(const std::string weight_path, const int max_batch_size)
     _gpt_layers_vec.push_back(gpt_layer);
   }
 
+  _post_linear_layer.reset(new LinearLayer<OpType_, OpType_>(
+      max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._embed_size,
+      MATRIX_OP::Transpose, MATRIX_OP::NonTranspose, 1.f, true));
+  _linear_layer->load_params(tw_.get_src_emb_wei(), 4);
+
   // initial LayerNormalize layer
   _lyr_norm_layer.reset(new LyrNormalizeLayer<OpType_, OpType_>(
       max_batch_size * tw_._beam_size, tw_._hidden_size));
-  _lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 2);
+  _lyr_norm_layer->load_params(tw_.get_src_emb_wei(), 6);
 
   // intial Project hidden states to vocab logits
   _linear_layer.reset(new LinearLayer<OpType_, OpType_>(
-      max_batch_size * tw_._beam_size, tw_._hidden_size, tw_._src_vocab_size,
+      max_batch_size * tw_._beam_size, tw_._embed_size, tw_._src_vocab_size,
       MATRIX_OP::Transpose, MATRIX_OP::NonTranspose, 1.f));
-  _linear_layer->load_params(tw_.get_src_emb_wei(), 0);
+  _linear_layer->load_params(tw_.get_src_emb_wei(), 8);
 
   _generator_layer.reset(new GeneratorLayer<OpType_>(
       _generate_method, tw_._n_enc_layer, max_batch_size, tw_._max_step,
@@ -118,19 +128,23 @@ BigGpt::~BigGpt() {}
 void BigGpt::before_forward(int batch_size, int prompt_len, int steps) {
   if (steps == 0) {
     _launch_gpt_emb_layer->before_forward(batch_size, prompt_len, 0);
+    _pre_linear_layer->before_forward(batch_size * tw_._beam_size, prompt_len);
     for (auto iter : _gpt_layers_vec) {
       iter->before_forward(batch_size * tw_._beam_size, prompt_len, 0);
     }
+    _post_linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     _lyr_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
     _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     _generator_layer->before_forward(batch_size, prompt_len, 0);
   } else {
     _launch_gpt_emb_layer->before_forward(batch_size, 1,
                                           prompt_len + steps - 1);
+    _pre_linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     for (auto iter : _gpt_layers_vec) {
       iter->before_forward(batch_size * tw_._beam_size, 1,
                            prompt_len + steps - 1);
     }
+    _post_linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     _lyr_norm_layer->before_forward(batch_size * tw_._beam_size, 1);
     _linear_layer->before_forward(batch_size * tw_._beam_size, 1);
     _generator_layer->before_forward(batch_size, prompt_len, steps);
@@ -159,6 +173,7 @@ void BigGpt::Infer() {
     before_forward(batch_size, prompt_len, steps);
 
     _launch_gpt_emb_layer->forward();
+    _pre_linear_layer->forward();
     for (auto iter : _gpt_layers_vec) {
       iter->forward();
     }
@@ -178,8 +193,9 @@ void BigGpt::Infer() {
         }
       }
     }
-    _linear_layer->forward();
+    _post_linear_layer->forward();
     _lyr_norm_layer->forward();
+    _linear_layer->forward();
 
     _generator_layer->forward();
 

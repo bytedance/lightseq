@@ -45,9 +45,14 @@ message BigGptEmbeddingLayer {
   // so, look it up directly will get the input token embedding
   repeated float token_embedding = 1;
   repeated float position_embedding = 2;
+  repeated float pre_token_proj_weight = 3;
+  repeated float pre_token_proj_bias = 4;
+  repeated float post_token_proj_weight = 5;
+  repeated float post_token_proj_bias = 6;
   // the last layer_norm of encoder
-  repeated float norm_scale = 3;
-  repeated float norm_bias = 4;
+  repeated float norm_scale = 7;
+  repeated float norm_bias = 8;
+  repeated float logits_linear_weight = 9;
 }
 
 message BigGptModelConf {
